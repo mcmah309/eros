@@ -6,8 +6,8 @@ use eros::{Context, GenericError, OneOf};
 fn nesting_unit_context() {
     fn func1()  -> eros::Result<()> {
             return Err(eros::generic!("This is an issue"));
-            eros::bail!("This is an issue");
-            return Err(OneOf::new(GenericError::new("This is an issue"))).context("From func1");
+            // eros::bail!("This is an issue");
+            // return Err(OneOf::new(GenericError::new("This is an issue"))).context("From func1");
         }
 
     fn func2() -> Result<(), OneOf<(i32,GenericError)>> {
