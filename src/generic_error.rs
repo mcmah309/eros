@@ -1,6 +1,8 @@
 use std::{borrow::Cow, fmt};
 
-use crate::{string_kind::StringKind, ErrorUnion};
+use crate::{
+    string_kind::StringKind, type_set::{SupersetOf, TypeSet}, Cons, End, ErrorUnion
+};
 
 /// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
 /// type of issue. And context can be added at different levels in the call stack.
@@ -34,6 +36,15 @@ impl GenericCtxError {
     pub fn context<C: Into<StringKind>>(mut self, context: C) -> Self {
         self.context.push(context.into());
         self
+    }
+
+    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Cons<GenericError,End>, Index>,
+    {
+        let error: ErrorUnion<(GenericError,)> = self.into();
+        error.inflate()
     }
 }
 
@@ -89,6 +100,15 @@ impl GenericError {
 
     pub fn any(any: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
         GenericError::Source(any)
+    }
+
+    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Cons<GenericError,End>, Index>,
+    {
+        let error: ErrorUnion<(GenericError,)> = self.into();
+        error.inflate()
     }
 }
 
