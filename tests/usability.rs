@@ -39,12 +39,12 @@ fn retry() {
                 return Ok(());
             };
 
-            match err.narrow::<Timeout, _>() {
+            match err.deflate::<Timeout, _>() {
                 Ok(_timeout) => continue,
                 Err(allocation_oneof) => {
                     println!("didn't get Timeout, now trying to get NotEnoughMemory");
                     let allocation_oneof: ErrorUnion<(NotEnoughMemory,)> = allocation_oneof;
-                    let allocation = allocation_oneof.narrow::<NotEnoughMemory, _>().unwrap();
+                    let allocation = allocation_oneof.deflate::<NotEnoughMemory, _>().unwrap();
 
                     return Err(ErrorUnion::new(allocation));
                 }
@@ -62,7 +62,7 @@ fn does_stuff() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout)>> {
     // TODO Try impl after superset type work
     let _allocation = match allocates() {
         Ok(a) => a,
-        Err(e) => return Err(e.broaden()),
+        Err(e) => return Err(e.inflate()),
     };
 
     // TODO Try impl after superset type work
@@ -89,30 +89,30 @@ fn chats() -> Result<(), Timeout> {
 #[test]
 fn smoke() {
     let o_1: ErrorUnion<(u32, String)> = ErrorUnion::new(5_u32);
-    let _narrowed_1: u32 = o_1.narrow::<u32, _>().unwrap();
+    let _narrowed_1: u32 = o_1.deflate::<u32, _>().unwrap();
 
     let o_2: ErrorUnion<(String, u32)> = ErrorUnion::new(5_u32);
-    let _narrowed_2: u32 = o_2.narrow::<u32, _>().unwrap();
+    let _narrowed_2: u32 = o_2.deflate::<u32, _>().unwrap();
 
     let o_3: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
-    let _narrowed_3: ErrorUnion<(String,)> = o_3.narrow::<u32, _>().unwrap_err();
+    let _narrowed_3: ErrorUnion<(String,)> = o_3.deflate::<u32, _>().unwrap_err();
 
     let o_4: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
 
-    let _: String = o_4.narrow().unwrap();
+    let _: String = o_4.deflate().unwrap();
 
     let o_5: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
-    o_5.narrow::<String, _>().unwrap();
+    o_5.deflate::<String, _>().unwrap();
 
     let o_6: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
-    let o_7: ErrorUnion<(u32, String)> = o_6.broaden();
+    let o_7: ErrorUnion<(u32, String)> = o_6.inflate();
     let o_8: ErrorUnion<(String, u32)> = o_7.subset().unwrap();
     let _: ErrorUnion<(u32, String)> = o_8.subset().unwrap();
 
     let o_9: ErrorUnion<(u8, u16, u32)> = ErrorUnion::new(3_u32);
     let _: Result<ErrorUnion<(u16,)>, ErrorUnion<(u8, u32)>> = o_9.subset();
     let o_10: ErrorUnion<(u8, u16, u32)> = ErrorUnion::new(3_u32);
-    let _: Result<u16, ErrorUnion<(u8, u32)>> = o_10.narrow();
+    let _: Result<u16, ErrorUnion<(u8, u32)>> = o_10.deflate();
 }
 
 #[test]

@@ -9,11 +9,11 @@ fn error_union() {
         }
 
     fn func2() -> Result<(), ErrorUnion<(i32,std::io::Error)>> {
-        func1().context("From func2".to_string()).map_err(ErrorUnion::broaden)
+        func1().context("From func2".to_string()).map_err(ErrorUnion::inflate)
     }
 
     fn func3() -> eros::Result<(), (std::io::Error,i32,bool)> {
-        return func2().with_context(|| "From func3").map_err(ErrorUnion::broaden)
+        return func2().with_context(|| "From func3").map_err(ErrorUnion::inflate)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error,i32, bool)>> = func3();

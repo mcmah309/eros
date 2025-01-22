@@ -134,7 +134,7 @@ where
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `ErrorUnion` which does not contain that
     /// type as one of its possible variants.
-    pub fn narrow<Target, Index>(
+    pub fn deflate<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -159,7 +159,7 @@ where
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    pub fn broaden<Other, Index>(self) -> ErrorUnion<Other>
+    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
