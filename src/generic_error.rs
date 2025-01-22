@@ -56,10 +56,7 @@ impl From<&'static str> for GenericError {
 
 impl From<Cow<'static, str>> for GenericError {
     fn from(s: Cow<'static, str>) -> Self {
-        match s {
-            Cow::Borrowed(s) => GenericError::Msg(StringKind::Static(s)),
-            Cow::Owned(s) => GenericError::Msg(StringKind::Owned(s)),
-        }
+        GenericError::Msg(s.into())
     }
 }
 

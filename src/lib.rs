@@ -11,6 +11,7 @@ pub type GenericResult<T> = std::result::Result<T, ErrorUnion<(GenericError,)>>;
 
 pub use context::Context;
 pub use generic_error::GenericError;
+pub use string_kind::StringKind;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
 pub use error_union::ErrorUnion;

@@ -1,4 +1,4 @@
-use std::fmt::{self, Display};
+use std::{borrow::Cow, fmt::{self, Display}};
 
 #[derive(Debug)]
 pub enum StringKind {
@@ -42,5 +42,14 @@ impl From<&'static str> for StringKind {
 impl From<String> for StringKind {
     fn from(s: String) -> StringKind {
         StringKind::Owned(s)
+    }
+}
+
+impl From<Cow<'static, str>> for StringKind {
+    fn from(s: Cow<'static, str>) -> StringKind {
+        match s {
+            Cow::Borrowed(s) => StringKind::Static(s),
+            Cow::Owned(s) => StringKind::Owned(s),
+        }
     }
 }
