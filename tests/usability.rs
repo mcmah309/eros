@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use eros::U;
+use eros::ErrorUnion;
 
 // #[derive(Debug)]
 struct NotEnoughMemory;
@@ -33,7 +33,7 @@ impl Display for RetriesExhausted {
 
 #[test]
 fn retry() {
-    fn inner() -> Result<(), U<(NotEnoughMemory, RetriesExhausted)>> {
+    fn inner() -> Result<(), ErrorUnion<(NotEnoughMemory, RetriesExhausted)>> {
         for _ in 0..3 {
             let Err(err) = does_stuff() else {
                 return Ok(());
@@ -43,22 +43,22 @@ fn retry() {
                 Ok(_timeout) => continue,
                 Err(allocation_oneof) => {
                     println!("didn't get Timeout, now trying to get NotEnoughMemory");
-                    let allocation_oneof: U<(NotEnoughMemory,)> = allocation_oneof;
+                    let allocation_oneof: ErrorUnion<(NotEnoughMemory,)> = allocation_oneof;
                     let allocation = allocation_oneof.narrow::<NotEnoughMemory, _>().unwrap();
 
-                    return Err(U::new(allocation));
+                    return Err(ErrorUnion::new(allocation));
                 }
             }
         }
 
-        Err(U::new(RetriesExhausted))
+        Err(ErrorUnion::new(RetriesExhausted))
     }
 
     let inner = inner();
     print!("{:?}", inner);
 }
 
-fn does_stuff() -> Result<(), U<(NotEnoughMemory, Timeout)>> {
+fn does_stuff() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout)>> {
     // TODO Try impl after superset type work
     let _allocation = match allocates() {
         Ok(a) => a,
@@ -68,13 +68,13 @@ fn does_stuff() -> Result<(), U<(NotEnoughMemory, Timeout)>> {
     // TODO Try impl after superset type work
     let _chat = match chats() {
         Ok(c) => c,
-        Err(e) => return Err(U::new(e)),
+        Err(e) => return Err(ErrorUnion::new(e)),
     };
 
     Ok(())
 }
 
-fn allocates() -> Result<(), U<(NotEnoughMemory,)>> {
+fn allocates() -> Result<(), ErrorUnion<(NotEnoughMemory,)>> {
     let result: Result<(), NotEnoughMemory> = Err(NotEnoughMemory);
 
     result?;
@@ -88,31 +88,31 @@ fn chats() -> Result<(), Timeout> {
 
 #[test]
 fn smoke() {
-    let o_1: U<(u32, String)> = U::new(5_u32);
+    let o_1: ErrorUnion<(u32, String)> = ErrorUnion::new(5_u32);
     let _narrowed_1: u32 = o_1.narrow::<u32, _>().unwrap();
 
-    let o_2: U<(String, u32)> = U::new(5_u32);
+    let o_2: ErrorUnion<(String, u32)> = ErrorUnion::new(5_u32);
     let _narrowed_2: u32 = o_2.narrow::<u32, _>().unwrap();
 
-    let o_3: U<(String, u32)> = U::new("5".to_string());
-    let _narrowed_3: U<(String,)> = o_3.narrow::<u32, _>().unwrap_err();
+    let o_3: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
+    let _narrowed_3: ErrorUnion<(String,)> = o_3.narrow::<u32, _>().unwrap_err();
 
-    let o_4: U<(String, u32)> = U::new("5".to_string());
+    let o_4: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
 
     let _: String = o_4.narrow().unwrap();
 
-    let o_5: U<(String, u32)> = U::new("5".to_string());
+    let o_5: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
     o_5.narrow::<String, _>().unwrap();
 
-    let o_6: U<(String, u32)> = U::new("5".to_string());
-    let o_7: U<(u32, String)> = o_6.broaden();
-    let o_8: U<(String, u32)> = o_7.subset().unwrap();
-    let _: U<(u32, String)> = o_8.subset().unwrap();
+    let o_6: ErrorUnion<(String, u32)> = ErrorUnion::new("5".to_string());
+    let o_7: ErrorUnion<(u32, String)> = o_6.broaden();
+    let o_8: ErrorUnion<(String, u32)> = o_7.subset().unwrap();
+    let _: ErrorUnion<(u32, String)> = o_8.subset().unwrap();
 
-    let o_9: U<(u8, u16, u32)> = U::new(3_u32);
-    let _: Result<U<(u16,)>, U<(u8, u32)>> = o_9.subset();
-    let o_10: U<(u8, u16, u32)> = U::new(3_u32);
-    let _: Result<u16, U<(u8, u32)>> = o_10.narrow();
+    let o_9: ErrorUnion<(u8, u16, u32)> = ErrorUnion::new(3_u32);
+    let _: Result<ErrorUnion<(u16,)>, ErrorUnion<(u8, u32)>> = o_9.subset();
+    let o_10: ErrorUnion<(u8, u16, u32)> = ErrorUnion::new(3_u32);
+    let _: Result<u16, ErrorUnion<(u8, u32)>> = o_10.narrow();
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn debug() {
     use std::error::Error;
     use std::io;
 
-    let o_1: U<(u32, String)> = U::new(5_u32);
+    let o_1: ErrorUnion<(u32, String)> = ErrorUnion::new(5_u32);
 
     // Debug is implemented if all types in the type set implement Debug
     dbg!(&o_1);
@@ -131,12 +131,12 @@ fn debug() {
     type E = io::Error;
     let e = io::Error::new(io::ErrorKind::Other, "wuaaaaahhhzzaaaaaaaa");
 
-    let o_2: U<(E,)> = U::new(e);
+    let o_2: ErrorUnion<(E,)> = ErrorUnion::new(e);
 
     // std::error::Error is implemented if all types in the type set implement it
     dbg!(o_2.source());
 
-    let o_3: U<(u32, String)> = U::new("hey".to_string());
+    let o_3: ErrorUnion<(u32, String)> = ErrorUnion::new("hey".to_string());
     dbg!(o_3);
 }
 
@@ -144,7 +144,7 @@ fn debug() {
 fn multi_match() {
     use eros::E2;
 
-    let o_1: U<(u32, String)> = U::new(5_u32);
+    let o_1: ErrorUnion<(u32, String)> = ErrorUnion::new(5_u32);
 
     match o_1.as_enum() {
         E2::A(u) => {
@@ -172,11 +172,11 @@ fn multi_narrow() {
     struct Timeout {}
     struct Backoff {}
 
-    let o_1: U<(u8, u16, u32, u64, u128)> = U::new(5_u32);
+    let o_1: ErrorUnion<(u8, u16, u32, u64, u128)> = ErrorUnion::new(5_u32);
 
-    let _narrow_res: Result<U<(u8, u128)>, U<(u16, u32, u64)>> = o_1.subset();
+    let _narrow_res: Result<ErrorUnion<(u8, u128)>, ErrorUnion<(u16, u32, u64)>> = o_1.subset();
 
-    let o_2: U<(u8, u16, Backoff, Timeout, u32, u64, u128)> = U::new(Timeout {});
+    let o_2: ErrorUnion<(u8, u16, Backoff, Timeout, u32, u64, u128)> = ErrorUnion::new(Timeout {});
 
     match o_2.subset::<(Timeout, Backoff), _>().unwrap().to_enum() {
         E2::A(Timeout {}) => {

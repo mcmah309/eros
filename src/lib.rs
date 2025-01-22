@@ -1,18 +1,19 @@
 mod context;
 mod generic_error;
 mod macros;
-mod one_of;
-mod one_of_to_enum;
+mod error_union;
+mod error_union_to_enum;
 mod string_kind;
 mod type_set;
 
-pub type Result<T> = std::result::Result<T, U<(GenericError,)>>;
+pub type Result<T,E> = std::result::Result<T, ErrorUnion<E>>;
+pub type GenericResult<T> = std::result::Result<T, ErrorUnion<(GenericError,)>>;
 
 pub use context::Context;
 pub use generic_error::GenericError;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
-pub use one_of::U;
+pub use error_union::ErrorUnion;
 
 pub use type_set::{E1, E2, E3, E4, E5, E6, E7, E8, E9};
 

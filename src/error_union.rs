@@ -12,25 +12,25 @@ use crate::type_set::{
 
 use crate::{Cons, End};
 
-/* ------------------------- OneOf ----------------------- */
+/* ------------------------- ErrorUnion ----------------------- */
 
-/// `OneOf` is an open sum type. It differs from an enum
+/// `ErrorUnion` is an open sum type. It differs from an enum
 /// in that you do not need to define any actual new type
 /// in order to hold some specific combination of variants,
-/// but rather you simply describe the OneOf as holding
+/// but rather you simply describe the ErrorUnion as holding
 /// one value out of several specific possibilities,
 /// defined by using a tuple of those possible variants
-/// as the generic parameter for the `OneOf`.
+/// as the generic parameter for the `ErrorUnion`.
 ///
-/// For example, a `OneOf<(String, u32)>` contains either
+/// For example, a `ErrorUnion<(String, u32)>` contains either
 /// a `String` or a `u32`. The value over a simple `Result`
 /// or other traditional enum starts to become apparent in larger
 /// codebases where error handling needs to occur in
-/// different places for different errors. `OneOf` allows
+/// different places for different errors. `ErrorUnion` allows
 /// you to quickly specify a function's return value as
 /// involving a precise subset of errors that the caller
 /// can clearly reason about.
-pub struct U<E: TypeSet> {
+pub struct ErrorUnion<E: TypeSet> {
     pub(crate) value: Box<dyn Any>,
     pub(crate) backtrace: Backtrace,
     pub(crate) context: Vec<StringKind>,
@@ -44,16 +44,16 @@ fn _send_sync_error_assert() {
     fn is_sync<T: Sync>(_: &T) {}
     fn is_error<T: Error>(_: &T) {}
 
-    let o: U<(io::Error,)> = U::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    let o: ErrorUnion<(io::Error,)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
     is_send(&o);
     is_sync(&o);
     is_error(&o);
 }
 
-unsafe impl<T> Send for U<T> where T: TypeSet + Send {}
-unsafe impl<T> Sync for U<T> where T: TypeSet + Sync {}
+unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
+unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
 
-impl<T> Deref for U<(T,)>
+impl<T> Deref for ErrorUnion<(T,)>
 where
     T: 'static,
 {
@@ -64,16 +64,16 @@ where
     }
 }
 
-impl<T> From<T> for U<(T,)>
+impl<T> From<T> for ErrorUnion<(T,)>
 where
     T: 'static,
 {
-    fn from(t: T) -> U<(T,)> {
-        U::new(t)
+    fn from(t: T) -> ErrorUnion<(T,)> {
+        ErrorUnion::new(t)
     }
 }
 
-impl<E> fmt::Debug for U<E>
+impl<E> fmt::Debug for ErrorUnion<E>
 where
     E: TypeSet,
     E::Variants: fmt::Display + DisplayFold,
@@ -86,7 +86,7 @@ where
     }
 }
 
-impl<E> fmt::Display for U<E>
+impl<E> fmt::Display for ErrorUnion<E>
 where
     E: TypeSet,
     E::Variants: fmt::Display + DisplayFold,
@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<E> Error for U<E>
+impl<E> Error for ErrorUnion<E>
 where
     E: TypeSet,
     E::Variants: Error + DisplayFold + ErrorFold,
@@ -116,17 +116,17 @@ where
     }
 }
 
-impl<E> U<E>
+impl<E> ErrorUnion<E>
 where
     E: TypeSet,
 {
-    /// Create a new `OneOf`.
-    pub fn new<T, Index>(t: T) -> U<E>
+    /// Create a new `ErrorUnion`.
+    pub fn new<T, Index>(t: T) -> ErrorUnion<E>
     where
         T: Any,
         E::Variants: Contains<T, Index>,
     {
-        U {
+        ErrorUnion {
             value: Box::new(t),
             context: Vec::new(),
             backtrace: Backtrace::capture(),
@@ -134,14 +134,14 @@ where
         }
     }
 
-    /// Attempt to downcast the `OneOf` into a specific type, and
-    /// if that fails, return a `OneOf` which does not contain that
+    /// Attempt to downcast the `ErrorUnion` into a specific type, and
+    /// if that fails, return a `ErrorUnion` which does not contain that
     /// type as one of its possible variants.
     pub fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
-        U<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
         Target: 'static,
@@ -150,7 +150,7 @@ where
         if self.value.is::<Target>() {
             Ok(*self.value.downcast::<Target>().unwrap())
         } else {
-            Err(U {
+            Err(ErrorUnion {
                 value: self.value,
                 context: self.context,
                 backtrace: self.backtrace,
@@ -159,15 +159,15 @@ where
         }
     }
 
-    /// Turns the `OneOf` into a `OneOf` with a set of variants
+    /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    pub fn broaden<Other, Index>(self) -> U<Other>
+    pub fn broaden<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
-        U {
+        ErrorUnion {
             value: self.value,
             context: self.context,
             backtrace: self.backtrace,
@@ -175,28 +175,28 @@ where
         }
     }
 
-    /// Attempt to split a subset of variants out of the `OneOf`,
+    /// Attempt to split a subset of variants out of the `ErrorUnion`,
     /// returning the remainder of possible variants if the value
     /// does not have one of the `TargetList` types.
     pub fn subset<TargetList, Index>(
         self,
     ) -> Result<
-        U<TargetList>,
-        U<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
+        ErrorUnion<TargetList>,
+        ErrorUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
         TargetList: TypeSet,
         E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
     {
         if E::Variants::is_fold(&self.value) {
-            Ok(U {
+            Ok(ErrorUnion {
                 value: self.value,
                 context: self.context,
                 backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         } else {
-            Err(U {
+            Err(ErrorUnion {
                 value: self.value,
                 context: self.context,
                 backtrace: self.backtrace,
@@ -205,7 +205,7 @@ where
         }
     }
 
-    /// For a `OneOf` with a single variant, return
+    /// For a `ErrorUnion` with a single variant, return
     /// the contained value.
     pub fn take<Target>(self) -> Target
     where
@@ -215,7 +215,7 @@ where
         *self.value.downcast::<Target>().unwrap()
     }
 
-    /// Convert the `OneOf` to an owned enum for
+    /// Convert the `ErrorUnion` to an owned enum for
     /// use in pattern matching etc...
     pub fn to_enum(self) -> E::Enum
     where

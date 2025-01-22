@@ -1,31 +1,31 @@
-use super::{U, E1, E2, E3, E4, E5, E6, E7, E8, E9};
+use super::{ErrorUnion, E1, E2, E3, E4, E5, E6, E7, E8, E9};
 
 /* ------------------------- Enum conversions ----------------------- */
 
-impl<A> From<U<(A,)>> for E1<A>
+impl<A> From<ErrorUnion<(A,)>> for E1<A>
 where
     A: 'static,
 {
-    fn from(one_of: U<(A,)>) -> Self {
+    fn from(one_of: ErrorUnion<(A,)>) -> Self {
         E1::A(*one_of.value.downcast().unwrap())
     }
 }
 
-impl<'a, A> From<&'a U<(A,)>> for E1<&'a A>
+impl<'a, A> From<&'a ErrorUnion<(A,)>> for E1<&'a A>
 where
     A: 'static,
 {
-    fn from(one_of: &'a U<(A,)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A,)>) -> Self {
         E1::A(one_of.value.downcast_ref().unwrap())
     }
 }
 
-impl<A, B> From<U<(A, B)>> for E2<A, B>
+impl<A, B> From<ErrorUnion<(A, B)>> for E2<A, B>
 where
     A: 'static,
     B: 'static,
 {
-    fn from(one_of: U<(A, B)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B)>) -> Self {
         if one_of.value.is::<A>() {
             E2::A(*one_of.value.downcast().unwrap())
         } else {
@@ -34,12 +34,12 @@ where
     }
 }
 
-impl<'a, A, B> From<&'a U<(A, B)>> for E2<&'a A, &'a B>
+impl<'a, A, B> From<&'a ErrorUnion<(A, B)>> for E2<&'a A, &'a B>
 where
     A: 'static,
     B: 'static,
 {
-    fn from(one_of: &'a U<(A, B)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B)>) -> Self {
         if one_of.value.is::<A>() {
             E2::A(one_of.value.downcast_ref().unwrap())
         } else {
@@ -48,13 +48,13 @@ where
     }
 }
 
-impl<A, B, C> From<U<(A, B, C)>> for E3<A, B, C>
+impl<A, B, C> From<ErrorUnion<(A, B, C)>> for E3<A, B, C>
 where
     A: 'static,
     B: 'static,
     C: 'static,
 {
-    fn from(one_of: U<(A, B, C)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C)>) -> Self {
         if one_of.value.is::<A>() {
             E3::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -65,13 +65,13 @@ where
     }
 }
 
-impl<'a, A, B, C> From<&'a U<(A, B, C)>> for E3<&'a A, &'a B, &'a C>
+impl<'a, A, B, C> From<&'a ErrorUnion<(A, B, C)>> for E3<&'a A, &'a B, &'a C>
 where
     A: 'static,
     B: 'static,
     C: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C)>) -> Self {
         if one_of.value.is::<A>() {
             E3::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
@@ -82,14 +82,14 @@ where
     }
 }
 
-impl<A, B, C, D> From<U<(A, B, C, D)>> for E4<A, B, C, D>
+impl<A, B, C, D> From<ErrorUnion<(A, B, C, D)>> for E4<A, B, C, D>
 where
     A: 'static,
     B: 'static,
     C: 'static,
     D: 'static,
 {
-    fn from(one_of: U<(A, B, C, D)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C, D)>) -> Self {
         if one_of.value.is::<A>() {
             E4::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -102,14 +102,14 @@ where
     }
 }
 
-impl<'a, A, B, C, D> From<&'a U<(A, B, C, D)>> for E4<&'a A, &'a B, &'a C, &'a D>
+impl<'a, A, B, C, D> From<&'a ErrorUnion<(A, B, C, D)>> for E4<&'a A, &'a B, &'a C, &'a D>
 where
     A: 'static,
     B: 'static,
     C: 'static,
     D: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C, D)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C, D)>) -> Self {
         if one_of.value.is::<A>() {
             E4::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<A, B, C, D, E> From<U<(A, B, C, D, E)>> for E5<A, B, C, D, E>
+impl<A, B, C, D, E> From<ErrorUnion<(A, B, C, D, E)>> for E5<A, B, C, D, E>
 where
     A: 'static,
     B: 'static,
@@ -130,7 +130,7 @@ where
     D: 'static,
     E: 'static,
 {
-    fn from(one_of: U<(A, B, C, D, E)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C, D, E)>) -> Self {
         if one_of.value.is::<A>() {
             E5::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -145,7 +145,7 @@ where
     }
 }
 
-impl<'a, A, B, C, D, E> From<&'a U<(A, B, C, D, E)>> for E5<&'a A, &'a B, &'a C, &'a D, &'a E>
+impl<'a, A, B, C, D, E> From<&'a ErrorUnion<(A, B, C, D, E)>> for E5<&'a A, &'a B, &'a C, &'a D, &'a E>
 where
     A: 'static,
     B: 'static,
@@ -153,7 +153,7 @@ where
     D: 'static,
     E: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C, D, E)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C, D, E)>) -> Self {
         if one_of.value.is::<A>() {
             E5::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
@@ -168,7 +168,7 @@ where
     }
 }
 
-impl<A, B, C, D, E, F> From<U<(A, B, C, D, E, F)>> for E6<A, B, C, D, E, F>
+impl<A, B, C, D, E, F> From<ErrorUnion<(A, B, C, D, E, F)>> for E6<A, B, C, D, E, F>
 where
     A: 'static,
     B: 'static,
@@ -177,7 +177,7 @@ where
     E: 'static,
     F: 'static,
 {
-    fn from(one_of: U<(A, B, C, D, E, F)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C, D, E, F)>) -> Self {
         if one_of.value.is::<A>() {
             E6::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -194,7 +194,7 @@ where
     }
 }
 
-impl<'a, A, B, C, D, E, F> From<&'a U<(A, B, C, D, E, F)>>
+impl<'a, A, B, C, D, E, F> From<&'a ErrorUnion<(A, B, C, D, E, F)>>
     for E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F>
 where
     A: 'static,
@@ -204,7 +204,7 @@ where
     E: 'static,
     F: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C, D, E, F)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F)>) -> Self {
         if one_of.value.is::<A>() {
             E6::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
@@ -221,7 +221,7 @@ where
     }
 }
 
-impl<A, B, C, D, E, F, G> From<U<(A, B, C, D, E, F, G)>> for E7<A, B, C, D, E, F, G>
+impl<A, B, C, D, E, F, G> From<ErrorUnion<(A, B, C, D, E, F, G)>> for E7<A, B, C, D, E, F, G>
 where
     A: 'static,
     B: 'static,
@@ -231,7 +231,7 @@ where
     F: 'static,
     G: 'static,
 {
-    fn from(one_of: U<(A, B, C, D, E, F, G)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
         if one_of.value.is::<A>() {
             E7::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -250,7 +250,7 @@ where
     }
 }
 
-impl<'a, A, B, C, D, E, F, G> From<&'a U<(A, B, C, D, E, F, G)>>
+impl<'a, A, B, C, D, E, F, G> From<&'a ErrorUnion<(A, B, C, D, E, F, G)>>
     for E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G>
 where
     A: 'static,
@@ -261,7 +261,7 @@ where
     F: 'static,
     G: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C, D, E, F, G)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
         if one_of.value.is::<A>() {
             E7::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
@@ -280,7 +280,7 @@ where
     }
 }
 
-impl<A, B, C, D, E, F, G, H> From<U<(A, B, C, D, E, F, G, H)>> for E8<A, B, C, D, E, F, G, H>
+impl<A, B, C, D, E, F, G, H> From<ErrorUnion<(A, B, C, D, E, F, G, H)>> for E8<A, B, C, D, E, F, G, H>
 where
     A: 'static,
     B: 'static,
@@ -291,7 +291,7 @@ where
     G: 'static,
     H: 'static,
 {
-    fn from(one_of: U<(A, B, C, D, E, F, G, H)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
         if one_of.value.is::<A>() {
             E8::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -312,7 +312,7 @@ where
     }
 }
 
-impl<'a, A, B, C, D, E, F, G, H> From<&'a U<(A, B, C, D, E, F, G, H)>>
+impl<'a, A, B, C, D, E, F, G, H> From<&'a ErrorUnion<(A, B, C, D, E, F, G, H)>>
     for E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H>
 where
     A: 'static,
@@ -324,7 +324,7 @@ where
     G: 'static,
     H: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C, D, E, F, G, H)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
         if one_of.value.is::<A>() {
             E8::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
@@ -345,7 +345,7 @@ where
     }
 }
 
-impl<A, B, C, D, E, F, G, H, I> From<U<(A, B, C, D, E, F, G, H, I)>>
+impl<A, B, C, D, E, F, G, H, I> From<ErrorUnion<(A, B, C, D, E, F, G, H, I)>>
     for E9<A, B, C, D, E, F, G, H, I>
 where
     A: 'static,
@@ -358,7 +358,7 @@ where
     H: 'static,
     I: 'static,
 {
-    fn from(one_of: U<(A, B, C, D, E, F, G, H, I)>) -> Self {
+    fn from(one_of: ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
         if one_of.value.is::<A>() {
             E9::A(*one_of.value.downcast().unwrap())
         } else if one_of.value.is::<B>() {
@@ -381,7 +381,7 @@ where
     }
 }
 
-impl<'a, A, B, C, D, E, F, G, H, I> From<&'a U<(A, B, C, D, E, F, G, H, I)>>
+impl<'a, A, B, C, D, E, F, G, H, I> From<&'a ErrorUnion<(A, B, C, D, E, F, G, H, I)>>
     for E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I>
 where
     A: 'static,
@@ -394,7 +394,7 @@ where
     H: 'static,
     I: 'static,
 {
-    fn from(one_of: &'a U<(A, B, C, D, E, F, G, H, I)>) -> Self {
+    fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
         if one_of.value.is::<A>() {
             E9::A(one_of.value.downcast_ref().unwrap())
         } else if one_of.value.is::<B>() {
