@@ -1,10 +1,12 @@
-use one_error::{Context, GenericError, OneOf};
+use eros::{Context, GenericError, OneOf};
 
 
 
 #[test]
 fn nesting_unit_context() {
-    fn func1()  -> one_error::Result<()> {
+    fn func1()  -> eros::Result<()> {
+            return Err(eros::generic!("This is an issue"));
+            eros::bail!("This is an issue");
             return Err(OneOf::new(GenericError::new("This is an issue"))).context("From func1");
         }
 

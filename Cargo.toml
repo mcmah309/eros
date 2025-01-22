@@ -1,11 +1,11 @@
 [package]
-name = "one_error"
+name = "eros"
 version = "0.0.1"
 edition = "2021"
-documentation = "https://docs.rs/one_error/"
+documentation = "https://docs.rs/eros/"
 description = "ergonomic and precise error handling built atop type-level set arithmetic and stack context"
 license = "Apache-2.0"
-repository = "https://github.com/mcmah309/one_error"
+repository = "https://github.com/mcmah309/eros"
 categories = ["rust-patterns"]
 keywords = ["error", "error-handling", "type-level", "anonymous", "sum"]
 readme = "README.md"

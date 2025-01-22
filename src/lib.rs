@@ -1,5 +1,6 @@
 mod context;
 mod generic_error;
+mod macros;
 mod one_of;
 mod one_of_to_enum;
 mod string_kind;

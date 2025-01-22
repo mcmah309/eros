@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use one_error::OneOf;
+use eros::OneOf;
 
 // #[derive(Debug)]
 struct NotEnoughMemory;
@@ -142,7 +142,7 @@ fn debug() {
 
 #[test]
 fn multi_match() {
-    use one_error::E2;
+    use eros::E2;
 
     let o_1: OneOf<(u32, String)> = OneOf::new(5_u32);
 
@@ -167,7 +167,7 @@ fn multi_match() {
 
 #[test]
 fn multi_narrow() {
-    use one_error::E2;
+    use eros::E2;
 
     struct Timeout {}
     struct Backoff {}
