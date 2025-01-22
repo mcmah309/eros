@@ -1,13 +1,13 @@
 [package]
 name = "eros"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 documentation = "https://docs.rs/eros/"
-description = "ergonomic and precise error handling built atop type-level set arithmetic and stack context"
+description = "Context aware, ergonomic and precise error handling."
 license = "Apache-2.0"
 repository = "https://github.com/mcmah309/eros"
 categories = ["rust-patterns"]
-keywords = ["error", "error-handling", "type-level", "anonymous", "sum"]
+keywords = ["error", "error-handling"]
 readme = "README.md"
 
 [dev-dependencies]
