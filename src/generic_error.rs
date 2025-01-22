@@ -72,7 +72,7 @@ where
     }
 }
 
-// Needs specialization to work
+// Dev Note: May need some sort of specialization to work. For now all the std lib are implemented explicitly below
 // impl<T> From<T> for GenericError where T: std::error::Error + Send + Sync + 'static {
 //     fn from(e: Box<T>) -> Self {
 //         GenericError::Source(Box::new(e))
