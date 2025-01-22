@@ -1,0 +1,34 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+{
+	"name": "rust",
+	"image": "rust",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				// general tools
+				"chunsen.bracket-select",
+				"dzhavat.bracket-pair-toggler",
+				"oderwat.indent-rainbow",
+				"fabiospampinato.vscode-git-history",
+				"streetsidesoftware.code-spell-checker",
+				"rebornix.toggle", // used in settings.json to add a toggle for inlay hints in rust - `ctrl+q`
+				// language support tools
+				"fill-labs.dependi", // dependency validation in Cargo.toml
+				// lsp, compilers, debuggers
+				"timonwong.shellcheck", // sh lsp
+				"tamasfe.even-better-toml", // toml lsp
+				"rust-lang.rust-analyzer", // rust lsp
+				"vadimcn.vscode-lldb", // rust debugger
+			]
+		}
+	},
+	"mounts": [
+		// ssh
+		"source=/home/henry/.ssh/,target=/root/.ssh,type=bind",
+	],
+	"runArgs": [
+		"--privileged",
+		"--net=host",
+	],
+	"remoteUser": "root",
+}
