@@ -1,4 +1,3 @@
-//! Type-level set inclusion and difference, inspired by frunk's approach: <https://archive.is/YwDMX>
 use core::any::Any;
 use core::fmt;
 use std::error::Error;
@@ -84,80 +83,31 @@ where
 
 /* ------------------------- Debug support ----------------------- */
 
-pub trait DebugFold {
-    fn debug_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
-}
+// pub trait DebugFold {
+//     fn debug_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
+// }
 
-impl DebugFold for End {
-    fn debug_fold(_: &Box<dyn Any>, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!("debug_fold called on End");
-    }
-}
+// impl DebugFold for End {
+//     fn debug_fold(_: &Box<dyn Any>, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         // unreachable!("debug_fold called on End");
+//         Ok(())
+//     }
+// }
 
-impl<Head, Tail> DebugFold for Cons<Head, Tail>
-where
-    Cons<Head, Tail>: fmt::Debug,
-    Head: 'static + fmt::Debug,
-    Tail: DebugFold,
-{
-    fn debug_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.fmt(formatter)
-        } else {
-            Tail::debug_fold(any, formatter)
-        }
-    }
-}
-
-/* ------------------------- Clone support ----------------------- */
-
-pub trait CloneFold {
-    fn clone_fold(any: &Box<dyn Any>) -> Box<dyn Any>;
-}
-
-impl Clone for End {
-    fn clone(&self) -> End {
-        unreachable!("clone called for End");
-    }
-}
-
-impl<Head, Tail> Clone for Cons<Head, Tail>
-where
-    Head: 'static + Clone,
-    Tail: CloneFold,
-{
-    fn clone(&self) -> Self {
-        unreachable!("clone called for Cons which is not constructable");
-    }
-}
-
-impl CloneFold for End {
-    fn clone_fold(_: &Box<dyn Any>) -> Box<dyn Any> {
-        unreachable!("clone_fold called on End");
-    }
-}
-
-impl<Head, Tail> CloneFold for Cons<Head, Tail>
-where
-    Head: 'static + Clone,
-    Tail: CloneFold,
-{
-    fn clone_fold(any: &Box<dyn Any>) -> Box<dyn Any> {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
-            Box::new(head_ref.clone())
-        } else {
-            Tail::clone_fold(any)
-        }
-    }
-}
-
-fn _clone_test() {
-    fn is_clone<T: Clone>() {}
-
-    type T0 = <(String, u32) as TypeSet>::Variants;
-
-    is_clone::<T0>();
-}
+// impl<Head, Tail> DebugFold for Cons<Head, Tail>
+// where
+//     Cons<Head, Tail>: fmt::Debug,
+//     Head: 'static + fmt::Debug,
+//     Tail: DebugFold,
+// {
+//     fn debug_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         if let Some(head_ref) = any.downcast_ref::<Head>() {
+//             head_ref.fmt(formatter)
+//         } else {
+//             Tail::debug_fold(any, formatter)
+//         }
+//     }
+// }
 
 /* ------------------------- Any::is support ----------------------- */
 
@@ -198,62 +148,92 @@ pub trait TypeSet {
 impl TypeSet for () {
     type Variants = End;
     type Enum = E0;
-    type EnumRef<'a> = E0 where Self: 'a;
+    type EnumRef<'a>
+        = E0
+    where
+        Self: 'a;
 }
 
 impl<A> TypeSet for (A,) {
     type Variants = Cons<A, End>;
     type Enum = E1<A>;
-    type EnumRef<'a> = E1<&'a A> where Self: 'a;
+    type EnumRef<'a>
+        = E1<&'a A>
+    where
+        Self: 'a;
 }
 
 impl<A, B> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
     type Enum = E2<A, B>;
-    type EnumRef<'a> = E2<&'a A, &'a B> where Self: 'a;
+    type EnumRef<'a>
+        = E2<&'a A, &'a B>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C> TypeSet for (A, B, C) {
     type Variants = Cons<A, Cons<B, Cons<C, End>>>;
     type Enum = E3<A, B, C>;
-    type EnumRef<'a> = E3<&'a A, &'a B, &'a C> where Self: 'a;
+    type EnumRef<'a>
+        = E3<&'a A, &'a B, &'a C>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C, D> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
     type Enum = E4<A, B, C, D>;
-    type EnumRef<'a> = E4<&'a A, &'a B, &'a C, &'a D> where Self: 'a;
+    type EnumRef<'a>
+        = E4<&'a A, &'a B, &'a C, &'a D>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>;
     type Enum = E5<A, B, C, D, E>;
-    type EnumRef<'a> = E5<&'a A, &'a B, &'a C, &'a D, &'a E> where Self: 'a;
+    type EnumRef<'a>
+        = E5<&'a A, &'a B, &'a C, &'a D, &'a E>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
     type Enum = E6<A, B, C, D, E, F>;
-    type EnumRef<'a> = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F> where Self: 'a;
+    type EnumRef<'a>
+        = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>;
     type Enum = E7<A, B, C, D, E, F, G>;
-    type EnumRef<'a> = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G> where Self: 'a;
+    type EnumRef<'a>
+        = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
     type Enum = E8<A, B, C, D, E, F, G, H>;
-    type EnumRef<'a> = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H> where Self: 'a;
+    type EnumRef<'a>
+        = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H>
+    where
+        Self: 'a;
 }
 
 impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
     type Variants =
         Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
     type Enum = E9<A, B, C, D, E, F, G, H, I>;
-    type EnumRef<'a> = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I> where Self: 'a;
+    type EnumRef<'a>
+        = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I>
+    where
+        Self: 'a;
 }
 
 /* ------------------------- TupleForm implemented for TypeSet ----------------------- */

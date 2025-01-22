@@ -1,13 +1,35 @@
+
+
+use std::fmt::Display;
+
 use one_error::OneOf;
 
-#[derive(Debug)]
+// #[derive(Debug)]
 struct NotEnoughMemory;
 
-#[derive(Debug)]
+impl Display for NotEnoughMemory {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "Not enough memory")
+    }
+}
+
+// #[derive(Debug)]
 struct Timeout;
 
-#[derive(Debug)]
+impl Display for Timeout {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "Timeout")
+    }
+}
+
+// #[derive(Debug)]
 struct RetriesExhausted;
+
+impl Display for RetriesExhausted {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "Retries exhausted")
+    }
+}
 
 #[test]
 fn retry() {
@@ -32,7 +54,8 @@ fn retry() {
         Err(OneOf::new(RetriesExhausted))
     }
 
-    let _ = dbg!(inner());
+    let inner = inner();
+    print!("{:?}", inner);
 }
 
 fn does_stuff() -> Result<(), OneOf<(NotEnoughMemory, Timeout)>> {

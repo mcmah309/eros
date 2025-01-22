@@ -9,3 +9,6 @@ repository = "https://github.com/mcmah309/one_error"
 categories = ["rust-patterns"]
 keywords = ["error", "error-handling", "type-level", "anonymous", "sum"]
 readme = "README.md"
+
+[dev-dependencies]
+anyhow="1"

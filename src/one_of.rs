@@ -2,11 +2,12 @@ use core::any::Any;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
+use std::backtrace::Backtrace;
 use std::error::Error;
 
+use crate::string_kind::StringKind;
 use crate::type_set::{
-    CloneFold, Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm,
-    TypeSet,
+    Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
 };
 
 use crate::{Cons, End};
@@ -31,6 +32,8 @@ use crate::{Cons, End};
 /// can clearly reason about.
 pub struct OneOf<E: TypeSet> {
     pub(crate) value: Box<dyn Any>,
+    pub(crate) backtrace: Backtrace,
+    pub(crate) context: Vec<StringKind>,
     _pd: PhantomData<E>,
 }
 
@@ -70,27 +73,16 @@ where
     }
 }
 
-impl<E> Clone for OneOf<E>
-where
-    E: TypeSet,
-    E::Variants: Clone + CloneFold,
-{
-    fn clone(&self) -> Self {
-        let value = E::Variants::clone_fold(&self.value);
-
-        OneOf {
-            value,
-            _pd: PhantomData,
-        }
-    }
-}
 impl<E> fmt::Debug for OneOf<E>
 where
     E: TypeSet,
-    E::Variants: fmt::Debug + DebugFold,
+    E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::debug_fold(&self.value, formatter)
+        fmt::Display::fmt(self, formatter)?;
+        write!(formatter, "\n\nBacktrace:\n")?;
+        fmt::Display::fmt(&self.backtrace, formatter)?;
+        Ok(())
     }
 }
 
@@ -100,14 +92,24 @@ where
     E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::display_fold(&self.value, formatter)
+        E::Variants::display_fold(&self.value, formatter)?;
+        if !self.context.is_empty() {
+            if !self.value.is::<()>() {
+                write!(formatter, "\n\n")?;
+            }
+            write!(formatter, "Context:")?;
+            for context_item in self.context.iter() {
+                write!(formatter, "\n    - {}", context_item)?;
+            }
+        }
+        Ok(())
     }
 }
 
 impl<E> Error for OneOf<E>
 where
     E: TypeSet,
-    E::Variants: Error + DebugFold + DisplayFold + ErrorFold,
+    E::Variants: Error + DisplayFold + ErrorFold,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         E::Variants::source_fold(&self.value)
@@ -126,6 +128,8 @@ where
     {
         OneOf {
             value: Box::new(t),
+            context: Vec::new(),
+            backtrace: Backtrace::capture(),
             _pd: PhantomData,
         }
     }
@@ -148,6 +152,8 @@ where
         } else {
             Err(OneOf {
                 value: self.value,
+                context: self.context,
+                backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         }
@@ -163,6 +169,8 @@ where
     {
         OneOf {
             value: self.value,
+            context: self.context,
+            backtrace: self.backtrace,
             _pd: PhantomData,
         }
     }
@@ -183,11 +191,15 @@ where
         if E::Variants::is_fold(&self.value) {
             Ok(OneOf {
                 value: self.value,
+                context: self.context,
+                backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         } else {
             Err(OneOf {
                 value: self.value,
+                context: self.context,
+                backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         }

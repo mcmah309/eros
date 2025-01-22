@@ -1,6 +1,14 @@
+mod context;
+mod generic_error;
 mod one_of;
 mod one_of_to_enum;
+mod string_kind;
 mod type_set;
+
+pub type Result<T> = std::result::Result<T, OneOf<(GenericError,)>>;
+
+pub use context::Context;
+pub use generic_error::GenericError;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
 pub use one_of::OneOf;
