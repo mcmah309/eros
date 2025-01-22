@@ -1,27 +1,19 @@
 use std::fmt::{self, Display};
 
 #[derive(Debug)]
-pub(crate) enum StringKind {
+pub enum StringKind {
     Static(&'static str),
     Owned(String),
 }
 
-// impl StringKind {
-//     pub fn string(string: impl Into<StringKind>) -> StringKind {
-//         string.into()
-//     }
-
-//     pub fn str(string: impl Into<&'static str>) -> StringKind {
-//         StringKind::Static(string.into())
-//     }
-
-//     pub fn as_str(&self) -> &str {
-//         match self {
-//             StringKind::Static(s) => s,
-//             StringKind::Owned(s) => s,
-//         }
-//     }
-// }
+impl StringKind {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StringKind::Static(s) => s,
+            StringKind::Owned(s) => s,
+        }
+    }
+}
 
 impl Display for StringKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

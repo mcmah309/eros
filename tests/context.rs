@@ -1,11 +1,13 @@
-use eros::{Context, GenericError, ErrorUnion};
+use eros::{Context, ErrorUnion, GenericError, GenericResult};
 
 
 
 #[test]
 fn nesting_unit_context() {
     fn func1()  -> eros::GenericResult<()> {
-            return Err(eros::generic!("This is an issue"));
+            return Err(eros::generic!(std::io::Error::new(std::io::ErrorKind::AddrInUse,"Address in use message here")));
+            // return Err(GenericError::msg("This is an issue").into());
+            // eros::bail!(std::io::Error::new(std::io::ErrorKind::AddrInUse,"Address in use message here"))
             // eros::bail!("This is an issue");
             // return Err(ErrorUnion::new(GenericError::new("This is an issue"))).context("From func1");
         }
@@ -39,6 +41,25 @@ fn nesting_error_context() {
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error,i32, bool)>> = func3();
+    // println!("{}", result.unwrap_err());
+    println!("{}", result.unwrap_err());
+}
+
+#[test]
+fn nesting_generic_error() {
+    fn func1()  -> GenericResult<()>{
+        eros::bail!("This is a bailing message");
+    }
+
+    fn func2() -> eros::Result<(), (GenericError,)> {
+        func1().context("From func2".to_string()).map_err(ErrorUnion::broaden)
+    }
+
+    fn func3() -> Result<(), ErrorUnion<(GenericError,i32,bool)>> {
+        return func2().with_context(|| "From func3").map_err(ErrorUnion::broaden)
+    }
+
+    let result: Result<(), ErrorUnion<(GenericError,i32, bool)>> = func3();
     // println!("{}", result.unwrap_err());
     println!("{}", result.unwrap_err());
 }
