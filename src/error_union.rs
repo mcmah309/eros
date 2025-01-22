@@ -94,12 +94,9 @@ where
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         E::Variants::display_fold(&self.value, formatter)?;
         if !self.context.is_empty() {
-            if !self.value.is::<()>() {
-                write!(formatter, "\n\n")?;
-            }
-            write!(formatter, "Context:")?;
+            write!(formatter, "\n\nContext:")?;
             for context_item in self.context.iter() {
-                write!(formatter, "\n    - {}", context_item)?;
+                write!(formatter, "\n\t- {}", context_item)?;
             }
         }
         Ok(())

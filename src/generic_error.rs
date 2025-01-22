@@ -1,8 +1,76 @@
 use std::{borrow::Cow, fmt};
 
-use crate::string_kind::StringKind;
+use crate::{string_kind::StringKind, ErrorUnion};
 
-/// A generic error for when you wish to propagate information about an issue, but the caller would not care about
+/// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
+/// type of issue. And context can be added at different levels in the call stack.
+#[derive(Debug)]
+pub struct GenericCtxError {
+    source: GenericError,
+    pub(crate) context: Vec<StringKind>,
+}
+
+impl GenericCtxError {
+    pub fn new(source: GenericError) -> Self {
+        Self {
+            source,
+            context: Vec::new(),
+        }
+    }
+
+    pub fn msg(message: impl Into<StringKind>) -> Self {
+        Self::new(GenericError::msg(message))
+    }
+
+    pub fn source<T: std::error::Error + Send + Sync + 'static>(source: T) -> Self {
+        Self::new(GenericError::source(source))
+    }
+
+    pub fn any(any: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+        Self::new(GenericError::any(any))
+    }
+
+    /// Adds additional context.
+    pub fn context<C: Into<StringKind>>(mut self, context: C) -> Self {
+        self.context.push(context.into());
+        self
+    }
+}
+
+impl fmt::Display for GenericCtxError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.source)?;
+        if !self.context.is_empty() {
+            write!(formatter, "\n\nContext:")?;
+            for context_item in self.context.iter() {
+                write!(formatter, "\n\t- {}", context_item)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for GenericCtxError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source.source()
+    }
+}
+
+impl From<GenericError> for GenericCtxError {
+    fn from(e: GenericError) -> Self {
+        Self::new(e)
+    }
+}
+
+impl From<GenericCtxError> for ErrorUnion<(GenericError,)> {
+    fn from(mut value: GenericCtxError) -> Self {
+        let mut error: ErrorUnion<(GenericError,)> = ErrorUnion::new(value.source);
+        error.context.append(&mut value.context);
+        error
+    }
+}
+
+/// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
 /// the type of issue.
 #[derive(Debug)]
 pub enum GenericError {

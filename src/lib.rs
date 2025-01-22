@@ -7,9 +7,10 @@ mod string_kind;
 mod type_set;
 
 pub type Result<T,E> = std::result::Result<T, ErrorUnion<E>>;
-pub type GenericResult<T> = std::result::Result<T, ErrorUnion<(GenericError,)>>;
+pub type GenericResult<T> = std::result::Result<T, GenericCtxError>;
 
 pub use context::Context;
+pub use generic_error::GenericCtxError;
 pub use generic_error::GenericError;
 pub use string_kind::StringKind;
 
