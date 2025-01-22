@@ -9,19 +9,11 @@ use crate::{Cons, End, Recurse};
 
 pub trait ErrorFold {
     fn source_fold(any: &Box<dyn Any>) -> Option<&(dyn Error + 'static)>;
-
-    #[cfg(feature = "error_provide")]
-    fn provide_fold<'a>(any: &'a Box<dyn Any>, request: &mut std::error::Request<'a>);
 }
 
 impl ErrorFold for End {
     fn source_fold(_: &Box<dyn Any>) -> Option<&(dyn Error + 'static)> {
         unreachable!("source_fold called on End");
-    }
-
-    #[cfg(feature = "error_provide")]
-    fn provide_fold<'a>(_: &Box<dyn Any>, _: &mut std::error::Request<'a>) {
-        unreachable!("provide_fold called on End");
     }
 }
 
@@ -43,15 +35,6 @@ where
             head_ref.source()
         } else {
             Tail::source_fold(any)
-        }
-    }
-
-    #[cfg(feature = "error_provide")]
-    fn provide_fold<'a>(any: &'a Box<dyn Any>, request: &mut std::error::Request<'a>) {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.provide(request)
-        } else {
-            Tail::provide_fold(any, request)
         }
     }
 }
