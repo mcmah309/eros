@@ -30,7 +30,7 @@ use crate::{Cons, End};
 /// you to quickly specify a function's return value as
 /// involving a precise subset of errors that the caller
 /// can clearly reason about.
-pub struct OneOf<E: TypeSet> {
+pub struct U<E: TypeSet> {
     pub(crate) value: Box<dyn Any>,
     pub(crate) backtrace: Backtrace,
     pub(crate) context: Vec<StringKind>,
@@ -44,16 +44,16 @@ fn _send_sync_error_assert() {
     fn is_sync<T: Sync>(_: &T) {}
     fn is_error<T: Error>(_: &T) {}
 
-    let o: OneOf<(io::Error,)> = OneOf::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    let o: U<(io::Error,)> = U::new(io::Error::new(io::ErrorKind::Other, "yooo"));
     is_send(&o);
     is_sync(&o);
     is_error(&o);
 }
 
-unsafe impl<T> Send for OneOf<T> where T: TypeSet + Send {}
-unsafe impl<T> Sync for OneOf<T> where T: TypeSet + Sync {}
+unsafe impl<T> Send for U<T> where T: TypeSet + Send {}
+unsafe impl<T> Sync for U<T> where T: TypeSet + Sync {}
 
-impl<T> Deref for OneOf<(T,)>
+impl<T> Deref for U<(T,)>
 where
     T: 'static,
 {
@@ -64,16 +64,16 @@ where
     }
 }
 
-impl<T> From<T> for OneOf<(T,)>
+impl<T> From<T> for U<(T,)>
 where
     T: 'static,
 {
-    fn from(t: T) -> OneOf<(T,)> {
-        OneOf::new(t)
+    fn from(t: T) -> U<(T,)> {
+        U::new(t)
     }
 }
 
-impl<E> fmt::Debug for OneOf<E>
+impl<E> fmt::Debug for U<E>
 where
     E: TypeSet,
     E::Variants: fmt::Display + DisplayFold,
@@ -86,7 +86,7 @@ where
     }
 }
 
-impl<E> fmt::Display for OneOf<E>
+impl<E> fmt::Display for U<E>
 where
     E: TypeSet,
     E::Variants: fmt::Display + DisplayFold,
@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<E> Error for OneOf<E>
+impl<E> Error for U<E>
 where
     E: TypeSet,
     E::Variants: Error + DisplayFold + ErrorFold,
@@ -116,17 +116,17 @@ where
     }
 }
 
-impl<E> OneOf<E>
+impl<E> U<E>
 where
     E: TypeSet,
 {
     /// Create a new `OneOf`.
-    pub fn new<T, Index>(t: T) -> OneOf<E>
+    pub fn new<T, Index>(t: T) -> U<E>
     where
         T: Any,
         E::Variants: Contains<T, Index>,
     {
-        OneOf {
+        U {
             value: Box::new(t),
             context: Vec::new(),
             backtrace: Backtrace::capture(),
@@ -141,7 +141,7 @@ where
         self,
     ) -> Result<
         Target,
-        OneOf<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+        U<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
         Target: 'static,
@@ -150,7 +150,7 @@ where
         if self.value.is::<Target>() {
             Ok(*self.value.downcast::<Target>().unwrap())
         } else {
-            Err(OneOf {
+            Err(U {
                 value: self.value,
                 context: self.context,
                 backtrace: self.backtrace,
@@ -162,12 +162,12 @@ where
     /// Turns the `OneOf` into a `OneOf` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    pub fn broaden<Other, Index>(self) -> OneOf<Other>
+    pub fn broaden<Other, Index>(self) -> U<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
-        OneOf {
+        U {
             value: self.value,
             context: self.context,
             backtrace: self.backtrace,
@@ -181,22 +181,22 @@ where
     pub fn subset<TargetList, Index>(
         self,
     ) -> Result<
-        OneOf<TargetList>,
-        OneOf<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
+        U<TargetList>,
+        U<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
         TargetList: TypeSet,
         E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
     {
         if E::Variants::is_fold(&self.value) {
-            Ok(OneOf {
+            Ok(U {
                 value: self.value,
                 context: self.context,
                 backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         } else {
-            Err(OneOf {
+            Err(U {
                 value: self.value,
                 context: self.context,
                 backtrace: self.backtrace,
