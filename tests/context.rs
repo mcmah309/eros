@@ -26,7 +26,7 @@ fn generic_context_error_to_error_union() {
         return Err(GenericCtxError::msg("This is root error message"))
     }
 
-    fn func2() -> Result<(), GenericCtxError> {
+    fn func2() -> eros::GenericResult<()> {
         func1().context("Generic context")
     }
 
@@ -38,21 +38,34 @@ fn generic_context_error_to_error_union() {
     println!("{}", result.unwrap_err());
 }
 
-// #[test]
-// fn nesting_generic_error() {
-//     fn func1()  -> GenericResult<()>{
-//         eros::bail!("This is a bailing message");
-//     }
+#[test]
+fn generic_error_to_error_union() {
+    fn func1()  -> Result<(), GenericError>{
+        return Err(GenericError::msg("This is root error message"))
+    }
 
-//     fn func2() -> eros::Result<(), (GenericError,)> {
-//         func1().context("From func2".to_string()).map_err(ErrorUnion::broaden)
-//     }
+    fn func2() -> Result<(), ErrorUnion<(std::io::Error,GenericError)>> {
+        func1().map_err(GenericError::inflate).context("Error union context")
+    }
 
-//     fn func3() -> Result<(), ErrorUnion<(GenericError,i32,bool)>> {
-//         return func2().with_context(|| "From func3").map_err(ErrorUnion::broaden)
-//     }
+    let result: Result<(), ErrorUnion<(std::io::Error,GenericError)>> = func2();
+    println!("{}", result.unwrap_err());
+}
 
-//     let result: Result<(), ErrorUnion<(GenericError,i32, bool)>> = func3();
-//     // println!("{}", result.unwrap_err());
-//     println!("{}", result.unwrap_err());
-// }
+#[test]
+fn bail() {
+    fn func1()  -> GenericResult<()>{
+        eros::bail!("This is a bailing message");
+    }
+
+    fn func2() -> eros::Result<(), (GenericError,)> {
+        func1().context("From func2".to_string()).map_err(GenericCtxError::inflate)
+    }
+
+    fn func3() -> Result<(), ErrorUnion<(GenericError,i32,bool)>> {
+        return func2().with_context(|| "From func3").map_err(ErrorUnion::inflate)
+    }
+
+    let result: Result<(), ErrorUnion<(GenericError,i32, bool)>> = func3();
+    println!("{}", result.unwrap_err());
+}
