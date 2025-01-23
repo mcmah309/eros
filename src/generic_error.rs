@@ -1,14 +1,16 @@
-use std::{borrow::Cow, fmt};
+use std::{backtrace::Backtrace, borrow::Cow, fmt};
 
 use crate::{
-    string_kind::StringKind, type_set::{SupersetOf, TypeSet}, Cons, End, ErrorUnion
+    string_kind::StringKind,
+    type_set::{SupersetOf, TypeSet},
+    Cons, End, ErrorUnion,
 };
 
 /// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
 /// type of issue. And context can be added at different levels in the call stack.
-#[derive(Debug)]
 pub struct GenericCtxError {
     source: GenericError,
+    backtrace: Backtrace,
     pub(crate) context: Vec<StringKind>,
 }
 
@@ -16,6 +18,7 @@ impl GenericCtxError {
     pub fn new(source: GenericError) -> Self {
         Self {
             source,
+            backtrace: Backtrace::capture(),
             context: Vec::new(),
         }
     }
@@ -41,7 +44,7 @@ impl GenericCtxError {
     pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<GenericError,End>, Index>,
+        Other::Variants: SupersetOf<Cons<GenericError, End>, Index>,
     {
         let error: ErrorUnion<(GenericError,)> = self.into();
         error.inflate()
@@ -61,6 +64,21 @@ impl fmt::Display for GenericCtxError {
     }
 }
 
+impl fmt::Debug for GenericCtxError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.source)?;
+        if !self.context.is_empty() {
+            write!(formatter, "\n\nContext:")?;
+            for context_item in self.context.iter() {
+                write!(formatter, "\n\t- {}", context_item)?;
+            }
+        }
+        write!(formatter, "\n\nBacktrace:\n")?;
+        fmt::Display::fmt(&self.backtrace, formatter)?;
+        Ok(())
+    }
+}
+
 impl std::error::Error for GenericCtxError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source.source()
@@ -74,9 +92,9 @@ impl From<GenericError> for GenericCtxError {
 }
 
 impl From<GenericCtxError> for ErrorUnion<(GenericError,)> {
-    fn from(mut value: GenericCtxError) -> Self {
-        let mut error: ErrorUnion<(GenericError,)> = ErrorUnion::new(value.source);
-        error.context.append(&mut value.context);
+    fn from(value: GenericCtxError) -> Self {
+        let error: ErrorUnion<(GenericError,)> =
+            ErrorUnion::new_internal(value.source, value.context, value.backtrace);
         error
     }
 }
@@ -105,7 +123,7 @@ impl GenericError {
     pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<GenericError,End>, Index>,
+        Other::Variants: SupersetOf<Cons<GenericError, End>, Index>,
     {
         let error: ErrorUnion<(GenericError,)> = self.into();
         error.inflate()

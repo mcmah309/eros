@@ -17,7 +17,8 @@ fn error_union() {
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error,i32, bool)>> = func3();
-    println!("{}", result.unwrap_err());
+    println!("{:?}", result.unwrap_err());
+    // println!("{}", result.unwrap_err());
 }
 
 #[test]
@@ -35,7 +36,8 @@ fn generic_context_error_to_error_union() {
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error,GenericError)>> = func3();
-    println!("{}", result.unwrap_err());
+    println!("{:?}", result.unwrap_err());
+    // println!("{}", result.unwrap_err());
 }
 
 #[test]
@@ -49,7 +51,8 @@ fn generic_error_to_error_union() {
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error,GenericError)>> = func2();
-    println!("{}", result.unwrap_err());
+    println!("{:?}", result.unwrap_err());
+    // println!("{}", result.unwrap_err());
 }
 
 #[test]
@@ -67,5 +70,6 @@ fn bail() {
     }
 
     let result: Result<(), ErrorUnion<(GenericError,i32, bool)>> = func3();
-    println!("{}", result.unwrap_err());
+    println!("{:?}", result.unwrap_err());
+    // println!("{}", result.unwrap_err());
 }

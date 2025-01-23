@@ -131,6 +131,19 @@ where
         }
     }
 
+    pub(crate) fn new_internal<T, Index>(t: T, context: Vec<StringKind>, backtrace: Backtrace) -> ErrorUnion<E>
+    where
+        T: Any,
+        E::Variants: Contains<T, Index>,
+    {
+        ErrorUnion {
+            value: Box::new(t),
+            context,
+            backtrace,
+            _pd: PhantomData,
+        }
+    }
+
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `ErrorUnion` which does not contain that
     /// type as one of its possible variants.
