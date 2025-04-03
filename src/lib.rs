@@ -12,6 +12,7 @@ pub type GenericResult<T> = std::result::Result<T, GenericCtxError>;
 pub use context::Context;
 pub use generic_error::GenericCtxError;
 pub use generic_error::GenericError;
+pub use generic_error::Generalize;
 pub use string_kind::StringKind;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
