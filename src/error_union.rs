@@ -2,15 +2,13 @@ use core::any::Any;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
-use std::backtrace::Backtrace;
 use std::error::Error;
 
-use crate::str::Str;
 use crate::type_set::{
     Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
 };
 
-use crate::{Cons, End};
+use crate::{Cons, End, TracedError};
 
 /* ------------------------- ErrorUnion ----------------------- */
 
@@ -35,8 +33,6 @@ use crate::{Cons, End};
 /// throughout the call chain.
 pub struct ErrorUnion<E: TypeSet> {
     pub(crate) value: Box<dyn Any>,
-    pub(crate) backtrace: Backtrace,
-    pub(crate) context: Vec<Str>,
     _pd: PhantomData<E>,
 }
 
@@ -83,8 +79,6 @@ where
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, formatter)?;
-        write!(formatter, "\n\nBacktrace:\n")?;
-        fmt::Display::fmt(&self.backtrace, formatter)?;
         Ok(())
     }
 }
@@ -96,12 +90,6 @@ where
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         E::Variants::display_fold(&self.value, formatter)?;
-        if !self.context.is_empty() {
-            write!(formatter, "\n\nContext:")?;
-            for context_item in self.context.iter() {
-                write!(formatter, "\n\t- {}", context_item)?;
-            }
-        }
         Ok(())
     }
 }
@@ -128,25 +116,6 @@ where
     {
         ErrorUnion {
             value: Box::new(t),
-            context: Vec::new(),
-            backtrace: Backtrace::capture(),
-            _pd: PhantomData,
-        }
-    }
-
-    pub(crate) fn new_internal<T, Index>(
-        t: T,
-        context: Vec<Str>,
-        backtrace: Backtrace,
-    ) -> ErrorUnion<E>
-    where
-        T: Any,
-        E::Variants: Contains<T, Index>,
-    {
-        ErrorUnion {
-            value: Box::new(t),
-            context,
-            backtrace,
             _pd: PhantomData,
         }
     }
@@ -169,8 +138,6 @@ where
         } else {
             Err(ErrorUnion {
                 value: self.value,
-                context: self.context,
-                backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         }
@@ -186,8 +153,6 @@ where
     {
         ErrorUnion {
             value: self.value,
-            context: self.context,
-            backtrace: self.backtrace,
             _pd: PhantomData,
         }
     }
@@ -208,15 +173,11 @@ where
         if E::Variants::is_fold(&self.value) {
             Ok(ErrorUnion {
                 value: self.value,
-                context: self.context,
-                backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         } else {
             Err(ErrorUnion {
                 value: self.value,
-                context: self.context,
-                backtrace: self.backtrace,
                 _pd: PhantomData,
             })
         }
@@ -251,8 +212,10 @@ where
     }
 }
 
+//************************************************************************//
+
 /// Run inflate and deflate directly on Results with ErrorUnions
-pub trait FlateResult<S, E>
+pub trait InflateResult<S, E>
 where
     E: TypeSet,
 {
@@ -263,7 +226,13 @@ where
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>;
+}
 
+/// Run inflate and deflate directly on Results with ErrorUnions
+pub trait DeflateResult<S, E>
+where
+    E: TypeSet,
+{
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `Result` with the `ErrorUnion` wither the remainder
     /// which does not contain that type as one of its possible variants.
@@ -281,7 +250,7 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> FlateResult<S, E> for Result<S, ErrorUnion<E>>
+impl<S, E> InflateResult<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
@@ -292,7 +261,12 @@ where
     {
         self.map_err(|e| e.inflate())
     }
+}
 
+impl<S, E> DeflateResult<S, E> for Result<S, ErrorUnion<E>>
+where
+    E: TypeSet,
+{
     fn deflate<Target, Index>(
         self,
     ) -> Result<
@@ -313,5 +287,15 @@ where
                 Err(err) => Err(Err(err)),
             },
         }
+    }
+}
+
+pub trait IntoUnionResult<S> {
+    fn union(self) -> Result<S, ErrorUnion<(TracedError,)>>;
+}
+
+impl<S> IntoUnionResult<S> for Result<S, TracedError> {
+    fn union(self) -> Result<S, ErrorUnion<(TracedError,)>> {
+        self.map_err(|e| e.inflate())
     }
 }

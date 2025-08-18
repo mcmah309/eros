@@ -14,11 +14,12 @@ pub type AnyResult<T> = std::result::Result<T, AnyError>;
 pub type AResult<T> = AnyResult<T>;
 
 pub use context::Context;
-pub use error_union::FlateResult;
+pub use error_union::InflateResult;
+pub use error_union::DeflateResult;
+pub use error_union::IntoUnionResult;
 pub use generic_error::TracedError;
+pub use generic_error::IntoTraced;
 pub use generic_error::AnyError;
-pub use generic_error::GenericResult;
-pub use generic_error::GenericError;
 pub use str::Str;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.

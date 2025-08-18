@@ -10,7 +10,7 @@ use crate::{
 /// type of issue. And context can be added at different levels in the call stack.
 pub struct TracedError {
     source: AnyError,
-    backtrace: Backtrace,
+    pub(crate) backtrace: Backtrace,
     pub(crate) context: Vec<Str>,
 }
 
@@ -44,9 +44,9 @@ impl TracedError {
     pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
+        Other::Variants: SupersetOf<Cons<TracedError, End>, Index>,
     {
-        let error: ErrorUnion<(AnyError,)> = self.into();
+        let error: ErrorUnion<(TracedError,)> = self.into();
         error.inflate()
     }
 }
@@ -88,14 +88,6 @@ impl std::error::Error for TracedError {
 impl From<AnyError> for TracedError {
     fn from(e: AnyError) -> Self {
         Self::new(e)
-    }
-}
-
-impl From<TracedError> for ErrorUnion<(AnyError,)> {
-    fn from(value: TracedError) -> Self {
-        let error: ErrorUnion<(AnyError,)> =
-            ErrorUnion::new_internal(value.source, value.context, value.backtrace);
-        error
     }
 }
 
@@ -150,6 +142,10 @@ impl AnyError {
         let error: ErrorUnion<(AnyError,)> = self.into();
         error.inflate()
     }
+
+    pub fn traced(self) -> TracedError {
+        TracedError::new(self)
+    }
 }
 
 impl fmt::Display for AnyError {
@@ -195,54 +191,19 @@ impl From<Cow<'static, str>> for AnyError {
 //     }
 // }
 
-/// Turn any Result into a Result with a generic Error
-pub trait GenericResult<S> {
-    fn any(self) -> Result<S, AnyError>;
 
-    fn traced(self) -> Result<S, TracedError>;
-
-    fn union(self) -> Result<S, ErrorUnion<(AnyError,)>>;
+pub trait IntoTraced<O> {
+    fn traced(self) -> O;
 }
 
-impl<S, E> GenericResult<S> for Result<S, E>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn any(self) -> Result<S, AnyError> {
-        self.map_err(AnyError::source)
-    }
-
+impl<S> IntoTraced<Result<S, TracedError>> for Result<S, AnyError> {
     fn traced(self) -> Result<S, TracedError> {
-        self.map_err(TracedError::source)
-    }
-
-    fn union(self) -> Result<S, ErrorUnion<(AnyError,)>> {
-        self.map_err(|e| ErrorUnion::new(AnyError::source(e)))
+        self.map_err(TracedError::new)
     }
 }
 
-/// Turn any Error into a generic Error
-pub trait GenericError {
-    fn any(self) -> AnyError;
-
-    fn traced(self) -> TracedError;
-
-    fn union(self) -> ErrorUnion<(AnyError,)>;
-}
-
-impl<E> GenericError for E
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn any(self) -> AnyError {
-        AnyError::source(self)
-    }
-
+impl<E> IntoTraced<TracedError> for E where E: std::error::Error + Send + Sync + 'static {
     fn traced(self) -> TracedError {
         TracedError::source(self)
-    }
-
-    fn union(self) -> ErrorUnion<(AnyError,)> {
-        ErrorUnion::new(AnyError::source(self))
     }
 }

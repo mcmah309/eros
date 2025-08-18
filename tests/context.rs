@@ -1,6 +1,5 @@
 use eros::{
-    AnyError, Context, ErrorUnion, FlateResult, GenericError, GenericResult, TracedError,
-    TracedResult,
+    AnyError, Context, DeflateResult, ErrorUnion, InflateResult, IntoTraced, IntoUnionResult, TracedError, TracedResult
 };
 
 #[test]
@@ -46,13 +45,11 @@ fn generic_context_error_to_error_union() {
         func1().context("Generic context")
     }
 
-    fn func3() -> Result<(), ErrorUnion<(std::io::Error, AnyError)>> {
-        func2()
-            .map_err(TracedError::inflate)
-            .context("Error union context")
+    fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
+        func2().union().inflate().context("Error union context")
     }
 
-    let result: Result<(), ErrorUnion<(std::io::Error, AnyError)>> = func3();
+    let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
     println!("{:?}", result.unwrap_err());
     // println!("{}", result.unwrap_err());
 }
@@ -80,11 +77,11 @@ fn bail() {
         eros::bail!("This is a bailing message {}", 1);
     }
 
-    fn func2() -> eros::UnionResult<(), (AnyError,)> {
+    fn func2() -> eros::UnionResult<(), (TracedError,)> {
         func1().context("From func2".to_string()).union()
     }
 
-    fn func3() -> Result<(), ErrorUnion<(AnyError, i32, bool)>> {
+    fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {
         return func2()
             .with_context(|| "From func3")
             .map_err(ErrorUnion::inflate);
@@ -97,7 +94,7 @@ fn bail() {
         return Err(error);
     }
 
-    let result: Result<(), ErrorUnion<(AnyError, i32, bool)>> = func3();
+    let result: Result<(), ErrorUnion<(TracedError, i32, bool)>> = func3();
     println!("{:?}", result.unwrap_err());
     let result2: TracedResult<()> = func4();
     println!("{:?}", result2.unwrap_err());
