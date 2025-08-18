@@ -17,6 +17,7 @@ where
 {
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<E>> {
         self.map_err(|mut e| {
+            // todo Note: This will fail to add context if `TracedError` is anything but the default type. Fix when specialization is stabilized.
             if let Some(traced_error) = e.value.downcast_mut::<TracedError>() {
                 traced_error.context.push(context.into());
             }
@@ -29,6 +30,7 @@ where
         F: FnOnce() -> C,
     {
         self.map_err(|mut e| {
+            // todo Note: This will fail to add context if `TracedError` is anything but the default type. Fix when specialization is stabilized.
             if let Some(traced_error) = e.value.downcast_mut::<TracedError>() {
                 traced_error.context.push(context().into());
             }
@@ -37,7 +39,7 @@ where
     }
 }
 
-impl<T,E> Context<T, TracedError<E>> for Result<T, TracedError<E>> {
+impl<T, E> Context<T, TracedError<E>> for Result<T, TracedError<E>> {
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
         self.map_err(|mut e| {
             e.context.push(context.into());

@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use core::ops::Deref;
 use std::error::Error;
 
+use crate::generic_error::BoxedError;
 use crate::type_set::{
     Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
 };
@@ -210,6 +211,25 @@ where
     {
         E::EnumRef::from(&self)
     }
+
+    /// Downcast the stored value to `T`
+    pub fn downcast<T: Any>(self) -> Result<T, Self> {
+        let ErrorUnion { value, _pd } = self;
+        value
+            .downcast::<T>()
+            .map(|e| *e)
+            .map_err(|e| ErrorUnion { value: e, _pd })
+    }
+
+    /// Downcast the stored value to `&T`
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        self.value.downcast_ref::<T>()
+    }
+
+    /// Downcast the stored value to `&mut T`
+    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.value.downcast_mut::<T>()
+    }
 }
 
 //************************************************************************//
@@ -296,13 +316,16 @@ pub trait IntoUnion<O> {
     fn inflate(self) -> O;
 }
 
-impl<S,E> IntoUnion<Result<S, ErrorUnion<(TracedError<E>,)>>> for Result<S, TracedError<E>> {
+impl<S, E: BoxedError> IntoUnion<Result<S, ErrorUnion<(TracedError<E>,)>>> for Result<S, TracedError<E>> {
     fn inflate(self) -> Result<S, ErrorUnion<(TracedError<E>,)>> {
         self.map_err(|e| e.inflate())
     }
 }
 
-impl<E> IntoUnion<ErrorUnion<(E,)>> for  E where E: std::error::Error + Send + Sync + 'static {
+impl<E> IntoUnion<ErrorUnion<(E,)>> for E
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
     fn inflate(self) -> ErrorUnion<(E,)> {
         self.into()
     }

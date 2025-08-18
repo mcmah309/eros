@@ -1,6 +1,6 @@
 use eros::{
     bail, traced, Context, DeflateResult, ErrorUnion, InflateResult, IntoTracedError, IntoUnion,
-    TracedError, TracedResult,
+    StrError, TracedError, TracedResult,
 };
 
 #[test]

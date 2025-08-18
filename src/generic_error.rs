@@ -1,4 +1,8 @@
-use std::{backtrace::Backtrace, borrow::Cow, fmt};
+use std::{
+    backtrace::Backtrace,
+    borrow::Cow,
+    fmt::{self},
+};
 
 use crate::{
     str_error::StrError,
@@ -6,20 +10,26 @@ use crate::{
     Cons, End, ErrorUnion,
 };
 
+pub trait BoxedError: std::error::Error + Send + Sync + 'static {}
+
+impl<T> BoxedError for T where T: std::error::Error + Send + Sync + 'static {}
+
+impl std::error::Error for Box<dyn BoxedError> {}
+
 /// A generic error for propagating information about the error context. The caller may or may not care about
 /// type the underlying error type depending on if `T` is provided.
-/// 
+///
 /// Context is intended to be added at different levels in the call stack with `context` or `with_context` methods.
-pub struct TracedError<T = Box<dyn std::error::Error + Send + Sync>>
+pub struct TracedError<T = Box<dyn BoxedError>>
 where
-    T: 'static,
+    T: BoxedError,
 {
     source: T,
     pub(crate) backtrace: Backtrace,
     pub(crate) context: Vec<StrError>,
 }
 
-impl<T> TracedError<T> {
+impl<T: BoxedError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
             source: source,
@@ -56,7 +66,7 @@ impl<T> TracedError<T> {
     }
 }
 
-impl fmt::Display for TracedError {
+impl<T: BoxedError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.source)?;
         if !self.context.is_empty() {
@@ -69,7 +79,7 @@ impl fmt::Display for TracedError {
     }
 }
 
-impl fmt::Debug for TracedError {
+impl<T: BoxedError> fmt::Debug for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.source)?;
         if !self.context.is_empty() {
@@ -84,7 +94,7 @@ impl fmt::Debug for TracedError {
     }
 }
 
-impl std::error::Error for TracedError {
+impl<T: BoxedError> std::error::Error for TracedError<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source.source()
     }
@@ -140,5 +150,33 @@ where
 
     fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.traced_dyn())
+    }
+}
+
+//************************************************************************//
+
+#[cfg(test)]
+mod test {
+    use crate::{Context, ErrorUnion, StrError, TracedError};
+
+    #[test]
+    fn adding_context_to_union() {
+        let concrete_traced_error: TracedError<std::io::Error> = TracedError::new(
+            std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use"),
+        );
+        let concrete_union_error: ErrorUnion<(
+            TracedError<std::io::Error>,
+            i32,
+            TracedError<StrError>,
+        )> = concrete_traced_error.inflate();
+        let result: Result<
+            (),
+            ErrorUnion<(TracedError<std::io::Error>, i32, TracedError<StrError>)>,
+        > = Err(concrete_union_error).context("Context 1");
+        let concrete_union_error = result.unwrap_err();
+        let concrete_traced_error = concrete_union_error
+            .downcast::<TracedError<std::io::Error>>()
+            .unwrap();
+        assert_eq!(concrete_traced_error.context, vec![StrError::from("Context 1")]);
     }
 }

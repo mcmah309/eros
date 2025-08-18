@@ -15,6 +15,7 @@ pub use context::Context;
 pub use error_union::InflateResult;
 pub use error_union::DeflateResult;
 pub use error_union::IntoUnion;
+pub use generic_error::BoxedError;
 pub use generic_error::TracedError;
 pub use generic_error::IntoTracedError;
 pub use str_error::StrError;
