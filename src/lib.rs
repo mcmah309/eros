@@ -1,3 +1,5 @@
+#![feature(specialization)]
+
 mod context;
 mod generic_error;
 mod macros;

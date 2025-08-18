@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use core::ops::Deref;
 use std::error::Error;
 
+use crate::context::HasContext;
 use crate::generic_error::BoxedError;
 use crate::type_set::{
     Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
@@ -33,7 +34,7 @@ use crate::{Cons, End, TracedError};
 /// `ErrorUnion` also holds the the root backtrace and context provided
 /// throughout the call chain.
 pub struct ErrorUnion<E: TypeSet> {
-    pub(crate) value: Box<dyn Any>,
+    pub(crate) value: Box<dyn HasContext>,
     _pd: PhantomData<E>,
 }
 
@@ -60,11 +61,13 @@ where
     type Target = T;
 
     fn deref(&self) -> &T {
-        self.value.downcast_ref::<T>().unwrap()
+        (self.value.as_ref() as &dyn Any)
+            .downcast_ref::<T>()
+            .unwrap()
     }
 }
 
-impl<T> From<T> for ErrorUnion<(T,)>
+impl<T: HasContext> From<T> for ErrorUnion<(T,)>
 where
     T: 'static,
 {
@@ -90,7 +93,7 @@ where
     E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::display_fold(&self.value, formatter)?;
+        E::Variants::display_fold(self.value.as_ref() as &dyn Any, formatter)?;
         Ok(())
     }
 }
@@ -101,7 +104,7 @@ where
     E::Variants: Error + DisplayFold + ErrorFold,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        E::Variants::source_fold(&self.value)
+        E::Variants::source_fold(self.value.as_ref() as &dyn Any)
     }
 }
 
@@ -112,7 +115,7 @@ where
     /// Create a new `ErrorUnion`.
     pub fn new<T, Index>(t: T) -> ErrorUnion<E>
     where
-        T: Any,
+        T: HasContext,
         E::Variants: Contains<T, Index>,
     {
         ErrorUnion {
@@ -134,8 +137,8 @@ where
         Target: 'static,
         E::Variants: Narrow<Target, Index>,
     {
-        if self.value.is::<Target>() {
-            Ok(*self.value.downcast::<Target>().unwrap())
+        if (self.value.as_ref() as &dyn Any).is::<Target>() {
+            Ok(*(self.value as Box<dyn Any>).downcast::<Target>().unwrap())
         } else {
             Err(ErrorUnion {
                 value: self.value,
@@ -171,7 +174,7 @@ where
         TargetList: TypeSet,
         E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
     {
-        if E::Variants::is_fold(&self.value) {
+        if E::Variants::is_fold(self.value.as_ref() as &dyn Any) {
             Ok(ErrorUnion {
                 value: self.value,
                 _pd: PhantomData,
@@ -191,7 +194,7 @@ where
         Target: 'static,
         E: TypeSet<Variants = Cons<Target, End>>,
     {
-        *self.value.downcast::<Target>().unwrap()
+        *(self.value as Box<dyn Any>).downcast::<Target>().unwrap()
     }
 
     /// Convert the `ErrorUnion` to an owned enum for
@@ -210,25 +213,6 @@ where
         E::EnumRef<'a>: From<&'a Self>,
     {
         E::EnumRef::from(&self)
-    }
-
-    /// Downcast the stored value to `T`
-    pub fn downcast<T: Any>(self) -> Result<T, Self> {
-        let ErrorUnion { value, _pd } = self;
-        value
-            .downcast::<T>()
-            .map(|e| *e)
-            .map_err(|e| ErrorUnion { value: e, _pd })
-    }
-
-    /// Downcast the stored value to `&T`
-    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        self.value.downcast_ref::<T>()
-    }
-
-    /// Downcast the stored value to `&mut T`
-    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.value.downcast_mut::<T>()
     }
 }
 
@@ -316,17 +300,10 @@ pub trait IntoUnion<O> {
     fn inflate(self) -> O;
 }
 
-impl<S, E: BoxedError> IntoUnion<Result<S, ErrorUnion<(TracedError<E>,)>>> for Result<S, TracedError<E>> {
+impl<S, E: BoxedError> IntoUnion<Result<S, ErrorUnion<(TracedError<E>,)>>>
+    for Result<S, TracedError<E>>
+{
     fn inflate(self) -> Result<S, ErrorUnion<(TracedError<E>,)>> {
         self.map_err(|e| e.inflate())
-    }
-}
-
-impl<E> IntoUnion<ErrorUnion<(E,)>> for E
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn inflate(self) -> ErrorUnion<(E,)> {
-        self.into()
     }
 }

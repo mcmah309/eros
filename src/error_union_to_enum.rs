@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use super::{ErrorUnion, E1, E2, E3, E4, E5, E6, E7, E8, E9};
 
 /* ------------------------- Enum conversions ----------------------- */
@@ -7,7 +9,7 @@ where
     A: 'static,
 {
     fn from(one_of: ErrorUnion<(A,)>) -> Self {
-        E1::A(*one_of.value.downcast().unwrap())
+        E1::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
     }
 }
 
@@ -16,7 +18,7 @@ where
     A: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A,)>) -> Self {
-        E1::A(one_of.value.downcast_ref().unwrap())
+        E1::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
     }
 }
 
@@ -26,10 +28,10 @@ where
     B: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B)>) -> Self {
-        if one_of.value.is::<A>() {
-            E2::A(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E2::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E2::B(*one_of.value.downcast().unwrap())
+            E2::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -40,10 +42,10 @@ where
     B: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B)>) -> Self {
-        if one_of.value.is::<A>() {
-            E2::A(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E2::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E2::B(one_of.value.downcast_ref().unwrap())
+            E2::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
@@ -55,12 +57,12 @@ where
     C: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C)>) -> Self {
-        if one_of.value.is::<A>() {
-            E3::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E3::B(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E3::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E3::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E3::C(*one_of.value.downcast().unwrap())
+            E3::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -72,12 +74,12 @@ where
     C: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C)>) -> Self {
-        if one_of.value.is::<A>() {
-            E3::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E3::B(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E3::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E3::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E3::C(one_of.value.downcast_ref().unwrap())
+            E3::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
@@ -90,14 +92,14 @@ where
     D: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C, D)>) -> Self {
-        if one_of.value.is::<A>() {
-            E4::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E4::B(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<C>() {
-            E4::C(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E4::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E4::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E4::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E4::D(*one_of.value.downcast().unwrap())
+            E4::D(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -110,14 +112,14 @@ where
     D: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C, D)>) -> Self {
-        if one_of.value.is::<A>() {
-            E4::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E4::B(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<C>() {
-            E4::C(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E4::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E4::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E4::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E4::D(one_of.value.downcast_ref().unwrap())
+            E4::D((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
@@ -131,21 +133,22 @@ where
     E: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C, D, E)>) -> Self {
-        if one_of.value.is::<A>() {
-            E5::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E5::B(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<C>() {
-            E5::C(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<D>() {
-            E5::D(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E5::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E5::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E5::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E5::D(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E5::E(*one_of.value.downcast().unwrap())
+            E5::E(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
 
-impl<'a, A, B, C, D, E> From<&'a ErrorUnion<(A, B, C, D, E)>> for E5<&'a A, &'a B, &'a C, &'a D, &'a E>
+impl<'a, A, B, C, D, E> From<&'a ErrorUnion<(A, B, C, D, E)>>
+    for E5<&'a A, &'a B, &'a C, &'a D, &'a E>
 where
     A: 'static,
     B: 'static,
@@ -154,16 +157,16 @@ where
     E: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C, D, E)>) -> Self {
-        if one_of.value.is::<A>() {
-            E5::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E5::B(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<C>() {
-            E5::C(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<D>() {
-            E5::D(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E5::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E5::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E5::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E5::D((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E5::E(one_of.value.downcast_ref().unwrap())
+            E5::E((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
@@ -178,18 +181,18 @@ where
     F: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C, D, E, F)>) -> Self {
-        if one_of.value.is::<A>() {
-            E6::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E6::B(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<C>() {
-            E6::C(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<D>() {
-            E6::D(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<E>() {
-            E6::E(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E6::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E6::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E6::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E6::D(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E6::E(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E6::F(*one_of.value.downcast().unwrap())
+            E6::F(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -205,18 +208,18 @@ where
     F: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F)>) -> Self {
-        if one_of.value.is::<A>() {
-            E6::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E6::B(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<C>() {
-            E6::C(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<D>() {
-            E6::D(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<E>() {
-            E6::E(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E6::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E6::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E6::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E6::D((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E6::E((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E6::F(one_of.value.downcast_ref().unwrap())
+            E6::F((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
@@ -232,20 +235,20 @@ where
     G: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
-        if one_of.value.is::<A>() {
-            E7::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E7::B(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<C>() {
-            E7::C(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<D>() {
-            E7::D(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<E>() {
-            E7::E(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<F>() {
-            E7::F(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E7::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E7::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E7::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E7::D(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E7::E(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<F>() {
+            E7::F(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E7::G(*one_of.value.downcast().unwrap())
+            E7::G(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -262,25 +265,26 @@ where
     G: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
-        if one_of.value.is::<A>() {
-            E7::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E7::B(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<C>() {
-            E7::C(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<D>() {
-            E7::D(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<E>() {
-            E7::E(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<F>() {
-            E7::F(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E7::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E7::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E7::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E7::D((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E7::E((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<F>() {
+            E7::F((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E7::G(one_of.value.downcast_ref().unwrap())
+            E7::G((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
 
-impl<A, B, C, D, E, F, G, H> From<ErrorUnion<(A, B, C, D, E, F, G, H)>> for E8<A, B, C, D, E, F, G, H>
+impl<A, B, C, D, E, F, G, H> From<ErrorUnion<(A, B, C, D, E, F, G, H)>>
+    for E8<A, B, C, D, E, F, G, H>
 where
     A: 'static,
     B: 'static,
@@ -292,22 +296,22 @@ where
     H: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
-        if one_of.value.is::<A>() {
-            E8::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E8::B(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<C>() {
-            E8::C(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<D>() {
-            E8::D(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<E>() {
-            E8::E(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<F>() {
-            E8::F(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<G>() {
-            E8::G(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E8::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E8::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E8::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E8::D(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E8::E(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<F>() {
+            E8::F(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<G>() {
+            E8::G(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E8::H(*one_of.value.downcast().unwrap())
+            E8::H(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -325,22 +329,22 @@ where
     H: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
-        if one_of.value.is::<A>() {
-            E8::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E8::B(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<C>() {
-            E8::C(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<D>() {
-            E8::D(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<E>() {
-            E8::E(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<F>() {
-            E8::F(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<G>() {
-            E8::G(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E8::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E8::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E8::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E8::D((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E8::E((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<F>() {
+            E8::F((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<G>() {
+            E8::G((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E8::H(one_of.value.downcast_ref().unwrap())
+            E8::H((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }
@@ -359,24 +363,24 @@ where
     I: 'static,
 {
     fn from(one_of: ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
-        if one_of.value.is::<A>() {
-            E9::A(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<B>() {
-            E9::B(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<C>() {
-            E9::C(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<D>() {
-            E9::D(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<E>() {
-            E9::E(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<F>() {
-            E9::F(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<G>() {
-            E9::G(*one_of.value.downcast().unwrap())
-        } else if one_of.value.is::<H>() {
-            E9::H(*one_of.value.downcast().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E9::A(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E9::B(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E9::C(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E9::D(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E9::E(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<F>() {
+            E9::F(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<G>() {
+            E9::G(*(one_of.value as Box<dyn Any>).downcast().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<H>() {
+            E9::H(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         } else {
-            E9::I(*one_of.value.downcast().unwrap())
+            E9::I(*(one_of.value as Box<dyn Any>).downcast().unwrap())
         }
     }
 }
@@ -395,24 +399,24 @@ where
     I: 'static,
 {
     fn from(one_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
-        if one_of.value.is::<A>() {
-            E9::A(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<B>() {
-            E9::B(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<C>() {
-            E9::C(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<D>() {
-            E9::D(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<E>() {
-            E9::E(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<F>() {
-            E9::F(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<G>() {
-            E9::G(one_of.value.downcast_ref().unwrap())
-        } else if one_of.value.is::<H>() {
-            E9::H(one_of.value.downcast_ref().unwrap())
+        if (one_of.value.as_ref() as &dyn Any).is::<A>() {
+            E9::A((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<B>() {
+            E9::B((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<C>() {
+            E9::C((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<D>() {
+            E9::D((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<E>() {
+            E9::E((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<F>() {
+            E9::F((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<G>() {
+            E9::G((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
+        } else if (one_of.value.as_ref() as &dyn Any).is::<H>() {
+            E9::H((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         } else {
-            E9::I(one_of.value.downcast_ref().unwrap())
+            E9::I((one_of.value.as_ref() as &dyn Any).downcast_ref().unwrap())
         }
     }
 }

@@ -1,26 +1,30 @@
-use crate::{generic_error::TracedError, str_error::StrError, type_set::TypeSet, ErrorUnion};
+use std::any::Any;
+
+use crate::{
+    generic_error::{BoxedError, TracedError},
+    str_error::StrError,
+    type_set::TypeSet,
+    ErrorUnion,
+};
 
 /// Provides `context` methods to add context to `Result`.
-pub trait Context<T, E> {
+pub trait Context<O> {
     /// Adds additional context.
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, E>;
+    fn context<C: Into<StrError>>(self, context: C) -> O;
 
     /// Lazily adds additional context.
-    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, E>
+    fn with_context<F, C: Into<StrError>>(self, f: F) -> O
     where
         F: FnOnce() -> C;
 }
 
-impl<T, E> Context<T, ErrorUnion<E>> for Result<T, ErrorUnion<E>>
+impl<T, E> Context<Result<T, ErrorUnion<E>>> for Result<T, ErrorUnion<E>>
 where
     E: TypeSet,
 {
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<E>> {
         self.map_err(|mut e| {
-            // todo Note: This will fail to add context if `TracedError` is anything but the default type. Fix when specialization is stabilized.
-            if let Some(traced_error) = e.value.downcast_mut::<TracedError>() {
-                traced_error.context.push(context.into());
-            }
+            e.value.add_context(context.into());
             e
         })
     }
@@ -30,30 +34,56 @@ where
         F: FnOnce() -> C,
     {
         self.map_err(|mut e| {
-            // todo Note: This will fail to add context if `TracedError` is anything but the default type. Fix when specialization is stabilized.
-            if let Some(traced_error) = e.value.downcast_mut::<TracedError>() {
-                traced_error.context.push(context().into());
-            }
+            e.value.add_context(context().into());
             e
         })
     }
 }
 
-impl<T, E> Context<T, TracedError<E>> for Result<T, TracedError<E>> {
+impl<T, E: BoxedError> Context<Result<T, TracedError<E>>> for Result<T, TracedError<E>> {
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
-        self.map_err(|mut e| {
-            e.context.push(context.into());
-            e
-        })
+        self.map_err(|e| e.context(context))
     }
 
     fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError<E>>
     where
         F: FnOnce() -> C,
     {
-        self.map_err(|mut e| {
-            e.context.push(context().into());
-            e
-        })
+        self.map_err(|e| e.with_context(context))
+    }
+}
+
+impl<T: BoxedError> Context<TracedError<T>> for TracedError<T> {
+    fn context<C: Into<StrError>>(mut self, context: C) -> TracedError<T> {
+        self.context.push(context.into());
+        self
+    }
+
+    fn with_context<F, C: Into<StrError>>(mut self, f: F) -> TracedError<T>
+    where
+        F: FnOnce() -> C,
+    {
+        self.context.push(f().into());
+        self
+    }
+}
+
+pub trait HasContext: Any {
+    fn add_context(&mut self, context: StrError);
+}
+
+impl<T: 'static> HasContext for T {
+    default fn add_context(&mut self, _context: StrError) {}
+}
+
+impl HasContext for Box<dyn HasContext> {
+    fn add_context(&mut self, context: StrError) {
+        (**self).add_context(context);
+    }
+}
+
+impl<T: BoxedError> HasContext for TracedError<T> {
+    fn add_context(&mut self, context: StrError) {
+        self.context.push(context);
     }
 }

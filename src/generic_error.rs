@@ -174,9 +174,14 @@ mod test {
             ErrorUnion<(TracedError<std::io::Error>, i32, TracedError<StrError>)>,
         > = Err(concrete_union_error).context("Context 1");
         let concrete_union_error = result.unwrap_err();
-        let concrete_traced_error = concrete_union_error
-            .downcast::<TracedError<std::io::Error>>()
-            .unwrap();
-        assert_eq!(concrete_traced_error.context, vec![StrError::from("Context 1")]);
+        let concrete_traced_error: TracedError<std::io::Error> =
+            match concrete_union_error.to_enum() {
+                crate::E3::A(traced_error) => traced_error,
+                _ => panic!("Wrong type"),
+            };
+        assert_eq!(
+            concrete_traced_error.context,
+            vec![StrError::from("Context 1")]
+        );
     }
 }

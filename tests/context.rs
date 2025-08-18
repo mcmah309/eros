@@ -1,6 +1,5 @@
 use eros::{
-    bail, traced, Context, DeflateResult, ErrorUnion, InflateResult, IntoTracedError, IntoUnion,
-    StrError, TracedError, TracedResult,
+    bail, traced, Context, DeflateResult, ErrorUnion, InflateResult, IntoTracedError, IntoUnion, StrError, TracedError, TracedResult
 };
 
 #[test]
@@ -47,7 +46,9 @@ fn generic_context_error_to_error_union() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func2().inflate().inflate().context("Error union context")
+        func2()
+            .map_err(TracedError::inflate)
+            .context("Error union context")
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
@@ -79,7 +80,9 @@ fn bail() {
     }
 
     fn func2() -> eros::UnionResult<(), (TracedError,)> {
-        func1().context("From func2".to_string()).inflate()
+        func1()
+            .context("From func2".to_string())
+            .inflate()
     }
 
     fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {

@@ -7,11 +7,11 @@ use crate::{Cons, End, Recurse};
 /* ------------------------- std::error::Error support ----------------------- */
 
 pub trait ErrorFold {
-    fn source_fold(any: &Box<dyn Any>) -> Option<&(dyn Error + 'static)>;
+    fn source_fold(any: &dyn Any) -> Option<&(dyn Error + 'static)>;
 }
 
 impl ErrorFold for End {
-    fn source_fold(_: &Box<dyn Any>) -> Option<&(dyn Error + 'static)> {
+    fn source_fold(_: &dyn Any) -> Option<&(dyn Error + 'static)> {
         unreachable!("source_fold called on End");
     }
 }
@@ -29,7 +29,7 @@ where
     Head: 'static + Error,
     Tail: ErrorFold,
 {
-    fn source_fold(any: &Box<dyn Any>) -> Option<&(dyn Error + 'static)> {
+    fn source_fold(any: &dyn Any) -> Option<&(dyn Error + 'static)> {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
             head_ref.source()
         } else {
@@ -57,11 +57,11 @@ impl fmt::Display for End {
 }
 
 pub trait DisplayFold {
-    fn display_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
+    fn display_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
 impl DisplayFold for End {
-    fn display_fold(_: &Box<dyn Any>, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn display_fold(_: &dyn Any, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         unreachable!("display_fold called on End");
     }
 }
@@ -72,7 +72,7 @@ where
     Head: 'static + fmt::Display,
     Tail: DisplayFold,
 {
-    fn display_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn display_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
             head_ref.fmt(formatter)
         } else {
@@ -112,11 +112,11 @@ where
 /* ------------------------- Any::is support ----------------------- */
 
 pub trait IsFold {
-    fn is_fold(any: &Box<dyn Any>) -> bool;
+    fn is_fold(any: &dyn Any) -> bool;
 }
 
 impl IsFold for End {
-    fn is_fold(_: &Box<dyn Any>) -> bool {
+    fn is_fold(_: &dyn Any) -> bool {
         false
     }
 }
@@ -126,7 +126,7 @@ where
     Head: 'static,
     Tail: IsFold,
 {
-    fn is_fold(any: &Box<dyn Any>) -> bool {
+    fn is_fold(any: &dyn Any) -> bool {
         if any.is::<Head>() {
             true
         } else {
