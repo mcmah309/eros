@@ -1,10 +1,8 @@
-
-
 use std::fmt::Display;
 
 use eros::ErrorUnion;
 
-// #[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
 
 impl Display for NotEnoughMemory {
@@ -33,6 +31,32 @@ impl Display for RetriesExhausted {
 
 #[test]
 fn retry() {
+    fn does_stuff() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout)>> {
+        let _allocation = match allocates() {
+            Ok(a) => a,
+            Err(e) => return Err(e.inflate()),
+        };
+
+        let _chat = match chats() {
+            Ok(c) => c,
+            Err(e) => return Err(ErrorUnion::new(e)),
+        };
+
+        Ok(())
+    }
+
+    fn allocates() -> Result<(), ErrorUnion<(NotEnoughMemory,)>> {
+        let result: Result<(), NotEnoughMemory> = Err(NotEnoughMemory);
+
+        result?;
+
+        Ok(())
+    }
+
+    fn chats() -> Result<(), Timeout> {
+        Err(Timeout)
+    }
+
     fn inner() -> Result<(), ErrorUnion<(NotEnoughMemory, RetriesExhausted)>> {
         for _ in 0..3 {
             let Err(err) = does_stuff() else {
@@ -41,12 +65,8 @@ fn retry() {
 
             match err.deflate::<Timeout, _>() {
                 Ok(_timeout) => continue,
-                Err(allocation_oneof) => {
-                    println!("didn't get Timeout, now trying to get NotEnoughMemory");
-                    let allocation_oneof: ErrorUnion<(NotEnoughMemory,)> = allocation_oneof;
-                    let allocation = allocation_oneof.deflate::<NotEnoughMemory, _>().unwrap();
-
-                    return Err(ErrorUnion::new(allocation));
+                Err(not_enough_memory_union) => {
+                    return Err(not_enough_memory_union.inflate());
                 }
             }
         }
@@ -54,36 +74,18 @@ fn retry() {
         Err(ErrorUnion::new(RetriesExhausted))
     }
 
-    let inner = inner();
-    print!("{:?}", inner);
-}
-
-fn does_stuff() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout)>> {
-    // TODO Try impl after superset type work
-    let _allocation = match allocates() {
-        Ok(a) => a,
-        Err(e) => return Err(e.inflate()),
+    let Err(err) = inner() else {
+        panic!("Should be error");
     };
-
-    // TODO Try impl after superset type work
-    let _chat = match chats() {
-        Ok(c) => c,
-        Err(e) => return Err(ErrorUnion::new(e)),
+    let err = match err.deflate::<RetriesExhausted, _>() {
+        Ok(_) => panic!("Should not have RetriesExhausted"),
+        Err(err) => err,
     };
-
-    Ok(())
-}
-
-fn allocates() -> Result<(), ErrorUnion<(NotEnoughMemory,)>> {
-    let result: Result<(), NotEnoughMemory> = Err(NotEnoughMemory);
-
-    result?;
-
-    Ok(())
-}
-
-fn chats() -> Result<(), Timeout> {
-    Err(Timeout)
+    let err = match err.deflate::<NotEnoughMemory, _>() {
+        Ok(err) => err,
+        Err(_) => panic!("Should have NotEnoughMemory"),
+    };
+    assert_eq!(err, NotEnoughMemory);
 }
 
 #[test]
