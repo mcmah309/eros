@@ -120,7 +120,7 @@ impl From<Cow<'static, str>> for TracedError {
 //************************************************************************//
 
 /// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
-/// the type of issue. Thus the type is erased. This more efficiently handles `String` like types with `StringKind` so no double heap allocation is needed.
+/// the type of issue. Thus the type is erased. This more efficiently handles `String` like types with `Str` so no double heap allocation is needed.
 #[derive(Debug)]
 pub enum AnyError {
     /// An error that is just a message
