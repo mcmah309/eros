@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt::{self, Display}};
 
+/// A type that can hold a string in either a static or owned form. No unnecessary allocation for static strings compared to `String`.
 #[derive(Debug)]
 pub enum StringKind {
     Static(&'static str),

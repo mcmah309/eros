@@ -8,14 +8,14 @@ use crate::{
 
 /// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
 /// type of issue. And context can be added at different levels in the call stack.
-pub struct GenericCtxError {
-    source: GenericError,
+pub struct TracedError {
+    source: AnyError,
     backtrace: Backtrace,
     pub(crate) context: Vec<StringKind>,
 }
 
-impl GenericCtxError {
-    pub fn new(source: GenericError) -> Self {
+impl TracedError {
+    pub fn new(source: AnyError) -> Self {
         Self {
             source,
             backtrace: Backtrace::capture(),
@@ -24,15 +24,15 @@ impl GenericCtxError {
     }
 
     pub fn msg(message: impl Into<StringKind>) -> Self {
-        Self::new(GenericError::msg(message))
+        Self::new(AnyError::msg(message))
     }
 
     pub fn source<T: std::error::Error + Send + Sync + 'static>(source: T) -> Self {
-        Self::new(GenericError::source(source))
+        Self::new(AnyError::source(source))
     }
 
     pub fn any(any: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        Self::new(GenericError::any(any))
+        Self::new(AnyError::any(any))
     }
 
     /// Adds additional context.
@@ -44,14 +44,14 @@ impl GenericCtxError {
     pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<GenericError, End>, Index>,
+        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
     {
-        let error: ErrorUnion<(GenericError,)> = self.into();
+        let error: ErrorUnion<(AnyError,)> = self.into();
         error.inflate()
     }
 }
 
-impl fmt::Display for GenericCtxError {
+impl fmt::Display for TracedError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.source)?;
         if !self.context.is_empty() {
@@ -64,7 +64,7 @@ impl fmt::Display for GenericCtxError {
     }
 }
 
-impl fmt::Debug for GenericCtxError {
+impl fmt::Debug for TracedError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.source)?;
         if !self.context.is_empty() {
@@ -79,109 +79,163 @@ impl fmt::Debug for GenericCtxError {
     }
 }
 
-impl std::error::Error for GenericCtxError {
+impl std::error::Error for TracedError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source.source()
     }
 }
 
-impl From<GenericError> for GenericCtxError {
-    fn from(e: GenericError) -> Self {
+impl From<AnyError> for TracedError {
+    fn from(e: AnyError) -> Self {
         Self::new(e)
     }
 }
 
-impl From<GenericCtxError> for ErrorUnion<(GenericError,)> {
-    fn from(value: GenericCtxError) -> Self {
-        let error: ErrorUnion<(GenericError,)> =
+impl From<TracedError> for ErrorUnion<(AnyError,)> {
+    fn from(value: TracedError) -> Self {
+        let error: ErrorUnion<(AnyError,)> =
             ErrorUnion::new_internal(value.source, value.context, value.backtrace);
         error
     }
 }
 
+impl From<String> for TracedError {
+    fn from(s: String) -> Self {
+        TracedError::msg(s)
+    }
+}
+
+impl From<&'static str> for TracedError {
+    fn from(s: &'static str) -> Self {
+        TracedError::msg(s)
+    }
+}
+
+impl From<Cow<'static, str>> for TracedError {
+    fn from(s: Cow<'static, str>) -> Self {
+        TracedError::msg(s)
+    }
+}
+
+//************************************************************************//
+
 /// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
-/// the type of issue.
+/// the type of issue. Efficiently handles `StringKind` so no double heap allocation is needed.
 #[derive(Debug)]
-pub enum GenericError {
+pub enum AnyError {
     Msg(StringKind),
     Source(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
-impl GenericError {
+impl AnyError {
     pub fn msg(message: impl Into<StringKind>) -> Self {
-        GenericError::Msg(message.into())
+        AnyError::Msg(message.into())
     }
 
     pub fn source<T: std::error::Error + Send + Sync + 'static>(source: T) -> Self {
-        GenericError::Source(Box::new(source))
+        AnyError::Source(Box::new(source))
     }
 
     pub fn any(any: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        GenericError::Source(any)
+        AnyError::Source(any)
     }
 
     pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<GenericError, End>, Index>,
+        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
     {
-        let error: ErrorUnion<(GenericError,)> = self.into();
+        let error: ErrorUnion<(AnyError,)> = self.into();
         error.inflate()
     }
 }
 
-impl fmt::Display for GenericError {
+impl fmt::Display for AnyError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            GenericError::Msg(msg) => write!(f, "{}", msg),
-            GenericError::Source(source) => write!(f, "{}", source),
+            AnyError::Msg(msg) => write!(f, "{}", msg),
+            AnyError::Source(source) => write!(f, "{}", source),
         }
     }
 }
 
-impl std::error::Error for GenericError {
+impl std::error::Error for AnyError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            GenericError::Msg(_) => None,
-            GenericError::Source(source) => Some(&**source),
+            AnyError::Msg(_) => None,
+            AnyError::Source(source) => Some(&**source),
         }
     }
 }
 
-impl From<String> for GenericError {
+impl From<String> for AnyError {
     fn from(s: String) -> Self {
-        GenericError::Msg(StringKind::Owned(s))
+        AnyError::msg(s)
     }
 }
 
-impl From<&'static str> for GenericError {
+impl From<&'static str> for AnyError {
     fn from(s: &'static str) -> Self {
-        GenericError::Msg(StringKind::Static(s))
+        AnyError::msg(s)
     }
 }
 
-impl From<Cow<'static, str>> for GenericError {
+impl From<Cow<'static, str>> for AnyError {
     fn from(s: Cow<'static, str>) -> Self {
-        GenericError::Msg(s.into())
+        AnyError::msg(s)
     }
 }
 
-
-// Note: This trait is used since
 // This does not work
-// impl<T> From<T> for GenericError where T: std::error::Error + Send + Sync + 'static {
+// impl<T> From<T> for AnyError where T: std::error::Error + Send + Sync + 'static {
 //     fn from(e: Box<T>) -> Self {
-//         GenericError::Source(Box::new(e))
+//         AnyError::Source(e)
 //     }
 // }
-pub trait Generalize<S> {
-    fn generalize(self) -> Result<S,GenericCtxError>;
+
+// Note: This trait exists since the above does not work
+pub trait IntoAny<O> {
+    fn into_any(self) -> O;
 }
 
-impl<S,E> Generalize<S> for Result<S,E> where E: std::error::Error + Send + Sync + 'static {
-    fn generalize(self) -> Result<S,GenericCtxError> {
-        self.map_err(|e| {
-            GenericCtxError::source(e)
-        })
+impl<S, E> IntoAny<Result<S, AnyError>> for Result<S, E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn into_any(self) -> Result<S, AnyError> {
+        self.map_err(|e| AnyError::source(e))
+    }
+}
+
+impl<E> IntoAny<AnyError> for E
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn into_any(self) -> AnyError {
+        AnyError::source(self)
+    }
+}
+
+//************************************************************************//
+
+pub trait IntoTraced<O> {
+    fn into_traced(self) -> O;
+}
+
+impl<S, E> IntoTraced<Result<S, TracedError>> for Result<S, E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn into_traced(self) -> Result<S, TracedError> {
+        self.map_err(|e| TracedError::source(e))
+    }
+}
+
+impl<E> IntoTraced<TracedError> for E
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn into_traced(self) -> TracedError {
+        TracedError::source(self)
     }
 }

@@ -6,13 +6,14 @@ mod error_union_to_enum;
 mod string_kind;
 mod type_set;
 
-pub type Result<T,E> = std::result::Result<T, ErrorUnion<E>>;
-pub type GenericResult<T> = std::result::Result<T, GenericCtxError>;
+pub type UnionResult<T,E> = std::result::Result<T, ErrorUnion<E>>;
+pub type TracedResult<T> = std::result::Result<T, TracedError>;
 
 pub use context::Context;
-pub use generic_error::GenericCtxError;
-pub use generic_error::GenericError;
-pub use generic_error::Generalize;
+pub use generic_error::TracedError;
+pub use generic_error::AnyError;
+pub use generic_error::IntoTraced;
+pub use generic_error::IntoAny;
 pub use string_kind::StringKind;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.

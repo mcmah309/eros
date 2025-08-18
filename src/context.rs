@@ -1,4 +1,4 @@
-use crate::{generic_error::GenericCtxError, string_kind::StringKind, type_set::TypeSet, ErrorUnion};
+use crate::{generic_error::TracedError, string_kind::StringKind, type_set::TypeSet, ErrorUnion};
 
 /// Provides `context` methods to add context to `Result`.
 pub trait Context<T, E>
@@ -34,15 +34,15 @@ where
     }
 }
 
-impl<T> Context<T,GenericCtxError> for Result<T,GenericCtxError> {
-    fn context<C: Into<StringKind>>(self, context: C) -> Result<T, GenericCtxError> {
+impl<T> Context<T,TracedError> for Result<T,TracedError> {
+    fn context<C: Into<StringKind>>(self, context: C) -> Result<T, TracedError> {
         self.map_err(|mut e| {
             e.context.push(context.into());
             e
         })
     }
 
-    fn with_context<F, C: Into<StringKind>>(self, context: F) -> Result<T, GenericCtxError>
+    fn with_context<F, C: Into<StringKind>>(self, context: F) -> Result<T, TracedError>
     where
         F: FnOnce() -> C,
     {

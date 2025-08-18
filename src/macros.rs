@@ -1,20 +1,15 @@
-
+/// `format!` like macro to return early from a function with a `TracedError`
 #[macro_export]
 macro_rules! bail {
-    ($error:expr) => {
-        return Err(eros::GenericCtxError::new(std::convert::identity::<eros::GenericError>($error.into())));
-    };
     ($($error:tt)+) => {
-        return Err(eros::GenericCtxError::new(std::convert::identity::<eros::GenericError>(format!($($error)*).into())));
+        return Err(eros::TracedError::new(std::convert::identity::<eros::AnyError>(format!($($error)*).into())));
     };
 }
 
+/// `format!` like macro to create a `TracedError`
 #[macro_export]
-macro_rules! eros {
-    ($error:expr) => {
-        eros::GenericCtxError::new(std::convert::identity::<eros::GenericError>($error).into());
-    };
+macro_rules! traced {
     ($($error:tt)+) => {
-        eros::GenericCtxError::new(std::convert::identity::<eros::GenericError>(format!($($error)*).into()))
+        eros::TracedError::new(std::convert::identity::<eros::AnyError>(format!($($error)*).into()))
     };
 }
