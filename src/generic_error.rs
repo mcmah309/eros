@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, borrow::Cow, fmt};
+use std::{backtrace::Backtrace, borrow::Cow, error::Error, fmt};
 
 use crate::{
     str::Str,
@@ -220,24 +220,66 @@ where
 
 //************************************************************************//
 
-pub trait IntoTracedError<O> {
-    fn traced(self) -> O;
+pub trait IntoGenericResult<S> {
+    fn any(self) -> Result<S, AnyError>;
+
+    fn traced(self) -> Result<S, TracedError>;
+
+    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>;
 }
 
-impl<S, E> IntoTracedError<Result<S, TracedError>> for Result<S, E>
+impl<S, E> IntoGenericResult<S> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
+    fn any(self) -> Result<S, AnyError> {
+        self.map_err(AnyError::source)
+    }
+
     fn traced(self) -> Result<S, TracedError> {
+        self.map_err(TracedError::source)
+    }
+
+    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
+    {
         self.map_err(|e| TracedError::source(e))
+            .map_err(TracedError::inflate)
     }
 }
 
-impl<E> IntoTracedError<TracedError> for E
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn traced(self) -> TracedError {
-        TracedError::source(self)
-    }
-}
+// pub trait IntoGenericError {
+//     fn any(self) -> AnyError;
+
+//     fn traced(self) -> TracedError;
+
+//     fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+//     where
+//         Other: TypeSet,
+//         Other::Variants: SupersetOf<Cons<AnyError, End>, Index>;
+// }
+
+// impl<E> IntoGenericError for E where 
+//     E: std::error::Error + Send + Sync + 'static,
+// {
+//     fn any(self) -> AnyError {
+//         AnyError::source(self)
+//     }
+
+//     fn traced(self) -> TracedError {
+//         TracedError::source(self)
+//     }
+
+//     fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+//     where
+//         Other: TypeSet,
+//         Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
+//     {
+//         ErrorUnion::new(self)
+//     }
+// }
