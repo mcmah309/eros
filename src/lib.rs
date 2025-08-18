@@ -3,7 +3,7 @@ mod generic_error;
 mod macros;
 mod error_union;
 mod error_union_to_enum;
-mod string_kind;
+mod str;
 mod type_set;
 
 pub type UnionResult<T,E> = std::result::Result<T, ErrorUnion<E>>;
@@ -18,7 +18,7 @@ pub use generic_error::TracedError;
 pub use generic_error::AnyError;
 pub use generic_error::IntoTracedError;
 pub use generic_error::IntoAnyError;
-pub use string_kind::StringKind;
+pub use str::Str;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
 pub use error_union::ErrorUnion;

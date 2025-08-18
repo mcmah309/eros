@@ -5,7 +5,7 @@ use core::ops::Deref;
 use std::backtrace::Backtrace;
 use std::error::Error;
 
-use crate::string_kind::StringKind;
+use crate::str::Str;
 use crate::type_set::{
     Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
 };
@@ -36,7 +36,7 @@ use crate::{Cons, End};
 pub struct ErrorUnion<E: TypeSet> {
     pub(crate) value: Box<dyn Any>,
     pub(crate) backtrace: Backtrace,
-    pub(crate) context: Vec<StringKind>,
+    pub(crate) context: Vec<Str>,
     _pd: PhantomData<E>,
 }
 
@@ -134,7 +134,7 @@ where
         }
     }
 
-    pub(crate) fn new_internal<T, Index>(t: T, context: Vec<StringKind>, backtrace: Backtrace) -> ErrorUnion<E>
+    pub(crate) fn new_internal<T, Index>(t: T, context: Vec<Str>, backtrace: Backtrace) -> ErrorUnion<E>
     where
         T: Any,
         E::Variants: Contains<T, Index>,

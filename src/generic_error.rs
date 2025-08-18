@@ -1,7 +1,7 @@
 use std::{backtrace::Backtrace, borrow::Cow, fmt};
 
 use crate::{
-    string_kind::StringKind,
+    str::Str,
     type_set::{SupersetOf, TypeSet},
     Cons, End, ErrorUnion,
 };
@@ -11,7 +11,7 @@ use crate::{
 pub struct TracedError {
     source: AnyError,
     backtrace: Backtrace,
-    pub(crate) context: Vec<StringKind>,
+    pub(crate) context: Vec<Str>,
 }
 
 impl TracedError {
@@ -23,7 +23,7 @@ impl TracedError {
         }
     }
 
-    pub fn msg(message: impl Into<StringKind>) -> Self {
+    pub fn msg(message: impl Into<Str>) -> Self {
         Self::new(AnyError::msg(message))
     }
 
@@ -36,7 +36,7 @@ impl TracedError {
     }
 
     /// Adds additional context.
-    pub fn context<C: Into<StringKind>>(mut self, context: C) -> Self {
+    pub fn context<C: Into<Str>>(mut self, context: C) -> Self {
         self.context.push(context.into());
         self
     }
@@ -124,13 +124,13 @@ impl From<Cow<'static, str>> for TracedError {
 #[derive(Debug)]
 pub enum AnyError {
     /// An error that is just a message
-    Msg(StringKind),
+    Msg(Str),
     /// An error that comes from another error which type is erased
     Source(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
 impl AnyError {
-    pub fn msg(message: impl Into<StringKind>) -> Self {
+    pub fn msg(message: impl Into<Str>) -> Self {
         AnyError::Msg(message.into())
     }
 
