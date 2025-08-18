@@ -58,7 +58,7 @@ fn generic_error_to_error_union() {
 #[test]
 fn bail() {
     fn func1()  -> GenericResult<()>{
-        eros::bail!("This is a bailing message");
+        eros::bail!("This is a bailing message {}", 1);
     }
 
     fn func2() -> eros::Result<(), (GenericError,)> {
