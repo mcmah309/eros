@@ -225,10 +225,7 @@ pub trait IntoGenericResult<S> {
 
     fn traced(self) -> Result<S, TracedError>;
 
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
-    where
-        Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>;
+    fn inflate(self) -> Result<S, ErrorUnion<(AnyError,)>>;
 }
 
 impl<S, E> IntoGenericResult<S> for Result<S, E>
@@ -243,43 +240,33 @@ where
         self.map_err(TracedError::source)
     }
 
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
-    where
-        Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
+    fn inflate(self) -> Result<S, ErrorUnion<(AnyError,)>>
     {
-        self.map_err(|e| TracedError::source(e))
-            .map_err(TracedError::inflate)
+        self.map_err(|e| ErrorUnion::new(AnyError::source(e)))
     }
 }
 
-// pub trait IntoGenericError {
-//     fn any(self) -> AnyError;
+pub trait IntoGenericError {
+    fn any(self) -> AnyError;
 
-//     fn traced(self) -> TracedError;
+    fn traced(self) -> TracedError;
 
-//     fn inflate<Other, Index>(self) -> ErrorUnion<Other>
-//     where
-//         Other: TypeSet,
-//         Other::Variants: SupersetOf<Cons<AnyError, End>, Index>;
-// }
+    fn inflate(self) -> ErrorUnion<(AnyError,)>;
+}
 
-// impl<E> IntoGenericError for E where 
-//     E: std::error::Error + Send + Sync + 'static,
-// {
-//     fn any(self) -> AnyError {
-//         AnyError::source(self)
-//     }
+impl<E> IntoGenericError for E where 
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn any(self) -> AnyError {
+        AnyError::source(self)
+    }
 
-//     fn traced(self) -> TracedError {
-//         TracedError::source(self)
-//     }
+    fn traced(self) -> TracedError {
+        TracedError::source(self)
+    }
 
-//     fn inflate<Other, Index>(self) -> ErrorUnion<Other>
-//     where
-//         Other: TypeSet,
-//         Other::Variants: SupersetOf<Cons<AnyError, End>, Index>,
-//     {
-//         ErrorUnion::new(self)
-//     }
-// }
+    fn inflate(self) -> ErrorUnion<(AnyError,)>
+    {
+        ErrorUnion::new(AnyError::source(self))
+    }
+}
