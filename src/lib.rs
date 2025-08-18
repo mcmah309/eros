@@ -3,24 +3,21 @@ mod generic_error;
 mod macros;
 mod error_union;
 mod error_union_to_enum;
-mod str;
+mod str_error;
 mod type_set;
 
 pub type UnionResult<T,E> = std::result::Result<T, ErrorUnion<E>>;
 pub type UResult<T,E> = UnionResult<T, E>;
 pub type TracedResult<T> = std::result::Result<T, TracedError>;
-pub type TResult<T> = TracedResult<T>;
-pub type AnyResult<T> = std::result::Result<T, AnyError>;
-pub type AResult<T> = AnyResult<T>;
+pub type Result<T> = TracedResult<T>;
 
 pub use context::Context;
 pub use error_union::InflateResult;
 pub use error_union::DeflateResult;
 pub use error_union::IntoUnion;
 pub use generic_error::TracedError;
-pub use generic_error::IntoTraced;
-pub use generic_error::AnyError;
-pub use str::Str;
+pub use generic_error::IntoTracedError;
+pub use str_error::StrError;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
 pub use error_union::ErrorUnion;

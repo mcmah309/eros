@@ -2,7 +2,7 @@
 #[macro_export]
 macro_rules! bail {
     ($($error:tt)+) => {
-        return Err(eros::TracedError::new(std::convert::identity::<eros::AnyError>(format!($($error)*).into())));
+        return Err(eros::TracedError::new(Box::new(eros::StrError::Owned(format!($($error)*)))));
     };
 }
 
@@ -10,6 +10,6 @@ macro_rules! bail {
 #[macro_export]
 macro_rules! traced {
     ($($error:tt)+) => {
-        eros::TracedError::new(std::convert::identity::<eros::AnyError>(format!($($error)*).into()))
+        eros::TracedError::new(Box::new(eros::StrError::Owned(format!($($error)*))))
     };
 }

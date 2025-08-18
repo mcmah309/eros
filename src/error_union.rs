@@ -293,17 +293,17 @@ where
 //************************************************************************//
 
 pub trait IntoUnion<O> {
-    fn union(self) -> O;
+    fn inflate(self) -> O;
 }
 
-impl<S> IntoUnion<Result<S, ErrorUnion<(TracedError,)>>> for Result<S, TracedError> {
-    fn union(self) -> Result<S, ErrorUnion<(TracedError,)>> {
+impl<S,E> IntoUnion<Result<S, ErrorUnion<(TracedError<E>,)>>> for Result<S, TracedError<E>> {
+    fn inflate(self) -> Result<S, ErrorUnion<(TracedError<E>,)>> {
         self.map_err(|e| e.inflate())
     }
 }
 
 impl<E> IntoUnion<ErrorUnion<(E,)>> for  E where E: std::error::Error + Send + Sync + 'static {
-    fn union(self) -> ErrorUnion<(E,)> {
+    fn inflate(self) -> ErrorUnion<(E,)> {
         self.into()
     }
 }

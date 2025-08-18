@@ -1,5 +1,6 @@
 use eros::{
-    AnyError, Context, DeflateResult, ErrorUnion, InflateResult, IntoTraced, IntoUnion, TracedError, TracedResult
+    bail, traced, Context, DeflateResult, ErrorUnion, InflateResult, IntoTracedError, IntoUnion,
+    TracedError, TracedResult,
 };
 
 #[test]
@@ -38,7 +39,7 @@ fn error_union() {
 #[test]
 fn generic_context_error_to_error_union() {
     fn func1() -> Result<(), TracedError> {
-        return Err(TracedError::msg("This is root error message"));
+        return Err(traced!("This is root error message"));
     }
 
     fn func2() -> eros::TracedResult<()> {
@@ -46,7 +47,7 @@ fn generic_context_error_to_error_union() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func2().union().inflate().context("Error union context")
+        func2().inflate().inflate().context("Error union context")
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
@@ -56,17 +57,17 @@ fn generic_context_error_to_error_union() {
 
 #[test]
 fn generic_error_to_error_union() {
-    fn func1() -> Result<(), AnyError> {
-        return Err(AnyError::msg("This is root error message"));
+    fn func1() -> Result<(), TracedError> {
+        return Err(bail!("This is root error message"));
     }
 
-    fn func2() -> Result<(), ErrorUnion<(std::io::Error, AnyError)>> {
+    fn func2() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
         func1()
-            .map_err(AnyError::inflate)
+            .map_err(TracedError::inflate)
             .context("Error union context")
     }
 
-    let result: Result<(), ErrorUnion<(std::io::Error, AnyError)>> = func2();
+    let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func2();
     println!("{:?}", result.unwrap_err());
     // println!("{}", result.unwrap_err());
 }
@@ -78,7 +79,7 @@ fn bail() {
     }
 
     fn func2() -> eros::UnionResult<(), (TracedError,)> {
-        func1().context("From func2".to_string()).union()
+        func1().context("From func2".to_string()).inflate()
     }
 
     fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {
@@ -90,7 +91,7 @@ fn bail() {
     fn func4() -> TracedResult<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
-                .traced();
+                .traced_dyn();
         return Err(error);
     }
 
