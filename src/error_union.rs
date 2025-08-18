@@ -30,7 +30,7 @@ use crate::{Cons, End};
 /// you to quickly specify a function's return value as
 /// involving a precise subset of errors that the caller
 /// can clearly reason about.
-/// 
+///
 /// `ErrorUnion` also holds the the root backtrace and context provided
 /// throughout the call chain.
 pub struct ErrorUnion<E: TypeSet> {
@@ -134,7 +134,11 @@ where
         }
     }
 
-    pub(crate) fn new_internal<T, Index>(t: T, context: Vec<Str>, backtrace: Backtrace) -> ErrorUnion<E>
+    pub(crate) fn new_internal<T, Index>(
+        t: T,
+        context: Vec<Str>,
+        backtrace: Backtrace,
+    ) -> ErrorUnion<E>
     where
         T: Any,
         E::Variants: Contains<T, Index>,
@@ -244,5 +248,70 @@ where
         E::EnumRef<'a>: From<&'a Self>,
     {
         E::EnumRef::from(&self)
+    }
+}
+
+/// Run inflate and deflate directly on Results with ErrorUnions
+pub trait FlateResult<S, E>
+where
+    E: TypeSet,
+{
+    /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
+    /// which is a superset of the current one. This may also be
+    /// the same set of variants, but in a different order.
+    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<E::Variants, Index>;
+
+    /// Attempt to downcast the `ErrorUnion` into a specific type, and
+    /// if that fails, return a `Result` with the `ErrorUnion` wither the remainder
+    /// which does not contain that type as one of its possible variants.
+    fn deflate<Target, Index>(
+        self,
+    ) -> Result<
+        Target,
+        Result<
+            S,
+            ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+        >,
+    >
+    where
+        Target: 'static,
+        E::Variants: Narrow<Target, Index>;
+}
+
+impl<S, E> FlateResult<S, E> for Result<S, ErrorUnion<E>>
+where
+    E: TypeSet,
+{
+    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<E::Variants, Index>,
+    {
+        self.map_err(|e| e.inflate())
+    }
+
+    fn deflate<Target, Index>(
+        self,
+    ) -> Result<
+        Target,
+        Result<
+            S,
+            ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+        >,
+    >
+    where
+        Target: 'static,
+        E::Variants: Narrow<Target, Index>,
+    {
+        match self {
+            Ok(value) => Err(Ok(value)),
+            Err(err) => match err.deflate() {
+                Ok(value) => return Ok(value),
+                Err(err) => Err(Err(err)),
+            },
+        }
     }
 }

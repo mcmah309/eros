@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, borrow::Cow, error::Error, fmt};
+use std::{backtrace::Backtrace, borrow::Cow, fmt};
 
 use crate::{
     str::Str,
@@ -195,40 +195,16 @@ impl From<Cow<'static, str>> for AnyError {
 //     }
 // }
 
-// Note: This trait exists since the above does not work
-pub trait IntoAnyError<O> {
-    fn any(self) -> O;
-}
-
-impl<S, E> IntoAnyError<Result<S, AnyError>> for Result<S, E>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn any(self) -> Result<S, AnyError> {
-        self.map_err(|e| AnyError::source(e))
-    }
-}
-
-impl<E> IntoAnyError<AnyError> for E
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn any(self) -> AnyError {
-        AnyError::source(self)
-    }
-}
-
-//************************************************************************//
-
-pub trait IntoGenericResult<S> {
+/// Turn any Result into a Result with a generic Error
+pub trait GenericResult<S> {
     fn any(self) -> Result<S, AnyError>;
 
     fn traced(self) -> Result<S, TracedError>;
 
-    fn inflate(self) -> Result<S, ErrorUnion<(AnyError,)>>;
+    fn union(self) -> Result<S, ErrorUnion<(AnyError,)>>;
 }
 
-impl<S, E> IntoGenericResult<S> for Result<S, E>
+impl<S, E> GenericResult<S> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
@@ -240,21 +216,22 @@ where
         self.map_err(TracedError::source)
     }
 
-    fn inflate(self) -> Result<S, ErrorUnion<(AnyError,)>>
-    {
+    fn union(self) -> Result<S, ErrorUnion<(AnyError,)>> {
         self.map_err(|e| ErrorUnion::new(AnyError::source(e)))
     }
 }
 
-pub trait IntoGenericError {
+/// Turn any Error into a generic Error
+pub trait GenericError {
     fn any(self) -> AnyError;
 
     fn traced(self) -> TracedError;
 
-    fn inflate(self) -> ErrorUnion<(AnyError,)>;
+    fn union(self) -> ErrorUnion<(AnyError,)>;
 }
 
-impl<E> IntoGenericError for E where 
+impl<E> GenericError for E
+where
     E: std::error::Error + Send + Sync + 'static,
 {
     fn any(self) -> AnyError {
@@ -265,8 +242,7 @@ impl<E> IntoGenericError for E where
         TracedError::source(self)
     }
 
-    fn inflate(self) -> ErrorUnion<(AnyError,)>
-    {
+    fn union(self) -> ErrorUnion<(AnyError,)> {
         ErrorUnion::new(AnyError::source(self))
     }
 }

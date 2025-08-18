@@ -30,7 +30,7 @@ impl Display for RetriesExhausted {
 }
 
 #[test]
-fn retry() {
+fn retry_example() {
     fn does_stuff() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout)>> {
         let _allocation = match allocates() {
             Ok(a) => a,
@@ -89,7 +89,7 @@ fn retry() {
 }
 
 #[test]
-fn smoke() {
+fn inflate_deflate() {
     let o_1: ErrorUnion<(u32, String)> = ErrorUnion::new(5_u32);
     let _narrowed_1: u32 = o_1.deflate::<u32, _>().unwrap();
 

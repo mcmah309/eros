@@ -1,4 +1,7 @@
-use eros::{AnyError, Context, ErrorUnion, IntoTracedError, TracedError, TracedResult};
+use eros::{
+    AnyError, Context, ErrorUnion, FlateResult, GenericError, GenericResult, TracedError,
+    TracedResult,
+};
 
 #[test]
 fn error_union() {
@@ -11,9 +14,7 @@ fn error_union() {
     }
 
     fn func2() -> Result<(), ErrorUnion<(i32, std::io::Error)>> {
-        func1()
-            .context("From func2".to_string())
-            .map_err(ErrorUnion::inflate)
+        func1().context("From func2".to_string()).inflate()
     }
 
     fn func3() -> eros::UnionResult<(), (std::io::Error, i32, bool)> {
@@ -22,9 +23,17 @@ fn error_union() {
             .map_err(ErrorUnion::inflate);
     }
 
+    fn func4() -> eros::UnionResult<(), (std::io::Error, bool)> {
+        return match func3().with_context(|| "From func4").deflate::<i32, _>() {
+            Ok(_) => panic!("should exist"),
+            Err(result) => result,
+        };
+    }
+
     let result: Result<(), ErrorUnion<(std::io::Error, i32, bool)>> = func3();
     println!("{:?}", result.unwrap_err());
-    // println!("{}", result.unwrap_err());
+    let result: Result<(), ErrorUnion<(std::io::Error, bool)>> = func4();
+    println!("{:?}", result.unwrap_err());
 }
 
 #[test]
@@ -72,9 +81,7 @@ fn bail() {
     }
 
     fn func2() -> eros::UnionResult<(), (AnyError,)> {
-        func1()
-            .context("From func2".to_string())
-            .map_err(TracedError::inflate)
+        func1().context("From func2".to_string()).union()
     }
 
     fn func3() -> Result<(), ErrorUnion<(AnyError, i32, bool)>> {
@@ -84,10 +91,9 @@ fn bail() {
     }
 
     fn func4() -> TracedResult<()> {
-        let error = std::io::Error::new(
-            std::io::ErrorKind::AddrInUse,
-            "Address in use message here",
-        ).traced();
+        let error =
+            std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
+                .traced();
         return Err(error);
     }
 
