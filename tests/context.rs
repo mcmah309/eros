@@ -1,4 +1,4 @@
-use eros::{AnyError, Context, ErrorUnion, IntoTraced, TracedError, TracedResult};
+use eros::{AnyError, Context, ErrorUnion, IntoTracedError, TracedError, TracedResult};
 
 #[test]
 fn error_union() {
@@ -87,7 +87,7 @@ fn bail() {
         let error = std::io::Error::new(
             std::io::ErrorKind::AddrInUse,
             "Address in use message here",
-        ).into_traced();
+        ).traced();
         return Err(error);
     }
 

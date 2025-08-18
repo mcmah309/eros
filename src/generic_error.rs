@@ -120,10 +120,12 @@ impl From<Cow<'static, str>> for TracedError {
 //************************************************************************//
 
 /// A generic error for when one wishes to propagate information about an issue, but the caller would not care about
-/// the type of issue. Efficiently handles `StringKind` so no double heap allocation is needed.
+/// the type of issue. Thus the type is erased. This more efficiently handles `String` like types with `StringKind` so no double heap allocation is needed.
 #[derive(Debug)]
 pub enum AnyError {
+    /// An error that is just a message
     Msg(StringKind),
+    /// An error that comes from another error which type is erased
     Source(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
@@ -194,48 +196,48 @@ impl From<Cow<'static, str>> for AnyError {
 // }
 
 // Note: This trait exists since the above does not work
-pub trait IntoAny<O> {
-    fn into_any(self) -> O;
+pub trait IntoAnyError<O> {
+    fn any(self) -> O;
 }
 
-impl<S, E> IntoAny<Result<S, AnyError>> for Result<S, E>
+impl<S, E> IntoAnyError<Result<S, AnyError>> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    fn into_any(self) -> Result<S, AnyError> {
+    fn any(self) -> Result<S, AnyError> {
         self.map_err(|e| AnyError::source(e))
     }
 }
 
-impl<E> IntoAny<AnyError> for E
+impl<E> IntoAnyError<AnyError> for E
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    fn into_any(self) -> AnyError {
+    fn any(self) -> AnyError {
         AnyError::source(self)
     }
 }
 
 //************************************************************************//
 
-pub trait IntoTraced<O> {
-    fn into_traced(self) -> O;
+pub trait IntoTracedError<O> {
+    fn traced(self) -> O;
 }
 
-impl<S, E> IntoTraced<Result<S, TracedError>> for Result<S, E>
+impl<S, E> IntoTracedError<Result<S, TracedError>> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    fn into_traced(self) -> Result<S, TracedError> {
+    fn traced(self) -> Result<S, TracedError> {
         self.map_err(|e| TracedError::source(e))
     }
 }
 
-impl<E> IntoTraced<TracedError> for E
+impl<E> IntoTracedError<TracedError> for E
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    fn into_traced(self) -> TracedError {
+    fn traced(self) -> TracedError {
         TracedError::source(self)
     }
 }

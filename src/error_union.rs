@@ -30,6 +30,9 @@ use crate::{Cons, End};
 /// you to quickly specify a function's return value as
 /// involving a precise subset of errors that the caller
 /// can clearly reason about.
+/// 
+/// `ErrorUnion` also holds the the root backtrace and context provided
+/// throughout the call chain.
 pub struct ErrorUnion<E: TypeSet> {
     pub(crate) value: Box<dyn Any>,
     pub(crate) backtrace: Backtrace,

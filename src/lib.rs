@@ -16,8 +16,8 @@ pub type AResult<T> = AnyResult<T>;
 pub use context::Context;
 pub use generic_error::TracedError;
 pub use generic_error::AnyError;
-pub use generic_error::IntoTraced;
-pub use generic_error::IntoAny;
+pub use generic_error::IntoTracedError;
+pub use generic_error::IntoAnyError;
 pub use string_kind::StringKind;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
