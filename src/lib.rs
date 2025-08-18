@@ -7,7 +7,11 @@ mod string_kind;
 mod type_set;
 
 pub type UnionResult<T,E> = std::result::Result<T, ErrorUnion<E>>;
+pub type UResult<T,E> = UnionResult<T, E>;
 pub type TracedResult<T> = std::result::Result<T, TracedError>;
+pub type TResult<T> = TracedResult<T>;
+pub type AnyResult<T> = std::result::Result<T, AnyError>;
+pub type AResult<T> = AnyResult<T>;
 
 pub use context::Context;
 pub use generic_error::TracedError;
