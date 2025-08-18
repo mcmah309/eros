@@ -1,5 +1,5 @@
 use eros::{
-    AnyError, Context, DeflateResult, ErrorUnion, InflateResult, IntoTraced, IntoUnionResult, TracedError, TracedResult
+    AnyError, Context, DeflateResult, ErrorUnion, InflateResult, IntoTraced, IntoUnion, TracedError, TracedResult
 };
 
 #[test]

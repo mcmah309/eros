@@ -184,13 +184,7 @@ impl From<Cow<'static, str>> for AnyError {
     }
 }
 
-// This does not work
-// impl<T> From<T> for AnyError where T: std::error::Error + Send + Sync + 'static {
-//     fn from(e: Box<T>) -> Self {
-//         AnyError::Source(e)
-//     }
-// }
-
+//************************************************************************//
 
 pub trait IntoTraced<O> {
     fn traced(self) -> O;
