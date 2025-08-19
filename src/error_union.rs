@@ -326,7 +326,7 @@ impl<S, F: 'static> IntoUnionResult<S, F> for Result<S, F> {
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
         Other::Variants: Contains<F, Index>,
     {
-        self.map_err(|e| e.inflate())
+        self.map_err(|e| e.union())
     }
 }
 
@@ -334,7 +334,7 @@ pub trait IntoUnion<F>
 where
     F: Contextable,
 {
-    fn inflate<Index, Other>(self) -> ErrorUnion<Other>
+    fn union<Index, Other>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
@@ -345,7 +345,7 @@ impl<F> IntoUnion<F> for F
 where
     F: Contextable,
 {
-    fn inflate<Index, Other>(self) -> ErrorUnion<Other>
+    fn union<Index, Other>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
