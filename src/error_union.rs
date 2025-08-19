@@ -219,7 +219,7 @@ where
 //************************************************************************//
 
 /// Run inflate and deflate directly on Results with ErrorUnions
-pub trait InflateResult<S, E>
+pub trait InflateUnionResult<S, E>
 where
     E: TypeSet,
 {
@@ -232,8 +232,21 @@ where
         Other::Variants: SupersetOf<E::Variants, Index>;
 }
 
+impl<S, E> InflateUnionResult<S, E> for Result<S, ErrorUnion<E>>
+where
+    E: TypeSet,
+{
+    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<E::Variants, Index>,
+    {
+        self.map_err(|e| e.inflate())
+    }
+}
+
 /// Run inflate and deflate directly on Results with ErrorUnions
-pub trait DeflateResult<S, E>
+pub trait DeflateUnionResult<S, E>
 where
     E: TypeSet,
 {
@@ -254,20 +267,7 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> InflateResult<S, E> for Result<S, ErrorUnion<E>>
-where
-    E: TypeSet,
-{
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
-    where
-        Other: TypeSet,
-        Other::Variants: SupersetOf<E::Variants, Index>,
-    {
-        self.map_err(|e| e.inflate())
-    }
-}
-
-impl<S, E> DeflateResult<S, E> for Result<S, ErrorUnion<E>>
+impl<S, E> DeflateUnionResult<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
@@ -296,14 +296,27 @@ where
 
 //************************************************************************//
 
-pub trait IntoUnion<O> {
-    fn inflate(self) -> O;
+//************************************************************************//
+
+pub trait IntoUnionResult<S, F>
+where
+    F: BoxedError,
+{
+    fn inflate<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Cons<TracedError<F>, End>, Index>;
 }
 
-impl<S, E: BoxedError> IntoUnion<Result<S, ErrorUnion<(TracedError<E>,)>>>
-    for Result<S, TracedError<E>>
+impl<S, F> IntoUnionResult<S, F> for Result<S, TracedError<F>>
+where
+    F: BoxedError,
 {
-    fn inflate(self) -> Result<S, ErrorUnion<(TracedError<E>,)>> {
-        self.map_err(|e| e.inflate())
+    fn inflate<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Cons<TracedError<F>, End>, Index>,
+    {
+        self.map_err(TracedError::inflate)
     }
 }

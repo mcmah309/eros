@@ -1,25 +1,25 @@
 #![cfg_attr(feature = "nightly", feature(min_specialization))]
 
 mod context;
-mod generic_error;
-mod macros;
 mod error_union;
 mod error_union_to_enum;
+mod generic_error;
+mod macros;
 mod str_error;
 mod type_set;
 
-pub type UnionResult<T,E> = std::result::Result<T, ErrorUnion<E>>;
-pub type UResult<T,E> = UnionResult<T, E>;
+pub type UnionResult<T, E> = std::result::Result<T, ErrorUnion<E>>;
+pub type UResult<T, E> = UnionResult<T, E>;
 pub type TracedResult<T, E = Box<dyn BoxedError>> = std::result::Result<T, TracedError<E>>;
-pub type Result<T> = TracedResult<T>;
+pub type Result<T, E = Box<dyn BoxedError>> = TracedResult<T, E>;
 
 pub use context::Context;
-pub use error_union::InflateResult;
-pub use error_union::DeflateResult;
-pub use error_union::IntoUnion;
+pub use error_union::DeflateUnionResult;
+pub use error_union::InflateUnionResult;
+pub use error_union::IntoUnionResult;
 pub use generic_error::BoxedError;
-pub use generic_error::TracedError;
 pub use generic_error::IntoTracedError;
+pub use generic_error::TracedError;
 pub use str_error::StrError;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.

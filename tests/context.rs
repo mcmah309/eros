@@ -1,7 +1,8 @@
 #![cfg(feature = "nightly")]
 
 use eros::{
-    bail, traced, Context, DeflateResult, ErrorUnion, InflateResult, IntoTracedError, IntoUnion, StrError, TracedError, TracedResult
+    bail, traced, Context, DeflateUnionResult, ErrorUnion, InflateUnionResult, IntoTracedError, IntoUnionResult,
+    StrError, TracedError, TracedResult,
 };
 
 #[test]
@@ -82,9 +83,7 @@ fn bail() {
     }
 
     fn func2() -> eros::UnionResult<(), (TracedError,)> {
-        func1()
-            .context("From func2".to_string())
-            .inflate()
+        func1().context("From func2".to_string()).inflate()
     }
 
     fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {

@@ -16,6 +16,7 @@ impl<T> BoxedError for T where T: std::error::Error + Send + Sync + 'static {}
 
 impl std::error::Error for Box<dyn BoxedError> {}
 
+
 /// A generic error for propagating information about the error context. The caller may or may not care about
 /// type the underlying error type depending on if `T` is provided.
 ///
@@ -94,6 +95,9 @@ impl<T: BoxedError> fmt::Debug for TracedError<T> {
     }
 }
 
+// Into `TracedError`
+//************************************************************************//
+
 impl<T: BoxedError> std::error::Error for TracedError<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source.source()
@@ -115,6 +119,12 @@ impl From<&'static str> for TracedError {
 impl From<Cow<'static, str>> for TracedError {
     fn from(s: Cow<'static, str>) -> Self {
         TracedError::new(Box::new(StrError::from(s)))
+    }
+}
+
+impl<T: BoxedError> From<T> for TracedError<T> {
+    fn from(e: T) -> Self {
+        TracedError::new(e)
     }
 }
 
