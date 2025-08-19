@@ -12,3 +12,8 @@ readme = "README.md"
 
 [dev-dependencies]
 anyhow="1"
+
+[features]
+default = []
+# This needs specialization. Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type
+nightly = []

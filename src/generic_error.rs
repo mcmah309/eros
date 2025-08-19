@@ -155,6 +155,7 @@ where
 
 //************************************************************************//
 
+#[cfg(feature = "nightly")]
 #[cfg(test)]
 mod test {
     use crate::{Context, ErrorUnion, StrError, TracedError};

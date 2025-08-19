@@ -1,3 +1,5 @@
+#![cfg(feature = "nightly")]
+
 use eros::{
     bail, traced, Context, DeflateResult, ErrorUnion, InflateResult, IntoTracedError, IntoUnion, StrError, TracedError, TracedResult
 };

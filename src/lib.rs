@@ -1,4 +1,4 @@
-#![feature(min_specialization)]
+#![cfg_attr(feature = "nightly", feature(min_specialization))]
 
 mod context;
 mod generic_error;
