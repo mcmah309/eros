@@ -10,7 +10,7 @@ mod type_set;
 
 pub type UnionResult<T,E> = std::result::Result<T, ErrorUnion<E>>;
 pub type UResult<T,E> = UnionResult<T, E>;
-pub type TracedResult<T> = std::result::Result<T, TracedError>;
+pub type TracedResult<T, E = Box<dyn BoxedError>> = std::result::Result<T, TracedError<E>>;
 pub type Result<T> = TracedResult<T>;
 
 pub use context::Context;
