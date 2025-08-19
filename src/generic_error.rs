@@ -161,8 +161,21 @@ impl<E> IntoDynTracedError<TracedError> for E
 where
     E: std::error::Error + Send + Sync + 'static,
 {
+    #[cfg(feature = "nightly")]
+    default fn traced_dyn(self) -> TracedError {
+        TracedError::new(Box::new(self))
+    }
+
+    #[cfg(not(feature = "nightly"))]
     fn traced_dyn(self) -> TracedError {
         TracedError::new(Box::new(self))
+    }
+}
+
+#[cfg(feature = "nightly")]
+impl IntoDynTracedError<TracedError> for Box<dyn BoxedError + '_> {
+    fn traced_dyn(self) -> TracedError {
+        TracedError::new(self)
     }
 }
 
