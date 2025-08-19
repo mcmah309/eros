@@ -68,21 +68,21 @@ impl<T: BoxedError> Context<TracedError<T>> for TracedError<T> {
     }
 }
 
-pub trait HasContext: Any {
+pub trait Contextable: Any {
     fn add_context(&mut self, context: StrError);
 }
 
-impl<T: 'static> HasContext for T {
+impl<T: 'static> Contextable for T {
     default fn add_context(&mut self, _context: StrError) {}
 }
 
-impl HasContext for Box<dyn HasContext> {
+impl Contextable for Box<dyn Contextable + '_> {
     fn add_context(&mut self, context: StrError) {
         (**self).add_context(context);
     }
 }
 
-impl<T: BoxedError> HasContext for TracedError<T> {
+impl<T: BoxedError> Contextable for TracedError<T> {
     fn add_context(&mut self, context: StrError) {
         self.context.push(context);
     }

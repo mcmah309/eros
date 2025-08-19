@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::ops::Deref;
 use std::error::Error;
 
-use crate::context::HasContext;
+use crate::context::Contextable;
 use crate::generic_error::BoxedError;
 use crate::type_set::{
     Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
@@ -34,7 +34,7 @@ use crate::{Cons, End, TracedError};
 /// `ErrorUnion` also holds the the root backtrace and context provided
 /// throughout the call chain.
 pub struct ErrorUnion<E: TypeSet> {
-    pub(crate) value: Box<dyn HasContext>,
+    pub(crate) value: Box<dyn Contextable>,
     _pd: PhantomData<E>,
 }
 
@@ -67,7 +67,7 @@ where
     }
 }
 
-impl<T: HasContext> From<T> for ErrorUnion<(T,)>
+impl<T: Contextable> From<T> for ErrorUnion<(T,)>
 where
     T: 'static,
 {
@@ -115,7 +115,7 @@ where
     /// Create a new `ErrorUnion`.
     pub fn new<T, Index>(t: T) -> ErrorUnion<E>
     where
-        T: HasContext,
+        T: Contextable,
         E::Variants: Contains<T, Index>,
     {
         ErrorUnion {
