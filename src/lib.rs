@@ -23,7 +23,6 @@ pub use generic_error::IntoConcreteTracedError;
 pub use generic_error::IntoDynTracedError;
 pub use error_union::FlateUnionResult;
 pub use error_union::IntoUnionResult;
-pub use error_union::IntoUnion;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
 pub use error_union::ErrorUnion;

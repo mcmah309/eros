@@ -326,31 +326,32 @@ impl<S, F: 'static> IntoUnionResult<S, F> for Result<S, F> {
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
         Other::Variants: Contains<F, Index>,
     {
-        self.map_err(|e| e.union())
+        self.map_err(ErrorUnion::new)
     }
 }
 
-pub trait IntoUnion<F>
-where
-    F: Contextable,
-{
-    fn union<Index, Other>(self) -> ErrorUnion<Other>
-    where
-        Other: TypeSet,
-        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
-        Other::Variants: Contains<F, Index>;
-}
+// Commented out since it conflicts with the above and cant merge into one trait since the return type is attached to the method generic
+// pub trait IntoUnion<F>
+// where
+//     F: Contextable,
+// {
+//     fn union<Index, Other>(self) -> ErrorUnion<Other>
+//     where
+//         Other: TypeSet,
+//         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+//         Other::Variants: Contains<F, Index>;
+// }
 
-impl<F> IntoUnion<F> for F
-where
-    F: Contextable,
-{
-    fn union<Index, Other>(self) -> ErrorUnion<Other>
-    where
-        Other: TypeSet,
-        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
-        Other::Variants: Contains<F, Index>,
-    {
-        ErrorUnion::new(self)
-    }
-}
+// impl<F> IntoUnion<F> for F
+// where
+//     F: Contextable,
+// {
+//     fn union<Index, Other>(self) -> ErrorUnion<Other>
+//     where
+//         Other: TypeSet,
+//         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+//         Other::Variants: Contains<F, Index>,
+//     {
+//         ErrorUnion::new(self)
+//     }
+// }
