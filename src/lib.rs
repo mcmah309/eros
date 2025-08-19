@@ -13,15 +13,16 @@ pub type UResult<T, E> = UnionResult<T, E>;
 pub type TracedResult<T, E = Box<dyn BoxedError>> = std::result::Result<T, TracedError<E>>;
 pub type Result<T, E = Box<dyn BoxedError>> = TracedResult<T, E>;
 
-pub use context::Context;
-pub use error_union::DeflateUnionResult;
-pub use error_union::InflateUnionResult;
-pub use error_union::IntoUnionResult;
-pub use error_union::IntoUnion;
 pub use generic_error::BoxedError;
-pub use generic_error::IntoTracedError;
 pub use generic_error::TracedError;
 pub use str_error::StrError;
+
+//traits
+pub use context::Context;
+pub use generic_error::IntoTracedError;
+pub use error_union::FlateUnionResult;
+pub use error_union::IntoUnionResult;
+pub use error_union::IntoUnion;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.
 pub use error_union::ErrorUnion;

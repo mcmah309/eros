@@ -216,10 +216,18 @@ where
     }
 }
 
+impl<T: BoxedError> ErrorUnion<(TracedError<T>,)> {
+    pub fn traced(self) -> TracedError<T> {
+        match self.to_enum() {
+            crate::E1::A(traced_error) => traced_error,
+        }
+    }
+}
+
 //************************************************************************//
 
 /// Run inflate and deflate directly on Results with ErrorUnions
-pub trait InflateUnionResult<S, E>
+pub trait FlateUnionResult<S, E>
 where
     E: TypeSet,
 {
@@ -230,26 +238,7 @@ where
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>;
-}
 
-impl<S, E> InflateUnionResult<S, E> for Result<S, ErrorUnion<E>>
-where
-    E: TypeSet,
-{
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
-    where
-        Other: TypeSet,
-        Other::Variants: SupersetOf<E::Variants, Index>,
-    {
-        self.map_err(|e| e.inflate())
-    }
-}
-
-/// Run inflate and deflate directly on Results with ErrorUnions
-pub trait DeflateUnionResult<S, E>
-where
-    E: TypeSet,
-{
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `Result` with the `ErrorUnion` wither the remainder
     /// which does not contain that type as one of its possible variants.
@@ -267,10 +256,18 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> DeflateUnionResult<S, E> for Result<S, ErrorUnion<E>>
+impl<S, E> FlateUnionResult<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
+    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        Other::Variants: SupersetOf<E::Variants, Index>,
+    {
+        self.map_err(|e| e.inflate())
+    }
+
     fn deflate<Target, Index>(
         self,
     ) -> Result<
@@ -309,7 +306,7 @@ impl<S, F: 'static> IntoUnionResult<S, F> for Result<S, F> {
     where
         Other: TypeSet,
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
-        Other::Variants: Contains<F, Index>
+        Other::Variants: Contains<F, Index>,
     {
         self.map_err(|e| e.inflate())
     }

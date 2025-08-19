@@ -163,6 +163,19 @@ where
     }
 }
 
+impl<S, E> IntoTracedError<Result<S, TracedError<E>>, Result<S, TracedError>> for Result<S, ErrorUnion<(TracedError<E>,)>>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn traced(self) -> Result<S, TracedError<E>> {
+        self.map_err(|e| e.traced())
+    }
+
+    fn traced_dyn(self) -> Result<S, TracedError> {
+        self.map_err(|e| e.traced_dyn())
+    }
+}
+
 //************************************************************************//
 
 #[cfg(feature = "nightly")]
