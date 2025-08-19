@@ -296,27 +296,46 @@ where
 
 //************************************************************************//
 
-//************************************************************************//
-
-pub trait IntoUnionResult<S, F>
-where
-    F: BoxedError,
-{
+pub trait IntoUnionResult<S, F> {
     fn inflate<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<TracedError<F>, End>, Index>;
+        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+        Other::Variants: Contains<F, Index>;
 }
 
-impl<S, F> IntoUnionResult<S, F> for Result<S, TracedError<F>>
-where
-    F: BoxedError,
-{
+impl<S, F: 'static> IntoUnionResult<S, F> for Result<S, F> {
     fn inflate<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<TracedError<F>, End>, Index>,
+        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+        Other::Variants: Contains<F, Index>
     {
-        self.map_err(TracedError::inflate)
+        self.map_err(|e| e.inflate())
+    }
+}
+
+pub trait IntoUnion<F>
+where
+    F: Contextable,
+{
+    fn inflate<Index, Other>(self) -> ErrorUnion<Other>
+    where
+        Other: TypeSet,
+        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+        Other::Variants: Contains<F, Index>;
+}
+
+impl<F> IntoUnion<F> for F
+where
+    F: Contextable,
+{
+    fn inflate<Index, Other>(self) -> ErrorUnion<Other>
+    where
+        Other: TypeSet,
+        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+        Other::Variants: Contains<F, Index>,
+    {
+        ErrorUnion::new(self)
     }
 }
