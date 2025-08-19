@@ -216,10 +216,28 @@ where
     }
 }
 
+impl<T: 'static> ErrorUnion<(T,)> {
+    pub fn into_inner(self) -> T {
+        match self.to_enum() {
+            crate::E1::A(inner) => inner,
+        }
+    }
+}
+
 impl<T: BoxedError> ErrorUnion<(TracedError<T>,)> {
+    // Note: overrides the trait
     pub fn traced(self) -> TracedError<T> {
         match self.to_enum() {
-            crate::E1::A(traced_error) => traced_error,
+            crate::E1::A(inner) => inner,
+        }
+    }
+}
+
+impl ErrorUnion<(TracedError,)> {
+    // Note: overrides the trait
+    pub fn traced_dyn(self) -> TracedError {
+        match self.to_enum() {
+            crate::E1::A(inner) => inner,
         }
     }
 }
@@ -294,7 +312,7 @@ where
 //************************************************************************//
 
 pub trait IntoUnionResult<S, F> {
-    fn inflate<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
@@ -302,7 +320,7 @@ pub trait IntoUnionResult<S, F> {
 }
 
 impl<S, F: 'static> IntoUnionResult<S, F> for Result<S, F> {
-    fn inflate<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,

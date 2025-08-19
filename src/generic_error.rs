@@ -16,7 +16,6 @@ impl<T> BoxedError for T where T: std::error::Error + Send + Sync + 'static {}
 
 impl std::error::Error for Box<dyn BoxedError> {}
 
-
 /// A generic error for propagating information about the error context. The caller may or may not care about
 /// type the underlying error type depending on if `T` is provided.
 ///
@@ -130,49 +129,92 @@ impl<T: BoxedError> From<T> for TracedError<T> {
 
 //************************************************************************//
 
-pub trait IntoTracedError<O1, O2> {
-    /// Convert Error to `TraceError` keeping the underlying type
-    fn traced(self) -> O1;
+// pub trait IntoTracedError<O1, O2>: IntoTracedConcreteError<O1> + IntoTracedDynError<O2> {
+//     fn traced(self) -> O1;
+
+//     fn traced_dyn(self) -> O2;
+// }
+
+// impl<T, O1, O2> IntoTracedError<O1, O2> for T where
+//     T: IntoTracedConcreteError<O1> + IntoTracedDynError<O2>
+// {
+//     fn traced(self) -> O1 {
+//         <Self as IntoTracedConcreteError<O1>>::traced(self)
+//     }
+
+//     fn traced_dyn(self) -> O2 {
+//         <Self as IntoTracedDynError<O2>>::traced_dyn(self)
+//     }
+// }
+
+pub trait IntoDynTracedError<O2> {
     /// Convert Error to `TraceError` without caring about the underlying type
     fn traced_dyn(self) -> O2;
 }
 
-impl<E> IntoTracedError<TracedError<E>, TracedError> for E
+pub trait IntoConcreteTracedError<O1> {
+    /// Convert Error to `TraceError` keeping the underlying type
+    fn traced(self) -> O1;
+}
+
+impl<E> IntoDynTracedError<TracedError> for E
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn traced_dyn(self) -> TracedError {
+        TracedError::new(Box::new(self))
+    }
+}
+
+impl<E> IntoConcreteTracedError<TracedError<E>> for E
 where
     E: std::error::Error + Send + Sync + 'static,
 {
     fn traced(self) -> TracedError<E> {
         TracedError::new(self)
     }
+}
 
-    fn traced_dyn(self) -> TracedError {
-        TracedError::new(Box::new(self))
+impl<S, E> IntoDynTracedError<Result<S, TracedError>> for Result<S, E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    #[cfg(feature = "nightly")]
+    default fn traced_dyn(self) -> Result<S, TracedError> {
+        self.map_err(|e| e.traced_dyn())
+    }
+
+    #[cfg(not(feature = "nightly"))]
+    fn traced_dyn(self) -> Result<S, TracedError> {
+        self.map_err(|e| e.traced_dyn())
     }
 }
 
-impl<S, E> IntoTracedError<Result<S, TracedError<E>>, Result<S, TracedError>> for Result<S, E>
+impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
     fn traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.traced())
     }
+}
 
+#[cfg(feature = "nightly")]
+impl<S> IntoDynTracedError<Result<S, TracedError>>
+    for Result<S, ErrorUnion<(TracedError<Box<dyn BoxedError + '_>>,)>>
+{
     fn traced_dyn(self) -> Result<S, TracedError> {
-        self.map_err(|e| e.traced_dyn())
+        self.map_err(|e| e.into_inner())
     }
 }
 
-impl<S, E> IntoTracedError<Result<S, TracedError<E>>, Result<S, TracedError>> for Result<S, ErrorUnion<(TracedError<E>,)>>
+impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>>
+    for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
     fn traced(self) -> Result<S, TracedError<E>> {
-        self.map_err(|e| e.traced())
-    }
-
-    fn traced_dyn(self) -> Result<S, TracedError> {
-        self.map_err(|e| e.traced_dyn())
+        self.map_err(|e| e.into_inner())
     }
 }
 

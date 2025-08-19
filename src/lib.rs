@@ -19,7 +19,8 @@ pub use str_error::StrError;
 
 //traits
 pub use context::Context;
-pub use generic_error::IntoTracedError;
+pub use generic_error::IntoConcreteTracedError;
+pub use generic_error::IntoDynTracedError;
 pub use error_union::FlateUnionResult;
 pub use error_union::IntoUnionResult;
 pub use error_union::IntoUnion;
