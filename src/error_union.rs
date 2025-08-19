@@ -7,7 +7,7 @@ use std::error::Error;
 use crate::context::Contextable;
 use crate::generic_error::BoxedError;
 use crate::type_set::{
-    Contains, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
+    Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet
 };
 
 use crate::{Cons, End, TracedError};
@@ -79,10 +79,10 @@ where
 impl<E> fmt::Debug for ErrorUnion<E>
 where
     E: TypeSet,
-    E::Variants: fmt::Display + DisplayFold,
+    E::Variants: fmt::Debug + DebugFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, formatter)?;
+        E::Variants::debug_fold(self.value.as_ref() as &dyn Any, formatter)?;
         Ok(())
     }
 }
@@ -101,7 +101,7 @@ where
 impl<E> Error for ErrorUnion<E>
 where
     E: TypeSet,
-    E::Variants: Error + DisplayFold + ErrorFold,
+    E::Variants: Error + DebugFold + DisplayFold + ErrorFold,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         E::Variants::source_fold(self.value.as_ref() as &dyn Any)

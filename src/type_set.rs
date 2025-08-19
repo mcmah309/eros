@@ -83,31 +83,30 @@ where
 
 /* ------------------------- Debug support ----------------------- */
 
-// pub trait DebugFold {
-//     fn debug_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
-// }
+pub trait DebugFold {
+    fn debug_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
+}
 
-// impl DebugFold for End {
-//     fn debug_fold(_: &Box<dyn Any>, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         // unreachable!("debug_fold called on End");
-//         Ok(())
-//     }
-// }
+impl DebugFold for End {
+    fn debug_fold(_: &dyn Any, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unreachable!("debug_fold called on End");
+    }
+}
 
-// impl<Head, Tail> DebugFold for Cons<Head, Tail>
-// where
-//     Cons<Head, Tail>: fmt::Debug,
-//     Head: 'static + fmt::Debug,
-//     Tail: DebugFold,
-// {
-//     fn debug_fold(any: &Box<dyn Any>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         if let Some(head_ref) = any.downcast_ref::<Head>() {
-//             head_ref.fmt(formatter)
-//         } else {
-//             Tail::debug_fold(any, formatter)
-//         }
-//     }
-// }
+impl<Head, Tail> DebugFold for Cons<Head, Tail>
+where
+    Cons<Head, Tail>: fmt::Debug,
+    Head: 'static + fmt::Debug,
+    Tail: DebugFold,
+{
+    fn debug_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(head_ref) = any.downcast_ref::<Head>() {
+            head_ref.fmt(formatter)
+        } else {
+            Tail::debug_fold(any, formatter)
+        }
+    }
+}
 
 /* ------------------------- Any::is support ----------------------- */
 
