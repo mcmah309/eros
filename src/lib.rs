@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "nightly", feature(min_specialization))]
+#![doc = include_str!("../README.md")]
 
 mod context;
 mod error_union;

@@ -48,15 +48,15 @@ fn main() {
 There should be no boilerplate needed when handling single or multiple typed error
 
 ```rust
-use eros::{bail, FlateUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
+use eros::{bail, IntoConcreteTracedError, IntoUnionResult, TracedError};
 use std::io::{Error, ErrorKind};
 
-// Uses `ErrorUnion` to track each type. `TracedError` remains untyped and 
+// Uses `ErrorUnion` to track each type. `TracedError` remains untyped and
 // `TracedError<Error>` is typed.
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
     // inflate the `TracedResult` type to an `UnionResult` type
-    let val = func2().inflate()?;
-    let val = func3().inflate()?;
+    let val = func2().union()?;
+    let val = func3().union()?;
     Ok(val)
 }
 
@@ -75,8 +75,8 @@ fn main() {
 }
 ```
 
-`UnionResult` and the underlying `UnionError`, work with regular types as well, not just `TracedError`. Thus the signal could easily be something like 
-```rust,no_run
+`UnionResult` and the underlying `UnionError`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
+```rust,ignore
 fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 ```
 
@@ -89,8 +89,8 @@ use eros::{bail, FlateUnionResult, IntoConcreteTracedError, IntoUnionResult, Tra
 use std::io::{Error, ErrorKind};
 
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
-    let val = func2().inflate()?;
-    let val = func3().inflate()?;
+    let val = func2().union()?;
+    let val = func3().union()?;
     Ok(val)
 }
 
@@ -102,14 +102,14 @@ fn func3() -> eros::Result<(), Error> {
     return Err(Error::new(ErrorKind::AddrInUse, "message here")).traced();
 }
 
-// Error type is no longer tracked, we handled internally. Otherwise we could 
+// Error type is no longer tracked, we handled internally. Otherwise we could
 // have just turned the error back into a `TracedError`
 fn func4() -> eros::Result<()> {
     // Deflate the `ErrorUnion` and handle the `TracedError<Error>` case.
-    match func1().deflate::<TracedError<Error>,_>() {
+    match func1().deflate::<TracedError<Error>, _>() {
         Ok(traced_io_error) => {
             todo!()
-        },
+        }
         // The error type is now `ErrorUnion<(TracedError,)>`, thus we can convert into the inner traced type
         Err(result) => result.traced(),
     }
@@ -126,7 +126,7 @@ Errors should always provided context of the operations in the call stack that l
 
 ```rust
 use eros::{
-    bail, Context, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult, TracedError,
+    bail, Context, IntoDynTracedError, IntoUnionResult, TracedError,
 };
 use std::io::{Error, ErrorKind};
 
@@ -150,7 +150,6 @@ fn func3() -> eros::Result<()> {
         .context("This is some context");
 }
 
-#[test]
 fn main() {
     let out = func1().context("Last bit of context").unwrap_err();
     println!("{out:#?}");
