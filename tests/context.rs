@@ -1,7 +1,8 @@
 #![cfg(feature = "nightly")]
 
 use eros::{
-    bail, traced, Context, ErrorUnion, FlateUnionResult, IntoDynTracedError, IntoUnionResult, StrError, TracedError, TracedResult
+    bail, traced, Context, ErrorUnion, FlateUnionResult, IntoDynTracedError, IntoUnionResult,
+    TracedError, TracedResult,
 };
 
 #[test]
@@ -61,7 +62,7 @@ fn generic_context_error_to_error_union() {
 #[test]
 fn generic_error_to_error_union() {
     fn func1() -> Result<(), TracedError> {
-        return Err(bail!("This is root error message"));
+        bail!("This is root error message")
     }
 
     fn func2() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
