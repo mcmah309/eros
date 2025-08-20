@@ -8,16 +8,16 @@ Eros is the swish army knife of error handling approaches. It fits perfectly wel
 - [thiserror](https://github.com/dtolnay/thiserror)
 
 Eros is built on this philosophy:
-- Error types only matter when the caller cares about the type.
-- There should be no boilerplate needed when handling single or multiple typed errors.
-- Users should be able to seamlessly transition to and from fully typed errors.
-- Errors should always provided context of the operations in the call stack that lead to the error.
+1. [Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise.](#optional-typed-errors).
+2. [There should be no boilerplate needed when handling single or multiple typed errors.](#no-boilerplate)
+3. [Users should be able to seamlessly transition to and from fully typed errors.](#seamless-transitions-between-error-types)
+4. [Errors should always provided context of the operations in the call stack that lead to the error.](#errors-have-context)
 
 ## In Philosophy In Action
 
-### Error types only matter when the caller cares about the type
+### Optional Typed Errors
 
-Error types should matter when the caller cares about the type. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. Thus improving ergonomics.
+Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. Thus improving ergonomics.
 
 ```rust
 use eros::{bail, IntoDynTracedError};
@@ -43,7 +43,7 @@ fn main() {
 }
 ```
 
-### There should be no boilerplate needed when handling single or multiple typed error
+### No Boilerplate
 
 There should be no boilerplate needed when handling single or multiple typed error
 
@@ -80,7 +80,7 @@ fn main() {
 fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 ```
 
-### Users should be able to seamlessly transition to and from fully typed errors
+### Seamless Transitions Between Error Types
 
 Users should be able to seamlessly transition to and from fully typed errors
 
@@ -120,7 +120,7 @@ fn main() {
 }
 ```
 
-### Errors should always provided context of the operations in the call stack that lead to the error
+### Errors Have Context
 
 Errors should always provided context of the operations in the call stack that lead to the error.
 
