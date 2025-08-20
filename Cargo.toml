@@ -15,5 +15,5 @@ anyhow="1"
 
 [features]
 default = []
-# This needs specialization. Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type
-nightly = []
+# This requires the `min_specialization` feature. Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type. And improve some operations.
+min_specialization = []

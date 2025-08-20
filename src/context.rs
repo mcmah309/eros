@@ -4,7 +4,7 @@ use crate::{
     generic_error::{BoxedError, TracedError},
     str_error::StrError,
 };
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 use crate::{type_set::TypeSet, ErrorUnion};
 
 /// Provides `context` methods to add context to `Result`.
@@ -18,7 +18,7 @@ pub trait Context<O> {
         F: FnOnce() -> C;
 }
 
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 impl<T, E> Context<Result<T, ErrorUnion<E>>> for Result<T, ErrorUnion<E>>
 where
     E: TypeSet,
@@ -76,18 +76,18 @@ pub trait Contextable: Any {
 }
 
 impl<T: 'static> Contextable for T {
-    #[cfg(feature = "nightly")]
+    #[cfg(feature = "min_specialization")]
     default fn add_context(&mut self, _context: StrError) {}
-    #[cfg(not(feature = "nightly"))]
+    #[cfg(not(feature = "min_specialization"))]
     fn add_context(&mut self, _context: StrError) {}
 }
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 impl Contextable for Box<dyn Contextable + '_> {
     fn add_context(&mut self, context: StrError) {
         (**self).add_context(context);
     }
 }
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 impl<T: BoxedError> Contextable for TracedError<T> {
     fn add_context(&mut self, context: StrError) {
         self.context.push(context);

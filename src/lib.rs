@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "nightly", feature(min_specialization))]
+#![cfg_attr(feature = "min_specialization", feature(min_specialization))]
 #![doc = include_str!("../README.md")]
 
 mod context;

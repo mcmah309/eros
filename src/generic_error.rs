@@ -161,18 +161,18 @@ impl<E> IntoDynTracedError<TracedError> for E
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    #[cfg(feature = "nightly")]
+    #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> TracedError {
         TracedError::new(Box::new(self))
     }
 
-    #[cfg(not(feature = "nightly"))]
+    #[cfg(not(feature = "min_specialization"))]
     fn traced_dyn(self) -> TracedError {
         TracedError::new(Box::new(self))
     }
 }
 
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 impl IntoDynTracedError<TracedError> for Box<dyn BoxedError + '_> {
     fn traced_dyn(self) -> TracedError {
         TracedError::new(self)
@@ -192,12 +192,12 @@ impl<S, E> IntoDynTracedError<Result<S, TracedError>> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    #[cfg(feature = "nightly")]
+    #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.traced_dyn())
     }
 
-    #[cfg(not(feature = "nightly"))]
+    #[cfg(not(feature = "min_specialization"))]
     fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.traced_dyn())
     }
@@ -212,7 +212,7 @@ where
     }
 }
 
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 impl<S> IntoDynTracedError<Result<S, TracedError>>
     for Result<S, ErrorUnion<(TracedError<Box<dyn BoxedError + '_>>,)>>
 {
@@ -233,7 +233,7 @@ where
 
 //************************************************************************//
 
-#[cfg(feature = "nightly")]
+#[cfg(feature = "min_specialization")]
 #[cfg(test)]
 mod test {
     use crate::{Context, ErrorUnion, StrError, TracedError};

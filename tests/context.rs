@@ -1,41 +1,45 @@
-#![cfg(feature = "nightly")]
-
 use eros::{
-    bail, traced, Context, ErrorUnion, FlateUnionResult, IntoDynTracedError, IntoUnionResult,
-    TracedError, TracedResult,
+    bail, traced, Context, ErrorUnion, IntoDynTracedError, IntoUnionResult, TracedError,
+    TracedResult,
 };
 
-#[test]
-fn error_union() {
-    fn func1() -> eros::UnionResult<(), (std::io::Error,)> {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::AddrInUse,
-            "Address in use message here",
-        )
-        .into());
-    }
+#[cfg(feature = "min_specialization")]
+#[cfg(test)]
+mod min_specialization {
+    use eros::{Context, ErrorUnion, FlateUnionResult};
 
-    fn func2() -> Result<(), ErrorUnion<(i32, std::io::Error)>> {
-        func1().context("From func2".to_string()).inflate()
-    }
+    #[test]
+    fn error_union() {
+        fn func1() -> eros::UnionResult<(), (std::io::Error,)> {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AddrInUse,
+                "Address in use message here",
+            )
+            .into());
+        }
 
-    fn func3() -> eros::UnionResult<(), (std::io::Error, i32, bool)> {
-        return func2()
-            .with_context(|| "From func3")
-            .map_err(ErrorUnion::inflate);
-    }
+        fn func2() -> Result<(), ErrorUnion<(i32, std::io::Error)>> {
+            func1().context("From func2".to_string()).inflate()
+        }
 
-    fn func4() -> eros::UnionResult<(), (std::io::Error, bool)> {
-        return match func3().with_context(|| "From func4").deflate::<i32, _>() {
-            Ok(_) => panic!("should exist"),
-            Err(result) => result,
-        };
-    }
+        fn func3() -> eros::UnionResult<(), (std::io::Error, i32, bool)> {
+            return func2()
+                .with_context(|| "From func3")
+                .map_err(ErrorUnion::inflate);
+        }
 
-    let result: Result<(), ErrorUnion<(std::io::Error, i32, bool)>> = func3();
-    println!("{:?}", result.unwrap_err());
-    let result: Result<(), ErrorUnion<(std::io::Error, bool)>> = func4();
-    println!("{:?}", result.unwrap_err());
+        fn func4() -> eros::UnionResult<(), (std::io::Error, bool)> {
+            return match func3().with_context(|| "From func4").deflate::<i32, _>() {
+                Ok(_) => panic!("should exist"),
+                Err(result) => result,
+            };
+        }
+
+        let result: Result<(), ErrorUnion<(std::io::Error, i32, bool)>> = func3();
+        println!("{:?}", result.unwrap_err());
+        let result: Result<(), ErrorUnion<(std::io::Error, bool)>> = func4();
+        println!("{:?}", result.unwrap_err());
+    }
 }
 
 #[test]
@@ -49,9 +53,7 @@ fn generic_context_error_to_error_union() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func2()
-            .map_err(TracedError::inflate)
-            .context("Error union context")
+        func2().map_err(TracedError::inflate)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
@@ -66,9 +68,7 @@ fn generic_error_to_error_union() {
     }
 
     fn func2() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func1()
-            .map_err(TracedError::inflate)
-            .context("Error union context")
+        func1().map_err(TracedError::inflate)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func2();
@@ -87,9 +87,7 @@ fn bail() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {
-        return func2()
-            .with_context(|| "From func3")
-            .map_err(ErrorUnion::inflate);
+        return func2().map_err(ErrorUnion::inflate);
     }
 
     fn func4() -> TracedResult<()> {
