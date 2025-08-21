@@ -29,12 +29,31 @@ where
     pub(crate) context: Vec<StrError>,
 }
 
+impl TracedError {
+    pub fn boxed<E: AnyError>(source: E) -> TracedError {
+        TracedError::new(Box::new(source))
+    }
+
+    // Note: overrides extension
+    pub fn traced_dyn(self) -> TracedError {
+        self
+    }
+}
+
 impl<T: AnyError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
             source: source,
             backtrace: Backtrace::capture(),
             context: Vec::new(),
+        }
+    }
+
+    pub fn into_dyn(self) -> TracedError {
+        TracedError {
+            source: Box::new(self.source),
+            backtrace: self.backtrace,
+            context: self.context,
         }
     }
 
@@ -63,6 +82,11 @@ impl<T: AnyError> TracedError<T> {
     {
         let error: ErrorUnion<(TracedError<T>,)> = self.into();
         error.inflate()
+    }
+
+    // Note: overrides extension
+    pub fn traced(self) -> TracedError<T> {
+        self
     }
 }
 
@@ -218,6 +242,24 @@ impl<S> IntoDynTracedError<Result<S, TracedError>>
 {
     fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.into_inner())
+    }
+}
+
+#[cfg(feature = "min_specialization")]
+impl<S, E: AnyError> IntoDynTracedError<Result<S, TracedError>>
+    for Result<S, ErrorUnion<(TracedError<E>,)>>
+{
+    default fn traced_dyn(self) -> Result<S, TracedError> {
+        self.map_err(|e| e.into_inner().into_dyn())
+    }
+}
+
+#[cfg(feature = "min_specialization")]
+impl<S> IntoDynTracedError<Result<S, TracedError>>
+    for Result<S, TracedError<Box<dyn AnyError + '_>>>
+{
+    fn traced_dyn(self) -> Result<S, TracedError> {
+        self
     }
 }
 
