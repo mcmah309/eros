@@ -274,15 +274,36 @@ Backtrace:
 
 ```rust
 use eros::{
-    traced, Context, FlateUnionResult, IntoConcreteTracedError, IntoDynTracedError,
-    IntoUnionResult, TracedError,
+    bail, Context, FlateUnionResult, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult,
+    TracedError,
 };
-use reqwest::blocking::Client;
+use reqwest::blocking::{Client, Response};
 use std::thread::sleep;
 use std::time::Duration;
 
+// Add tracing to an error by wrapping it in a `TraceError`.
+// When we don't care about the error type we can use `eros::Result<_>` which has tracing.
+// `eros::Result<_>` === `Result<_,TracedError>` === `TracedResult<_>`
+// When we *do* care about the error type we can use `eros::Result<_,_>` which also has tracing but preserves the error type.
+// `eros::Result<_,_>` === `Result<_,TracedError<_>>` === `TracedResult<_,_>`
+// In the below example we don't preserve the error type.
+fn handle_response(res: Response) -> eros::Result<String> {
+    if !res.status().is_success() {
+        // `bail!` to directly bail with the error message.
+        // See `traced!` to create a `TraceError` without bailing.
+        bail!("Bad response: {}", res.status());
+    }
+
+    let body = res
+        .text()
+        // Trace the `Err` without the type (`TracedError`)
+        .traced_dyn()
+        // Add context to the traced error if an `Err`
+        .context("while reading response body")?;
+    Ok(body)
+}
+
 // Explicitly handle multiple Err types at the same time with `UnionResult`
-// Add tracing to an error by wrapping it in a `TraceError`
 // `UnionResult<_,_>` === `Result<_,ErrorUnion<_>>`
 fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error>, TracedError)> {
     let client = Client::new();
@@ -292,28 +313,15 @@ fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error
         .send()
         // Explicitly trace the `Err` with the type (`TracedError<reqwest::Error>`)
         .traced()
-        // Add context to the traced error if an `Err`
+        // Add lazy context to the traced error if an `Err`
         .with_context(|| format!("Url: {url}"))
         // Convert the `TracedError<reqwest::Error>` into a `UnionError<_>`.
-        // If this type was already and `UnionError` we would call `inflate` instead.
+        // If this type was already a `UnionError`, we would call `inflate` instead.
         .union()?;
 
-    if !res.status().is_success() {
-        // `traced!` create a `TraceError`. See also `bail!`.
-        Err(traced!("Bad response: {}", res.status())).union()?;
-    }
-
-    let body = res
-        .text()
-        // Trace the `Err` without the type (`TracedError`)
-        .traced_dyn()
-        .context("while reading response body")
-        .union()?;
-
-    Ok(body)
+    handle_response(res).union()
 }
 
-// `eros::Result<_>` === `Result<_,TracedError>` === `TracedResult<_>`
 fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
     let mut attempts = 0;
 
@@ -331,7 +339,7 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
                 }
             }
             // `result` is now `UnionResult<String,(TracedError,)>`, so we convert the `Err` type
-            // into `TracedError`. Thus `Result<String,TracedError>`
+            // into `TracedError`. Thus, we now have a `Result<String,TracedError>`.
             Err(result) => return result.map_err(|e| e.into_inner()),
         }
     }
@@ -366,13 +374,13 @@ Backtrace:
    4: <core::result::Result<S,E> as eros::generic_error::IntoConcreteTracedError<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced
              at ./src/generic_error.rs:235:14
    5: x::fetch_url
-             at ./tests/x.rs:15:10
+             at ./tests/x.rs:39:10
    6: x::fetch_with_retry
-             at ./tests/x.rs:38:15
+             at ./tests/x.rs:56:15
    7: x::main
-             at ./tests/x.rs:54:11
+             at ./tests/x.rs:74:11
    8: x::main::{{closure}}
-             at ./tests/x.rs:53:10
+             at ./tests/x.rs:73:10
    9: core::ops::function::FnOnce::call_once
              at /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:253:5
   10: core::ops::function::FnOnce::call_once
