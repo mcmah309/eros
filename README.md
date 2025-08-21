@@ -12,7 +12,7 @@ Eros is the swish army knife of error handling approaches. It fits perfectly wel
 - [thiserror](https://github.com/dtolnay/thiserror)
 
 Eros is built on this philosophy:
-1. [Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise.](#optional-typed-errors).
+1. [Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise.](#optional-typed-errors)
 2. [There should be no boilerplate needed when handling single or multiple typed errors.](#no-boilerplate)
 3. [Users should be able to seamlessly transition to and from fully typed errors.](#seamless-transitions-between-error-types)
 4. [Errors should always provided context of the operations in the call stack that lead to the error.](#errors-have-context)
@@ -49,7 +49,7 @@ fn main() {
 
 ### No Boilerplate
 
-There should be no boilerplate needed when handling single or multiple typed error
+There should be no boilerplate needed when handling single or multiple typed error.
 
 ```rust
 use eros::{bail, IntoConcreteTracedError, IntoUnionResult, TracedError};
@@ -86,7 +86,7 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 
 ### Seamless Transitions Between Error Types
 
-Users should be able to seamlessly transition to and from fully typed errors
+Users should be able to seamlessly transition to and from fully typed errors.
 
 ```rust
 use eros::{bail, FlateUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
@@ -165,10 +165,6 @@ fn main() {
 }
 ```
 
-<details>
-
-  <summary>Output</summary>
-
 ```console
 Something went wrong
 
@@ -243,5 +239,3 @@ Backtrace:
   32:     0x7f20d3477c3c - <unknown>
   33:                0x0 - <unknown>
   ```
-
-</details>
