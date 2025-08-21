@@ -11,7 +11,7 @@ Eros is the swish army knife of error handling approaches. It fits perfectly wel
 - [error_set](https://github.com/mcmah309/error_set)
 - [thiserror](https://github.com/dtolnay/thiserror)
 
-Eros is built on this philosophy:
+Eros is built on the following philosophy:
 1. [Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise.](#optional-typed-errors)
 2. [There should be no boilerplate needed when handling single or multiple typed errors.](#no-boilerplate)
 3. [Users should be able to seamlessly transition to and from fully typed errors.](#seamless-transitions-between-error-types)
