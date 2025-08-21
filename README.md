@@ -106,8 +106,7 @@ fn func3() -> eros::Result<(), Error> {
     return Err(Error::new(ErrorKind::AddrInUse, "message here")).traced();
 }
 
-// Error type is no longer tracked, we handled internally. Otherwise we could
-// have just turned the error back into a `TracedError`
+// Error type is no longer tracked, we handled internally.
 fn func4() -> eros::Result<()> {
     // Deflate the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
     match func1().deflate::<TracedError<Error>, _>() {
