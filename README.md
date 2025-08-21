@@ -281,7 +281,7 @@ use reqwest::blocking::{Client, Response};
 use std::thread::sleep;
 use std::time::Duration;
 
-// Add tracing to an error by wrapping it in a `TraceError`.
+// Add tracing to an error by wrapping it in a `TracedError`.
 // When we don't care about the error type we can use `eros::Result<_>` which has tracing.
 // `eros::Result<_>` === `Result<_,TracedError>` === `TracedResult<_>`
 // When we *do* care about the error type we can use `eros::Result<_,_>` which also has tracing but preserves the error type.
@@ -290,7 +290,7 @@ use std::time::Duration;
 fn handle_response(res: Response) -> eros::Result<String> {
     if !res.status().is_success() {
         // `bail!` to directly bail with the error message.
-        // See `traced!` to create a `TraceError` without bailing.
+        // See `traced!` to create a `TracedError` without bailing.
         bail!("Bad response: {}", res.status());
     }
 
