@@ -114,8 +114,10 @@ fn func4() -> eros::Result<()> {
         Ok(traced_io_error) => {
             todo!()
         }
-        // The error type is now `ErrorUnion<(TracedError,)>`, thus we can convert into the inner traced type
-        Err(result) => result.traced(),
+        // The error type is now a union with a single type (`ErrorUnion<(TracedError,)>`), 
+        // thus we can convert into the inner traced type.
+        // Alternatively, we could just call `traced` on `result` to accomplish the same thing
+        Err(result) => result.map_err(|e| e.into_inner()),
     }
 }
 
@@ -155,7 +157,7 @@ fn func3() -> eros::Result<()> {
 }
 
 fn main() {
-    // Can add context to `ErrorUnion` when the `min_specialization` feature is enabled
+    // Can add context to `ErrorUnion` when the `min_specialization` feature flag is enabled
     // let out = func1().context("Last bit of context").unwrap_err();
     let out = func1();
     println!("{out:#?}");

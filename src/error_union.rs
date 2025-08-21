@@ -7,7 +7,7 @@ use std::error::Error;
 use crate::context::Contextable;
 use crate::generic_error::AnyError;
 use crate::type_set::{
-    Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet
+    Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
 };
 
 use crate::{Cons, End, TracedError};
@@ -225,20 +225,16 @@ impl<T: 'static> ErrorUnion<(T,)> {
 }
 
 impl<T: AnyError> ErrorUnion<(TracedError<T>,)> {
-    // Note: overrides the trait
+    // Note: overrides the trait so we don't just wrap in another TracedError
     pub fn traced(self) -> TracedError<T> {
-        match self.to_enum() {
-            crate::E1::A(inner) => inner,
-        }
+        self.into_inner()
     }
 }
 
 impl ErrorUnion<(TracedError,)> {
-    // Note: overrides the trait
+    // Note: overrides the trait so we don't just wrap in another TracedError
     pub fn traced_dyn(self) -> TracedError {
-        match self.to_enum() {
-            crate::E1::A(inner) => inner,
-        }
+        self.into_inner()
     }
 }
 
