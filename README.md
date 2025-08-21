@@ -281,22 +281,31 @@ use reqwest::blocking::Client;
 use std::thread::sleep;
 use std::time::Duration;
 
+// Explicitly handle multiple Err types at the same time with `UnionResult`
+// Add tracing to an error by wrapping it in a `TraceError`
+// `UnionResult<_,_>` === `Result<_,ErrorUnion<_>>`
 fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error>, TracedError)> {
     let client = Client::new();
 
     let res = client
         .get(url)
         .send()
+        // Explicitly trace the `Err` with the type (`TracedError<reqwest::Error>`)
         .traced()
+        // Add context to the traced error if an `Err`
         .with_context(|| format!("Url: {url}"))
+        // Convert the `TracedError<reqwest::Error>` into a `UnionError<_>`.
+        // If this type was already and `UnionError` we would call `inflate` instead.
         .union()?;
 
     if !res.status().is_success() {
+        // `traced!` create a `TraceError`. See also `bail!`.
         Err(traced!("Bad response: {}", res.status())).union()?;
     }
 
     let body = res
         .text()
+        // Trace the `Err` without the type (`TracedError`)
         .traced_dyn()
         .context("while reading response body")
         .union()?;
@@ -304,12 +313,14 @@ fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error
     Ok(body)
 }
 
+// `eros::Result<_>` === `Result<_,TracedError>` === `TracedResult<_>`
 fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
     let mut attempts = 0;
 
     loop {
         attempts += 1;
 
+        // Handle one of the error types explicitly with `deflate`!
         match fetch_url(url).deflate::<TracedError<reqwest::Error>, _>() {
             Ok(request_error) => {
                 if attempts < retries {
@@ -319,13 +330,15 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
                     return Err(request_error.into_dyn().context("Retries exceeded"));
                 }
             }
+            // `result` is now `UnionResult<String,(TracedError,)>`, so we convert the `Err` type
+            // into `TracedError`. Thus `Result<String,TracedError>`
             Err(result) => return result.map_err(|e| e.into_inner()),
         }
     }
 }
 
 fn main() {
-    match fetch_with_retry("https://badurl214651523152316hng.com", 3) {
+    match fetch_with_retry("https://badurl214651523152316hng.com", 3).context("Fetch failed") {
         Ok(body) => println!("Ok Body:\n{body}"),
         Err(err) => eprintln!("Error:\n{err:?}"),
     }
@@ -339,6 +352,7 @@ error sending request
 Context:
         - Url: https://badurl214651523152316hng.com
         - Retries exceeded
+        - Fetch failed
 
 Backtrace:
    0: eros::generic_error::TracedError<T>::new
