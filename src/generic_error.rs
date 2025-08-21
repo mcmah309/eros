@@ -10,26 +10,26 @@ use crate::{
     Cons, End, ErrorUnion,
 };
 
-pub trait BoxedError: std::error::Error + Send + Sync + 'static {}
+pub trait AnyError: std::error::Error + Send + Sync + 'static {}
 
-impl<T> BoxedError for T where T: std::error::Error + Send + Sync + 'static {}
+impl<T> AnyError for T where T: std::error::Error + Send + Sync + 'static {}
 
-impl std::error::Error for Box<dyn BoxedError> {}
+impl std::error::Error for Box<dyn AnyError> {}
 
 /// A generic error for propagating information about the error context. The caller may or may not care about
 /// type the underlying error type depending on if `T` is provided.
 ///
 /// Context is intended to be added at different levels in the call stack with `context` or `with_context` methods.
-pub struct TracedError<T = Box<dyn BoxedError>>
+pub struct TracedError<T = Box<dyn AnyError>>
 where
-    T: BoxedError,
+    T: AnyError,
 {
     source: T,
     pub(crate) backtrace: Backtrace,
     pub(crate) context: Vec<StrError>,
 }
 
-impl<T: BoxedError> TracedError<T> {
+impl<T: AnyError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
             source: source,
@@ -66,7 +66,7 @@ impl<T: BoxedError> TracedError<T> {
     }
 }
 
-impl<T: BoxedError> fmt::Display for TracedError<T> {
+impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.source)?;
         if !self.context.is_empty() {
@@ -79,7 +79,7 @@ impl<T: BoxedError> fmt::Display for TracedError<T> {
     }
 }
 
-impl<T: BoxedError> fmt::Debug for TracedError<T> {
+impl<T: AnyError> fmt::Debug for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.source)?;
         if !self.context.is_empty() {
@@ -97,7 +97,7 @@ impl<T: BoxedError> fmt::Debug for TracedError<T> {
 // Into `TracedError`
 //************************************************************************//
 
-impl<T: BoxedError> std::error::Error for TracedError<T> {
+impl<T: AnyError> std::error::Error for TracedError<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source.source()
     }
@@ -121,7 +121,7 @@ impl From<Cow<'static, str>> for TracedError {
     }
 }
 
-impl<T: BoxedError> From<T> for TracedError<T> {
+impl<T: AnyError> From<T> for TracedError<T> {
     fn from(e: T) -> Self {
         TracedError::new(e)
     }
@@ -173,7 +173,7 @@ where
 }
 
 #[cfg(feature = "min_specialization")]
-impl IntoDynTracedError<TracedError> for Box<dyn BoxedError + '_> {
+impl IntoDynTracedError<TracedError> for Box<dyn AnyError + '_> {
     fn traced_dyn(self) -> TracedError {
         TracedError::new(self)
     }
@@ -214,7 +214,7 @@ where
 
 #[cfg(feature = "min_specialization")]
 impl<S> IntoDynTracedError<Result<S, TracedError>>
-    for Result<S, ErrorUnion<(TracedError<Box<dyn BoxedError + '_>>,)>>
+    for Result<S, ErrorUnion<(TracedError<Box<dyn AnyError + '_>>,)>>
 {
     fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.into_inner())

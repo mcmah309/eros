@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use crate::{
-    generic_error::{BoxedError, TracedError},
+    generic_error::{AnyError, TracedError},
     str_error::StrError,
 };
 #[cfg(feature = "min_specialization")]
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<T, E: BoxedError> Context<Result<T, TracedError<E>>> for Result<T, TracedError<E>> {
+impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedError<E>> {
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
         self.map_err(|e| e.context(context))
     }
@@ -54,7 +54,7 @@ impl<T, E: BoxedError> Context<Result<T, TracedError<E>>> for Result<T, TracedEr
     }
 }
 
-impl<T: BoxedError> Context<TracedError<T>> for TracedError<T> {
+impl<T: AnyError> Context<TracedError<T>> for TracedError<T> {
     fn context<C: Into<StrError>>(mut self, context: C) -> TracedError<T> {
         self.context.push(context.into());
         self
@@ -88,7 +88,7 @@ impl Contextable for Box<dyn Contextable + '_> {
     }
 }
 #[cfg(feature = "min_specialization")]
-impl<T: BoxedError> Contextable for TracedError<T> {
+impl<T: AnyError> Contextable for TracedError<T> {
     fn add_context(&mut self, context: StrError) {
         self.context.push(context);
     }

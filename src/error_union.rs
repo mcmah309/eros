@@ -5,7 +5,7 @@ use core::ops::Deref;
 use std::error::Error;
 
 use crate::context::Contextable;
-use crate::generic_error::BoxedError;
+use crate::generic_error::AnyError;
 use crate::type_set::{
     Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet
 };
@@ -224,7 +224,7 @@ impl<T: 'static> ErrorUnion<(T,)> {
     }
 }
 
-impl<T: BoxedError> ErrorUnion<(TracedError<T>,)> {
+impl<T: AnyError> ErrorUnion<(TracedError<T>,)> {
     // Note: overrides the trait
     pub fn traced(self) -> TracedError<T> {
         match self.to_enum() {

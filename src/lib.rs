@@ -11,10 +11,10 @@ mod type_set;
 
 pub type UnionResult<T, E> = std::result::Result<T, ErrorUnion<E>>;
 pub type UResult<T, E> = UnionResult<T, E>;
-pub type TracedResult<T, E = Box<dyn BoxedError>> = std::result::Result<T, TracedError<E>>;
-pub type Result<T, E = Box<dyn BoxedError>> = TracedResult<T, E>;
+pub type TracedResult<T, E = Box<dyn AnyError>> = std::result::Result<T, TracedError<E>>;
+pub type Result<T, E = Box<dyn AnyError>> = TracedResult<T, E>;
 
-pub use generic_error::BoxedError;
+pub use generic_error::AnyError;
 pub use generic_error::TracedError;
 pub use str_error::StrError;
 
