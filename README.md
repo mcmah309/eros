@@ -136,11 +136,11 @@ use std::io::{Error, ErrorKind};
 
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
     let val = func2()
-        .union()
-        .with_context(|| format!("This is some more context"))?;
+        .with_context(|| format!("This is some more context"))
+        .union()?;
     let val = func3()
-        .union()
-        .context(format!("This is some more context"))?;
+        .context(format!("This is some more context"))
+        .union()?;
     Ok(val)
 }
 
@@ -155,7 +155,9 @@ fn func3() -> eros::Result<()> {
 }
 
 fn main() {
-    let out = func1().context("Last bit of context").unwrap_err();
+    // Can add context to `ErrorUnion` when the `min_specialization` feature is enabled
+    // let out = func1().context("Last bit of context").unwrap_err();
+    let out = func1();
     println!("{out:#?}");
 }
 ```
