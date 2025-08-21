@@ -127,6 +127,36 @@ fn main() {
 }
 ```
 
+And to expand an `ErrorUnion` just call `inflate`
+
+```rust
+use eros::{FlateUnionResult, IntoUnionResult};
+use std::io::Error;
+
+fn func1() -> eros::UnionResult<(), (Error, String)> {
+    Ok(())
+}
+
+fn func2() -> eros::UnionResult<(), (i32, u16)> {
+    Ok(())
+}
+
+fn func3() -> Result<(), f64> {
+    Ok(())
+}
+
+fn func4() -> eros::UnionResult<(), (Error, String, i32, u16, f64)> {
+    func1().inflate()?;
+    func2().inflate()?;
+    func3().union()?;
+    Ok(())
+}
+
+fn main() {
+    func4();
+}
+```
+
 ### Errors Have Context
 
 Errors should always provided context of the operations in the call stack that lead to the error.
