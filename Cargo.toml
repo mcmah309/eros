@@ -11,9 +11,9 @@ keywords = ["error", "error-handling"]
 readme = "README.md"
 
 [dev-dependencies]
-anyhow="1"
+reqwest = { version = "0.12", features = ["blocking"] }
 
 [features]
-default = []
+default = ["min_specialization"]
 # This requires the `min_specialization` feature. Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type. And improve some operations.
 min_specialization = []

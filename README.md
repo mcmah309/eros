@@ -269,3 +269,140 @@ Backtrace:
   32:     0x7f20d3477c3c - <unknown>
   33:                0x0 - <unknown>
   ```
+
+## Putting It All Together
+
+```rust
+use eros::{
+    traced, Context, FlateUnionResult, IntoConcreteTracedError, IntoDynTracedError,
+    IntoUnionResult, TracedError,
+};
+use reqwest::blocking::Client;
+use std::thread::sleep;
+use std::time::Duration;
+
+fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error>, TracedError)> {
+    let client = Client::new();
+
+    let res = client
+        .get(url)
+        .send()
+        .traced()
+        .with_context(|| format!("Url: {url}"))
+        .union()?;
+
+    if !res.status().is_success() {
+        Err(traced!("Bad response: {}", res.status())).union()?;
+    }
+
+    let body = res
+        .text()
+        .traced_dyn()
+        .context("while reading response body")
+        .union()?;
+
+    Ok(body)
+}
+
+fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
+    let mut attempts = 0;
+
+    loop {
+        attempts += 1;
+
+        match fetch_url(url).deflate::<TracedError<reqwest::Error>, _>() {
+            Ok(request_error) => {
+                if attempts < retries {
+                    sleep(Duration::from_millis(200));
+                    continue;
+                } else {
+                    return Err(request_error.into_dyn().context("Retries exceeded"));
+                }
+            }
+            Err(result) => return result.map_err(|e| e.into_inner()),
+        }
+    }
+}
+
+fn main() {
+    match fetch_with_retry("https://badurl214651523152316hng.com", 3) {
+        Ok(body) => println!("Ok Body:\n{body}"),
+        Err(err) => eprintln!("Error:\n{err:?}"),
+    }
+}
+```
+Output:
+```console
+Error:
+error sending request
+
+Context:
+        - Url: https://badurl214651523152316hng.com
+        - Retries exceeded
+
+Backtrace:
+   0: eros::generic_error::TracedError<T>::new
+             at ./src/generic_error.rs:47:24
+   1: <E as eros::generic_error::IntoConcreteTracedError<eros::generic_error::TracedError<E>>>::traced
+             at ./src/generic_error.rs:211:9
+   2: <core::result::Result<S,E> as eros::generic_error::IntoConcreteTracedError<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced::{{closure}}
+             at ./src/generic_error.rs:235:28
+   3: core::result::Result<T,E>::map_err
+             at /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:914:27
+   4: <core::result::Result<S,E> as eros::generic_error::IntoConcreteTracedError<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced
+             at ./src/generic_error.rs:235:14
+   5: x::fetch_url
+             at ./tests/x.rs:15:10
+   6: x::fetch_with_retry
+             at ./tests/x.rs:38:15
+   7: x::main
+             at ./tests/x.rs:54:11
+   8: x::main::{{closure}}
+             at ./tests/x.rs:53:10
+   9: core::ops::function::FnOnce::call_once
+             at /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:253:5
+  10: core::ops::function::FnOnce::call_once
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/ops/function.rs:253:5
+  11: test::__rust_begin_short_backtrace
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:648:18
+  12: test::run_test_in_process::{{closure}}
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:671:74
+  13: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/panic/unwind_safe.rs:272:9
+  14: std::panicking::catch_unwind::do_call
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:589:40
+  15: std::panicking::catch_unwind
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:552:19
+  16: std::panic::catch_unwind
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panic.rs:359:14
+  17: test::run_test_in_process
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:671:27
+  18: test::run_test::{{closure}}
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:592:43
+  19: test::run_test::{{closure}}
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:622:41
+  20: std::sys::backtrace::__rust_begin_short_backtrace
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/sys/backtrace.rs:158:18
+  21: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/thread/mod.rs:559:17
+  22: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/panic/unwind_safe.rs:272:9
+  23: std::panicking::catch_unwind::do_call
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:589:40
+  24: std::panicking::catch_unwind
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:552:19
+  25: std::panic::catch_unwind
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panic.rs:359:14
+  26: std::thread::Builder::spawn_unchecked_::{{closure}}
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/thread/mod.rs:557:30
+  27: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/ops/function.rs:253:5
+  28: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/alloc/src/boxed.rs:1971:9
+  29: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/alloc/src/boxed.rs:1971:9
+  30: std::sys::pal::unix::thread::Thread::new::thread_start
+             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/sys/pal/unix/thread.rs:97:17
+  31: <unknown>
+  32: <unknown>
+```
