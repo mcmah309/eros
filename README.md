@@ -13,7 +13,7 @@ Eros is the swish army knife of error handling approaches. It fits perfectly wel
 
 Eros is built on the following philosophy:
 1. [Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise.](#optional-typed-errors)
-2. [There should be no boilerplate needed when handling single or multiple typed errors.](#no-boilerplate)
+2. [There should be no boilerplate needed when handling single or multiple typed errors - no need to create another error enum](#no-boilerplate)
 3. [Users should be able to seamlessly transition to and from fully typed errors.](#seamless-transitions-between-error-types)
 4. [Errors should always provided context of the operations in the call stack that lead to the error.](#errors-have-context)
 
