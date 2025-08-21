@@ -109,14 +109,15 @@ fn func3() -> eros::Result<(), Error> {
 // Error type is no longer tracked, we handled internally. Otherwise we could
 // have just turned the error back into a `TracedError`
 fn func4() -> eros::Result<()> {
-    // Deflate the `ErrorUnion` and handle the `TracedError<Error>` case.
+    // Deflate the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
     match func1().deflate::<TracedError<Error>, _>() {
         Ok(traced_io_error) => {
-            todo!()
+            todo!("Handle `TracedError<std::io::Error>` case")
         }
-        // The error type is now a union with a single type (`ErrorUnion<(TracedError,)>`), 
+        // The error type of the Result has been deflated.
+        // It is now a union with a single type (`ErrorUnion<(TracedError,)>`), 
         // thus we can convert into the inner traced type.
-        // Alternatively, we could just call `traced` on `result` to accomplish the same thing
+        // Note: Alternatively, we could just call `traced` on `result` to accomplish the same thing
         Err(result) => result.map_err(|e| e.into_inner()),
     }
 }
