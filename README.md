@@ -17,7 +17,7 @@ Eros is built on the following philosophy:
 3. [Users should be able to seamlessly transition to and from fully typed errors.](#seamless-transitions-between-error-types)
 4. [Errors should always provided context of the operations in the call stack that lead to the error.](#errors-have-context)
 
-## In Philosophy In Action
+## Philosophy In Action
 
 ### Optional Typed Errors
 
