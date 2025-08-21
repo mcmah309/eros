@@ -303,7 +303,8 @@ fn handle_response(res: Response) -> eros::Result<String> {
     Ok(body)
 }
 
-// Explicitly handle multiple Err types at the same time with `UnionResult`
+// Explicitly handle multiple Err types at the same time with `UnionResult`.
+// No new error enum creation is needed or nesting of errors.
 // `UnionResult<_,_>` === `Result<_,ErrorUnion<_>>`
 fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error>, TracedError)> {
     let client = Client::new();
