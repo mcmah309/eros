@@ -21,7 +21,7 @@ Eros is built on this philosophy:
 
 ### Optional Typed Errors
 
-Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. Thus improving ergonomics.
+Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis.
 
 ```rust
 use eros::{bail, IntoDynTracedError};
