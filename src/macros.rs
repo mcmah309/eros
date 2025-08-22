@@ -1,15 +1,21 @@
 /// `format!` like macro to return early from a function with a `TracedError`
 #[macro_export]
 macro_rules! bail {
+    ($error:literal) => {
+        return Err($crate::TracedError::boxed($crate::StrError::Static($error)))
+    };
     ($($error:tt)+) => {
-        return Err(eros::TracedError::boxed(eros::StrError::Owned(format!($($error)*))));
+        return Err($crate::TracedError::boxed($crate::StrError::Owned(format!($($error)*))));
     };
 }
 
 /// `format!` like macro to create a `TracedError`
 #[macro_export]
 macro_rules! traced {
+    ($error:literal) => {
+        $crate::TracedError::boxed($crate::StrError::Static($error))
+    };
     ($($error:tt)+) => {
-        eros::TracedError::boxed(eros::StrError::Owned(format!($($error)*)))
+        $crate::TracedError::boxed($crate::StrError::Owned(format!($($error)*)))
     };
 }
