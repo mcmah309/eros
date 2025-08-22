@@ -75,13 +75,13 @@ impl<T: AnyError> TracedError<T> {
         self
     }
 
-    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+    pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<Cons<TracedError<T>, End>, Index>,
     {
         let error: ErrorUnion<(TracedError<T>,)> = self.into();
-        error.inflate()
+        error.widen()
     }
 
     // Note: overrides extension
@@ -289,7 +289,7 @@ mod test {
             TracedError<std::io::Error>,
             i32,
             TracedError<StrError>,
-        )> = concrete_traced_error.inflate();
+        )> = concrete_traced_error.widen();
         let result: Result<
             (),
             ErrorUnion<(TracedError<std::io::Error>, i32, TracedError<StrError>)>,

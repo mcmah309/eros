@@ -127,7 +127,7 @@ where
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `ErrorUnion` which does not contain that
     /// type as one of its possible variants.
-    pub fn deflate<Target, Index>(
+    pub fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -150,7 +150,7 @@ where
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+    pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
@@ -240,15 +240,15 @@ impl ErrorUnion<(TracedError,)> {
 
 //************************************************************************//
 
-/// Run inflate and deflate directly on Results with ErrorUnions
-pub trait FlateUnionResult<S, E>
+/// Run widen and narrow directly on Results with ErrorUnions
+pub trait ReshapeUnionResult<S, E>
 where
     E: TypeSet,
 {
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>;
@@ -256,7 +256,7 @@ where
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `Result` with the `ErrorUnion` wither the remainder
     /// which does not contain that type as one of its possible variants.
-    fn deflate<Target, Index>(
+    fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -270,19 +270,19 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> FlateUnionResult<S, E> for Result<S, ErrorUnion<E>>
+impl<S, E> ReshapeUnionResult<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
-        self.map_err(|e| e.inflate())
+        self.map_err(|e| e.widen())
     }
 
-    fn deflate<Target, Index>(
+    fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -297,7 +297,7 @@ where
     {
         match self {
             Ok(value) => Err(Ok(value)),
-            Err(err) => match err.deflate() {
+            Err(err) => match err.narrow() {
                 Ok(value) => return Ok(value),
                 Err(err) => Err(Err(err)),
             },

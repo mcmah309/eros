@@ -58,7 +58,7 @@ use std::io::{Error, ErrorKind};
 // Uses `ErrorUnion` to track each type. `TracedError` remains untyped and
 // `TracedError<Error>` is typed.
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
-    // inflate the `TracedResult` type to an `UnionResult` type
+    // widen the `TracedResult` type to an `UnionResult` type
     let val = func2().union()?;
     let val = func3().union()?;
     Ok(val)
@@ -89,7 +89,7 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors.
 
 ```rust
-use eros::{bail, FlateUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
+use eros::{bail, ReshapeUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
 use std::io::{Error, ErrorKind};
 
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
@@ -108,12 +108,12 @@ fn func3() -> eros::Result<(), Error> {
 
 // Error type is no longer tracked, we handled internally.
 fn func4() -> eros::Result<()> {
-    // Deflate the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
-    match func1().deflate::<TracedError<Error>, _>() {
+    // Narrow the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
+    match func1().narrow::<TracedError<Error>, _>() {
         Ok(traced_io_error) => {
             todo!("Handle `TracedError<std::io::Error>` case")
         }
-        // The error type of the Result has been deflated.
+        // The error type of the Result has been narrowed.
         // It is now a union with a single type (`ErrorUnion<(TracedError,)>`), 
         // thus we can convert into the inner traced type.
         // Note: Alternatively, we could just call `traced` on `result` to accomplish the same thing
@@ -126,10 +126,10 @@ fn main() {
 }
 ```
 
-And to expand an `ErrorUnion` just call `inflate`
+And to expand an `ErrorUnion` just call `widen`
 
 ```rust
-use eros::{FlateUnionResult, IntoUnionResult};
+use eros::{ReshapeUnionResult, IntoUnionResult};
 use std::io::Error;
 
 fn func1() -> eros::UnionResult<(), (Error, String)> {
@@ -145,8 +145,8 @@ fn func3() -> Result<(), f64> {
 }
 
 fn func4() -> eros::UnionResult<(), (Error, String, i32, u16, f64)> {
-    func1().inflate()?;
-    func2().inflate()?;
+    func1().widen()?;
+    func2().widen()?;
     func3().union()?;
     Ok(())
 }
@@ -273,7 +273,7 @@ Backtrace:
 
 ```rust
 use eros::{
-    bail, Context, FlateUnionResult, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult,
+    bail, Context, ReshapeUnionResult, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult,
     TracedError,
 };
 use reqwest::blocking::{Client, Response};
@@ -316,7 +316,7 @@ fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error
         // Add lazy context to the traced error if an `Err`
         .with_context(|| format!("Url: {url}"))
         // Convert the `TracedError<reqwest::Error>` into a `UnionError<_>`.
-        // If this type was already a `UnionError`, we would call `inflate` instead.
+        // If this type was already a `UnionError`, we would call `widen` instead.
         .union()?;
 
     handle_response(res).union()
@@ -328,8 +328,8 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
     loop {
         attempts += 1;
 
-        // Handle one of the error types explicitly with `deflate`!
-        match fetch_url(url).deflate::<TracedError<reqwest::Error>, _>() {
+        // Handle one of the error types explicitly with `narrow`!
+        match fetch_url(url).narrow::<TracedError<reqwest::Error>, _>() {
             Ok(request_error) => {
                 if attempts < retries {
                     sleep(Duration::from_millis(200));
