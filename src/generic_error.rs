@@ -24,7 +24,7 @@ pub struct TracedError<T = Box<dyn AnyError>>
 where
     T: AnyError,
 {
-    source: T,
+    inner: T,
     pub(crate) backtrace: Backtrace,
     pub(crate) context: Vec<StrError>,
 }
@@ -43,7 +43,7 @@ impl TracedError {
 impl<T: AnyError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
-            source: source,
+            inner: source,
             backtrace: Backtrace::capture(),
             context: Vec::new(),
         }
@@ -51,22 +51,22 @@ impl<T: AnyError> TracedError<T> {
 
     pub fn into_dyn(self) -> TracedError {
         TracedError {
-            source: Box::new(self.source),
+            inner: Box::new(self.inner),
             backtrace: self.backtrace,
             context: self.context,
         }
     }
 
-    pub fn into_source(self) -> T {
-        self.source
+    pub fn into_inner(self) -> T {
+        self.inner
     }
 
-    pub fn source(&self) -> &T {
-        &self.source
+    pub fn inner(&self) -> &T {
+        &self.inner
     }
 
-    pub fn source_mut(&mut self) -> &mut T {
-        &mut self.source
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 
     /// Adds additional context.
@@ -92,7 +92,7 @@ impl<T: AnyError> TracedError<T> {
 
 impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.source)?;
+        write!(formatter, "{}", self.inner)?;
         if !self.context.is_empty() {
             write!(formatter, "\n\nContext:")?;
             for context_item in self.context.iter() {
@@ -105,7 +105,7 @@ impl<T: AnyError> fmt::Display for TracedError<T> {
 
 impl<T: AnyError> fmt::Debug for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.source)?;
+        write!(formatter, "{}", self.inner)?;
         if !self.context.is_empty() {
             write!(formatter, "\n\nContext:")?;
             for context_item in self.context.iter() {
@@ -123,7 +123,7 @@ impl<T: AnyError> fmt::Debug for TracedError<T> {
 
 impl<T: AnyError> std::error::Error for TracedError<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.source()
+        self.inner.source()
     }
 }
 
