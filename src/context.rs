@@ -71,6 +71,7 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
 
 //************************************************************************//
 
+/// Used internally to allow adding context directly to a `ErrorUnion`
 pub trait Contextable: Any {
     #[allow(unused_variables)]
     fn add_context(&mut self, context: StrError);

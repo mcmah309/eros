@@ -7,16 +7,23 @@ use std::{
 
 use crate::{str_error::StrError, ErrorUnion};
 
+/// Any error that satisfies this trait's bounds can be used in a `TracedError`
 pub trait AnyError: std::error::Error + Send + Sync + 'static {}
 
 impl<T> AnyError for T where T: std::error::Error + Send + Sync + 'static {}
 
 impl std::error::Error for Box<dyn AnyError> {}
 
-/// A generic error for propagating information about the error context. The caller may or may not care about
-/// type the underlying error type depending on if `T` is provided.
-///
-/// Context is intended to be added at different levels in the call stack with `context` or `with_context` methods.
+/// `TracedError` allows adding context to an error throughout the callstack with the `context` or `with_context` methods.
+/// This context may be information such as variable values or ongoing operations while the error occurred.
+/// If the error is handled higher in the stack, then this can be disregarded (no log pollution).
+/// Otherwise you can log it (or panic), capturing all the relevant information in one log.
+/// 
+/// A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
+/// 
+/// The caller of the context using a `TracedError` may or may not care about type the underlying error.
+/// If it does not, consider using the generic `TracedError`. Otherwise, you can specify the type
+/// with `TracedError<T>`.
 pub struct TracedError<T = Box<dyn AnyError>>
 where
     T: AnyError,
@@ -29,6 +36,7 @@ where
 }
 
 impl TracedError {
+    /// Create a dynamic type erased `TracedError`
     pub fn boxed<E: AnyError>(source: E) -> TracedError {
         TracedError::new(Box::new(source))
     }
@@ -50,6 +58,7 @@ impl<T: AnyError> TracedError<T> {
         }
     }
 
+    /// Converts these `TracedError` into dynamic type erased `TracedError`
     pub fn into_dyn(self) -> TracedError {
         TracedError {
             inner: Box::new(self.inner),
@@ -60,14 +69,17 @@ impl<T: AnyError> TracedError<T> {
         }
     }
 
+    /// Converts into the inner type
     pub fn into_inner(self) -> T {
         self.inner
     }
 
+    /// Gets a reference to the inner type
     pub fn inner(&self) -> &T {
         &self.inner
     }
 
+    /// Gets a mutable reference to the inner type
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -187,12 +199,12 @@ impl<T: AnyError> From<T> for TracedError<T> {
 // }
 
 pub trait IntoDynTracedError<O2> {
-    /// Convert Error to `TraceError` without caring about the underlying type
+    /// Convert Error to `TracedError` without caring about the underlying type
     fn traced_dyn(self) -> O2;
 }
 
 pub trait IntoConcreteTracedError<O1> {
-    /// Convert Error to `TraceError` keeping the underlying type
+    /// Convert Error to `TracedError` keeping the underlying type
     fn traced(self) -> O1;
 }
 

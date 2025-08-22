@@ -23,16 +23,14 @@ use crate::{Cons, End, TracedError};
 /// as the generic parameter for the `ErrorUnion`.
 ///
 /// For example, a `ErrorUnion<(String, u32)>` contains either
-/// a `String` or a `u32`. The value over a simple `Result`
-/// or other traditional enum starts to become apparent in larger
+/// a `String` or a `u32`. The benefit of this over creating
+/// specific enums for each function become apparent in larger
 /// codebases where error handling needs to occur in
-/// different places for different errors. `ErrorUnion` allows
+/// different places for different errors. As such, `ErrorUnion` allows
 /// you to quickly specify a function's return value as
 /// involving a precise subset of errors that the caller
-/// can clearly reason about.
-///
-/// `ErrorUnion` also holds the the root backtrace and context provided
-/// throughout the call chain.
+/// can clearly reason about. Providing maximum composability with
+/// no boilerplate.
 pub struct ErrorUnion<E: TypeSet> {
     pub(crate) value: Box<dyn Contextable>,
     _pd: PhantomData<E>,
@@ -217,6 +215,7 @@ where
 }
 
 impl<T: 'static> ErrorUnion<(T,)> {
+    /// Convert to the inner type of an ErrorUnion with a single possible type.
     pub fn into_inner(self) -> T {
         match self.to_enum() {
             crate::E1::A(inner) => inner,
@@ -308,6 +307,7 @@ where
 //************************************************************************//
 
 pub trait IntoUnionResult<S, F> {
+    /// Creates an `ErrorUnion` for this type.
     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
