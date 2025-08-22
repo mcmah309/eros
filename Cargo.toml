@@ -14,6 +14,13 @@ readme = "README.md"
 reqwest = { version = "0.12", features = ["blocking"] }
 
 [features]
-default = []
-# This requires the `min_specialization` feature. Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type. And improve some operations.
+default = ["traced"]
+# Disabling this feature will disable context and backtrace for `TracedError`, 
+# turning it into just a new type that may be optimized away. 
+# Libraries should consider disabling this, allowing downstream crates to decide.
+# Or when trying to optimize the binary.
+traced = []
+# This requires the `min_specialization` feature. 
+# Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type. 
+# And improve some operations.
 min_specialization = []

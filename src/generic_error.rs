@@ -1,5 +1,6 @@
+#[cfg(feature = "traced")]
+use std::backtrace::Backtrace;
 use std::{
-    backtrace::Backtrace,
     borrow::Cow,
     fmt::{self},
 };
@@ -25,7 +26,9 @@ where
     T: AnyError,
 {
     inner: T,
+    #[cfg(feature = "traced")]
     pub(crate) backtrace: Backtrace,
+    #[cfg(feature = "traced")]
     pub(crate) context: Vec<StrError>,
 }
 
@@ -44,7 +47,9 @@ impl<T: AnyError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
             inner: source,
+            #[cfg(feature = "traced")]
             backtrace: Backtrace::capture(),
+            #[cfg(feature = "traced")]
             context: Vec::new(),
         }
     }
@@ -52,7 +57,9 @@ impl<T: AnyError> TracedError<T> {
     pub fn into_dyn(self) -> TracedError {
         TracedError {
             inner: Box::new(self.inner),
+            #[cfg(feature = "traced")]
             backtrace: self.backtrace,
+            #[cfg(feature = "traced")]
             context: self.context,
         }
     }
@@ -69,17 +76,23 @@ impl<T: AnyError> TracedError<T> {
         &mut self.inner
     }
 
-    /// Adds additional context.
+    /// Adds additional context. This becomes a no-op if the `traced` feature is disabled.
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
     pub fn context<C: Into<StrError>>(mut self, context: C) -> Self {
+        #[cfg(feature = "traced")]
         self.context.push(context.into());
         self
     }
 
-    /// Adds additional context lazily.
+    /// Adds additional context lazily. This becomes a no-op if the `traced` feature is disabled.
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
     pub fn with_context<F, C: Into<StrError>>(mut self, f: F) -> TracedError<T>
     where
         F: FnOnce() -> C,
     {
+        #[cfg(feature = "traced")]
         self.context.push(f().into());
         self
     }
@@ -102,10 +115,13 @@ impl<T: AnyError> TracedError<T> {
 impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.inner)?;
-        if !self.context.is_empty() {
-            write!(formatter, "\n\nContext:")?;
-            for context_item in self.context.iter() {
-                write!(formatter, "\n\t- {}", context_item)?;
+        #[cfg(feature = "traced")]
+        {
+            if !self.context.is_empty() {
+                write!(formatter, "\n\nContext:")?;
+                for context_item in self.context.iter() {
+                    write!(formatter, "\n\t- {}", context_item)?;
+                }
             }
         }
         Ok(())
@@ -115,14 +131,17 @@ impl<T: AnyError> fmt::Display for TracedError<T> {
 impl<T: AnyError> fmt::Debug for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.inner)?;
-        if !self.context.is_empty() {
-            write!(formatter, "\n\nContext:")?;
-            for context_item in self.context.iter() {
-                write!(formatter, "\n\t- {}", context_item)?;
+        #[cfg(feature = "traced")]
+        {
+            if !self.context.is_empty() {
+                write!(formatter, "\n\nContext:")?;
+                for context_item in self.context.iter() {
+                    write!(formatter, "\n\t- {}", context_item)?;
+                }
             }
+            write!(formatter, "\n\nBacktrace:\n")?;
+            fmt::Display::fmt(&self.backtrace, formatter)?;
         }
-        write!(formatter, "\n\nBacktrace:\n")?;
-        fmt::Display::fmt(&self.backtrace, formatter)?;
         Ok(())
     }
 }
@@ -285,6 +304,7 @@ where
 //************************************************************************//
 
 #[cfg(feature = "min_specialization")]
+#[cfg(feature = "traced")]
 #[cfg(test)]
 mod test {
     use crate::{Context, ErrorUnion, StrError, TracedError};
