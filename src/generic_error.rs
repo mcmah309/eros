@@ -5,11 +5,7 @@ use std::{
     fmt::{self},
 };
 
-use crate::{
-    str_error::StrError,
-    type_set::{SupersetOf, TypeSet},
-    Cons, End, ErrorUnion,
-};
+use crate::{str_error::StrError, ErrorUnion};
 
 pub trait AnyError: std::error::Error + Send + Sync + 'static {}
 
@@ -95,15 +91,6 @@ impl<T: AnyError> TracedError<T> {
         #[cfg(feature = "traced")]
         self.context.push(f().into());
         self
-    }
-
-    pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
-    where
-        Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<TracedError<T>, End>, Index>,
-    {
-        let error: ErrorUnion<(TracedError<T>,)> = self.into();
-        error.widen()
     }
 
     // Note: overrides extension

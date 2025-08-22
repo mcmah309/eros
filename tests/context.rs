@@ -55,7 +55,7 @@ fn generic_context_error_to_error_union() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func2().map_err(TracedError::widen)
+        func2().map_err(ErrorUnion::new)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
@@ -70,7 +70,7 @@ fn generic_error_to_error_union() {
     }
 
     fn func2() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func1().map_err(TracedError::widen)
+        func1().map_err(ErrorUnion::new)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func2();
