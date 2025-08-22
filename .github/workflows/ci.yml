@@ -29,4 +29,5 @@ jobs:
             cargo test --all-features
           else
             cargo test
+            cargo test --no-default-features
           fi
