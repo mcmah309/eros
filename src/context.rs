@@ -54,21 +54,6 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
     }
 }
 
-impl<T: AnyError> Context<TracedError<T>> for TracedError<T> {
-    fn context<C: Into<StrError>>(mut self, context: C) -> TracedError<T> {
-        self.context.push(context.into());
-        self
-    }
-
-    fn with_context<F, C: Into<StrError>>(mut self, f: F) -> TracedError<T>
-    where
-        F: FnOnce() -> C,
-    {
-        self.context.push(f().into());
-        self
-    }
-}
-
 //************************************************************************//
 
 pub trait Contextable: Any {

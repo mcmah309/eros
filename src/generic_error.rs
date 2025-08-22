@@ -75,6 +75,15 @@ impl<T: AnyError> TracedError<T> {
         self
     }
 
+    /// Adds additional context lazily.
+    pub fn with_context<F, C: Into<StrError>>(mut self, f: F) -> TracedError<T>
+    where
+        F: FnOnce() -> C,
+    {
+        self.context.push(f().into());
+        self
+    }
+
     pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
