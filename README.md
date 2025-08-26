@@ -428,3 +428,141 @@ Backtrace:
   31: <unknown>
   32: <unknown>
 ```
+
+## Comparison with Other Error Libraries
+
+Eros takes a unique approach in Rust's error handling ecosystem. Here's how it compares to other popular libraries:
+
+### Quick Overview
+
+| Library | Core Strength | Best For |
+|---------|---------------|----------|
+| **eros** | Flexible error types + composition | Libraries and apps needing type flexibility |
+| **snafu** | Ergonomic custom error types | When you want structured, domain-specific errors |
+| **error-stack** | Rich debugging reports | Applications prioritizing observability |
+
+### Type Handling Philosophy
+
+**eros**: "Types matter only when the caller cares"
+```rust
+// Untyped for rapid development
+fn quick() -> eros::Result<String> { bail!("failed") }
+
+// Typed when precision matters
+fn precise() -> eros::Result<String, IoError> { file_read().traced() }
+
+// Multiple types without enum boilerplate
+fn flexible() -> eros::UnionResult<Data, (IoError, ParseError)> {
+    let raw = read_file().traced().union()?;
+    parse_data(raw).traced().union()
+}
+```
+
+**snafu**: "Define your domain errors upfront"
+```rust
+#[derive(Debug, Snafu)]
+enum ConfigError {
+    #[snafu(display("Failed to read config from {path}"))]
+    ReadFailed { path: String, source: IoError },
+
+    #[snafu(display("Invalid format in line {line}"))]
+    ParseFailed { line: usize, source: serde_json::Error },
+}
+
+fn load_config() -> Result<Config, ConfigError> {
+    let content = fs::read_to_string("config.json")
+        .context(ReadFailedSnafu { path: "config.json" })?;
+    serde_json::from_str(&content)
+        .context(ParseFailedSnafu { line: 1 })
+}
+```
+
+**error-stack**: "Single report type with rich context"
+```rust
+#[derive(Debug)]
+struct ConfigError;
+
+fn load_config() -> Result<Config, ConfigError> {
+    let content = fs::read_to_string("config.json")
+        .change_context(ConfigError)
+        .attach_printable("Failed to read config file")?;
+
+    serde_json::from_str(&content)
+        .change_context(ConfigError)
+        .attach_printable("Config format is invalid")
+}
+```
+
+### Multi-Error Scenarios
+
+**eros**: Compose types naturally without defining new enums
+```rust
+fn validate_user(data: &str) -> eros::UnionResult<User, (ValidationError, DatabaseError, NetworkError)> {
+    let parsed = parse_input(data).traced().union()?;
+    let validated = check_database(&parsed).traced().union()?;  
+    notify_external_service(&validated).traced().union()?;
+    Ok(validated)
+}
+
+// Handle specific errors without losing others
+match validate_user(input).deflate::<NetworkError, _>() {
+    Ok(net_err) => retry_with_backoff(net_err),
+    Err(other_errors) => handle_validation_or_db_errors(other_errors),
+}
+```
+
+**snafu**: Requires defining composite error enums
+```rust
+#[derive(Debug, Snafu)]
+enum UserError {
+    Validation { source: ValidationError },
+    Database { source: DatabaseError },
+    Network { source: NetworkError },
+}
+
+fn validate_user(data: &str) -> Result<User, UserError> {
+    let parsed = parse_input(data).context(ValidationSnafu)?;
+    let validated = check_database(&parsed).context(DatabaseSnafu)?;
+    notify_external_service(&validated).context(NetworkSnafu)?;
+    Ok(validated)
+}
+```
+
+**error-stack**: Single context type with detailed reporting
+```rust
+fn validate_user(data: &str) -> Result<User, UserError> {
+    let parsed = parse_input(data)
+        .change_context(UserError)
+        .attach_printable("Input validation phase")?;
+
+    let validated = check_database(&parsed)
+        .change_context(UserError) 
+        .attach_printable("Database validation phase")?;
+
+    notify_external_service(&validated)
+        .change_context(UserError)
+        .attach_printable("External notification phase")?;
+
+    Ok(validated)
+}
+```
+
+### When to Choose What
+
+**Choose eros if you want:**
+- Maximum flexibility between typed and untyped errors
+- Zero boilerplate for handling multiple error types
+- Library-friendly APIs that don't impose error structure on callers
+- Performance-critical applications with efficient error propagation
+
+**Choose snafu if you want:**
+- Well-structured, domain-specific error types
+- Clear error hierarchies with good ergonomics
+- Compile-time guarantees about error context
+- Traditional enum-based error handling with less boilerplate
+
+**Choose error-stack if you want:**
+- Maximum debugging information and error introspection
+- Rich error reports with arbitrary data attachments
+- Application-focused error handling with detailed observability
+- Advanced error analysis and reporting capabilities
