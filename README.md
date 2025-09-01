@@ -432,6 +432,38 @@ Backtrace:
 
 ## Perfect For Libraries And Optimized Binaries As Well
 
-Eros comes with the `traced` feature flag enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Consider disabling this by default and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+Eros is perfect for libraries and applications. It is also optimized for binary size and performance.
 
-Exposing `TracedError`,`TracedError<T>`, or `ErrorUnion<(..T,)>` in an api is perfectly fine. But if one would rather not expose these implementation details, consider just wrapping in a new type `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut` or at least exposing a way to to convert to the underlying `TracedError`. That way if a downstream uses Eros they can also add additional context.
+### Optimizations
+
+Eros comes with the `traced` feature flag enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Libraries should consider disabling this by default and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+
+### Public Api
+
+Exposing `TracedError`/`TracedError<T>`, or `ErrorUnion<(..T,)>` in a public api is perfectly fine and usually preferred. Though, if one wants to add their own custom error type for all exposed api's, use the `map` method.
+```rust
+#[derive(Debug)]
+struct MyErrorType(Box<dyn AnyError>);
+
+impl Display for MyErrorType {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "MyErrorType: {}", self.0)
+    }
+}
+
+impl std::error::Error for MyErrorType {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+pub fn public_api() -> eros::Result<(), MyErrorType> {
+    let error: TracedError =
+        TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
+    let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(e));
+    Err(error)
+}
+```
+#### Wrapper Types
+
+If one wants to use their own error type, one may reach for a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping a may still unintentionally occur, that is why exposing the `TracedError`/`TracedError<T>` in the api is usually preferred.
