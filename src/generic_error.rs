@@ -331,7 +331,7 @@ mod test {
             TracedError<std::io::Error>,
             i32,
             TracedError<StrError>,
-        )> = concrete_traced_error.widen();
+        )> = ErrorUnion::new(concrete_traced_error);
         let result: Result<
             (),
             ErrorUnion<(TracedError<std::io::Error>, i32, TracedError<StrError>)>,
