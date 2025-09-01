@@ -27,7 +27,6 @@ jobs:
         run: |
           if [ "${{ matrix.rust }}" == "nightly" ]; then
             cargo test --all-features
-          else
-            cargo test
-            cargo test --no-default-features
           fi
+          cargo test
+          cargo test --no-default-features
