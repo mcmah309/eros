@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::ErrorUnion;
+use eros::{ErrorUnion, TracedError};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -188,4 +188,27 @@ fn multi_narrow() {
             unreachable!()
         }
     }
+}
+
+#[derive(Debug)]
+struct IoErrorWrapper(std::io::Error);
+
+impl Display for IoErrorWrapper {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "IoErrorWrapper: {}", self.0)
+    }
+}
+
+impl std::error::Error for IoErrorWrapper {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+#[test]
+fn map_inner() {
+    let error: TracedError<std::io::Error> =
+        TracedError::new(std::io::Error::new(std::io::ErrorKind::Other, "wuaaaaahhh"));
+    let error: TracedError<IoErrorWrapper> = error.map(|e| IoErrorWrapper(e));
+    println!("{error}");
 }

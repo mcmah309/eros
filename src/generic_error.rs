@@ -84,6 +84,21 @@ impl<T: AnyError> TracedError<T> {
         &mut self.inner
     }
 
+    /// Maps the inner error to another while preserving context and backtrace
+    pub fn map<U, F>(self, f: F) -> TracedError<U>
+    where
+        U: AnyError,
+        F: FnOnce(T) -> U,
+    {
+        TracedError {
+            inner: f(self.inner),
+            #[cfg(feature = "traced")]
+            backtrace: self.backtrace,
+            #[cfg(feature = "traced")]
+            context: self.context,
+        }
+    }
+
     /// Adds additional context. This becomes a no-op if the `traced` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
