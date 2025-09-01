@@ -442,10 +442,12 @@ Eros comes with the `traced` feature flag enabled by default. If this is disable
 
 Exposing `TracedError`/`TracedError<T>`, or `ErrorUnion<(..T,)>` in a public api is perfectly fine and usually preferred. Though, if one wants to add their own custom error type for all exposed api's, use the `map` method.
 ```rust
+use eros::{AnyError, TracedError};
+
 #[derive(Debug)]
 struct MyErrorType(Box<dyn AnyError>);
 
-impl Display for MyErrorType {
+impl std::fmt::Display for MyErrorType {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "MyErrorType: {}", self.0)
     }
