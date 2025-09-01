@@ -3,7 +3,9 @@ use std::{
     fmt::{self, Display},
 };
 
-/// An Error type that can hold a string in either a static or owned form. No unnecessary allocation for static strings compared to `String`.
+/// An Error type that is just a message. 
+/// It can hold a string in either a static or owned form. 
+/// No unnecessary allocation for static strings compared to `String`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StrError {
     Static(&'static str),

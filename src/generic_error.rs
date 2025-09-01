@@ -1,35 +1,41 @@
+#[cfg(feature = "traced")]
+use std::backtrace::Backtrace;
 use std::{
-    backtrace::Backtrace,
     borrow::Cow,
     fmt::{self},
 };
 
-use crate::{
-    str_error::StrError,
-    type_set::{SupersetOf, TypeSet},
-    Cons, End, ErrorUnion,
-};
+use crate::{str_error::StrError, ErrorUnion};
 
+/// Any error that satisfies this trait's bounds can be used in a `TracedError`
 pub trait AnyError: std::error::Error + Send + Sync + 'static {}
 
 impl<T> AnyError for T where T: std::error::Error + Send + Sync + 'static {}
 
 impl std::error::Error for Box<dyn AnyError> {}
 
-/// A generic error for propagating information about the error context. The caller may or may not care about
-/// type the underlying error type depending on if `T` is provided.
-///
-/// Context is intended to be added at different levels in the call stack with `context` or `with_context` methods.
+/// `TracedError` allows adding context to an error throughout the callstack with the `context` or `with_context` methods.
+/// This context may be information such as variable values or ongoing operations while the error occurred.
+/// If the error is handled higher in the stack, then this can be disregarded (no log pollution).
+/// Otherwise you can log it (or panic), capturing all the relevant information in one log.
+/// 
+/// A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
+/// 
+/// Use `TracedError` if the underlying error type does not matter.
+/// Otherwise, the type can be specified with `TracedError<T>`.
 pub struct TracedError<T = Box<dyn AnyError>>
 where
     T: AnyError,
 {
-    source: T,
+    inner: T,
+    #[cfg(feature = "traced")]
     pub(crate) backtrace: Backtrace,
+    #[cfg(feature = "traced")]
     pub(crate) context: Vec<StrError>,
 }
 
 impl TracedError {
+    /// Create a dynamic type erased `TracedError`
     pub fn boxed<E: AnyError>(source: E) -> TracedError {
         TracedError::new(Box::new(source))
     }
@@ -43,45 +49,74 @@ impl TracedError {
 impl<T: AnyError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
-            source: source,
+            inner: source,
+            #[cfg(feature = "traced")]
             backtrace: Backtrace::capture(),
+            #[cfg(feature = "traced")]
             context: Vec::new(),
         }
     }
 
+    /// Converts these `TracedError` into dynamic type erased `TracedError`
     pub fn into_dyn(self) -> TracedError {
         TracedError {
-            source: Box::new(self.source),
+            inner: Box::new(self.inner),
+            #[cfg(feature = "traced")]
             backtrace: self.backtrace,
+            #[cfg(feature = "traced")]
             context: self.context,
         }
     }
 
-    pub fn into_source(self) -> T {
-        self.source
+    /// Converts into the inner type
+    pub fn into_inner(self) -> T {
+        self.inner
     }
 
-    pub fn source(&self) -> &T {
-        &self.source
+    /// Gets a reference to the inner type
+    pub fn inner(&self) -> &T {
+        &self.inner
     }
 
-    pub fn source_mut(&mut self) -> &mut T {
-        &mut self.source
+    /// Gets a mutable reference to the inner type
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 
-    /// Adds additional context.
+    /// Maps the inner error to another while preserving context and backtrace
+    pub fn map<U, F>(self, f: F) -> TracedError<U>
+    where
+        U: AnyError,
+        F: FnOnce(T) -> U,
+    {
+        TracedError {
+            inner: f(self.inner),
+            #[cfg(feature = "traced")]
+            backtrace: self.backtrace,
+            #[cfg(feature = "traced")]
+            context: self.context,
+        }
+    }
+
+    /// Adds additional context. This becomes a no-op if the `traced` feature is disabled.
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
     pub fn context<C: Into<StrError>>(mut self, context: C) -> Self {
+        #[cfg(feature = "traced")]
         self.context.push(context.into());
         self
     }
 
-    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+    /// Adds additional context lazily. This becomes a no-op if the `traced` feature is disabled.
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
+    pub fn with_context<F, C: Into<StrError>>(mut self, f: F) -> TracedError<T>
     where
-        Other: TypeSet,
-        Other::Variants: SupersetOf<Cons<TracedError<T>, End>, Index>,
+        F: FnOnce() -> C,
     {
-        let error: ErrorUnion<(TracedError<T>,)> = self.into();
-        error.inflate()
+        #[cfg(feature = "traced")]
+        self.context.push(f().into());
+        self
     }
 
     // Note: overrides extension
@@ -92,11 +127,14 @@ impl<T: AnyError> TracedError<T> {
 
 impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.source)?;
-        if !self.context.is_empty() {
-            write!(formatter, "\n\nContext:")?;
-            for context_item in self.context.iter() {
-                write!(formatter, "\n\t- {}", context_item)?;
+        write!(formatter, "{}", self.inner)?;
+        #[cfg(feature = "traced")]
+        {
+            if !self.context.is_empty() {
+                write!(formatter, "\n\nContext:")?;
+                for context_item in self.context.iter() {
+                    write!(formatter, "\n\t- {}", context_item)?;
+                }
             }
         }
         Ok(())
@@ -105,15 +143,18 @@ impl<T: AnyError> fmt::Display for TracedError<T> {
 
 impl<T: AnyError> fmt::Debug for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.source)?;
-        if !self.context.is_empty() {
-            write!(formatter, "\n\nContext:")?;
-            for context_item in self.context.iter() {
-                write!(formatter, "\n\t- {}", context_item)?;
+        write!(formatter, "{}", self.inner)?;
+        #[cfg(feature = "traced")]
+        {
+            if !self.context.is_empty() {
+                write!(formatter, "\n\nContext:")?;
+                for context_item in self.context.iter() {
+                    write!(formatter, "\n\t- {}", context_item)?;
+                }
             }
+            write!(formatter, "\n\nBacktrace:\n")?;
+            fmt::Display::fmt(&self.backtrace, formatter)?;
         }
-        write!(formatter, "\n\nBacktrace:\n")?;
-        fmt::Display::fmt(&self.backtrace, formatter)?;
         Ok(())
     }
 }
@@ -123,7 +164,7 @@ impl<T: AnyError> fmt::Debug for TracedError<T> {
 
 impl<T: AnyError> std::error::Error for TracedError<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.source()
+        self.inner.source()
     }
 }
 
@@ -172,12 +213,12 @@ impl<T: AnyError> From<T> for TracedError<T> {
 // }
 
 pub trait IntoDynTracedError<O2> {
-    /// Convert Error to `TraceError` without caring about the underlying type
+    /// Convert Error to `TracedError` without caring about the underlying type
     fn traced_dyn(self) -> O2;
 }
 
 pub trait IntoConcreteTracedError<O1> {
-    /// Convert Error to `TraceError` keeping the underlying type
+    /// Convert Error to `TracedError` keeping the underlying type
     fn traced(self) -> O1;
 }
 
@@ -276,6 +317,7 @@ where
 //************************************************************************//
 
 #[cfg(feature = "min_specialization")]
+#[cfg(feature = "traced")]
 #[cfg(test)]
 mod test {
     use crate::{Context, ErrorUnion, StrError, TracedError};
@@ -289,7 +331,7 @@ mod test {
             TracedError<std::io::Error>,
             i32,
             TracedError<StrError>,
-        )> = concrete_traced_error.inflate();
+        )> = ErrorUnion::new(concrete_traced_error);
         let result: Result<
             (),
             ErrorUnion<(TracedError<std::io::Error>, i32, TracedError<StrError>)>,

@@ -1,3 +1,5 @@
+#![cfg(feature = "traced")]
+
 use eros::{
     bail, traced, Context, ErrorUnion, IntoDynTracedError, IntoUnionResult, TracedError,
     TracedResult,
@@ -6,7 +8,7 @@ use eros::{
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
 mod min_specialization {
-    use eros::{Context, ErrorUnion, FlateUnionResult};
+    use eros::{Context, ErrorUnion, ReshapeUnionResult};
 
     #[test]
     fn error_union() {
@@ -19,17 +21,17 @@ mod min_specialization {
         }
 
         fn func2() -> Result<(), ErrorUnion<(i32, std::io::Error)>> {
-            func1().context("From func2".to_string()).inflate()
+            func1().context("From func2".to_string()).widen()
         }
 
         fn func3() -> eros::UnionResult<(), (std::io::Error, i32, bool)> {
             return func2()
                 .with_context(|| "From func3")
-                .map_err(ErrorUnion::inflate);
+                .map_err(ErrorUnion::widen);
         }
 
         fn func4() -> eros::UnionResult<(), (std::io::Error, bool)> {
-            return match func3().with_context(|| "From func4").deflate::<i32, _>() {
+            return match func3().with_context(|| "From func4").narrow::<i32, _>() {
                 Ok(_) => panic!("should exist"),
                 Err(result) => result,
             };
@@ -53,7 +55,7 @@ fn generic_context_error_to_error_union() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func2().map_err(TracedError::inflate)
+        func2().map_err(ErrorUnion::new)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
@@ -68,7 +70,7 @@ fn generic_error_to_error_union() {
     }
 
     fn func2() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
-        func1().map_err(TracedError::inflate)
+        func1().map_err(ErrorUnion::new)
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func2();
@@ -87,7 +89,7 @@ fn bail() {
     }
 
     fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {
-        return func2().map_err(ErrorUnion::inflate);
+        return func2().map_err(ErrorUnion::widen);
     }
 
     fn func4() -> TracedResult<()> {

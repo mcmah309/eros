@@ -2,6 +2,7 @@
 
 [<img alt="github" src="https://img.shields.io/badge/github-mcmah309/eros-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/mcmah309/eros)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/eros.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/eros)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 
 Eros is the swiss army knife of error handling approaches. It fits perfectly well into libraries and applications. Eros is heavily inspired by:
@@ -58,7 +59,7 @@ use std::io::{Error, ErrorKind};
 // Uses `ErrorUnion` to track each type. `TracedError` remains untyped and
 // `TracedError<Error>` is typed.
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
-    // inflate the `TracedResult` type to an `UnionResult` type
+    // widen the `TracedResult` type to an `UnionResult` type
     let val = func2().union()?;
     let val = func3().union()?;
     Ok(val)
@@ -89,7 +90,7 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors.
 
 ```rust
-use eros::{bail, FlateUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
+use eros::{bail, ReshapeUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
 use std::io::{Error, ErrorKind};
 
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
@@ -108,12 +109,12 @@ fn func3() -> eros::Result<(), Error> {
 
 // Error type is no longer tracked, we handled internally.
 fn func4() -> eros::Result<()> {
-    // Deflate the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
-    match func1().deflate::<TracedError<Error>, _>() {
+    // Narrow the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
+    match func1().narrow::<TracedError<Error>, _>() {
         Ok(traced_io_error) => {
             todo!("Handle `TracedError<std::io::Error>` case")
         }
-        // The error type of the Result has been deflated.
+        // The error type of the Result has been narrowed.
         // It is now a union with a single type (`ErrorUnion<(TracedError,)>`), 
         // thus we can convert into the inner traced type.
         // Note: Alternatively, we could just call `traced` on `result` to accomplish the same thing
@@ -126,10 +127,10 @@ fn main() {
 }
 ```
 
-And to expand an `ErrorUnion` just call `inflate`
+And to expand an `ErrorUnion` just call `widen`
 
 ```rust
-use eros::{FlateUnionResult, IntoUnionResult};
+use eros::{ReshapeUnionResult, IntoUnionResult};
 use std::io::Error;
 
 fn func1() -> eros::UnionResult<(), (Error, String)> {
@@ -145,8 +146,8 @@ fn func3() -> Result<(), f64> {
 }
 
 fn func4() -> eros::UnionResult<(), (Error, String, i32, u16, f64)> {
-    func1().inflate()?;
-    func2().inflate()?;
+    func1().widen()?;
+    func2().widen()?;
     func3().union()?;
     Ok(())
 }
@@ -273,7 +274,7 @@ Backtrace:
 
 ```rust
 use eros::{
-    bail, Context, FlateUnionResult, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult,
+    bail, Context, ReshapeUnionResult, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult,
     TracedError,
 };
 use reqwest::blocking::{Client, Response};
@@ -316,7 +317,7 @@ fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error
         // Add lazy context to the traced error if an `Err`
         .with_context(|| format!("Url: {url}"))
         // Convert the `TracedError<reqwest::Error>` into a `UnionError<_>`.
-        // If this type was already a `UnionError`, we would call `inflate` instead.
+        // If this type was already a `UnionError`, we would call `widen` instead.
         .union()?;
 
     handle_response(res).union()
@@ -328,8 +329,8 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
     loop {
         attempts += 1;
 
-        // Handle one of the error types explicitly with `deflate`!
-        match fetch_url(url).deflate::<TracedError<reqwest::Error>, _>() {
+        // Handle one of the error types explicitly with `narrow`!
+        match fetch_url(url).narrow::<TracedError<reqwest::Error>, _>() {
             Ok(request_error) => {
                 if attempts < retries {
                     sleep(Duration::from_millis(200));
@@ -428,3 +429,43 @@ Backtrace:
   31: <unknown>
   32: <unknown>
 ```
+
+## Perfect For Libraries And Optimized Binaries As Well
+
+Eros is perfect for libraries and applications. It is also optimized for binary size and performance.
+
+### Optimizations
+
+Eros comes with the `traced` feature flag enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Libraries should consider disabling this by default and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+
+### Public Apis
+
+Exposing `TracedError`/`TracedError<T>`, or `ErrorUnion<(..T,)>` in a public api is perfectly fine and usually preferred. Though, if one wants to add their own custom error type for all exposed api's, use the `map` method.
+```rust
+use eros::{AnyError, TracedError};
+
+#[derive(Debug)]
+struct MyErrorType(Box<dyn AnyError>);
+
+impl std::fmt::Display for MyErrorType {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "MyErrorType: {}", self.0)
+    }
+}
+
+impl std::error::Error for MyErrorType {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+pub fn public_api() -> eros::Result<(), MyErrorType> {
+    let error: TracedError =
+        TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
+    let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(e));
+    Err(error)
+}
+```
+#### Wrapper Types
+
+An alternative to exposing `TracedError`/`TracedError<T>` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping a may still unintentionally occur, that is why exposing the `TracedError`/`TracedError<T>` in the api is usually preferred.

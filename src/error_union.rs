@@ -23,16 +23,14 @@ use crate::{Cons, End, TracedError};
 /// as the generic parameter for the `ErrorUnion`.
 ///
 /// For example, a `ErrorUnion<(String, u32)>` contains either
-/// a `String` or a `u32`. The value over a simple `Result`
-/// or other traditional enum starts to become apparent in larger
+/// a `String` or a `u32`. The benefit of this over creating
+/// specific enums for each function become apparent in larger
 /// codebases where error handling needs to occur in
-/// different places for different errors. `ErrorUnion` allows
+/// different places for different errors. As such, `ErrorUnion` allows
 /// you to quickly specify a function's return value as
 /// involving a precise subset of errors that the caller
-/// can clearly reason about.
-///
-/// `ErrorUnion` also holds the the root backtrace and context provided
-/// throughout the call chain.
+/// can clearly reason about. Providing maximum composability with
+/// no boilerplate.
 pub struct ErrorUnion<E: TypeSet> {
     pub(crate) value: Box<dyn Contextable>,
     _pd: PhantomData<E>,
@@ -127,7 +125,7 @@ where
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `ErrorUnion` which does not contain that
     /// type as one of its possible variants.
-    pub fn deflate<Target, Index>(
+    pub fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -150,7 +148,7 @@ where
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    pub fn inflate<Other, Index>(self) -> ErrorUnion<Other>
+    pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
@@ -217,6 +215,7 @@ where
 }
 
 impl<T: 'static> ErrorUnion<(T,)> {
+    /// Convert to the inner type of an ErrorUnion with a single possible type.
     pub fn into_inner(self) -> T {
         match self.to_enum() {
             crate::E1::A(inner) => inner,
@@ -240,15 +239,15 @@ impl ErrorUnion<(TracedError,)> {
 
 //************************************************************************//
 
-/// Run inflate and deflate directly on Results with ErrorUnions
-pub trait FlateUnionResult<S, E>
+/// Run widen and narrow directly on Results with ErrorUnions
+pub trait ReshapeUnionResult<S, E>
 where
     E: TypeSet,
 {
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>;
@@ -256,7 +255,7 @@ where
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `Result` with the `ErrorUnion` wither the remainder
     /// which does not contain that type as one of its possible variants.
-    fn deflate<Target, Index>(
+    fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -270,19 +269,19 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> FlateUnionResult<S, E> for Result<S, ErrorUnion<E>>
+impl<S, E> ReshapeUnionResult<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
-    fn inflate<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+    fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
-        self.map_err(|e| e.inflate())
+        self.map_err(|e| e.widen())
     }
 
-    fn deflate<Target, Index>(
+    fn narrow<Target, Index>(
         self,
     ) -> Result<
         Target,
@@ -297,7 +296,7 @@ where
     {
         match self {
             Ok(value) => Err(Ok(value)),
-            Err(err) => match err.deflate() {
+            Err(err) => match err.narrow() {
                 Ok(value) => return Ok(value),
                 Err(err) => Err(Err(err)),
             },
@@ -308,6 +307,7 @@ where
 //************************************************************************//
 
 pub trait IntoUnionResult<S, F> {
+    /// Creates an `ErrorUnion` for this type.
     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
