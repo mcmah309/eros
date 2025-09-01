@@ -330,6 +330,17 @@ pub trait HasTracedError {
     fn traced_mut(&mut self) -> &mut TracedError<Self::Underlying>;
 }
 
+// todo replace the next with something like this and do the same for dyn (need to make this work).
+// ? Do we even need the above trait for anything since we have deref
+// impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E::Underlying>>> for Result<S, E>
+// where
+//     E: HasTracedError,
+// {
+//     fn traced(self) -> Result<S, TracedError<E::Underlying>> {
+//         todo!()
+//     }
+// }
+
 impl<S, E> IntoConcreteTracedError<Result<S, E>> for Result<S, E>
 where
     E: HasTracedError,
