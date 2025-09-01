@@ -1,8 +1,9 @@
 #![cfg(feature = "traced")]
 
+use std::fmt::{Debug, Display};
+
 use eros::{
-    bail, traced, Context, ErrorUnion, IntoDynTracedError, IntoUnionResult, TracedError,
-    TracedResult,
+    bail, traced, AnyError, Context, ErrorUnion, IntoDynTracedError, IntoUnionResult, HasTracedError, TracedError, TracedResult
 };
 
 #[cfg(feature = "min_specialization")]
@@ -103,4 +104,34 @@ fn bail() {
     println!("{:?}", result.unwrap_err());
     let result2: TracedResult<()> = func4();
     println!("{:?}", result2.unwrap_err());
+}
+
+
+#[derive(Debug)]
+struct MyError(TracedError);
+
+impl std::error::Error for MyError {}
+
+impl Display for MyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MyError: {}", self.0)
+    }
+}
+
+impl HasTracedError for MyError {
+    type Underlying = Box<dyn AnyError>;
+
+    fn traced_mut(&mut self) -> &mut TracedError<Self::Underlying> {
+        &mut self.0
+    }
+}
+
+#[test]
+fn custom_traced_error() {
+    let my_error = MyError(traced!("This is an error"));
+    let my_error = my_error.context("This is some context");
+    println!("{}", my_error);
+    let result: Result<(), MyError> = Err(my_error);
+    let result = result.context("This is some more context");
+    println!("{}", result.unwrap_err());
 }

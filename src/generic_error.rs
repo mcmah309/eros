@@ -18,9 +18,9 @@ impl std::error::Error for Box<dyn AnyError> {}
 /// This context may be information such as variable values or ongoing operations while the error occurred.
 /// If the error is handled higher in the stack, then this can be disregarded (no log pollution).
 /// Otherwise you can log it (or panic), capturing all the relevant information in one log.
-/// 
+///
 /// A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
-/// 
+///
 /// The caller of the context using a `TracedError` may or may not care about type the underlying error.
 /// If it does not, consider using the generic `TracedError`. Otherwise, you can specify the type
 /// with `TracedError<T>`.
@@ -93,6 +93,13 @@ impl<T: AnyError> TracedError<T> {
         self
     }
 
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
+    pub(crate) fn context_mut<C: Into<StrError>>(&mut self, context: C) {
+        #[cfg(feature = "traced")]
+        self.context.push(context.into());
+    }
+
     /// Adds additional context lazily. This becomes a no-op if the `traced` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
@@ -103,6 +110,16 @@ impl<T: AnyError> TracedError<T> {
         #[cfg(feature = "traced")]
         self.context.push(f().into());
         self
+    }
+
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
+    pub(crate) fn with_context_mut<F, C: Into<StrError>>(&mut self, f: F)
+    where
+        F: FnOnce() -> C,
+    {
+        #[cfg(feature = "traced")]
+        self.context.push(f().into());
     }
 
     // Note: overrides extension
@@ -302,6 +319,37 @@ where
 
 //************************************************************************//
 
+/// A trait to be implemented by external error types to allow adding `context`
+pub trait HasTracedError {
+    // uncomment when https://github.com/rust-lang/rust/issues/29661 resolves
+    // type Underlying: AnyError = Box<dyn AnyError>;
+
+    /// The inner error type of the `TracedError`. If untyped should be `Box<dyn AnyError>`.
+    type Underlying: AnyError;
+
+    fn traced_mut(&mut self) -> &mut TracedError<Self::Underlying>;
+}
+
+impl<S, E> IntoConcreteTracedError<Result<S, E>> for Result<S, E>
+where
+    E: HasTracedError,
+{
+    fn traced(self) -> Result<S, E> {
+        self
+    }
+}
+
+impl<S, E> IntoDynTracedError<Result<S, E>> for Result<S, E>
+where
+    E: HasTracedError,
+{
+    fn traced_dyn(self) -> Result<S, E> {
+        self
+    }
+}
+
+//************************************************************************//
+
 #[cfg(feature = "min_specialization")]
 #[cfg(feature = "traced")]
 #[cfg(test)]
@@ -317,7 +365,7 @@ mod test {
             TracedError<std::io::Error>,
             i32,
             TracedError<StrError>,
-        )> = concrete_traced_error.widen();
+        )> = ErrorUnion::new(concrete_traced_error);
         let result: Result<
             (),
             ErrorUnion<(TracedError<std::io::Error>, i32, TracedError<StrError>)>,

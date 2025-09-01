@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use crate::{
-    generic_error::{AnyError, TracedError},
+    generic_error::{AnyError, HasTracedError, TracedError},
     str_error::StrError,
 };
 #[cfg(feature = "min_specialization")]
@@ -66,6 +66,46 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
         return self.map_err(|e| e.with_context(context));
         #[cfg(not(feature = "traced"))]
         return self;
+    }
+}
+
+//************************************************************************//
+
+impl<E: HasTracedError> Context<E> for E {
+    fn context<C: Into<StrError>>(mut self, context: C) -> E {
+        let traced_error = self.traced_mut();
+        traced_error.context_mut(context);
+        self
+    }
+
+    fn with_context<F, C: Into<StrError>>(mut self, f: F) -> E
+    where
+        F: FnOnce() -> C,
+    {
+        let traced_error = self.traced_mut();
+        traced_error.with_context_mut(f);
+        self
+    }
+}
+
+impl<T, E: HasTracedError> Context<Result<T, E>> for Result<T, E> {
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, E> {
+        self.map_err(|mut e| {
+            let traced_error = e.traced_mut();
+            traced_error.context_mut(context);
+            e
+        })
+    }
+
+    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, E>
+    where
+        F: FnOnce() -> C,
+    {
+        self.map_err(|mut e| {
+            let traced_error = e.traced_mut();
+            traced_error.with_context_mut(f);
+            e
+        })
     }
 }
 
