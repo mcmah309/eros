@@ -438,7 +438,7 @@ Eros is perfect for libraries and applications. It is also optimized for binary 
 
 Eros comes with the `traced` feature flag enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Libraries should consider disabling this by default and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
 
-### Public Api
+### Public Apis
 
 Exposing `TracedError`/`TracedError<T>`, or `ErrorUnion<(..T,)>` in a public api is perfectly fine and usually preferred. Though, if one wants to add their own custom error type for all exposed api's, use the `map` method.
 ```rust
