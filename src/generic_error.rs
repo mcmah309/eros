@@ -258,7 +258,7 @@ impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>> for Result<S, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    fn traced(self) -> Result<S, TracedError<E>> {
+    default fn traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.traced())
     }
 }
@@ -299,6 +299,34 @@ where
         self.map_err(|e| e.into_inner())
     }
 }
+
+//************************************************************************//
+
+pub trait IntoTracedError {
+    type Underlying: AnyError;
+
+    fn into_traced(self) -> TracedError<Self::Underlying>;
+}
+
+impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E::Underlying>>>
+    for Result<S, E>
+where
+    E: std::error::Error + Send + Sync + 'static + IntoTracedError,
+{
+    fn traced(self) -> Result<S, TracedError<E::Underlying>> {
+        self.map_err(|e| e.into_traced())
+    }
+}
+
+// impl<S, E> IntoDynTracedError<Result<S, TracedError>>
+//     for Result<S, E>
+// where
+//     E: std::error::Error + Send + Sync + 'static + IntoTracedError,
+// {
+//     fn traced(self) -> Result<S, TracedError> {
+//         self.map_err(|e| e.into_traced())
+//     }
+// }
 
 //************************************************************************//
 

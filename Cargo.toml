@@ -14,7 +14,7 @@ readme = "README.md"
 reqwest = { version = "0.12", features = ["blocking"] }
 
 [features]
-default = ["traced"]
+default = ["traced", "min_specialization"]
 # Disabling this feature will disable context and backtrace for `TracedError`, 
 # turning it into just a new type that may be optimized away. 
 # Libraries should consider disabling this, allowing downstream crates to decide.
