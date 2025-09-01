@@ -21,9 +21,8 @@ impl std::error::Error for Box<dyn AnyError> {}
 /// 
 /// A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
 /// 
-/// The caller of the context using a `TracedError` may or may not care about type the underlying error.
-/// If it does not, consider using the generic `TracedError`. Otherwise, you can specify the type
-/// with `TracedError<T>`.
+/// Use `TracedError` if the underlying error type does not matter.
+/// Otherwise, the type can be specified with `TracedError<T>`.
 pub struct TracedError<T = Box<dyn AnyError>>
 where
     T: AnyError,
