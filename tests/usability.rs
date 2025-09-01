@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{ErrorUnion, TracedError};
+use eros::{AnyError, ErrorUnion, TracedError};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -205,10 +205,31 @@ impl std::error::Error for IoErrorWrapper {
     }
 }
 
+#[derive(Debug)]
+struct MyErrorType(Box<dyn AnyError>);
+
+impl Display for MyErrorType {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "MyErrorType: {}", self.0)
+    }
+}
+
+impl std::error::Error for MyErrorType {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
 #[test]
 fn map_inner() {
     let error: TracedError<std::io::Error> =
         TracedError::new(std::io::Error::new(std::io::ErrorKind::Other, "wuaaaaahhh"));
     let error: TracedError<IoErrorWrapper> = error.map(|e| IoErrorWrapper(e));
+    println!("{error}");
+    let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(Box::new(e)));
+    println!("{error}");
+    let error: TracedError =
+        TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
+    let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(e));
     println!("{error}");
 }
