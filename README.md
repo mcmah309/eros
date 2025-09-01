@@ -474,4 +474,4 @@ An alternative to exposing `TracedError`/`TracedError<T>` is a wrapper type like
 
 #### Internal Tracing For Testing Only
 
-If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing. By default disable the `traced` feature flag so all tracing operations become a no opt. This can be then enabled for tests only. Then at the api boundary one can easily just call `into_inner` to get the inner `T` in `TracedError<T>`.
+If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing, they should By default disable the `traced` feature flag so all tracing operations become a no opt. This can then be enabled for tests only. Then at the api boundary one can easily just call `into_inner` to get the inner `T` in `TracedError<T>`. Thus no constructs of this library will be exposed to downstream crates and there is no performance impact.
