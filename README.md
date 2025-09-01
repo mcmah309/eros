@@ -430,6 +430,10 @@ Backtrace:
   32: <unknown>
 ```
 
+## `TracedError`
+
+`TracedError` allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and added to the log if `RUST_BACKTRACE` is set. Use `TracedError` if the underlying error type does not matter. Otherwise, the type can be specified with `TracedError<T>`.
+
 ## Perfect For Libraries And Optimized Binaries As Well
 
 Eros is perfect for libraries and applications. It is also optimized for binary size and performance.
