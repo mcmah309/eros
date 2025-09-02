@@ -22,7 +22,7 @@ pub use str_error::StrError;
 pub use context::Context;
 pub use generic_error::IntoConcreteTracedError;
 pub use generic_error::IntoDynTracedError;
-pub use generic_error::OptionTraced;
+pub use generic_error::OptionTracedExt;
 pub use error_union::ReshapeUnionResult;
 pub use error_union::IntoUnionResult;
 
