@@ -44,6 +44,7 @@ where
             e.value.add_context(context().into());
             e
         });
+        #[cfg(not(feature = "traced"))]
         return self;
     }
 }
