@@ -18,9 +18,9 @@ impl std::error::Error for Box<dyn AnyError> {}
 /// This context may be information such as variable values or ongoing operations while the error occurred.
 /// If the error is handled higher in the stack, then this can be disregarded (no log pollution).
 /// Otherwise you can log it (or panic), capturing all the relevant information in one log.
-/// 
+///
 /// A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
-/// 
+///
 /// Use `TracedError` if the underlying error type does not matter.
 /// Otherwise, the type can be specified with `TracedError<T>`.
 pub struct TracedError<T = Box<dyn AnyError>>
@@ -311,6 +311,18 @@ where
 {
     fn traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.into_inner())
+    }
+}
+
+//************************************************************************//
+
+pub trait OptionTraced<S> {
+    fn ok_or_traced(self) -> Result<S, TracedError>;
+}
+
+impl<S> OptionTraced<S> for Option<S> {
+    fn ok_or_traced(self) -> Result<S, TracedError> {
+        self.ok_or_else(|| TracedError::boxed(StrError::Static("`Option` is `None`")))
     }
 }
 
