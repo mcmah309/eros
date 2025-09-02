@@ -7,6 +7,7 @@ use std::{
 
 use crate::{str_error::StrError, ErrorUnion};
 
+
 /// Any error that satisfies this trait's bounds can be used in a `TracedError`
 pub trait AnyError: std::error::Error + Send + Sync + 'static {}
 
@@ -36,12 +37,12 @@ where
 
 impl TracedError {
     /// Create a dynamic type erased `TracedError`
-    pub fn boxed<E: AnyError>(source: E) -> TracedError {
+    pub fn boxed<E: AnyError>(source: E) -> Self {
         TracedError::new(Box::new(source))
     }
 
     // Note: overrides extension
-    pub fn traced_dyn(self) -> TracedError {
+    pub fn traced_dyn(self) -> Self {
         self
     }
 }
@@ -120,7 +121,7 @@ impl<T: AnyError> TracedError<T> {
     }
 
     // Note: overrides extension
-    pub fn traced(self) -> TracedError<T> {
+    pub fn traced(self) -> Self {
         self
     }
 }
@@ -224,7 +225,7 @@ pub trait IntoConcreteTracedError<O1> {
 
 impl<E> IntoDynTracedError<TracedError> for E
 where
-    E: std::error::Error + Send + Sync + 'static,
+    E: AnyError,
 {
     #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> TracedError {
@@ -246,7 +247,7 @@ impl IntoDynTracedError<TracedError> for Box<dyn AnyError + '_> {
 
 impl<E> IntoConcreteTracedError<TracedError<E>> for E
 where
-    E: std::error::Error + Send + Sync + 'static,
+    E: AnyError,
 {
     fn traced(self) -> TracedError<E> {
         TracedError::new(self)
@@ -255,7 +256,7 @@ where
 
 impl<S, E> IntoDynTracedError<Result<S, TracedError>> for Result<S, E>
 where
-    E: std::error::Error + Send + Sync + 'static,
+    E: AnyError,
 {
     #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> Result<S, TracedError> {
@@ -270,7 +271,7 @@ where
 
 impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>> for Result<S, E>
 where
-    E: std::error::Error + Send + Sync + 'static,
+    E: AnyError,
 {
     fn traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.traced())
@@ -307,7 +308,7 @@ impl<S> IntoDynTracedError<Result<S, TracedError>>
 impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>>
     for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
-    E: std::error::Error + Send + Sync + 'static,
+    E: AnyError
 {
     fn traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.into_inner())
