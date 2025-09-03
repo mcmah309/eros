@@ -8,7 +8,7 @@ use eros::{
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
 mod min_specialization {
-    use eros::{Context, ErrorUnion, ReshapeUnionResult};
+    use eros::{traced, Context, ErrorUnion, ReshapeUnionResult, TracedError};
 
     #[test]
     fn error_union() {
@@ -37,16 +37,29 @@ mod min_specialization {
             };
         }
 
+        fn func5() -> eros::UnionResult<(), (std::io::Error, bool, TracedError)> {
+            return Err(ErrorUnion::new(traced!("Error"))).context("From func5");
+        }
+
         let result: Result<(), ErrorUnion<(std::io::Error, i32, bool)>> = func3();
         println!("{:?}", result.as_ref().unwrap_err());
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
         assert!(
-            message.contains("Context:"),
-            "Expected context in message:\n{}",
+            !message.contains("Context:"),
+            "Expected no context in message:\n{}",
             message
         );
         let result: Result<(), ErrorUnion<(std::io::Error, bool)>> = func4();
+        println!("{:?}", result.as_ref().unwrap_err());
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(
+            !message.contains("Context:"),
+            "Expected no context in message:\n{}",
+            message
+        );
+        let result: Result<(), ErrorUnion<(std::io::Error, bool, TracedError)>> = func5();
         println!("{:?}", result.as_ref().unwrap_err());
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
