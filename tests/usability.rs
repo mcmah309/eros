@@ -147,24 +147,26 @@ fn multi_match() {
     use eros::E2;
 
     let o_1: ErrorUnion<(u32, String)> = ErrorUnion::new(5_u32);
-
+    let mut is_hit = false;
     match o_1.as_enum() {
         E2::A(u) => {
-            println!("handling {u}: u32")
+            is_hit = true;
         }
         E2::B(s) => {
-            println!("handling {s}: String")
+            unreachable!()
         }
     }
-
+    assert!(is_hit);
+    is_hit = false;
     match o_1.to_enum() {
         E2::A(u) => {
-            println!("handling {u}: u32")
+            is_hit = true;
         }
         E2::B(s) => {
-            println!("handling {s}: String")
+            unreachable!()
         }
     }
+    assert!(is_hit);
 }
 
 #[test]
@@ -180,14 +182,16 @@ fn multi_narrow() {
 
     let o_2: ErrorUnion<(u8, u16, Backoff, Timeout, u32, u64, u128)> = ErrorUnion::new(Timeout {});
 
+    let mut is_hit: bool = false;
     match o_2.subset::<(Timeout, Backoff), _>().unwrap().to_enum() {
         E2::A(Timeout {}) => {
-            println!(":)");
+            is_hit = true;
         }
         E2::B(Backoff {}) => {
             unreachable!()
         }
     }
+    assert!(is_hit);
 }
 
 #[derive(Debug)]
@@ -226,12 +230,28 @@ fn map_inner() {
         TracedError::new(std::io::Error::new(std::io::ErrorKind::Other, "wuaaaaahhh"));
     let error: TracedError<IoErrorWrapper> = error.map(|e| IoErrorWrapper(e));
     println!("{error}");
+    let message = error.to_string();
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
     let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(Box::new(e)));
     println!("{error}");
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
     let error: TracedError =
         TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
     let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(e));
     println!("{error}");
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
 }
 
 #[test]

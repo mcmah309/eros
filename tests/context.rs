@@ -38,9 +38,23 @@ mod min_specialization {
         }
 
         let result: Result<(), ErrorUnion<(std::io::Error, i32, bool)>> = func3();
-        println!("{:?}", result.unwrap_err());
+        println!("{:?}", result.as_ref().unwrap_err());
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(
+            message.contains("Context:"),
+            "Expected context in message:\n{}",
+            message
+        );
         let result: Result<(), ErrorUnion<(std::io::Error, bool)>> = func4();
-        println!("{:?}", result.unwrap_err());
+        println!("{:?}", result.as_ref().unwrap_err());
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(
+            message.contains("Context:"),
+            "Expected context in message:\n{}",
+            message
+        );
     }
 }
 
@@ -59,8 +73,14 @@ fn generic_context_error_to_error_union() {
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
-    println!("{:?}", result.unwrap_err());
-    // println!("{}", result.unwrap_err());
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Context:"),
+        "Expected context in message:\n{}",
+        message
+    );
 }
 
 #[test]
@@ -74,8 +94,14 @@ fn generic_error_to_error_union() {
     }
 
     let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func2();
-    println!("{:?}", result.unwrap_err());
-    // println!("{}", result.unwrap_err());
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
 }
 
 #[test]
@@ -100,9 +126,23 @@ fn bail() {
     }
 
     let result: Result<(), ErrorUnion<(TracedError, i32, bool)>> = func3();
-    println!("{:?}", result.unwrap_err());
-    let result2: TracedResult<()> = func4();
-    println!("{:?}", result2.unwrap_err());
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Context:"),
+        "Expected context in message:\n{}",
+        message
+    );
+    let result: TracedResult<()> = func4();
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
 }
 
 #[test]
@@ -118,8 +158,7 @@ fn context_directly_on_error() {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
-        let value = result
-            .context("This is some context")?;
+        let value = result.context("This is some context")?;
         return Ok(value);
     }
 
@@ -132,11 +171,32 @@ fn context_directly_on_error() {
     }
 
     let result: TracedResult<()> = on_error();
-    println!("{:?}", result.unwrap_err());
-    let result2: TracedResult<()> = on_result();
-    println!("{:?}", result2.unwrap_err());
-    let result3: TracedResult<()> = on_result_again();
-    println!("{:?}", result3.unwrap_err());
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Context:"),
+        "Expected context in message:\n{}",
+        message
+    );
+    let result: TracedResult<()> = on_result();
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Context:"),
+        "Expected context in message:\n{}",
+        message
+    );
+    let result: TracedResult<()> = on_result_again();
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Context:"),
+        "Expected context in message:\n{}",
+        message
+    );
 }
 
 #[test]
