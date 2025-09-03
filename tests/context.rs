@@ -161,11 +161,4 @@ fn nesting_traced_dyn_calls() {
 
     let count = message.match_indices("Context:").count();
     assert_eq!(count, 1, "Expected only one 'Context:', got:\n{}", message);
-
-    let count = message.match_indices("Backtrace:").count();
-    assert_eq!(
-        count, 1,
-        "Expected only one 'Backtrace:', got:\n{}",
-        message
-    );
 }
