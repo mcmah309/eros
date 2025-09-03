@@ -118,6 +118,10 @@ impl<T: AnyError> TracedError<T> {
         self.context.push(f().into());
         self
     }
+
+    pub fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.inner.source()
+    }
 }
 
 impl<T: AnyError> fmt::Display for TracedError<T> {
