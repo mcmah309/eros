@@ -163,7 +163,7 @@ Errors should always provided context of the operations in the call stack that l
 
 ```rust
 use eros::{
-    bail, Context, IntoDynTracedError, IntoUnionResult, TracedError,
+    bail, Context, IntoUnionResult, TracedError,
 };
 use std::io::{Error, ErrorKind};
 
@@ -183,7 +183,9 @@ fn func2() -> eros::Result<()> {
 
 fn func3() -> eros::Result<()> {
     return Err(Error::new(ErrorKind::AddrInUse, "message here"))
-        .traced_dyn()
+        // Trace the `Err` without the type (`TracedError`)
+        // Note: Calling `.traced_dyn()` not needed. we can call `context` directly
+        // .traced_dyn()
         .context("This is some context");
 }
 
@@ -297,8 +299,8 @@ fn handle_response(res: Response) -> eros::Result<String> {
     let body = res
         .text()
         // Trace the `Err` without the type (`TracedError`)
-        // Note: This is not needed. we could call `context` directly and it defaults to `traced_dyn`
-        .traced_dyn()
+        // Note: Calling `.traced_dyn()` not needed. we can call `context` directly
+        // .traced_dyn()
         // Add context to the traced error if an `Err`
         .context("while reading response body")?;
     Ok(body)
