@@ -336,7 +336,7 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
                     sleep(Duration::from_millis(200));
                     continue;
                 } else {
-                    return Err(request_error.into_dyn().context("Retries exceeded"));
+                    return Err(request_error.traced_dyn().context("Retries exceeded"));
                 }
             }
             // `result` is now `UnionResult<String,(TracedError,)>`, so we convert the `Err` type

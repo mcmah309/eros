@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{AnyError, ErrorUnion, TracedError};
+use eros::{traced, AnyError, ErrorUnion, IntoDynTracedError, TracedError};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -232,4 +232,19 @@ fn map_inner() {
         TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
     let error: TracedError<MyErrorType> = error.map(|e| MyErrorType(e));
     println!("{error}");
+}
+
+#[test]
+#[should_panic]
+fn double_traced_dyn_error() {
+    let error = traced!("Error");
+    let _error = error.traced_dyn();
+}
+
+#[test]
+#[should_panic]
+fn double_traced_dyn_result() {
+    let error = traced!("Error");
+    let result: Result<(), TracedError> = Err(error);
+    let _result = result.traced_dyn();
 }

@@ -21,7 +21,7 @@ mod min_specialization {
         }
 
         fn func2() -> Result<(), ErrorUnion<(i32, std::io::Error)>> {
-            func1().context("From func2".to_string()).widen()
+            func1().widen().context("From func2".to_string())
         }
 
         fn func3() -> eros::UnionResult<(), (std::io::Error, i32, bool)> {
@@ -103,4 +103,39 @@ fn bail() {
     println!("{:?}", result.unwrap_err());
     let result2: TracedResult<()> = func4();
     println!("{:?}", result2.unwrap_err());
+}
+
+#[test]
+fn context_directly_on_error() {
+    fn func1() -> TracedResult<()> {
+        let error =
+            std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
+                .context("This is some context");
+        return Err(error.traced_dyn());
+    }
+
+    fn func2() -> TracedResult<()> {
+        let error =
+            std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
+        let result: Result<(), std::io::Error> = Err(error);
+        let value = result
+            .context("This is some context")
+            .map_err(|e| e.traced_dyn())?;
+        return Ok(value);
+    }
+
+    fn func3() -> TracedResult<()> {
+        let error =
+            std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
+        let result: Result<(), std::io::Error> = Err(error);
+        let value = result.context("This is some context").traced_dyn()?;
+        return Ok(value);
+    }
+
+    let result: TracedResult<()> = func1();
+    println!("{:?}", result.unwrap_err());
+    let result2: TracedResult<()> = func2();
+    println!("{:?}", result2.unwrap_err());
+    let result3: TracedResult<()> = func3();
+    println!("{:?}", result3.unwrap_err());
 }

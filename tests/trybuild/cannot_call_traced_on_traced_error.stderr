@@ -1,0 +1,12 @@
+error[E0597]: `error` does not live long enough
+ --> tests/trybuild/cannot_call_traced_on_traced_error.rs:7:18
+  |
+6 |     let error: eros::TracedError = traced!("Error");
+  |         ----- binding `error` declared here
+7 |     let _error = error.traced();
+  |                  ^^^^^---------
+  |                  |
+  |                  borrowed value does not live long enough
+  |                  argument requires that `error` is borrowed for `'static`
+8 | }
+  | - `error` dropped here while still borrowed

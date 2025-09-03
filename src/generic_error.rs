@@ -7,7 +7,6 @@ use std::{
 
 use crate::{str_error::StrError, ErrorUnion};
 
-
 /// Any error that satisfies this trait's bounds can be used in a `TracedError`
 pub trait AnyError: std::error::Error + Send + Sync + 'static {}
 
@@ -40,11 +39,6 @@ impl TracedError {
     pub fn boxed<E: AnyError>(source: E) -> Self {
         TracedError::new(Box::new(source))
     }
-
-    // Note: overrides extension
-    pub fn traced_dyn(self) -> Self {
-        self
-    }
 }
 
 impl<T: AnyError> TracedError<T> {
@@ -59,7 +53,12 @@ impl<T: AnyError> TracedError<T> {
     }
 
     /// Converts these `TracedError` into dynamic type erased `TracedError`
-    pub fn into_dyn(self) -> TracedError {
+    pub fn traced_dyn(self) -> TracedError {
+        debug_assert!(
+            std::any::TypeId::of::<T>() != std::any::TypeId::of::<Box<dyn AnyError>>(),
+            "traced_dyn() called on already boxed TracedError"
+        );
+
         TracedError {
             inner: Box::new(self.inner),
             #[cfg(feature = "traced")]
@@ -119,11 +118,6 @@ impl<T: AnyError> TracedError<T> {
         self.context.push(f().into());
         self
     }
-
-    // Note: overrides extension
-    pub fn traced(self) -> Self {
-        self
-    }
 }
 
 impl<T: AnyError> fmt::Display for TracedError<T> {
@@ -163,7 +157,23 @@ impl<T: AnyError> fmt::Debug for TracedError<T> {
 // Into `TracedError`
 //************************************************************************//
 
-impl<T: AnyError> std::error::Error for TracedError<T> {
+// Note: This is not implemented so something like `TracedError<TracedError<T>>` is not possible.
+// Also this allows us to implement `Context` on `E: AnyError` since it does not conflict with itself.
+// e.g. In `impl<E: AnyError> Context<TracedError<E>> for E` `TracedError<E>` cannot be `E`.
+// Thus `context` can be called directly with no `traced()`/`traced_dyn()` call.
+// impl<T: AnyError> std::error::Error for TracedError<T> {
+//     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+//         self.inner.source()
+//     }
+// }
+
+impl<T: AnyError> std::error::Error for &TracedError<T> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.inner.source()
+    }
+}
+
+impl<T: AnyError> std::error::Error for &mut TracedError<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.source()
     }
@@ -195,32 +205,9 @@ impl<T: AnyError> From<T> for TracedError<T> {
 
 //************************************************************************//
 
-// pub trait IntoTracedError<O1, O2>: IntoTracedConcreteError<O1> + IntoTracedDynError<O2> {
-//     fn traced(self) -> O1;
-
-//     fn traced_dyn(self) -> O2;
-// }
-
-// impl<T, O1, O2> IntoTracedError<O1, O2> for T where
-//     T: IntoTracedConcreteError<O1> + IntoTracedDynError<O2>
-// {
-//     fn traced(self) -> O1 {
-//         <Self as IntoTracedConcreteError<O1>>::traced(self)
-//     }
-
-//     fn traced_dyn(self) -> O2 {
-//         <Self as IntoTracedDynError<O2>>::traced_dyn(self)
-//     }
-// }
-
 pub trait IntoDynTracedError<O2> {
     /// Convert Error to `TracedError` without caring about the underlying type
     fn traced_dyn(self) -> O2;
-}
-
-pub trait IntoConcreteTracedError<O1> {
-    /// Convert Error to `TracedError` keeping the underlying type
-    fn traced(self) -> O1;
 }
 
 impl<E> IntoDynTracedError<TracedError> for E
@@ -245,19 +232,16 @@ impl IntoDynTracedError<TracedError> for Box<dyn AnyError + '_> {
     }
 }
 
-impl<E> IntoConcreteTracedError<TracedError<E>> for E
-where
-    E: AnyError,
-{
-    fn traced(self) -> TracedError<E> {
-        TracedError::new(self)
-    }
-}
-
 impl<S, E> IntoDynTracedError<Result<S, TracedError>> for Result<S, E>
 where
     E: AnyError,
 {
+    fn traced_dyn(self) -> Result<S, TracedError> {
+        self.map_err(|e| e.traced_dyn())
+    }
+}
+
+impl<S, E: AnyError> IntoDynTracedError<Result<S, TracedError>> for Result<S, TracedError<E>> {
     #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.traced_dyn())
@@ -269,6 +253,30 @@ where
     }
 }
 
+#[cfg(feature = "min_specialization")]
+impl<S> IntoDynTracedError<Result<S, TracedError<Box<dyn AnyError + '_>>>>
+    for Result<S, TracedError<Box<dyn AnyError + '_>>>
+{
+    fn traced_dyn(self) -> Result<S, TracedError> {
+        self
+    }
+}
+
+//************************************************************************//
+
+pub trait IntoConcreteTracedError<O1> {
+    /// Convert Error to `TracedError` keeping the underlying type
+    fn traced(self) -> O1;
+}
+
+impl<E> IntoConcreteTracedError<TracedError<E>> for E
+where
+    E: AnyError,
+{
+    fn traced(self) -> TracedError<E> {
+        TracedError::new(self)
+    }
+}
 impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>> for Result<S, E>
 where
     E: AnyError,
@@ -278,37 +286,10 @@ where
     }
 }
 
-#[cfg(feature = "min_specialization")]
-impl<S> IntoDynTracedError<Result<S, TracedError>>
-    for Result<S, ErrorUnion<(TracedError<Box<dyn AnyError + '_>>,)>>
-{
-    fn traced_dyn(self) -> Result<S, TracedError> {
-        self.map_err(|e| e.into_inner())
-    }
-}
-
-#[cfg(feature = "min_specialization")]
-impl<S, E: AnyError> IntoDynTracedError<Result<S, TracedError>>
-    for Result<S, ErrorUnion<(TracedError<E>,)>>
-{
-    default fn traced_dyn(self) -> Result<S, TracedError> {
-        self.map_err(|e| e.into_inner().into_dyn())
-    }
-}
-
-#[cfg(feature = "min_specialization")]
-impl<S> IntoDynTracedError<Result<S, TracedError>>
-    for Result<S, TracedError<Box<dyn AnyError + '_>>>
-{
-    fn traced_dyn(self) -> Result<S, TracedError> {
-        self
-    }
-}
-
 impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>>
     for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
-    E: AnyError
+    E: AnyError,
 {
     fn traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.into_inner())

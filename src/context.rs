@@ -70,6 +70,48 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
     }
 }
 
+impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, E> {
+    #[allow(unused_variables)]
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
+        #[cfg(feature = "traced")]
+        return self.map_err(|e| TracedError::new(e).context(context));
+        #[cfg(not(feature = "traced"))]
+        return self;
+    }
+
+    #[allow(unused_variables)]
+    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError<E>>
+    where
+        F: FnOnce() -> C,
+    {
+        #[cfg(feature = "traced")]
+        return self.map_err(|e| TracedError::new(e).with_context(context));
+        #[cfg(not(feature = "traced"))]
+        return self;
+    }
+}
+
+impl<E: AnyError> Context<TracedError<E>> for E {
+    #[allow(unused_variables)]
+    fn context<C: Into<StrError>>(self, context: C) -> TracedError<E> {
+        #[cfg(feature = "traced")]
+        return TracedError::new(self).context(context);
+        #[cfg(not(feature = "traced"))]
+        return self;
+    }
+
+    #[allow(unused_variables)]
+    fn with_context<F, C: Into<StrError>>(self, context: F) -> TracedError<E>
+    where
+        F: FnOnce() -> C,
+    {
+        #[cfg(feature = "traced")]
+        return TracedError::new(self).with_context(context);
+        #[cfg(not(feature = "traced"))]
+        return self;
+    }
+}
+
 //************************************************************************//
 
 /// Used internally to allow adding context directly to a `ErrorUnion`
