@@ -76,7 +76,7 @@ impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
         #[cfg(feature = "traced")]
         return self.map_err(|e| TracedError::boxed(e).context(context));
         #[cfg(not(feature = "traced"))]
-        return self.map_err(TracedError::new);
+        return self.map_err(TracedError::boxed);
     }
 
     #[allow(unused_variables)]
@@ -87,7 +87,7 @@ impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
         #[cfg(feature = "traced")]
         return self.map_err(|e| TracedError::boxed(e).with_context(context));
         #[cfg(not(feature = "traced"))]
-        return self.map_err(TracedError::new);
+        return self.map_err(TracedError::boxed);
     }
 }
 
