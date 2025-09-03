@@ -235,7 +235,7 @@ fn map_inner() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "min_specialization"), should_panic)]
+#[should_panic]
 fn double_traced_dyn_error() {
     let error = traced!("Error");
     let _error = error.traced_dyn();
