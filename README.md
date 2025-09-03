@@ -313,6 +313,7 @@ fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error
         .get(url)
         .send()
         // Explicitly trace the `Err` with the type (`TracedError<reqwest::Error>`)
+        // Note: This is not needed we could call `with_context` directly
         .traced()
         // Add lazy context to the traced error if an `Err`
         .with_context(|| format!("Url: {url}"))
