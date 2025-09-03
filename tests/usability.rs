@@ -235,14 +235,14 @@ fn map_inner() {
 }
 
 #[test]
-#[should_panic]
+#[cfg_attr(not(feature = "min_specialization"), should_panic)]
 fn double_traced_dyn_error() {
     let error = traced!("Error");
     let _error = error.traced_dyn();
 }
 
 #[test]
-#[should_panic]
+#[cfg_attr(not(feature = "min_specialization"), should_panic)]
 fn double_traced_dyn_result() {
     let error = traced!("Error");
     let result: Result<(), TracedError> = Err(error);

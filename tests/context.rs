@@ -139,3 +139,33 @@ fn context_directly_on_error() {
     let result3: TracedResult<()> = func3();
     println!("{:?}", result3.unwrap_err());
 }
+
+#[test]
+#[cfg_attr(not(feature = "min_specialization"), should_panic)]
+fn nesting_traced_dyn_calls() {
+    fn func1() -> TracedResult<()> {
+        eros::bail!("This is a bailing message {}", 1);
+    }
+
+    fn func2() -> TracedResult<()> {
+        func1()
+            .context("One")
+            .traced_dyn()
+            .context("Two")
+            .traced_dyn()
+            .context("Three")
+    }
+
+    let result: TracedResult<()> = func2();
+    let message = result.unwrap_err().to_string();
+
+    let count = message.match_indices("Context:").count();
+    assert_eq!(count, 1, "Expected only one 'Context:', got:\n{}", message);
+
+    let count = message.match_indices("Backtrace:").count();
+    assert_eq!(
+        count, 1,
+        "Expected only one 'Backtrace:', got:\n{}",
+        message
+    );
+}
