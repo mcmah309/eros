@@ -107,36 +107,35 @@ fn bail() {
 
 #[test]
 fn context_directly_on_error() {
-    fn func1() -> TracedResult<()> {
+    fn on_error() -> TracedResult<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
                 .context("This is some context");
-        return Err(error.traced_dyn());
+        return Err(error);
     }
 
-    fn func2() -> TracedResult<()> {
+    fn on_result() -> TracedResult<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
         let value = result
-            .context("This is some context")
-            .map_err(|e| e.traced_dyn())?;
+            .context("This is some context")?;
         return Ok(value);
     }
 
-    fn func3() -> TracedResult<()> {
+    fn on_result_again() -> TracedResult<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
-        let value = result.context("This is some context").traced_dyn()?;
+        let value = result.context("This is some context")?;
         return Ok(value);
     }
 
-    let result: TracedResult<()> = func1();
+    let result: TracedResult<()> = on_error();
     println!("{:?}", result.unwrap_err());
-    let result2: TracedResult<()> = func2();
+    let result2: TracedResult<()> = on_result();
     println!("{:?}", result2.unwrap_err());
-    let result3: TracedResult<()> = func3();
+    let result3: TracedResult<()> = on_result_again();
     println!("{:?}", result3.unwrap_err());
 }
 

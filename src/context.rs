@@ -70,45 +70,45 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
     }
 }
 
-impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, E> {
+impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
     #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError> {
         #[cfg(feature = "traced")]
-        return self.map_err(|e| TracedError::new(e).context(context));
+        return self.map_err(|e| TracedError::boxed(e).context(context));
         #[cfg(not(feature = "traced"))]
         return self.map_err(TracedError::new);
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError<E>>
+    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError>
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "traced")]
-        return self.map_err(|e| TracedError::new(e).with_context(context));
+        return self.map_err(|e| TracedError::boxed(e).with_context(context));
         #[cfg(not(feature = "traced"))]
         return self.map_err(TracedError::new);
     }
 }
 
-impl<E: AnyError> Context<TracedError<E>> for E {
+impl<E: AnyError> Context<TracedError> for E {
     #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> TracedError<E> {
+    fn context<C: Into<StrError>>(self, context: C) -> TracedError {
         #[cfg(feature = "traced")]
-        return TracedError::new(self).context(context);
+        return TracedError::boxed(self).context(context);
         #[cfg(not(feature = "traced"))]
-        return TracedError::new(self);
+        return TracedError::boxed(self);
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> TracedError<E>
+    fn with_context<F, C: Into<StrError>>(self, context: F) -> TracedError
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "traced")]
-        return TracedError::new(self).with_context(context);
+        return TracedError::boxed(self).with_context(context);
         #[cfg(not(feature = "traced"))]
-        return TracedError::new(self);
+        return TracedError::boxed(self);
     }
 }
 
