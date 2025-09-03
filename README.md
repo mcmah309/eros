@@ -447,7 +447,7 @@ Eros comes with the `traced` feature flag enabled by default. If this is disable
 
 #### First Class Tracing
 
-Exposing `TracedError`/`TracedError<T>`, or `ErrorUnion<(..T,)>` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. Though, if one wants to add their own custom error type for all public api's, use the `map` method at these boundaries.
+Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. Though, if one wants to add their own custom error type for all public api's, use the `map` method at these boundaries.
 ```rust
 use eros::{AnyError, TracedError};
 
@@ -475,7 +475,7 @@ pub fn public_api() -> eros::Result<(), MyErrorType> {
 ```
 #### Wrapper Types
 
-An alternative to exposing `TracedError`/`TracedError<T>` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping may still unintentionally occur, that is why exposing the `TracedError`/`TracedError<T>` in the api is usually preferred.
+An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself.
 
 #### Internal Tracing For Testing Only
 
