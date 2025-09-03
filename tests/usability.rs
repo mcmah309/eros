@@ -268,3 +268,20 @@ fn double_traced_dyn_result() {
     let result: Result<(), TracedError> = Err(error);
     let _result = result.traced_dyn();
 }
+
+#[test]
+fn source_lives_long_enough() {
+    enum Wrapper {
+        TracedError(TracedError),
+    }
+
+    let error = traced!("Error");
+    let wrapper_binding = Wrapper::TracedError(error);
+    let wrapper = &wrapper_binding;
+    let source = match wrapper {
+        // Wrapper::TracedError(traced_error) => std::error::Error::source(traced_error), // does not work
+        Wrapper::TracedError(traced_error) => traced_error.source(),
+
+    };
+    let _source = source;
+}

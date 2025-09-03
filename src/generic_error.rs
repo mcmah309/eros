@@ -119,6 +119,10 @@ impl<T: AnyError> TracedError<T> {
         self
     }
 
+    // Note: Even though `std::error::Error` is implemented for Deref.
+    // We still redeclare `source` here to tie the lifetime to this,
+    // rather than another deref
+    /// Returns the lower-level source of this error, if any.
     pub fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.source()
     }
