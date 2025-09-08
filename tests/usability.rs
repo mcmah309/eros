@@ -281,7 +281,25 @@ fn source_lives_long_enough() {
     let source = match wrapper {
         // Wrapper::TracedError(traced_error) => std::error::Error::source(traced_error), // does not work
         Wrapper::TracedError(traced_error) => traced_error.source(),
-
     };
     let _source = source;
+}
+
+#[test]
+fn x() {
+    let error = traced!("Root");
+    let error = error.context("the context before");
+    let error = error.into_any_error();
+    let error = TracedError::from_dyn_error(error).unwrap();
+    let error = error.context("The context after");
+    let message = error.to_string();
+    assert!(
+        !message.contains(
+            r#"Context:
+- the context before
+- The context after"#
+        ),
+        "Expected context to be correct:\n{}",
+        message
+    );
 }

@@ -39,6 +39,27 @@ impl TracedError {
     pub fn boxed<E: AnyError>(source: E) -> Self {
         TracedError::new(Box::new(source))
     }
+
+    /// Attempts to downcast a `Box<dyn AnyError>` into a `TracedError`.
+    pub fn from_dyn_error(error: Box<dyn AnyError>) -> Option<Self> {
+        // let any = &*error as &dyn std::any::Any;
+        // if any.is::<DynTracedErrorWrapper>() {
+        //     let wrapper = *(error as Box<dyn std::any::Any>)
+        //         .downcast::<DynTracedErrorWrapper>()
+        //         .unwrap();
+        //     return wrapper.0;
+        // }
+        // TracedError::new(error)
+        (error as Box<dyn std::any::Any>)
+            .downcast::<DynTracedErrorWrapper>()
+            .ok()
+            .map(|e| (*e).0)
+    }
+
+    /// Properly erases this `TracedError` into a `Box<dyn AnyError>`.
+    pub fn into_any_error(self) -> Box<dyn AnyError> {
+        Box::new(DynTracedErrorWrapper(self))
+    }
 }
 
 impl<T: AnyError> TracedError<T> {
@@ -313,6 +334,26 @@ pub trait OptionTracedExt<S> {
 impl<S> OptionTracedExt<S> for Option<S> {
     fn ok_or_traced(self) -> Result<S, TracedError> {
         self.ok_or_else(|| TracedError::boxed(StrError::Static("`Option` is `None`")))
+    }
+}
+
+//************************************************************************//
+
+/// Internal struct to convert a `TracedError` into `AnyError`.
+///
+/// Note: `TracedError` is not `AnyError` since otherwise there would be conflicting trait implementations
+#[derive(Debug)]
+struct DynTracedErrorWrapper(TracedError);
+
+impl std::error::Error for DynTracedErrorWrapper {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.inner.source()
+    }
+}
+
+impl fmt::Display for DynTracedErrorWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
