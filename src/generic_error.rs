@@ -8,7 +8,7 @@ use std::{
 use crate::{str_error::StrError, ErrorUnion};
 
 /// Any error that satisfies this trait's bounds can be used in a `TracedError`
-pub trait AnyError: std::error::Error + Send + Sync + 'static {}
+pub trait AnyError: std::any::Any + std::error::Error + Send + Sync + 'static {}
 
 impl<T> AnyError for T where T: std::error::Error + Send + Sync + 'static {}
 
