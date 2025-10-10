@@ -16,11 +16,15 @@ trybuild = "1"
 
 [features]
 default = ["traced"]
-# Disabling this feature will disable context and backtrace for `TracedError`, 
-# turning it into just a new type that may be optimized away. 
+# Wrapper flag.
+# Disabling "context" and "backtrace" turns `TracedError` into a new type that may be optimized away. 
 # Libraries should consider disabling this, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
-traced = []
+traced = ["context", "backtrace"]
+# Enables context for `TracedError`
+context = []
+# Enables backtrace for `TracedError`
+backtrace = []
 # This requires the `min_specialization` feature. 
 # Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type. 
 # And improve some operations.

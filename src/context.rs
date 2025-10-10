@@ -25,12 +25,12 @@ where
 {
     #[allow(unused_variables)]
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<E>> {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return self.map_err(|mut e| {
             e.value.add_context(context.into());
             e
         });
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return self;
     }
 
@@ -39,12 +39,12 @@ where
     where
         F: FnOnce() -> C,
     {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return self.map_err(|mut e| {
             e.value.add_context(context().into());
             e
         });
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return self;
     }
 }
@@ -52,9 +52,9 @@ where
 impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedError<E>> {
     #[allow(unused_variables)]
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return self.map_err(|e| e.context(context));
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return self;
     }
 
@@ -63,9 +63,9 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
     where
         F: FnOnce() -> C,
     {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return self.map_err(|e| e.with_context(context));
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return self;
     }
 }
@@ -73,9 +73,9 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
 impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
     #[allow(unused_variables)]
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError> {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return self.map_err(|e| TracedError::boxed(e).context(context));
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return self.map_err(TracedError::boxed);
     }
 
@@ -84,9 +84,9 @@ impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
     where
         F: FnOnce() -> C,
     {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return self.map_err(|e| TracedError::boxed(e).with_context(context));
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return self.map_err(TracedError::boxed);
     }
 }
@@ -94,9 +94,9 @@ impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
 impl<E: AnyError> Context<TracedError> for E {
     #[allow(unused_variables)]
     fn context<C: Into<StrError>>(self, context: C) -> TracedError {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return TracedError::boxed(self).context(context);
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return TracedError::boxed(self);
     }
 
@@ -105,9 +105,9 @@ impl<E: AnyError> Context<TracedError> for E {
     where
         F: FnOnce() -> C,
     {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         return TracedError::boxed(self).with_context(context);
-        #[cfg(not(feature = "traced"))]
+        #[cfg(not(feature = "context"))]
         return TracedError::boxed(self);
     }
 }
@@ -132,7 +132,7 @@ impl<T: 'static> Contextable for T {
 impl Contextable for Box<dyn Contextable + '_> {
     #[allow(unused_variables)]
     fn add_context(&mut self, context: StrError) {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         (**self).add_context(context);
     }
 }
@@ -140,7 +140,7 @@ impl Contextable for Box<dyn Contextable + '_> {
 impl<T: AnyError> Contextable for TracedError<T> {
     #[allow(unused_variables)]
     fn add_context(&mut self, context: StrError) {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         self.context.push(context);
     }
 }

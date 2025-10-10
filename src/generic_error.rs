@@ -1,4 +1,4 @@
-#[cfg(feature = "traced")]
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::{
     borrow::Cow,
@@ -28,9 +28,9 @@ where
     T: AnyError,
 {
     inner: T,
-    #[cfg(feature = "traced")]
+    #[cfg(feature = "backtrace")]
     pub(crate) backtrace: Backtrace,
-    #[cfg(feature = "traced")]
+    #[cfg(feature = "context")]
     pub(crate) context: Vec<StrError>,
 }
 
@@ -45,9 +45,9 @@ impl<T: AnyError> TracedError<T> {
     pub fn new(source: T) -> Self {
         Self {
             inner: source,
-            #[cfg(feature = "traced")]
+            #[cfg(feature = "backtrace")]
             backtrace: Backtrace::capture(),
-            #[cfg(feature = "traced")]
+            #[cfg(feature = "context")]
             context: Vec::new(),
         }
     }
@@ -61,9 +61,9 @@ impl<T: AnyError> TracedError<T> {
 
         TracedError {
             inner: Box::new(self.inner),
-            #[cfg(feature = "traced")]
+            #[cfg(feature = "backtrace")]
             backtrace: self.backtrace,
-            #[cfg(feature = "traced")]
+            #[cfg(feature = "context")]
             context: self.context,
         }
     }
@@ -91,9 +91,9 @@ impl<T: AnyError> TracedError<T> {
     {
         TracedError {
             inner: f(self.inner),
-            #[cfg(feature = "traced")]
+            #[cfg(feature = "backtrace")]
             backtrace: self.backtrace,
-            #[cfg(feature = "traced")]
+            #[cfg(feature = "context")]
             context: self.context,
         }
     }
@@ -102,7 +102,7 @@ impl<T: AnyError> TracedError<T> {
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     pub fn context<C: Into<StrError>>(mut self, context: C) -> Self {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         self.context.push(context.into());
         self
     }
@@ -114,7 +114,7 @@ impl<T: AnyError> TracedError<T> {
     where
         F: FnOnce() -> C,
     {
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         self.context.push(f().into());
         self
     }
@@ -131,7 +131,7 @@ impl<T: AnyError> TracedError<T> {
 impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.inner)?;
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         {
             if !self.context.is_empty() {
                 write!(formatter, "\n\nContext:")?;
@@ -147,7 +147,7 @@ impl<T: AnyError> fmt::Display for TracedError<T> {
 impl<T: AnyError> fmt::Debug for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.inner)?;
-        #[cfg(feature = "traced")]
+        #[cfg(feature = "context")]
         {
             if !self.context.is_empty() {
                 write!(formatter, "\n\nContext:")?;
@@ -155,6 +155,9 @@ impl<T: AnyError> fmt::Debug for TracedError<T> {
                     write!(formatter, "\n\t- {}", context_item)?;
                 }
             }
+        }
+        #[cfg(feature = "backtrace")]
+        {
             write!(formatter, "\n\nBacktrace:\n")?;
             fmt::Display::fmt(&self.backtrace, formatter)?;
         }
