@@ -127,32 +127,32 @@ impl<T: AnyError> TracedError<T> {
         self.inner.source()
     }
 
-    pub fn into_parts(self) -> (T, ErrorTrace) {
-        let Self {
-            inner,
-            backtrace,
-            context,
-        } = self;
-        (
-            inner,
-            ErrorTrace {
-                #[cfg(feature = "backtrace")]
-                backtrace,
-                #[cfg(feature = "context")]
-                context,
-            },
-        )
-    }
+    // pub fn into_parts(self) -> (T, ErrorTrace) {
+    //     let Self {
+    //         inner,
+    //         backtrace,
+    //         context,
+    //     } = self;
+    //     (
+    //         inner,
+    //         ErrorTrace {
+    //             #[cfg(feature = "backtrace")]
+    //             backtrace,
+    //             #[cfg(feature = "context")]
+    //             context,
+    //         },
+    //     )
+    // }
 
-    pub fn from_parts(inner: T, error_trace: ErrorTrace) -> TracedError<T> {
-        TracedError {
-            inner,
-            #[cfg(feature = "backtrace")]
-            backtrace: error_trace.backtrace,
-            #[cfg(feature = "context")]
-            context: error_trace.context,
-        }
-    }
+    // pub fn from_parts(inner: T, error_trace: ErrorTrace) -> TracedError<T> {
+    //     TracedError {
+    //         inner,
+    //         #[cfg(feature = "backtrace")]
+    //         backtrace: error_trace.backtrace,
+    //         #[cfg(feature = "context")]
+    //         context: error_trace.context,
+    //     }
+    // }
 }
 
 impl<T: AnyError> fmt::Display for TracedError<T> {
@@ -307,20 +307,35 @@ pub trait IntoConcreteTracedError<O1> {
     fn traced(self) -> O1;
 }
 
-impl<E> IntoConcreteTracedError<TracedError<E>> for E
+impl<E1,E2> IntoConcreteTracedError<TracedError<E2>> for E1
 where
-    E: AnyError,
+    E1: AnyError,
+    E2: AnyError,
+    E1: Into<E2>,
 {
-    fn traced(self) -> TracedError<E> {
-        TracedError::new(self)
+    fn traced(self) -> TracedError<E2> {
+        TracedError::new(self.into())
     }
 }
-impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>> for Result<S, E>
+impl<S, E1, E2> IntoConcreteTracedError<Result<S, TracedError<E2>>> for Result<S, E1>
 where
-    E: AnyError,
+    E1: AnyError,
+    E2: AnyError,
+    E1: Into<E2>,
 {
-    fn traced(self) -> Result<S, TracedError<E>> {
+    fn traced(self) -> Result<S, TracedError<E2>> {
         self.map_err(|e| e.traced())
+    }
+}
+
+impl<S, E1, E2> IntoConcreteTracedError<Result<S, TracedError<E2>>> for Result<S, TracedError<E1>>
+where
+    E1: AnyError,
+    E2: AnyError,
+    E1: Into<E2>,
+{
+    fn traced(self) -> Result<S, TracedError<E2>> {
+        self.map_err(|e| e.map(|e| e.into()))
     }
 }
 
@@ -348,34 +363,34 @@ impl<S> OptionTracedExt<S> for Option<S> {
 
 //************************************************************************//
 
-/// An opaque type holding both the context and the backtrace derived from a [`TracedError`].
-// Dev Not: This is needed since something something like
-// ```rust
-// impl<T, U> From<TracedError<T>> for TracedError<U>
-// where
-//     T: Into<U>,
-//     U: AnyError,
-// {
-//     fn from(err: TracedError<T>) -> Self {
-//         TracedError {
-//             inner: err.inner.into(),
-//             #[cfg(feature = "backtrace")]
-//             backtrace: err.backtrace,
-//             #[cfg(feature = "context")]
-//             context: err.context,
-//         }
-//     }
+// /// An opaque type holding both the context and the backtrace derived from a [`TracedError`].
+// // Dev Not: This is needed since something something like
+// // ```rust
+// // impl<T, U> From<TracedError<T>> for TracedError<U>
+// // where
+// //     T: Into<U>,
+// //     U: AnyError,
+// // {
+// //     fn from(err: TracedError<T>) -> Self {
+// //         TracedError {
+// //             inner: err.inner.into(),
+// //             #[cfg(feature = "backtrace")]
+// //             backtrace: err.backtrace,
+// //             #[cfg(feature = "context")]
+// //             context: err.context,
+// //         }
+// //     }
+// // }
+// // ```
+// // is not possible since it conflicts with `impl<T> From<T> for T;` from core.
+// // We should leave this opaque for backward compatible api considerations.
+// #[derive(Debug)]
+// pub struct ErrorTrace {
+//     #[cfg(feature = "backtrace")]
+//     backtrace: Backtrace,
+//     #[cfg(feature = "context")]
+//     context: Vec<StrError>,
 // }
-// ```
-// is not possible since it conflicts with `impl<T> From<T> for T;` from core.
-// We should leave this opaque for backward compatible api considerations.
-#[derive(Debug)]
-pub struct ErrorTrace {
-    #[cfg(feature = "backtrace")]
-    backtrace: Backtrace,
-    #[cfg(feature = "context")]
-    context: Vec<StrError>,
-}
 
 //************************************************************************//
 
