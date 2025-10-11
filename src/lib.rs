@@ -23,8 +23,8 @@ pub use str_error::StrError;
 pub use context::Context;
 pub use error_union::IntoUnionResult;
 pub use error_union::ReshapeUnionResult;
-pub use generic_error::IntoConcreteTracedError;
-pub use generic_error::IntoDynTracedError;
+pub use generic_error::IntoTraced;
+pub use generic_error::IntoTracedDyn;
 pub use generic_error::OptionTracedExt;
 
 /// Similar to anonymous unions / enums in languages that support type narrowing.

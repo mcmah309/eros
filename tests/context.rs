@@ -1,7 +1,7 @@
 #![cfg(feature = "traced")]
 
 use eros::{
-    bail, traced, Context, ErrorUnion, IntoDynTracedError, IntoUnionResult, TracedError,
+    bail, traced, Context, ErrorUnion, IntoTracedDyn, IntoUnionResult, TracedError,
     TracedResult,
 };
 

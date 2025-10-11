@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{traced, AnyError, ErrorUnion, IntoDynTracedError, TracedError};
+use eros::{traced, AnyError, ErrorUnion, IntoTracedDyn, TracedError};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;

@@ -243,12 +243,13 @@ impl<T: AnyError> From<T> for TracedError<T> {
 
 //************************************************************************//
 
-pub trait IntoDynTracedError<O2> {
+/// Into a type with a dynamic [`TracedError`]
+pub trait IntoTracedDyn<O2> {
     /// Convert Error to `TracedError` without caring about the underlying type
     fn traced_dyn(self) -> O2;
 }
 
-impl<E> IntoDynTracedError<TracedError> for E
+impl<E> IntoTracedDyn<TracedError> for E
 where
     E: AnyError,
 {
@@ -264,13 +265,13 @@ where
 }
 
 #[cfg(feature = "min_specialization")]
-impl IntoDynTracedError<TracedError> for Box<dyn AnyError + '_> {
+impl IntoTracedDyn<TracedError> for Box<dyn AnyError + '_> {
     fn traced_dyn(self) -> TracedError {
         TracedError::new(self)
     }
 }
 
-impl<S, E> IntoDynTracedError<Result<S, TracedError>> for Result<S, E>
+impl<S, E> IntoTracedDyn<Result<S, TracedError>> for Result<S, E>
 where
     E: AnyError,
 {
@@ -279,7 +280,7 @@ where
     }
 }
 
-impl<S, E: AnyError> IntoDynTracedError<Result<S, TracedError>> for Result<S, TracedError<E>> {
+impl<S, E: AnyError> IntoTracedDyn<Result<S, TracedError>> for Result<S, TracedError<E>> {
     #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.traced_dyn())
@@ -292,7 +293,7 @@ impl<S, E: AnyError> IntoDynTracedError<Result<S, TracedError>> for Result<S, Tr
 }
 
 #[cfg(feature = "min_specialization")]
-impl<S> IntoDynTracedError<Result<S, TracedError<Box<dyn AnyError + '_>>>>
+impl<S> IntoTracedDyn<Result<S, TracedError<Box<dyn AnyError + '_>>>>
     for Result<S, TracedError<Box<dyn AnyError + '_>>>
 {
     fn traced_dyn(self) -> Result<S, TracedError> {
@@ -302,12 +303,13 @@ impl<S> IntoDynTracedError<Result<S, TracedError<Box<dyn AnyError + '_>>>>
 
 //************************************************************************//
 
-pub trait IntoConcreteTracedError<O1> {
+/// Into a type with a concrete [`TracedError<T>`]
+pub trait IntoTraced<O1> {
     /// Convert Error to `TracedError` keeping the underlying type
     fn traced(self) -> O1;
 }
 
-impl<E1,E2> IntoConcreteTracedError<TracedError<E2>> for E1
+impl<E1,E2> IntoTraced<TracedError<E2>> for E1
 where
     E1: AnyError,
     E2: AnyError,
@@ -317,7 +319,7 @@ where
         TracedError::new(self.into())
     }
 }
-impl<S, E1, E2> IntoConcreteTracedError<Result<S, TracedError<E2>>> for Result<S, E1>
+impl<S, E1, E2> IntoTraced<Result<S, TracedError<E2>>> for Result<S, E1>
 where
     E1: AnyError,
     E2: AnyError,
@@ -328,7 +330,7 @@ where
     }
 }
 
-impl<S, E1, E2> IntoConcreteTracedError<Result<S, TracedError<E2>>> for Result<S, TracedError<E1>>
+impl<S, E1, E2> IntoTraced<Result<S, TracedError<E2>>> for Result<S, TracedError<E1>>
 where
     E1: AnyError,
     E2: AnyError,
@@ -339,7 +341,7 @@ where
     }
 }
 
-impl<S, E> IntoConcreteTracedError<Result<S, TracedError<E>>>
+impl<S, E> IntoTraced<Result<S, TracedError<E>>>
     for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
     E: AnyError,
