@@ -1,4 +1,4 @@
-#![cfg(feature = "traced")]
+#![cfg(all(feature = "context", feature = "backtrace"))]
 
 use eros::{
     bail, traced, Context, ErrorUnion, TracedDyn, IntoUnionResult, TracedError,

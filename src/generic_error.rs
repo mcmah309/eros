@@ -447,7 +447,7 @@ impl<S> OptionTracedExt<S> for Option<S> {
 //************************************************************************//
 
 #[cfg(feature = "min_specialization")]
-#[cfg(feature = "traced")]
+#[cfg(all(feature = "context", feature = "backtrace"))]
 #[cfg(test)]
 mod test {
     use crate::{Context, ErrorUnion, StrError, TracedError};

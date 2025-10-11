@@ -15,12 +15,10 @@ reqwest = { version = "0.12", features = ["blocking"] }
 trybuild = "1"
 
 [features]
-default = ["traced"]
-# Wrapper flag.
 # Disabling "context" and "backtrace" turns `TracedError` into a new type that may be optimized away. 
 # Libraries should consider disabling this, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
-traced = ["context", "backtrace"]
+default = ["context", "backtrace"]
 # Enables context for `TracedError`
 context = []
 # Enables backtrace for `TracedError`

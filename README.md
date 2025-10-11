@@ -443,7 +443,7 @@ Eros is perfect for libraries and applications. It is also optimized for binary 
 
 ### Optimizations
 
-Eros comes with the `traced` feature flag enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Libraries should consider disabling this by default and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Libraries should consider disabling default features and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
 
 ### Public Apis
 
@@ -481,4 +481,4 @@ An alternative to exposing `TracedError` is a wrapper type like a new type - `My
 
 #### Internal Tracing For Testing Only
 
-If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing, they should by default disable the `traced` feature flag so all tracing operations become a no opt. This can then be enabled for tests only. Then at the api boundary one can easily just call `into_inner` to get the inner `T` in `TracedError<T>`. Thus no constructs of this library will be exposed to downstream crates and there is no performance impact.
+If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing, they should by default disable the default feature flags so all tracing operations become a no opt. This can then be enabled for tests only. Then at the api boundary one can easily just call `into_inner` to get the inner `T` in `TracedError<T>`. Thus no constructs of this library will be exposed to downstream crates and there is no performance impact.
