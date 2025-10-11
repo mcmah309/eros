@@ -1,4 +1,4 @@
-use eros::{traced, IntoConcreteTracedError};
+use eros::{traced, Traced};
 
 
 

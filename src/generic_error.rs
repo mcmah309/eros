@@ -244,12 +244,12 @@ impl<T: AnyError> From<T> for TracedError<T> {
 //************************************************************************//
 
 /// Into a type with a dynamic [`TracedError`]
-pub trait IntoTracedDyn<O2> {
+pub trait TracedDyn<O2> {
     /// Convert Error to `TracedError` without caring about the underlying type
     fn traced_dyn(self) -> O2;
 }
 
-impl<E> IntoTracedDyn<TracedError> for E
+impl<E> TracedDyn<TracedError> for E
 where
     E: AnyError,
 {
@@ -265,13 +265,13 @@ where
 }
 
 #[cfg(feature = "min_specialization")]
-impl IntoTracedDyn<TracedError> for Box<dyn AnyError + '_> {
+impl TracedDyn<TracedError> for Box<dyn AnyError + '_> {
     fn traced_dyn(self) -> TracedError {
         TracedError::new(self)
     }
 }
 
-impl<S, E> IntoTracedDyn<Result<S, TracedError>> for Result<S, E>
+impl<S, E> TracedDyn<Result<S, TracedError>> for Result<S, E>
 where
     E: AnyError,
 {
@@ -280,7 +280,7 @@ where
     }
 }
 
-impl<S, E: AnyError> IntoTracedDyn<Result<S, TracedError>> for Result<S, TracedError<E>> {
+impl<S, E: AnyError> TracedDyn<Result<S, TracedError>> for Result<S, TracedError<E>> {
     #[cfg(feature = "min_specialization")]
     default fn traced_dyn(self) -> Result<S, TracedError> {
         self.map_err(|e| e.traced_dyn())
@@ -293,7 +293,7 @@ impl<S, E: AnyError> IntoTracedDyn<Result<S, TracedError>> for Result<S, TracedE
 }
 
 #[cfg(feature = "min_specialization")]
-impl<S> IntoTracedDyn<Result<S, TracedError<Box<dyn AnyError + '_>>>>
+impl<S> TracedDyn<Result<S, TracedError<Box<dyn AnyError + '_>>>>
     for Result<S, TracedError<Box<dyn AnyError + '_>>>
 {
     fn traced_dyn(self) -> Result<S, TracedError> {
@@ -303,10 +303,60 @@ impl<S> IntoTracedDyn<Result<S, TracedError<Box<dyn AnyError + '_>>>>
 
 //************************************************************************//
 
-/// Into a type with a concrete [`TracedError<T>`]
-pub trait IntoTraced<O1> {
-    /// Convert Error to `TracedError` keeping the underlying type
+/// Into a type with a concrete [`TracedError<E>`] without mapping `E`, see also [`IntoTraced`]
+pub trait Traced<O1> {
+    /// Convert Error to a type containing a [`TracedError`] keeping the underlying type
     fn traced(self) -> O1;
+}
+
+impl<E> Traced<TracedError<E>> for E
+where
+    E: AnyError,
+{
+    fn traced(self) -> TracedError<E> {
+        TracedError::new(self)
+    }
+}
+impl<S, E> Traced<Result<S, TracedError<E>>> for Result<S, E>
+where
+    E: AnyError,
+{
+    fn traced(self) -> Result<S, TracedError<E>> {
+        self.map_err(|e| e.traced())
+    }
+}
+
+// impl<S, E> Traced<Result<S, TracedError<E>>> for Result<S, TracedError<E>>
+// where
+//     E: AnyError,
+// {
+//     fn traced(self) -> Result<S, TracedError<E>> {
+//         self
+//     }
+// }
+
+impl<S, E> Traced<Result<S, TracedError<E>>>
+    for Result<S, ErrorUnion<(TracedError<E>,)>>
+where
+    E: AnyError,
+{
+    fn traced(self) -> Result<S, TracedError<E>> {
+        self.map_err(|e| e.into_inner())
+    }
+}
+
+/// Into a type with a concrete [`TracedError<E2>`] mapping to `E2` from `E1`, see also [`Traced`]
+// Dev Note: We cannot fully replace [`Traced`] with this since with multiple chains -
+// ```rust
+// error
+//   .into_traced()
+//   .context("Some context")
+//   .union()?;
+// ```
+// The target type becomes undeterminable for the compiler.
+pub trait IntoTraced<O1> {
+        /// Convert Error to a type containing a [`TracedError`] mapping the underlying type
+    fn into_traced(self) -> O1;
 }
 
 impl<E1,E2> IntoTraced<TracedError<E2>> for E1
@@ -315,7 +365,7 @@ where
     E2: AnyError,
     E1: Into<E2>,
 {
-    fn traced(self) -> TracedError<E2> {
+    fn into_traced(self) -> TracedError<E2> {
         TracedError::new(self.into())
     }
 }
@@ -325,8 +375,8 @@ where
     E2: AnyError,
     E1: Into<E2>,
 {
-    fn traced(self) -> Result<S, TracedError<E2>> {
-        self.map_err(|e| e.traced())
+    fn into_traced(self) -> Result<S, TracedError<E2>> {
+        self.map_err(|e| e.into_traced())
     }
 }
 
@@ -336,7 +386,7 @@ where
     E2: AnyError,
     E1: Into<E2>,
 {
-    fn traced(self) -> Result<S, TracedError<E2>> {
+    fn into_traced(self) -> Result<S, TracedError<E2>> {
         self.map_err(|e| e.map(|e| e.into()))
     }
 }
@@ -346,7 +396,7 @@ impl<S, E> IntoTraced<Result<S, TracedError<E>>>
 where
     E: AnyError,
 {
-    fn traced(self) -> Result<S, TracedError<E>> {
+    fn into_traced(self) -> Result<S, TracedError<E>> {
         self.map_err(|e| e.into_inner())
     }
 }

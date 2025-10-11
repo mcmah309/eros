@@ -25,7 +25,7 @@ Eros is built on the following philosophy:
 Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis.
 
 ```rust
-use eros::{bail, IntoDynTracedError};
+use eros::{bail, TracedDyn};
 use std::io::{Error, ErrorKind};
 
 // The Error type is untracked and the underlying types are different
@@ -53,7 +53,7 @@ fn main() {
 There should be no boilerplate needed when handling single or multiple typed error.
 
 ```rust
-use eros::{bail, IntoConcreteTracedError, IntoUnionResult, TracedError};
+use eros::{bail, Traced, IntoUnionResult, TracedError};
 use std::io::{Error, ErrorKind};
 
 // Uses `ErrorUnion` to track each type. `TracedError` remains untyped and
@@ -90,7 +90,7 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors.
 
 ```rust
-use eros::{bail, ReshapeUnionResult, IntoConcreteTracedError, IntoUnionResult, TracedError};
+use eros::{bail, ReshapeUnionResult, Traced, IntoUnionResult, TracedError};
 use std::io::{Error, ErrorKind};
 
 fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
@@ -276,7 +276,7 @@ Backtrace:
 
 ```rust
 use eros::{
-    bail, Context, ReshapeUnionResult, IntoConcreteTracedError, IntoDynTracedError, IntoUnionResult,
+    bail, Context, ReshapeUnionResult, Traced, TracedDyn, IntoUnionResult,
     TracedError,
 };
 use reqwest::blocking::{Client, Response};
@@ -369,13 +369,13 @@ Context:
 Backtrace:
    0: eros::generic_error::TracedError<T>::new
              at ./src/generic_error.rs:47:24
-   1: <E as eros::generic_error::IntoConcreteTracedError<eros::generic_error::TracedError<E>>>::traced
+   1: <E as eros::generic_error::Traced<eros::generic_error::TracedError<E>>>::traced
              at ./src/generic_error.rs:211:9
-   2: <core::result::Result<S,E> as eros::generic_error::IntoConcreteTracedError<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced::{{closure}}
+   2: <core::result::Result<S,E> as eros::generic_error::Traced<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced::{{closure}}
              at ./src/generic_error.rs:235:28
    3: core::result::Result<T,E>::map_err
              at /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:914:27
-   4: <core::result::Result<S,E> as eros::generic_error::IntoConcreteTracedError<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced
+   4: <core::result::Result<S,E> as eros::generic_error::Traced<core::result::Result<S,eros::generic_error::TracedError<E>>>>::traced
              at ./src/generic_error.rs:235:14
    5: x::fetch_url
              at ./tests/x.rs:39:10

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{traced, AnyError, ErrorUnion, IntoTracedDyn, TracedError};
+use eros::{traced, AnyError, ErrorUnion, TracedDyn, TracedError};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -281,7 +281,117 @@ fn source_lives_long_enough() {
     let source = match wrapper {
         // Wrapper::TracedError(traced_error) => std::error::Error::source(traced_error), // does not work
         Wrapper::TracedError(traced_error) => traced_error.source(),
-
     };
     let _source = source;
+}
+
+//************************************************************************//
+
+#[cfg(test)]
+mod into_traced {
+    use eros::{Context, IntoTraced, Traced};
+
+    #[derive(Debug)]
+    pub enum OurError {
+        IoError(std::io::Error),
+    }
+    #[allow(unused_qualifications)]
+    impl core::error::Error for OurError {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+            match self {
+                OurError::IoError(source) => source.source(),
+                #[allow(unreachable_patterns)]
+                _ => None,
+            }
+        }
+    }
+    impl core::fmt::Display for OurError {
+        #[inline]
+        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+            match &*self {
+                OurError::IoError(source) => write!(f, "{}", source),
+            }
+        }
+    }
+    impl From<std::io::Error> for OurError {
+        fn from(error: std::io::Error) -> Self {
+            OurError::IoError(error)
+        }
+    }
+    #[derive(Debug)]
+    pub enum AnotherError {
+        AnotherErrorVariant,
+        IoError(std::io::Error),
+    }
+    #[allow(unused_qualifications)]
+    impl core::error::Error for AnotherError {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+            match self {
+                AnotherError::IoError(source) => source.source(),
+                #[allow(unreachable_patterns)]
+                _ => None,
+            }
+        }
+    }
+    impl core::fmt::Display for AnotherError {
+        #[inline]
+        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+            match &*self {
+                AnotherError::AnotherErrorVariant => write!(
+                    f,
+                    "{}",
+                    concat!(
+                        stringify!(AnotherError),
+                        "::",
+                        stringify!(AnotherErrorVariant)
+                    )
+                ),
+                AnotherError::IoError(source) => write!(f, "{}", source),
+            }
+        }
+    }
+    impl From<OurError> for AnotherError {
+        fn from(error: OurError) -> Self {
+            match error {
+                OurError::IoError(source) => AnotherError::IoError(source),
+            }
+        }
+    }
+    impl From<std::io::Error> for AnotherError {
+        fn from(error: std::io::Error) -> Self {
+            AnotherError::IoError(error)
+        }
+    }
+
+    fn raw_error_result() -> Result<(), std::io::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "this is a raw io error",
+        ))
+    }
+
+    fn traced_error_result() -> eros::Result<(), std::io::Error> {
+        raw_error_result().traced().context("Here is some context")
+    }
+
+    fn traced_our_error_enum_result1() -> eros::Result<(), OurError> {
+        let _ = traced_error_result()
+            .into_traced()
+            .context("More context")?; // `.traced()` does not work here
+        let _ = raw_error_result()
+            .into_traced()
+            .context("Different context")?; // `.traced()` does not work here
+        Ok(())
+    }
+
+    fn traced_our_error_enum_result2() -> eros::Result<(), AnotherError> {
+        let _ = traced_our_error_enum_result1().into_traced()?; // `.traced()` does not work here
+        Ok(())
+    }
+
+    #[test]
+    fn into_traced() {
+        let error = traced_our_error_enum_result2().unwrap_err();
+        assert!(matches!(error.inner(), AnotherError::IoError(_)));
+    }
 }

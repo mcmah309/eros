@@ -6,9 +6,9 @@ error[E0599]: the method `traced` exists for enum `Result<(), TracedError>`, but
   |
   = note: the following trait bounds were not satisfied:
           `&Result<(), TracedError<Box<dyn AnyError>>>: AnyError`
-          which is required by `&Result<(), TracedError<Box<dyn AnyError>>>: IntoConcreteTracedError<TracedError<&Result<(), TracedError<Box<dyn AnyError>>>>>`
+          which is required by `&Result<(), TracedError<Box<dyn AnyError>>>: Traced<TracedError<&Result<(), TracedError<Box<dyn AnyError>>>>>`
           `&mut Result<(), TracedError>: AnyError`
-          which is required by `&mut Result<(), TracedError>: IntoConcreteTracedError<TracedError<&mut Result<(), TracedError>>>`
+          which is required by `&mut Result<(), TracedError>: Traced<TracedError<&mut Result<(), TracedError>>>`
 note: the method `traced` exists on the type `TracedError`
  --> src/generic_error.rs
   |
