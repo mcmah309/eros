@@ -126,6 +126,33 @@ impl<T: AnyError> TracedError<T> {
     pub fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.source()
     }
+
+    pub fn into_parts(self) -> (T, ErrorTrace) {
+        let Self {
+            inner,
+            backtrace,
+            context,
+        } = self;
+        (
+            inner,
+            ErrorTrace {
+                #[cfg(feature = "backtrace")]
+                backtrace,
+                #[cfg(feature = "context")]
+                context,
+            },
+        )
+    }
+
+    pub fn from_parts(inner: T, error_trace: ErrorTrace) -> TracedError<T> {
+        TracedError {
+            inner,
+            #[cfg(feature = "backtrace")]
+            backtrace: error_trace.backtrace,
+            #[cfg(feature = "context")]
+            context: error_trace.context,
+        }
+    }
 }
 
 impl<T: AnyError> fmt::Display for TracedError<T> {
@@ -317,6 +344,37 @@ impl<S> OptionTracedExt<S> for Option<S> {
     fn ok_or_traced(self) -> Result<S, TracedError> {
         self.ok_or_else(|| TracedError::boxed(StrError::Static("`Option` is `None`")))
     }
+}
+
+//************************************************************************//
+
+/// An opaque type holding both the context and the backtrace derived from a [`TracedError`].
+// Dev Not: This is needed since something something like
+// ```rust
+// impl<T, U> From<TracedError<T>> for TracedError<U>
+// where
+//     T: Into<U>,
+//     U: AnyError,
+// {
+//     fn from(err: TracedError<T>) -> Self {
+//         TracedError {
+//             inner: err.inner.into(),
+//             #[cfg(feature = "backtrace")]
+//             backtrace: err.backtrace,
+//             #[cfg(feature = "context")]
+//             context: err.context,
+//         }
+//     }
+// }
+// ```
+// is not possible since it conflicts with `impl<T> From<T> for T;` from core.
+// We should leave this opaque for backward compatible api considerations.
+#[derive(Debug)]
+pub struct ErrorTrace {
+    #[cfg(feature = "backtrace")]
+    backtrace: Backtrace,
+    #[cfg(feature = "context")]
+    context: Vec<StrError>,
 }
 
 //************************************************************************//
