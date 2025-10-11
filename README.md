@@ -223,54 +223,8 @@ Backtrace:
                                at /workspaces/eros/tests/x.rs:28:15
    8:     0x5561eafea397 - x::main::{{closure}}::h9ec95e65e08ea0a5
                                at /workspaces/eros/tests/x.rs:27:10
-   9:     0x5561eafe6bc6 - core::ops::function::FnOnce::call_once::h89665ff874f9aff0
-                               at /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:253:5
-  10:     0x5561eb02945b - core::ops::function::FnOnce::call_once::he7780dbaf3819be9
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/ops/function.rs:253:5
-  11:     0x5561eb02945b - test::__rust_begin_short_backtrace::he52f6244ba5ffadb
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:648:18
-  12:     0x5561eb02862e - test::run_test_in_process::{{closure}}::h4b5580962b2f03a8
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:671:74
-  13:     0x5561eb02862e - <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once::h19cb5d2621bd88eb
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/panic/unwind_safe.rs:272:9
-  14:     0x5561eb02862e - std::panicking::catch_unwind::do_call::hea0162f6125d4c37
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:589:40
-  15:     0x5561eb02862e - std::panicking::catch_unwind::h58eff26629cdc5e5
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:552:19
-  16:     0x5561eb02862e - std::panic::catch_unwind::haee4559c8279658f
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panic.rs:359:14
-  17:     0x5561eb02862e - test::run_test_in_process::hd400bd155f277427
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:671:27
-  18:     0x5561eb02862e - test::run_test::{{closure}}::h0d9903d185102994
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:592:43
-  19:     0x5561eafec3a4 - test::run_test::{{closure}}::hc4b5b0598a6862e8
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:622:41
-  20:     0x5561eafec3a4 - std::sys::backtrace::__rust_begin_short_backtrace::ha7ee3160b6c13598
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/sys/backtrace.rs:158:18
-  21:     0x5561eafefc6a - std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}::hbaba1875801144df
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/thread/mod.rs:559:17
-  22:     0x5561eafefc6a - <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once::heb48e77784f0385f
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/panic/unwind_safe.rs:272:9
-  23:     0x5561eafefc6a - std::panicking::catch_unwind::do_call::he0ffef791c49aaef
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:589:40
-  24:     0x5561eafefc6a - std::panicking::catch_unwind::h99d55591c3b90bdb
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:552:19
-  25:     0x5561eafefc6a - std::panic::catch_unwind::h4ea92e4fa0439888
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panic.rs:359:14
-  26:     0x5561eafefc6a - std::thread::Builder::spawn_unchecked_::{{closure}}::h03c8861180b28db2
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/thread/mod.rs:557:30
-  27:     0x5561eafefc6a - core::ops::function::FnOnce::call_once{{vtable.shim}}::h00b23c1a00a0e90a
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/ops/function.rs:253:5
-  28:     0x5561eb0619d7 - <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once::hcd81d65010c14a3e
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/alloc/src/boxed.rs:1971:9
-  29:     0x5561eb0619d7 - <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once::h96a52a5b098b326a
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/alloc/src/boxed.rs:1971:9
-  30:     0x5561eb0619d7 - std::sys::pal::unix::thread::Thread::new::thread_start::hd5dce28806973ef9
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/sys/pal/unix/thread.rs:97:17
-  31:     0x7f20d33eaaa4 - <unknown>
-  32:     0x7f20d3477c3c - <unknown>
-  33:                0x0 - <unknown>
-  ```
+...
+```
 
 ## Putting It All Together
 
