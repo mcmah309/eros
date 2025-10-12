@@ -369,6 +369,8 @@ For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`
 
 `eros`'s flexibility and optimizations make it a the perfect option for both libraries and binaries.
 
+*Libraries should default disable the default feature flags* so all tracing operations become a no opt for the library. This can then be enabled for tests only.
+
 #### Suggested Route
 
 Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
@@ -377,7 +379,9 @@ Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and us
 
 ##### Wrapper Error Types
 
-An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself.
+An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. 
+
+The downside is wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself. Additionally the `into_traced` api can no longer be used across api boundaries ( [example](https://github.com/mcmah309/error_set?tab=readme-ov-file#eros)) which limits composability.
 
 ##### Non-Wrapper Error Types
 
@@ -416,7 +420,3 @@ pub fn public_api() -> Result<(), MyErrorType> {
 ```
 
 </details>
-
-###### Internal Tracing For Testing Only
-
-If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing, they should by default disable the default feature flags so all tracing operations become a no opt for the library. This can then be enabled for tests only. Then at the api boundary they can use one of the previous approaches. Thus no constructs of this library will be exposed to downstream crates.
