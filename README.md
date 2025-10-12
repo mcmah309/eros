@@ -358,25 +358,25 @@ Backtrace:
 
 For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate.
 
-### Use In Libraries
+## Use In Libraries
 
 `eros`'s flexibility and optimizations make it a the perfect option for both libraries and binaries.
 
 *Libraries should consider disabling default features* and allowing downstream crates to enable this. This can then be enabled for tests only in the library.
 
-#### Suggested Route
+### Suggested Route
 
 Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
 
-#### Alternatives
+### Alternatives
 
-##### Wrapper Error Types
+#### Wrapper Error Types
 
 An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. 
 
 The downside is wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself. Additionally the `into_traced` api can no longer be used across api boundaries ([example](https://github.com/mcmah309/error_set?tab=readme-ov-file#eros)) which limits composability.
 
-##### Non-Wrapper Error Types
+#### Non-Wrapper Error Types
 
 If one wants to add their own custom error type for all public api's without exposing constructs like `TracedError`, use the `into_inner` method at these boundaries.
 
@@ -413,3 +413,11 @@ pub fn public_api() -> Result<(), MyErrorType> {
 ```
 
 </details>
+
+## Special Thanks
+
+Special thank you to the authors and contributors of the following crates that inspired `eros`:
+- [anyhow](https://github.com/dtolnay/anyhow)
+- [terrors](https://github.com/komora-io/terrors)
+- [error_set](https://github.com/mcmah309/error_set)
+- [thiserror](https://github.com/dtolnay/thiserror)
