@@ -140,9 +140,9 @@ And to expand an `ErrorUnion` just call `widen`
 
 ```rust
 use eros::{ReshapeUnionResult, IntoUnionResult};
-use std::io::Error;
+use std::io;
 
-fn func1() -> eros::UnionResult<(), (Error, String)> {
+fn func1() -> eros::UnionResult<(), (io::Error, String)> {
     Ok(())
 }
 
@@ -154,7 +154,7 @@ fn func3() -> Result<(), f64> {
     Ok(())
 }
 
-fn func4() -> eros::UnionResult<(), (Error, String, i32, u16, f64)> {
+fn func4() -> eros::UnionResult<(), (io::Error, String, i32, u16, f64)> {
     func1().widen()?;
     func2().widen()?;
     func3().union()?;
@@ -172,11 +172,11 @@ Errors should always provided context of the operations in the call stack that l
 
 ```rust
 use eros::{
-    bail, Context, IntoUnionResult, TracedError,
+    bail, Context, IntoUnionResult, TE,
 };
-use std::io::{Error, ErrorKind};
+use std::io;
 
-fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
+fn func1() -> eros::UnionResult<(), (TE<io::Error>, TE)> {
     let val = func2()
         .with_context(|| format!("This is some more context"))
         .union()?;
@@ -191,7 +191,7 @@ fn func2() -> eros::Result<()> {
 }
 
 fn func3() -> eros::Result<()> {
-    return Err(Error::new(ErrorKind::AddrInUse, "message here"))
+    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"))
         // Trace the `Err` without the type (`TracedError`)
         // Note: Calling `.traced_dyn()` not needed. we can call `context` directly
         // .traced_dyn()
@@ -246,7 +246,7 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 ```rust
 use eros::{
     bail, Context, ReshapeUnionResult, Traced, TracedDyn, IntoUnionResult,
-    TracedError,
+    TE,
 };
 use reqwest::blocking::{Client, Response};
 use std::thread::sleep;
@@ -278,7 +278,7 @@ fn handle_response(res: Response) -> eros::Result<String> {
 // Explicitly handle multiple Err types at the same time with `UnionResult`.
 // No new error enum creation is needed or nesting of errors.
 // `UnionResult<_,_>` == `Result<_,ErrorUnion<_>>`
-fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error>, TracedError)> {
+fn fetch_url(url: &str) -> eros::UnionResult<String, (TE<reqwest::Error>, TE)> {
     let client = Client::new();
 
     let res = client
@@ -302,7 +302,7 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
         attempts += 1;
 
         // Handle one of the error types explicitly with `narrow`!
-        match fetch_url(url).narrow::<TracedError<reqwest::Error>, _>() {
+        match fetch_url(url).narrow::<TE<reqwest::Error>, _>() {
             Ok(request_error) => {
                 if attempts < retries {
                     sleep(Duration::from_millis(200));
@@ -357,7 +357,7 @@ Backtrace:
 
 ## `TracedError`
 
-`TracedError` allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and added to the log if `RUST_BACKTRACE` is set. Use `TracedError` if the underlying error type does not matter. Otherwise, the type can be specified with `TracedError<T>`.
+`TracedError` (type alias `TE`) allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and added to the log if `RUST_BACKTRACE` is set. Use `TracedError` if the underlying error type does not matter. Otherwise, the type can be specified with `TracedError<T>`.
 
 ## `ErrorUnion`
 
