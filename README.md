@@ -239,7 +239,7 @@ Eros comes with the `context` and `backtrace` feature flags enabled by default. 
 
 Additionally in this case, `TracedError` has the same effect as `Box`. Boxing errors is a common trick to increase performance and decrease memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
 
-Thus, *Libraries should consider disabling default features* and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+See the [Use In Libraries](#use-in-libraries) section as well.
 
 ## Putting It All Together
 
@@ -369,7 +369,7 @@ For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`
 
 `eros`'s flexibility and optimizations make it a the perfect option for both libraries and binaries.
 
-*Libraries should default disable the default feature flags* so all tracing operations become a no opt for the library. This can then be enabled for tests only.
+*Libraries should consider disabling default features* and allowing downstream crates to enable this. This can then be enabled for tests only in the library.
 
 #### Suggested Route
 
