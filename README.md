@@ -60,13 +60,13 @@ There should be no boilerplate needed when handling any number of typed error. T
 
 ```rust
 use eros::{bail, Traced, IntoUnionResult, TE};
-use std::io::{Error, ErrorKind};
+use std::io;
 
 // Uses `ErrorUnion` to track each type. 
 // `UnionResult<_,(..)>` == `Result<_,ErrorUnion<(..)>>`.
 // Here `TracedError` remains untyped and `TracedError<Error>` is typed.
 // `TE` is a type alias for `TracedError`.
-fn func1() -> eros::UnionResult<(), (TE<Error>, TE)> {
+fn func1() -> eros::UnionResult<(), (TE<io::Error>, TE)> {
     // Change the `eros::Result` type to an `UnionResult` type
     let val = func2().union()?; // TracedError
     let val = func3().union()?; // TracedError<Error>
@@ -79,8 +79,8 @@ fn func2() -> eros::Result<()> {
 }
 
 // Error type is tracked. Here the underlying error type is `std::io::Error`
-fn func3() -> eros::Result<(), Error> {
-    return Err(Error::new(ErrorKind::AddrInUse, "message here")).traced();
+fn func3() -> eros::Result<(), io::Error> {
+    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here")).traced();
 }
 
 fn main() {
@@ -99,10 +99,10 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about.
 
 ```rust
-use eros::{bail, ReshapeUnionResult, Traced, IntoUnionResult, TracedError};
-use std::io::{Error, ErrorKind};
+use eros::{bail, ReshapeUnionResult, Traced, IntoUnionResult, TE};
+use std::io;
 
-fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
+fn func1() -> eros::UnionResult<(), (TE<io::Error>, TE)> {
     let val = func2().union()?;
     let val = func3().union()?;
     Ok(val)
@@ -112,14 +112,14 @@ fn func2() -> eros::Result<()> {
     bail!("Something went wrong")
 }
 
-fn func3() -> eros::Result<(), Error> {
-    return Err(Error::new(ErrorKind::AddrInUse, "message here")).traced();
+fn func3() -> eros::Result<(), io::Error> {
+    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here")).traced();
 }
 
 // Error type is no longer tracked, we handled internally.
 fn func4() -> eros::Result<()> {
     // Narrow the `ErrorUnion` and handle to only handle `TracedError<Error>` case!
-    match func1().narrow::<TracedError<Error>, _>() {
+    match func1().narrow::<TE<io::Error>, _>() {
         Ok(traced_io_error) => {
             todo!("Handle `TracedError<std::io::Error>` case")
         }
