@@ -381,7 +381,7 @@ Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and us
 
 An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. 
 
-The downside is wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself. Additionally the `into_traced` api can no longer be used across api boundaries ( [example](https://github.com/mcmah309/error_set?tab=readme-ov-file#eros)) which limits composability.
+The downside is wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself. Additionally the `into_traced` api can no longer be used across api boundaries ([example](https://github.com/mcmah309/error_set?tab=readme-ov-file#eros)) which limits composability.
 
 ##### Non-Wrapper Error Types
 
