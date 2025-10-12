@@ -5,30 +5,35 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 
-Eros is the swiss army knife of error handling approaches. It fits perfectly well into libraries and applications. Eros is heavily inspired by:
+Eros is the swiss army knife of error handling approaches. It fits perfectly well into libraries and applications.
+
+Eros is built on the following philosophy:
+1. Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. [Link](#optional-typed-errors)
+2. There should be no boilerplate needed when handling any number of typed errors - no need to create an error enum for each case. [Link](#no-boilerplate)
+3. Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about. [Link](#seamless-transitions-between-error-types)
+4. Errors should always provided context of the operations in the call stack that lead to the error. [Link](#errors-have-context)
+5. Error constructs should performant. [Link](#optimizations)
+
+Eros is heavily inspired by:
 
 - [anyhow](https://github.com/dtolnay/anyhow)
 - [terrors](https://github.com/komora-io/terrors)
 - [error_set](https://github.com/mcmah309/error_set)
 - [thiserror](https://github.com/dtolnay/thiserror)
 
-Eros is built on the following philosophy:
-1. [Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise.](#optional-typed-errors)
-2. [There should be no boilerplate needed when handling single or multiple typed errors - no need to create another error enum](#no-boilerplate)
-3. [Users should be able to seamlessly transition to and from fully typed errors.](#seamless-transitions-between-error-types)
-4. [Errors should always provided context of the operations in the call stack that lead to the error.](#errors-have-context)
-
 ## Philosophy In Action
 
 ### Optional Typed Errors
 
-Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis.
+Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. This is where [TracedError](#tracederror) helps.
 
 ```rust
 use eros::{bail, TracedDyn};
 use std::io::{Error, ErrorKind};
 
-// The Error type is untracked and the underlying types are different
+// The Error type is untracked and the underlying types are different.
+// If one wanted to track the error this can be done - `eros::Result<(), _>`,
+// since `eros::Result<()>` == `eros::Result<(), TracedError>`.
 fn func1() -> eros::Result<()> {
     let val = func2()?;
     let val = func3()?;
@@ -50,18 +55,21 @@ fn main() {
 
 ### No Boilerplate
 
-There should be no boilerplate needed when handling single or multiple typed error.
+There should be no boilerplate needed when handling any number of typed error. This is where [ErrorUnion](#errorunion) helps.
+
 
 ```rust
-use eros::{bail, Traced, IntoUnionResult, TracedError};
+use eros::{bail, Traced, IntoUnionResult, TE};
 use std::io::{Error, ErrorKind};
 
-// Uses `ErrorUnion` to track each type. `TracedError` remains untyped and
-// `TracedError<Error>` is typed.
-fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
-    // widen the `TracedResult` type to an `UnionResult` type
-    let val = func2().union()?;
-    let val = func3().union()?;
+// Uses `ErrorUnion` to track each type. 
+// `UnionResult<_,(..)>` == `Result<_,ErrorUnion<(..)>>`.
+// Here `TracedError` remains untyped and `TracedError<Error>` is typed.
+// `TE` is a type alias for `TracedError`.
+fn func1() -> eros::UnionResult<(), (TE<Error>, TE)> {
+    // Change the `eros::Result` type to an `UnionResult` type
+    let val = func2().union()?; // TracedError
+    let val = func3().union()?; // TracedError<Error>
     Ok(val)
 }
 
@@ -79,6 +87,7 @@ fn main() {
     func1();
 }
 ```
+The above code is precisely typed for what we care about and there was no need to create an error enum for each case.
 
 `UnionResult` and the underlying `UnionError`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
 ```rust,ignore
@@ -87,7 +96,7 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 
 ### Seamless Transitions Between Error Types
 
-Users should be able to seamlessly transition to and from fully typed errors.
+Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about.
 
 ```rust
 use eros::{bail, ReshapeUnionResult, Traced, IntoUnionResult, TracedError};
@@ -172,7 +181,7 @@ fn func1() -> eros::UnionResult<(), (TracedError<Error>, TracedError)> {
         .with_context(|| format!("This is some more context"))
         .union()?;
     let val = func3()
-        .context(format!("This is some more context"))
+        .context("This is some more context")
         .union()?;
     Ok(val)
 }
@@ -224,6 +233,14 @@ Backtrace:
 ...
 ```
 
+### Optimizations
+
+Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. 
+
+Additionally in this case, `TracedError` has the same effect as `Box`. Boxing errors is a common trick to increase performance and decrease memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
+
+Thus, *Libraries should consider disabling default features* and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+
 ## Putting It All Together
 
 ```rust
@@ -237,9 +254,9 @@ use std::time::Duration;
 
 // Add tracing to an error by wrapping it in a `TracedError`.
 // When we don't care about the error type we can use `eros::Result<_>` which has tracing.
-// `eros::Result<_>` === `Result<_,TracedError>` === `TracedResult<_>`
+// `eros::Result<_>` == `Result<_,TracedError>` == `TracedResult<_>`
 // When we *do* care about the error type we can use `eros::Result<_,_>` which also has tracing but preserves the error type.
-// `eros::Result<_,_>` === `Result<_,TracedError<_>>` === `TracedResult<_,_>`
+// `eros::Result<_,_>` == `Result<_,TracedError<_>>` == `TracedResult<_,_>`
 // In the below example we don't preserve the error type.
 fn handle_response(res: Response) -> eros::Result<String> {
     if !res.status().is_success() {
@@ -260,7 +277,7 @@ fn handle_response(res: Response) -> eros::Result<String> {
 
 // Explicitly handle multiple Err types at the same time with `UnionResult`.
 // No new error enum creation is needed or nesting of errors.
-// `UnionResult<_,_>` === `Result<_,ErrorUnion<_>>`
+// `UnionResult<_,_>` == `Result<_,ErrorUnion<_>>`
 fn fetch_url(url: &str) -> eros::UnionResult<String, (TracedError<reqwest::Error>, TracedError)> {
     let client = Client::new();
 
@@ -342,19 +359,34 @@ Backtrace:
 
 `TracedError` allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and added to the log if `RUST_BACKTRACE` is set. Use `TracedError` if the underlying error type does not matter. Otherwise, the type can be specified with `TracedError<T>`.
 
-## Perfect For Libraries And Optimized Binaries As Well
+## `ErrorUnion`
 
-Eros is perfect for libraries and applications. It is also optimized for binary size and performance.
+`ErrorUnion` is an open sum type. It differs from an enum in that you do not need to define any actual new type in order to hold some specific combination of variants, but rather you simply describe the ErrorUnion as holding one value out of several specific possibilities, defined by using a tuple of those possible variants as the generic parameter for the `ErrorUnion`.
 
-### Optimizations
+For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate.
 
-Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. Libraries should consider disabling default features and allowing downstream crates to enable this. This can also be disabled when attempting to optimize the binary in release mode.
+### Use In Libraries
 
-### Public Apis
+`eros`'s flexibility and optimizations make it a the perfect option for both libraries and binaries.
 
-#### First Class Tracing
+#### Suggested Route
 
-Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. Though, if one wants to add their own custom error type for all public api's, use the `map` method at these boundaries.
+Exposing `TracedError`, or `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
+
+#### Alternatives
+
+##### Wrapper Error Types
+
+An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself.
+
+##### Non-Wrapper Error Types
+
+If one wants to add their own custom error type for all public api's without exposing constructs like `TracedError`, use the `into_inner` method at these boundaries.
+
+<details>
+
+<summary>Example Implementation</summary>
+
 ```rust
 use eros::{AnyError, TracedError};
 
@@ -373,17 +405,18 @@ impl std::error::Error for MyErrorType {
     }
 }
 
-pub fn public_api() -> eros::Result<(), MyErrorType> {
-    let error: TracedError =
-        TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
-    let error: TracedError<MyErrorType> = error.map(MyErrorType);
-    Err(error)
+fn internal_api() -> eros::Result<()> {
+    Err(TracedError::boxed(std::io::Error::new(std::io::ErrorKind::Other, "io error")))
+}
+
+pub fn public_api() -> Result<(), MyErrorType> {
+    // Replace `TracedError` with your custom error type
+    internal_api().map_err(|e| MyErrorType(e.into_inner()))
 }
 ```
-#### Wrapper Types
 
-An alternative to exposing `TracedError` is a wrapper type like a new type - `MyErrorType(TracedError)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_traced` method as a way to to convert to the underlying `TracedError`. That way, if a downstream uses Eros they can get the `TracedError` rather than wrapping it in another `TracedError`. But wrapping/nesting `TracedError` may still unintentionally occur, that is why exposing the `TracedError` in the api is usually preferred, since `TracedError` cannot be nested within itself.
+</details>
 
-#### Internal Tracing For Testing Only
+###### Internal Tracing For Testing Only
 
-If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing, they should by default disable the default feature flags so all tracing operations become a no opt. This can then be enabled for tests only. Then at the api boundary one can easily just call `into_inner` to get the inner `T` in `TracedError<T>`. Thus no constructs of this library will be exposed to downstream crates and there is no performance impact.
+If one does not want to expose any tracing details of the library and only use `TracedError` internally for testing, they should by default disable the default feature flags so all tracing operations become a no opt for the library. This can then be enabled for tests only. Then at the api boundary they can use one of the previous approaches. Thus no constructs of this library will be exposed to downstream crates.
