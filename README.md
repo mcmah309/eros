@@ -5,21 +5,14 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 
-Eros is the swiss army knife of error handling approaches. It fits perfectly well into libraries and applications.
+Eros is the swiss army knife of error handling approaches. It fits perfectly well into libraries and binaries.
 
-Eros is built on the following philosophy:
+Built on the following philosophy:
 1. Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. [Link](#optional-typed-errors)
 2. There should be no boilerplate needed when handling any number of typed errors - no need to create an error enum for each case. [Link](#no-boilerplate)
 3. Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about. [Link](#seamless-transitions-between-error-types)
 4. Errors should always provided context of the operations in the call stack that lead to the error. [Link](#errors-have-context)
 5. Error constructs should performant. [Link](#optimizations)
-
-Eros is heavily inspired by:
-
-- [anyhow](https://github.com/dtolnay/anyhow)
-- [terrors](https://github.com/komora-io/terrors)
-- [error_set](https://github.com/mcmah309/error_set)
-- [thiserror](https://github.com/dtolnay/thiserror)
 
 ## Philosophy In Action
 
