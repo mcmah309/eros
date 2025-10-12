@@ -221,8 +221,6 @@ Backtrace:
                                at /workspaces/eros/tests/x.rs:7:15
    7:     0x5561eafe82dc - x::main::h6b82c0c63f51d406
                                at /workspaces/eros/tests/x.rs:28:15
-   8:     0x5561eafea397 - x::main::{{closure}}::h9ec95e65e08ea0a5
-                               at /workspaces/eros/tests/x.rs:27:10
 ...
 ```
 
@@ -337,54 +335,7 @@ Backtrace:
              at ./tests/x.rs:56:15
    7: x::main
              at ./tests/x.rs:74:11
-   8: x::main::{{closure}}
-             at ./tests/x.rs:73:10
-   9: core::ops::function::FnOnce::call_once
-             at /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:253:5
-  10: core::ops::function::FnOnce::call_once
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/ops/function.rs:253:5
-  11: test::__rust_begin_short_backtrace
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:648:18
-  12: test::run_test_in_process::{{closure}}
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:671:74
-  13: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/panic/unwind_safe.rs:272:9
-  14: std::panicking::catch_unwind::do_call
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:589:40
-  15: std::panicking::catch_unwind
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:552:19
-  16: std::panic::catch_unwind
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panic.rs:359:14
-  17: test::run_test_in_process
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:671:27
-  18: test::run_test::{{closure}}
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:592:43
-  19: test::run_test::{{closure}}
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/test/src/lib.rs:622:41
-  20: std::sys::backtrace::__rust_begin_short_backtrace
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/sys/backtrace.rs:158:18
-  21: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/thread/mod.rs:559:17
-  22: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/panic/unwind_safe.rs:272:9
-  23: std::panicking::catch_unwind::do_call
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:589:40
-  24: std::panicking::catch_unwind
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panicking.rs:552:19
-  25: std::panic::catch_unwind
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/panic.rs:359:14
-  26: std::thread::Builder::spawn_unchecked_::{{closure}}
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/thread/mod.rs:557:30
-  27: core::ops::function::FnOnce::call_once{{vtable.shim}}
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/core/src/ops/function.rs:253:5
-  28: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/alloc/src/boxed.rs:1971:9
-  29: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/alloc/src/boxed.rs:1971:9
-  30: std::sys::pal::unix::thread::Thread::new::thread_start
-             at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/sys/pal/unix/thread.rs:97:17
-  31: <unknown>
-  32: <unknown>
+...
 ```
 
 ## `TracedError`
