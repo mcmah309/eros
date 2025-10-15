@@ -228,9 +228,9 @@ Backtrace:
 
 ### Optimizations
 
-Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError` and all context methods become a no-opt. Thus, `TracedError` becomes a new type and may be optimized away by the compiler. 
+Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `TracedError<T>` and all context methods become a no-opt. Thus, `TracedError<T>` becomes a new type and may be optimized away by the compiler. 
 
-Additionally in this case, `TracedError` has the same effect as `Box`. Boxing errors is a common trick to increase performance and decrease memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
+Additionally, in this case for the untyped version, `TracedError`, the new type is just a wrapper around a `Box`. Boxing errors is a common trick to increase performance and decrease stack memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
 
 See the [Use In Libraries](#use-in-libraries) section as well.
 
