@@ -20,7 +20,8 @@ pub use str_error::StrError;
 
 //traits
 pub use context::Context;
-pub use error_union::IntoUResult;
+pub use error_union::Union;
+pub use error_union::IntoUnion;
 pub use error_union::ReshapeUResult;
 pub use generic_error::Traced;
 pub use generic_error::TracedDyn;

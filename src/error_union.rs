@@ -1,8 +1,8 @@
 use core::any::Any;
+use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
-use core::error::Error;
 
 use crate::context::Contextable;
 use crate::generic_error::AnyError;
@@ -89,12 +89,14 @@ fn _send_sync_error_assert() {
     fn is_sync<T: Sync>(_: &T) {}
     fn is_error<T: Error>(_: &T) {}
 
-    let error_union: ErrorUnion<(io::Error, fmt::Error)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    let error_union: ErrorUnion<(io::Error, fmt::Error)> =
+        ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
     is_send(&error_union);
     is_sync(&error_union);
     // is_error(&error_union);
 
-    let error_union: ErrorUnion<(io::Error, TracedError<fmt::Error>)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    let error_union: ErrorUnion<(io::Error, TracedError<fmt::Error>)> =
+        ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
     is_send(&error_union);
     is_sync(&error_union);
     // is_error(&error_union);
@@ -327,7 +329,7 @@ where
 
 //************************************************************************//
 
-pub trait IntoUResult<S, F> {
+pub trait Union<S, F> {
     /// Creates an `ErrorUnion` for this type.
     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
@@ -336,7 +338,7 @@ pub trait IntoUResult<S, F> {
         Other::Variants: Contains<F, Index>;
 }
 
-impl<S, F: 'static> IntoUResult<S, F> for Result<S, F> {
+impl<S, F: 'static> Union<S, F> for Result<S, F> {
     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
@@ -344,6 +346,29 @@ impl<S, F: 'static> IntoUResult<S, F> for Result<S, F> {
         Other::Variants: Contains<F, Index>,
     {
         self.map_err(ErrorUnion::new)
+    }
+}
+
+pub trait IntoUnion<S, F> {
+    /// Creates an `ErrorUnion` for this type.
+    fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+        Other::Variants: Contains<F, Index>;
+}
+
+impl<S, F1: 'static, F2: 'static> IntoUnion<S, F2> for Result<S, F1>
+where
+    F1: Into<F2>,
+{
+    fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    where
+        Other: TypeSet,
+        // Other::Variants: SupersetOf<Cons<F, End>, Index>,
+        Other::Variants: Contains<F2, Index>,
+    {
+        self.map_err(|e| ErrorUnion::new(e.into()))
     }
 }
 

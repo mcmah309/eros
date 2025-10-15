@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{traced, AnyError, ErrorUnion, TracedDyn, TracedError};
+use eros::{traced, AnyError, ErrorUnion, IntoUnion, TracedDyn, TracedError, Union};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -394,4 +394,52 @@ mod into_traced {
         let error = traced_our_error_enum_result2().unwrap_err();
         assert!(matches!(error.inner(), AnotherError::IoError(_)));
     }
+}
+
+//************************************************************************//
+
+#[test]
+fn union() {
+    #[derive(Debug)]
+    struct MyCustomError(std::io::Error);
+
+    impl Display for MyCustomError {
+        fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(fmt, "MyCustomError: {}", self.0)
+        }
+    }
+
+    impl std::error::Error for MyCustomError {}
+
+    impl From<std::io::Error> for MyCustomError {
+        fn from(value: std::io::Error) -> Self {
+            MyCustomError(value)
+        }
+    }
+
+    fn regular_union() -> ErrorUnion<(std::io::Error,)> {
+        let error = std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
+        return error.into();
+    }
+
+    fn result_union() -> Result<(), ErrorUnion<(std::io::Error,)>> {
+        let error = std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
+        return Err(error).union();
+    }
+
+    fn mapped_result_union() -> Result<(), ErrorUnion<(MyCustomError,)>> {
+        let error = std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
+        return Err(error).into_union();
+    }
+
+    let error = regular_union();
+    assert_eq!(error.into_inner().kind(), std::io::ErrorKind::AddrInUse);
+    let result = result_union();
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert_eq!(error.into_inner().kind(), std::io::ErrorKind::AddrInUse);
+    let result = mapped_result_union();
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert_eq!(error.into_inner().0.kind(), std::io::ErrorKind::AddrInUse);
 }

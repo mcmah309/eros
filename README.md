@@ -52,7 +52,7 @@ There should be no boilerplate needed when handling any number of errors (typed 
 
 
 ```rust
-use eros::{bail, Traced, IntoUResult, TE};
+use eros::{bail, Traced, Union, TE};
 use std::io;
 
 // `ErrorUnion` is used to track each possible error type,
@@ -95,7 +95,7 @@ fn func1() -> eros::UResult<(), (io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about.
 
 ```rust
-use eros::{bail, ReshapeUResult, Traced, IntoUResult, TE};
+use eros::{bail, ReshapeUResult, Traced, Union, TE};
 use std::io;
 
 fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
@@ -135,7 +135,7 @@ fn main() {
 And to expand an `ErrorUnion` just call `widen`
 
 ```rust
-use eros::{ReshapeUResult, IntoUResult};
+use eros::{ReshapeUResult, Union};
 use std::io;
 
 fn func1() -> eros::UResult<(), (io::Error, String)> {
@@ -168,7 +168,7 @@ Errors should always provided context of the operations in the call stack that l
 
 ```rust
 use eros::{
-    bail, Context, IntoUResult, TE,
+    bail, Context, Union, TE,
 };
 use std::io;
 
@@ -241,7 +241,7 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 
 ```rust
 use eros::{
-    bail, Context, ReshapeUResult, Traced, TracedDyn, IntoUResult,
+    bail, Context, ReshapeUResult, Traced, TracedDyn, Union,
     TE,
 };
 use reqwest::blocking::{Client, Response};

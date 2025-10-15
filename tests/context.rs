@@ -2,7 +2,7 @@
 
 use std::any::Any;
 
-use eros::{AbsentValueError, Context, ErrorUnion, IntoUResult, TracedDyn};
+use eros::{AbsentValueError, Context, ErrorUnion, Union, TracedDyn};
 
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
