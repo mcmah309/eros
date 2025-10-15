@@ -9,7 +9,7 @@ Eros is the swiss army knife of error handling approaches. It fits perfectly wel
 
 Built on the following philosophy:
 1. Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. [Link](#optional-typed-errors)
-2. There should be no boilerplate needed when handling any number of typed errors - no need to create an error enum for each case. [Link](#no-boilerplate)
+2. There should be no boilerplate needed when handling any number of errors - no need to create an error enum for each case. [Link](#no-boilerplate)
 3. Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about. [Link](#seamless-transitions-between-error-types)
 4. Errors should always provided context of the operations in the call stack that lead to the error. [Link](#errors-have-context)
 5. Error constructs should performant. [Link](#optimizations)
@@ -48,17 +48,18 @@ fn main() {
 
 ### No Boilerplate
 
-There should be no boilerplate needed when handling any number of typed error. This is where [ErrorUnion](#errorunion) helps.
+There should be no boilerplate needed when handling any number of errors (typed or untyped). This is where [ErrorUnion](#errorunion) helps in addition to [TracedError](#tracederror).
 
 
 ```rust
 use eros::{bail, Traced, IntoUResult, TE};
 use std::io;
 
-// Uses `ErrorUnion` to track each type. 
+// `ErrorUnion` is used to track each possible error type,
+// instead of creating a enum for each possible error variant.
 // `UResult<_,(..)>` == `Result<_,ErrorUnion<(..)>>`.
-// Here `TracedError` remains untyped and `TracedError<Error>` is typed.
-// `TE` is a type alias for `TracedError`.
+// Here `TracedError` remains untyped and `TracedError<io::Error>` is typed.
+// `TE<T>` is a type alias for `TracedError<T>`.
 fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
     // Change the `eros::Result` type to an `UResult` type
     let val = func2().union()?; // TracedError
@@ -66,12 +67,14 @@ fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
     Ok(val)
 }
 
-// Error type not tracked
+// The error type not tracked
 fn func2() -> eros::Result<()> {
     bail!("Something went wrong")
 }
 
-// Error type is tracked. Here the underlying error type is `std::io::Error`
+// The error type can be tracked with `TracedError<T>` as well.
+// Here the underlying error type is `io::Error`.
+// `eros::Result<(), _>` == `Result<(), TracedError<_>>`
 fn func3() -> eros::Result<(), io::Error> {
     return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here")).traced();
 }
@@ -82,9 +85,9 @@ fn main() {
 ```
 The above code is precisely typed for what we care about and there was no need to create an error enum for each case.
 
-`UResult` and the underlying `UnionError`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
+`UResult` and the underlying `ErrorUnion`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
 ```rust,ignore
-fn func1() -> eros::UResult<(), (std::io::Error, my_crate::Error)>;
+fn func1() -> eros::UResult<(), (io::Error, my_crate::Error)>;
 ```
 
 ### Seamless Transitions Between Error Types
@@ -354,9 +357,62 @@ Backtrace:
 
 ## `ErrorUnion`
 
-`ErrorUnion` is an open sum type. It differs from an enum in that you do not need to define any actual new type in order to hold some specific combination of variants, but rather you simply describe the ErrorUnion as holding one value out of several specific possibilities, defined by using a tuple of those possible variants as the generic parameter for the `ErrorUnion`.
+`ErrorUnion` is an open sum type. An open sum type takes full advantage of rust's powerful type system. It differs from an enum in that you do not need to define any actual new type in order to hold some specific combination of variants, but rather you simply describe the ErrorUnion as holding one value out of several specific possibilities. Thi is defined by using a tuple of those possible variants as the generic parameter for the `ErrorUnion`. 
 
-For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate.
+For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate. E.g.
+
+```rust
+use eros::ErrorUnion;
+use std::{fmt, io};
+
+fn main() {
+    let error: ErrorUnion<(fmt::Error, io::Error)>;
+}
+```
+vs
+```rust
+use std::{fmt, io};
+
+fn main() {
+    let error: CustomError;
+}
+
+#[derive(Debug)]
+pub enum CustomError {
+    FmtError(fmt::Error),
+    IoError(io::Error),
+}
+
+impl std::fmt::Display for CustomError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CustomError::FmtError(e) => write!(fmt, "{}", e),
+            CustomError::IoError(e) => write!(fmt, "{}", e),
+        }
+    }
+}
+
+impl std::error::Error for CustomError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            CustomError::FmtError(e) => e.source(),
+            CustomError::IoError(e) => e.source(),
+        }
+    }
+}
+
+impl From<fmt::Error> for CustomError {
+    fn from(error: fmt::Error) -> Self {
+        CustomError::FmtError(error)
+    }
+}
+
+impl From<io::Error> for CustomError {
+    fn from(error: io::Error) -> Self {
+        CustomError::IoError(error)
+    }
+}
+```
 
 ## Use In Libraries
 
