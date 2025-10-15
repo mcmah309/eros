@@ -95,7 +95,7 @@ fn func1() -> eros::UResult<(), (io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about.
 
 ```rust
-use eros::{bail, ReshapeUResult, Traced, Union, TE};
+use eros::{bail, ReshapeUnion, Traced, Union, TE};
 use std::io;
 
 fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
@@ -135,7 +135,7 @@ fn main() {
 And to expand an `ErrorUnion` just call `widen`
 
 ```rust
-use eros::{ReshapeUResult, Union};
+use eros::{ReshapeUnion, Union};
 use std::io;
 
 fn func1() -> eros::UResult<(), (io::Error, String)> {
@@ -241,7 +241,7 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 
 ```rust
 use eros::{
-    bail, Context, ReshapeUResult, Traced, TracedDyn, Union,
+    bail, Context, ReshapeUnion, Traced, TracedDyn, Union,
     TE,
 };
 use reqwest::blocking::{Client, Response};

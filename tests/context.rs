@@ -7,7 +7,7 @@ use eros::{AbsentValueError, Context, ErrorUnion, Union, TracedDyn};
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
 mod min_specialization {
-    use eros::{traced, Context, ErrorUnion, ReshapeUResult, TracedError};
+    use eros::{traced, Context, ErrorUnion, ReshapeUnion, TracedError};
 
     #[test]
     fn error_union() {
