@@ -1,9 +1,6 @@
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
-use eros::{
-    bail, traced, Context, ErrorUnion, TracedDyn, IntoUnionResult, TracedError,
-    TracedResult,
-};
+use eros::{Context, ErrorUnion, IntoUnionResult, TracedDyn};
 
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
@@ -73,19 +70,19 @@ mod min_specialization {
 
 #[test]
 fn generic_context_error_to_error_union() {
-    fn func1() -> Result<(), TracedError> {
-        return Err(traced!("This is root error message"));
+    fn func1() -> Result<(), eros::TracedError> {
+        return Err(eros::traced!("This is root error message"));
     }
 
-    fn func2() -> eros::TracedResult<()> {
+    fn func2() -> eros::Result<()> {
         func1().context("Generic context")
     }
 
-    fn func3() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
+    fn func3() -> Result<(), ErrorUnion<(std::io::Error, eros::TracedError)>> {
         func2().map_err(ErrorUnion::new)
     }
 
-    let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func3();
+    let result: Result<(), ErrorUnion<(std::io::Error, eros::TracedError)>> = func3();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -98,15 +95,15 @@ fn generic_context_error_to_error_union() {
 
 #[test]
 fn generic_error_to_error_union() {
-    fn func1() -> Result<(), TracedError> {
-        bail!("This is root error message")
+    fn func1() -> Result<(), eros::TracedError> {
+        eros::bail!("This is root error message")
     }
 
-    fn func2() -> Result<(), ErrorUnion<(std::io::Error, TracedError)>> {
+    fn func2() -> Result<(), ErrorUnion<(std::io::Error, eros::TracedError)>> {
         func1().map_err(ErrorUnion::new)
     }
 
-    let result: Result<(), ErrorUnion<(std::io::Error, TracedError)>> = func2();
+    let result: Result<(), ErrorUnion<(std::io::Error, eros::TracedError)>> = func2();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -119,26 +116,26 @@ fn generic_error_to_error_union() {
 
 #[test]
 fn bail() {
-    fn func1() -> TracedResult<()> {
+    fn func1() -> eros::Result<()> {
         eros::bail!("This is a bailing message {}", 1);
     }
 
-    fn func2() -> eros::UnionResult<(), (TracedError,)> {
+    fn func2() -> eros::UnionResult<(), (eros::TracedError,)> {
         func1().context("From func2".to_string()).union()
     }
 
-    fn func3() -> Result<(), ErrorUnion<(TracedError, i32, bool)>> {
+    fn func3() -> Result<(), ErrorUnion<(eros::TracedError, i32, bool)>> {
         return func2().map_err(ErrorUnion::widen);
     }
 
-    fn func4() -> TracedResult<()> {
+    fn func4() -> eros::Result<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
                 .traced_dyn();
         return Err(error);
     }
 
-    let result: Result<(), ErrorUnion<(TracedError, i32, bool)>> = func3();
+    let result: Result<(), ErrorUnion<(eros::TracedError, i32, bool)>> = func3();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -147,7 +144,49 @@ fn bail() {
         "Expected context in message:\n{}",
         message
     );
-    let result: TracedResult<()> = func4();
+    let result: eros::Result<()> = func4();
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
+}
+
+#[test]
+fn ensure() {
+    fn func1() -> eros::Result<()> {
+        eros::ensure!(1 == 2, "This is a bailing message {}", 1);
+        Ok(())
+    }
+
+    fn func2() -> eros::UnionResult<(), (eros::TracedError,)> {
+        func1().context("From func2".to_string()).union()
+    }
+
+    fn func3() -> Result<(), ErrorUnion<(eros::TracedError, i32, bool)>> {
+        return func2().map_err(ErrorUnion::widen);
+    }
+
+    fn func4() -> eros::Result<()> {
+        let error =
+            std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
+                .traced_dyn();
+        return Err(error);
+    }
+
+    let result: Result<(), ErrorUnion<(eros::TracedError, i32, bool)>> = func3();
+    println!("{:?}", result.as_ref().unwrap_err());
+    assert!(result.is_err());
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Context:"),
+        "Expected context in message:\n{}",
+        message
+    );
+    let result: eros::Result<()> = func4();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -160,14 +199,14 @@ fn bail() {
 
 #[test]
 fn context_directly_on_error() {
-    fn on_error() -> TracedResult<()> {
+    fn on_error() -> eros::Result<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here")
                 .context("This is some context");
         return Err(error);
     }
 
-    fn on_result() -> TracedResult<()> {
+    fn on_result() -> eros::Result<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
@@ -175,7 +214,7 @@ fn context_directly_on_error() {
         return Ok(value);
     }
 
-    fn on_result_again() -> TracedResult<()> {
+    fn on_result_again() -> eros::Result<()> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
@@ -183,7 +222,7 @@ fn context_directly_on_error() {
         return Ok(value);
     }
 
-    let result: TracedResult<()> = on_error();
+    let result: eros::Result<()> = on_error();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -192,7 +231,7 @@ fn context_directly_on_error() {
         "Expected context in message:\n{}",
         message
     );
-    let result: TracedResult<()> = on_result();
+    let result: eros::Result<()> = on_result();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -201,7 +240,7 @@ fn context_directly_on_error() {
         "Expected context in message:\n{}",
         message
     );
-    let result: TracedResult<()> = on_result_again();
+    let result: eros::Result<()> = on_result_again();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = result.unwrap_err().to_string();
@@ -215,11 +254,11 @@ fn context_directly_on_error() {
 #[test]
 #[cfg_attr(not(feature = "min_specialization"), should_panic)]
 fn nesting_traced_dyn_calls() {
-    fn func1() -> TracedResult<()> {
+    fn func1() -> eros::Result<()> {
         eros::bail!("This is a bailing message {}", 1);
     }
 
-    fn func2() -> TracedResult<()> {
+    fn func2() -> eros::Result<()> {
         func1()
             .context("One")
             .traced_dyn()
@@ -228,7 +267,7 @@ fn nesting_traced_dyn_calls() {
             .context("Three")
     }
 
-    let result: TracedResult<()> = func2();
+    let result: eros::Result<()> = func2();
     let message = result.unwrap_err().to_string();
 
     let count = message.match_indices("Context:").count();

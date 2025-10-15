@@ -247,9 +247,9 @@ use std::time::Duration;
 
 // Add tracing to an error by wrapping it in a `TracedError`.
 // When we don't care about the error type we can use `eros::Result<_>` which has tracing.
-// `eros::Result<_>` == `Result<_,TracedError>` == `TracedResult<_>`
+// `eros::Result<_>` == `Result<_,TracedError>`
 // When we *do* care about the error type we can use `eros::Result<_,_>` which also has tracing but preserves the error type.
-// `eros::Result<_,_>` == `Result<_,TracedError<_>>` == `TracedResult<_,_>`
+// `eros::Result<_,_>` == `Result<_,TracedError<_>>`
 // In the below example we don't preserve the error type.
 fn handle_response(res: Response) -> eros::Result<String> {
     if !res.status().is_success() {
