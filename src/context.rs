@@ -115,6 +115,14 @@ impl<E: AnyError> Context<TracedError> for E {
 //************************************************************************//
 
 impl<T> Context<Result<T, TracedError>> for Option<T> {
+    /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
+    /// and it is desired to propagate this information rather than immediately
+    /// panic with `.expect(..)` - presumably to capture additional context up the call stack.
+    /// The inner error type is the non-descriptive [`AbsentValueError`], which is type erased,
+    /// since the type should not be used to identify the type of error.
+    /// Constructing this type is always paired with information ([`context`])
+    /// to further explain why the value should exist or provided additional context
+    /// around the operation.
     #[allow(unused_variables)]
     fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError> {
         #[cfg(feature = "context")]
@@ -123,6 +131,14 @@ impl<T> Context<Result<T, TracedError>> for Option<T> {
         return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())));
     }
 
+    /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
+    /// and it is desired to propagate this information rather than immediately
+    /// panic with `.expect(..)` - presumably to capture additional context up the call stack.
+    /// The inner error type is the non-descriptive [`AbsentValueError`], which is type erased,
+    /// since the type should not be used to identify the type of error.
+    /// Constructing this type is always paired with information ([`context`])
+    /// to further explain why the value should exist or provided additional context
+    /// around the operation.
     #[allow(unused_variables)]
     fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError>
     where
