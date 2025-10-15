@@ -2,7 +2,7 @@ use core::any::Any;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
-use std::error::Error;
+use core::error::Error;
 
 use crate::context::Contextable;
 use crate::generic_error::AnyError;
@@ -43,10 +43,10 @@ fn _send_sync_error_assert() {
     fn is_sync<T: Sync>(_: &T) {}
     fn is_error<T: Error>(_: &T) {}
 
-    let o: ErrorUnion<(io::Error,)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
-    is_send(&o);
-    is_sync(&o);
-    is_error(&o);
+    let error_union: ErrorUnion<(io::Error, fmt::Error)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    is_send(&error_union);
+    is_sync(&error_union);
+    is_error(&error_union);
 }
 
 unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
