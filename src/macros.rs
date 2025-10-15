@@ -1,4 +1,4 @@
-/// `format!` like macro to return early from a function with a `TracedError`
+/// `format!` like macro to return early from a function with a [`crate::TracedError`]
 #[macro_export]
 macro_rules! bail {
     ($error:literal) => {
@@ -9,7 +9,7 @@ macro_rules! bail {
     };
 }
 
-/// `format!` like macro to create a `TracedError`
+/// `format!` like macro to create a [`crate::TracedError`]
 #[macro_export]
 macro_rules! traced {
     ($error:literal) => {
@@ -17,5 +17,20 @@ macro_rules! traced {
     };
     ($($error:tt)+) => {
         $crate::TracedError::boxed($crate::StrError::Owned(format!($($error)*)))
+    };
+}
+
+/// `assert!` like macro for bailing on a condition failure
+#[macro_export]
+macro_rules! ensure {
+    ($test:expr, $error:literal) => {
+        if !($test) {
+            $crate::bail!($error)
+        }
+    };
+    ($test:expr, $($error:tt)+) => {
+        if !($test) {
+            $crate::bail!($($error)*)
+        }
     };
 }
