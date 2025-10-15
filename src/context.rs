@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, fmt::Display};
 
 use crate::{
     generic_error::{AnyError, TracedError},
@@ -111,6 +111,47 @@ impl<E: AnyError> Context<TracedError> for E {
         return TracedError::boxed(self);
     }
 }
+
+//************************************************************************//
+
+impl<T> Context<Result<T, TracedError>> for Option<T> {
+    #[allow(unused_variables)]
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError> {
+        #[cfg(feature = "context")]
+        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())).context(context));
+        #[cfg(not(feature = "context"))]
+        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())));
+    }
+
+    #[allow(unused_variables)]
+    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError>
+    where
+        F: FnOnce() -> C,
+    {
+        #[cfg(feature = "context")]
+        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())).with_context(context));
+        #[cfg(not(feature = "context"))]
+        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())));
+    }
+}
+
+/// An Error type for unwrapping an `Option` that is `None`, but expected to be `Some`.
+/// This is used when it is desired to propagate this information rather than immediately
+/// panic with `.expect(..)` - presumably to capture additional context up the call stack.
+/// This is created by calling `.context(..)` on an `Option<T>`
+/// that was `None`. Thus constructing this type is always paired with information
+/// to further explain why the value should exist or provided additional context
+/// around the operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct AbsentValueError(());
+
+impl Display for AbsentValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "An `Option` was unexpectedly `None`")
+    }
+}
+
+impl std::error::Error for AbsentValueError {}
 
 //************************************************************************//
 

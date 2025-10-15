@@ -417,18 +417,6 @@ where
 
 //************************************************************************//
 
-pub trait OptionTracedExt<S> {
-    fn ok_or_traced(self) -> Result<S, TracedError>;
-}
-
-impl<S> OptionTracedExt<S> for Option<S> {
-    fn ok_or_traced(self) -> Result<S, TracedError> {
-        self.ok_or_else(|| TracedError::boxed(StrError::Static("`Option` is `None`")))
-    }
-}
-
-//************************************************************************//
-
 // /// An opaque type holding both the context and the backtrace derived from a [`TracedError`].
 // // Dev Not: This is needed since something something like
 // // ```rust

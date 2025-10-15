@@ -1,6 +1,8 @@
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
-use eros::{Context, ErrorUnion, IntoUResult, TracedDyn};
+use std::any::Any;
+
+use eros::{AbsentValueError, Context, ErrorUnion, IntoUResult, TracedDyn};
 
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
@@ -249,6 +251,19 @@ fn context_directly_on_error() {
         "Expected context in message:\n{}",
         message
     );
+}
+
+#[test]
+fn absent_value_error() {
+    fn func1() -> eros::Result<()> {
+        None.context("This value should be some")
+    }
+
+    let result = func1().context("Some context");
+    println!("{:?}", result);
+    let error = result.unwrap_err();
+    let inner_error = error.into_inner() as Box<dyn Any>;
+    assert!(inner_error.downcast::<AbsentValueError>().is_ok());
 }
 
 #[test]
