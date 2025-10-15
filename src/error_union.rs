@@ -240,7 +240,7 @@ impl ErrorUnion<(TracedError,)> {
 //************************************************************************//
 
 /// Run widen and narrow directly on Results with ErrorUnions
-pub trait ReshapeUnionResult<S, E>
+pub trait ReshapeUResult<S, E>
 where
     E: TypeSet,
 {
@@ -269,7 +269,7 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> ReshapeUnionResult<S, E> for Result<S, ErrorUnion<E>>
+impl<S, E> ReshapeUResult<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
@@ -306,7 +306,7 @@ where
 
 //************************************************************************//
 
-pub trait IntoUnionResult<S, F> {
+pub trait IntoUResult<S, F> {
     /// Creates an `ErrorUnion` for this type.
     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
@@ -315,7 +315,7 @@ pub trait IntoUnionResult<S, F> {
         Other::Variants: Contains<F, Index>;
 }
 
-impl<S, F: 'static> IntoUnionResult<S, F> for Result<S, F> {
+impl<S, F: 'static> IntoUResult<S, F> for Result<S, F> {
     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,

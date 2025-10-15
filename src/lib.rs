@@ -9,8 +9,7 @@ mod macros;
 mod str_error;
 mod type_set;
 
-pub type UnionResult<T, E> = std::result::Result<T, ErrorUnion<E>>;
-pub type UResult<T, E> = UnionResult<T, E>;
+pub type UResult<T, E> = std::result::Result<T, ErrorUnion<E>>;
 pub type Result<T, E = Box<dyn AnyError>> = std::result::Result<T, TracedError<E>>;
 pub type TE<E = Box<dyn AnyError>> = TracedError<E>;
 
@@ -20,8 +19,8 @@ pub use str_error::StrError;
 
 //traits
 pub use context::Context;
-pub use error_union::IntoUnionResult;
-pub use error_union::ReshapeUnionResult;
+pub use error_union::IntoUResult;
+pub use error_union::ReshapeUResult;
 pub use generic_error::Traced;
 pub use generic_error::TracedDyn;
 pub use generic_error::IntoTraced;

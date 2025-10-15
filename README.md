@@ -52,15 +52,15 @@ There should be no boilerplate needed when handling any number of typed error. T
 
 
 ```rust
-use eros::{bail, Traced, IntoUnionResult, TE};
+use eros::{bail, Traced, IntoUResult, TE};
 use std::io;
 
 // Uses `ErrorUnion` to track each type. 
-// `UnionResult<_,(..)>` == `Result<_,ErrorUnion<(..)>>`.
+// `UResult<_,(..)>` == `Result<_,ErrorUnion<(..)>>`.
 // Here `TracedError` remains untyped and `TracedError<Error>` is typed.
 // `TE` is a type alias for `TracedError`.
-fn func1() -> eros::UnionResult<(), (TE<io::Error>, TE)> {
-    // Change the `eros::Result` type to an `UnionResult` type
+fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
+    // Change the `eros::Result` type to an `UResult` type
     let val = func2().union()?; // TracedError
     let val = func3().union()?; // TracedError<Error>
     Ok(val)
@@ -82,9 +82,9 @@ fn main() {
 ```
 The above code is precisely typed for what we care about and there was no need to create an error enum for each case.
 
-`UnionResult` and the underlying `UnionError`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
+`UResult` and the underlying `UnionError`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
 ```rust,ignore
-fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
+fn func1() -> eros::UResult<(), (std::io::Error, my_crate::Error)>;
 ```
 
 ### Seamless Transitions Between Error Types
@@ -92,10 +92,10 @@ fn func1() -> eros::UnionResult<(), (std::io::Error, my_crate::Error)>;
 Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about.
 
 ```rust
-use eros::{bail, ReshapeUnionResult, Traced, IntoUnionResult, TE};
+use eros::{bail, ReshapeUResult, Traced, IntoUResult, TE};
 use std::io;
 
-fn func1() -> eros::UnionResult<(), (TE<io::Error>, TE)> {
+fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
     let val = func2().union()?;
     let val = func3().union()?;
     Ok(val)
@@ -132,14 +132,14 @@ fn main() {
 And to expand an `ErrorUnion` just call `widen`
 
 ```rust
-use eros::{ReshapeUnionResult, IntoUnionResult};
+use eros::{ReshapeUResult, IntoUResult};
 use std::io;
 
-fn func1() -> eros::UnionResult<(), (io::Error, String)> {
+fn func1() -> eros::UResult<(), (io::Error, String)> {
     Ok(())
 }
 
-fn func2() -> eros::UnionResult<(), (i32, u16)> {
+fn func2() -> eros::UResult<(), (i32, u16)> {
     Ok(())
 }
 
@@ -147,7 +147,7 @@ fn func3() -> Result<(), f64> {
     Ok(())
 }
 
-fn func4() -> eros::UnionResult<(), (io::Error, String, i32, u16, f64)> {
+fn func4() -> eros::UResult<(), (io::Error, String, i32, u16, f64)> {
     func1().widen()?;
     func2().widen()?;
     func3().union()?;
@@ -165,11 +165,11 @@ Errors should always provided context of the operations in the call stack that l
 
 ```rust
 use eros::{
-    bail, Context, IntoUnionResult, TE,
+    bail, Context, IntoUResult, TE,
 };
 use std::io;
 
-fn func1() -> eros::UnionResult<(), (TE<io::Error>, TE)> {
+fn func1() -> eros::UResult<(), (TE<io::Error>, TE)> {
     let val = func2()
         .with_context(|| format!("This is some more context"))
         .union()?;
@@ -238,7 +238,7 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 
 ```rust
 use eros::{
-    bail, Context, ReshapeUnionResult, Traced, TracedDyn, IntoUnionResult,
+    bail, Context, ReshapeUResult, Traced, TracedDyn, IntoUResult,
     TE,
 };
 use reqwest::blocking::{Client, Response};
@@ -268,10 +268,10 @@ fn handle_response(res: Response) -> eros::Result<String> {
     Ok(body)
 }
 
-// Explicitly handle multiple Err types at the same time with `UnionResult`.
+// Explicitly handle multiple Err types at the same time with `UResult`.
 // No new error enum creation is needed or nesting of errors.
-// `UnionResult<_,_>` == `Result<_,ErrorUnion<_>>`
-fn fetch_url(url: &str) -> eros::UnionResult<String, (TE<reqwest::Error>, TE)> {
+// `UResult<_,_>` == `Result<_,ErrorUnion<_>>`
+fn fetch_url(url: &str) -> eros::UResult<String, (TE<reqwest::Error>, TE)> {
     let client = Client::new();
 
     let res = client
@@ -304,7 +304,7 @@ fn fetch_with_retry(url: &str, retries: usize) -> eros::Result<String> {
                     return Err(request_error.traced_dyn().context("Retries exceeded"));
                 }
             }
-            // `result` is now `UnionResult<String,(TracedError,)>`, so we convert the `Err` type
+            // `result` is now `UResult<String,(TracedError,)>`, so we convert the `Err` type
             // into `TracedError`. Thus, we now have a `Result<String,TracedError>`.
             Err(result) => return result.map_err(|e| e.into_inner()),
         }

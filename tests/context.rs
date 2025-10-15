@@ -1,15 +1,15 @@
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
-use eros::{Context, ErrorUnion, IntoUnionResult, TracedDyn};
+use eros::{Context, ErrorUnion, IntoUResult, TracedDyn};
 
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
 mod min_specialization {
-    use eros::{traced, Context, ErrorUnion, ReshapeUnionResult, TracedError};
+    use eros::{traced, Context, ErrorUnion, ReshapeUResult, TracedError};
 
     #[test]
     fn error_union() {
-        fn func1() -> eros::UnionResult<(), (std::io::Error,)> {
+        fn func1() -> eros::UResult<(), (std::io::Error,)> {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::AddrInUse,
                 "Address in use message here",
@@ -21,20 +21,20 @@ mod min_specialization {
             func1().widen().context("From func2".to_string())
         }
 
-        fn func3() -> eros::UnionResult<(), (std::io::Error, i32, bool)> {
+        fn func3() -> eros::UResult<(), (std::io::Error, i32, bool)> {
             return func2()
                 .with_context(|| "From func3")
                 .map_err(ErrorUnion::widen);
         }
 
-        fn func4() -> eros::UnionResult<(), (std::io::Error, bool)> {
+        fn func4() -> eros::UResult<(), (std::io::Error, bool)> {
             return match func3().with_context(|| "From func4").narrow::<i32, _>() {
                 Ok(_) => panic!("should exist"),
                 Err(result) => result,
             };
         }
 
-        fn func5() -> eros::UnionResult<(), (std::io::Error, bool, TracedError)> {
+        fn func5() -> eros::UResult<(), (std::io::Error, bool, TracedError)> {
             return Err(ErrorUnion::new(traced!("Error"))).context("From func5");
         }
 
@@ -120,7 +120,7 @@ fn bail() {
         eros::bail!("This is a bailing message {}", 1);
     }
 
-    fn func2() -> eros::UnionResult<(), (eros::TracedError,)> {
+    fn func2() -> eros::UResult<(), (eros::TracedError,)> {
         func1().context("From func2".to_string()).union()
     }
 
@@ -162,7 +162,7 @@ fn ensure() {
         Ok(())
     }
 
-    fn func2() -> eros::UnionResult<(), (eros::TracedError,)> {
+    fn func2() -> eros::UResult<(), (eros::TracedError,)> {
         func1().context("From func2".to_string()).union()
     }
 
