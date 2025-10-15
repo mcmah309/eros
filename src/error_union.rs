@@ -36,22 +36,6 @@ pub struct ErrorUnion<E: TypeSet> {
     _pd: PhantomData<E>,
 }
 
-fn _send_sync_error_assert() {
-    use std::io;
-
-    fn is_send<T: Send>(_: &T) {}
-    fn is_sync<T: Sync>(_: &T) {}
-    fn is_error<T: Error>(_: &T) {}
-
-    let error_union: ErrorUnion<(io::Error, fmt::Error)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
-    is_send(&error_union);
-    is_sync(&error_union);
-    is_error(&error_union);
-}
-
-unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
-unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
-
 impl<T> Deref for ErrorUnion<(T,)>
 where
     T: 'static,
@@ -96,6 +80,30 @@ where
     }
 }
 
+//************************************************************************//
+
+fn _send_sync_error_assert() {
+    use std::io;
+
+    fn is_send<T: Send>(_: &T) {}
+    fn is_sync<T: Sync>(_: &T) {}
+    fn is_error<T: Error>(_: &T) {}
+
+    let error_union: ErrorUnion<(io::Error, fmt::Error)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    is_send(&error_union);
+    is_sync(&error_union);
+    // is_error(&error_union);
+
+    let error_union: ErrorUnion<(io::Error, TracedError<fmt::Error>)> = ErrorUnion::new(io::Error::new(io::ErrorKind::Other, "yooo"));
+    is_send(&error_union);
+    is_sync(&error_union);
+    // is_error(&error_union);
+    // is_error(&&error_union); // todo like with TracedError
+}
+
+unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
+unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
+
 impl<E> Error for ErrorUnion<E>
 where
     E: TypeSet,
@@ -105,6 +113,19 @@ where
         E::Variants::source_fold(self.value.as_ref() as &dyn Any)
     }
 }
+
+// impl<E> Error for &ErrorUnion<E>
+// where
+//     E: TypeSet,
+//     E::Variants: std::fmt::Display + std::fmt::Debug + DebugFold + DisplayFold,
+//     for<'a> &'a E::Variants: Error + ErrorFold,
+// {
+//     fn source(&self) -> Option<&(dyn Error + 'static)> {
+//         <&E::Variants as ErrorFold>::source_fold(self.value.as_ref() as &dyn Any)
+//     }
+// }
+
+//************************************************************************//
 
 impl<E> ErrorUnion<E>
 where

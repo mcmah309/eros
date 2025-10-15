@@ -195,6 +195,18 @@ impl<T: AnyError> fmt::Debug for TracedError<T> {
 // Into `TracedError`
 //************************************************************************//
 
+fn _send_sync_error_assert() {
+    fn is_send<T: Send>(_: &T) {}
+    fn is_sync<T: Sync>(_: &T) {}
+    fn is_error<T: std::error::Error>(_: &T) {}
+
+    let traced_error: TracedError = crate::traced!("");
+    is_send(&traced_error);
+    is_sync(&traced_error);
+    // is_error(&&traced_error);
+    is_error(&&traced_error);
+}
+
 // Note: This is not implemented so something like `TracedError<TracedError<T>>` is not possible.
 // Also this allows us to implement `Context` on `E: AnyError` since it does not conflict with itself.
 // e.g. In `impl<E: AnyError> Context<TracedError<E>> for E` `TracedError<E>` cannot be `E`.
@@ -216,6 +228,8 @@ impl<T: AnyError> std::error::Error for &mut TracedError<T> {
         self.inner.source()
     }
 }
+
+//************************************************************************//
 
 impl From<String> for TracedError {
     fn from(s: String) -> Self {
