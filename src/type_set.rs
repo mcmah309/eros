@@ -2,7 +2,23 @@ use core::any::Any;
 use core::fmt;
 use std::error::Error;
 
-use crate::{Cons, End, Recurse};
+/* ------------------------- Helpers ----------------------- */
+
+/// The final element of a type-level Cons list.
+#[doc(hidden)]
+#[derive(Debug)]
+pub enum End {}
+
+impl std::error::Error for End {}
+
+/// A compile-time list of types, similar to other basic functional list structures.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Cons<Head, Tail>(core::marker::PhantomData<Head>, Tail);
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Recurse<Tail>(Tail);
 
 /* ------------------------- std::error::Error support ----------------------- */
 
