@@ -11,7 +11,7 @@ keywords = ["error", "error-handling"]
 readme = "README.md"
 
 [dependencies]
-# Adds `into()` and `?` for anyhow `Result`s and `Error`s
+# Adds `into()` and `?` for anyhow `Result`s and `Error`s into eros types
 anyhow = { version = "1", optional = true }
 
 [dev-dependencies]
