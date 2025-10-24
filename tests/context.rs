@@ -312,7 +312,9 @@ fn integration_with_anyhow() {
     // println!("{error:?}");
 
     fn eros_result() -> eros::Result<()> {
-        anyhow_result()?;
+        use eros::TracedError;
+
+        anyhow_result().map_err(TracedError::anyhow)?;
         Ok(())
     }
 

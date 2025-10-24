@@ -1,9 +1,6 @@
 #[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
-use std::{
-    borrow::Cow,
-    fmt::{self},
-};
+use std::fmt::{self};
 
 use crate::{str_error::StrError, ErrorUnion};
 
@@ -155,6 +152,50 @@ impl<T: AnyError> TracedError<T> {
     // }
 }
 
+//************************************************************************//
+
+#[cfg(feature = "anyhow")]
+impl TracedError {
+    pub fn anyhow(error: anyhow::Error) -> TracedError {
+        let mut chain = error.chain();
+        let root = chain.next().unwrap().to_string();
+        #[cfg(feature = "backtrace")]
+        let (root, backtrace) = {
+            let backtrace: &Backtrace = error.backtrace();
+            if matches!(
+                backtrace.status(),
+                std::backtrace::BacktraceStatus::Captured
+            ) {
+                // Since we cannot get a `Backtrace` from a `&Backtrace`, we add it to root instead
+                (
+                    format!("{root}\n\nBacktrace:\n{}", backtrace.to_string()),
+                    Backtrace::disabled(),
+                )
+            } else {
+                (root, Backtrace::capture())
+            }
+        };
+        let root = StrError::Owned(root);
+        #[cfg(feature = "context")]
+        let context = {
+            let mut context = Vec::new();
+            for link in chain {
+                context.push(StrError::Owned(link.to_string()));
+            }
+            context
+        };
+        TracedError {
+            inner: Box::new(root),
+            #[cfg(feature = "backtrace")]
+            backtrace,
+            #[cfg(feature = "context")]
+            context,
+        }
+    }
+}
+
+//************************************************************************//
+
 impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.inner)?;
@@ -235,67 +276,9 @@ impl<T: AnyError> std::error::Error for &mut TracedError<T> {
 
 //************************************************************************//
 
-impl From<String> for TracedError {
-    fn from(s: String) -> Self {
-        TracedError::new(Box::new(StrError::from(s)))
-    }
-}
-
-impl From<&'static str> for TracedError {
-    fn from(s: &'static str) -> Self {
-        TracedError::new(Box::new(StrError::from(s)))
-    }
-}
-
-impl From<Cow<'static, str>> for TracedError {
-    fn from(s: Cow<'static, str>) -> Self {
-        TracedError::new(Box::new(StrError::from(s)))
-    }
-}
-
-impl<T: AnyError> From<T> for TracedError<T> {
+impl<T: AnyError> From<T> for TracedError {
     fn from(e: T) -> Self {
-        TracedError::new(e)
-    }
-}
-
-#[cfg(feature = "anyhow")]
-impl From<anyhow::Error> for TracedError {
-    fn from(value: anyhow::Error) -> Self {
-        let mut chain = value.chain();
-        let root = chain.next().unwrap().to_string();
-        #[cfg(feature = "backtrace")]
-        let (root, backtrace) = {
-            let backtrace: &Backtrace = value.backtrace();
-            if matches!(
-                backtrace.status(),
-                std::backtrace::BacktraceStatus::Captured
-            ) {
-                // Since we cannot get a `Backtrace` from a `&Backtrace`, we add it to root instead
-                (
-                    format!("{root}\n\nBacktrace:\n{}", backtrace.to_string()),
-                    Backtrace::disabled(),
-                )
-            } else {
-                (root, Backtrace::capture())
-            }
-        };
-        let root = StrError::Owned(root);
-        #[cfg(feature = "context")]
-        let context = {
-            let mut context = Vec::new();
-            for link in chain {
-                context.push(StrError::Owned(link.to_string()));
-            }
-            context
-        };
-        TracedError {
-            inner: Box::new(root),
-            #[cfg(feature = "backtrace")]
-            backtrace,
-            #[cfg(feature = "context")]
-            context,
-        }
+        TracedError::boxed(e)
     }
 }
 
