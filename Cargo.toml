@@ -1,6 +1,6 @@
 [package]
 name = "eros"
-version = "0.4.0"
+version = "0.5.0-alpha.0"
 edition = "2021"
 documentation = "https://docs.rs/eros/"
 description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
