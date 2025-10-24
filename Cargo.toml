@@ -11,7 +11,7 @@ keywords = ["error", "error-handling"]
 readme = "README.md"
 
 [dependencies]
-# Adds `into()` and `?` for anyhow `Result`s and `Error`s into eros types
+# Adds `TracedError::anyhow` for converting `anyhow::Error`s into a `TracedError`
 anyhow = { version = "1", optional = true }
 
 [dev-dependencies]
