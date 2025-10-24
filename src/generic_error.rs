@@ -1,9 +1,6 @@
 #[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
-use std::{
-    borrow::Cow,
-    fmt::{self},
-};
+use std::fmt::{self};
 
 use crate::{str_error::StrError, ErrorUnion};
 
@@ -231,27 +228,9 @@ impl<T: AnyError> std::error::Error for &mut TracedError<T> {
 
 //************************************************************************//
 
-impl From<String> for TracedError {
-    fn from(s: String) -> Self {
-        TracedError::new(Box::new(StrError::from(s)))
-    }
-}
-
-impl From<&'static str> for TracedError {
-    fn from(s: &'static str) -> Self {
-        TracedError::new(Box::new(StrError::from(s)))
-    }
-}
-
-impl From<Cow<'static, str>> for TracedError {
-    fn from(s: Cow<'static, str>) -> Self {
-        TracedError::new(Box::new(StrError::from(s)))
-    }
-}
-
-impl<T: AnyError> From<T> for TracedError<T> {
+impl<T: AnyError> From<T> for TracedError {
     fn from(e: T) -> Self {
-        TracedError::new(e)
+        TracedError::boxed(e)
     }
 }
 
@@ -349,8 +328,7 @@ where
 //     }
 // }
 
-impl<S, E> Traced<Result<S, TracedError<E>>>
-    for Result<S, ErrorUnion<(TracedError<E>,)>>
+impl<S, E> Traced<Result<S, TracedError<E>>> for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
     E: AnyError,
 {
@@ -369,11 +347,11 @@ where
 // ```
 // The target type becomes undeterminable for the compiler.
 pub trait IntoTraced<O1> {
-        /// Convert Error to a type containing a [`TracedError`] mapping the underlying type
+    /// Convert Error to a type containing a [`TracedError`] mapping the underlying type
     fn into_traced(self) -> O1;
 }
 
-impl<E1,E2> IntoTraced<TracedError<E2>> for E1
+impl<E1, E2> IntoTraced<TracedError<E2>> for E1
 where
     E1: AnyError,
     E2: AnyError,
@@ -405,8 +383,7 @@ where
     }
 }
 
-impl<S, E> IntoTraced<Result<S, TracedError<E>>>
-    for Result<S, ErrorUnion<(TracedError<E>,)>>
+impl<S, E> IntoTraced<Result<S, TracedError<E>>> for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
     E: AnyError,
 {
