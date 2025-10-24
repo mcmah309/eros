@@ -262,28 +262,38 @@ impl<T: AnyError> From<T> for TracedError<T> {
 #[cfg(feature = "anyhow")]
 impl From<anyhow::Error> for TracedError {
     fn from(value: anyhow::Error) -> Self {
-        let backtrace: &Backtrace = value.backtrace();
         let mut chain = value.chain();
         let root = chain.next().unwrap().to_string();
-        let (root, backtrace) = if matches!(
-            backtrace.status(),
-            std::backtrace::BacktraceStatus::Captured
-        ) {
-            // Since we cannot get a `Backtrace` from a `&Backtrace`, we add it to root instead
-            (
-                StrError::Owned(format!("{root}\n\nBacktrace:\n{}", backtrace.to_string())),
-                Backtrace::disabled(),
-            )
-        } else {
-            (StrError::Owned(root), Backtrace::capture())
+        #[cfg(feature = "backtrace")]
+        let (root, backtrace) = {
+            let backtrace: &Backtrace = value.backtrace();
+            if matches!(
+                backtrace.status(),
+                std::backtrace::BacktraceStatus::Captured
+            ) {
+                // Since we cannot get a `Backtrace` from a `&Backtrace`, we add it to root instead
+                (
+                    format!("{root}\n\nBacktrace:\n{}", backtrace.to_string()),
+                    Backtrace::disabled(),
+                )
+            } else {
+                (root, Backtrace::capture())
+            }
         };
-        let mut context = Vec::new();
-        for link in chain {
-            context.push(StrError::Owned(link.to_string()));
-        }
+        let root = StrError::Owned(root);
+        #[cfg(feature = "context")]
+        let context = {
+            let mut context = Vec::new();
+            for link in chain {
+                context.push(StrError::Owned(link.to_string()));
+            }
+            context
+        };
         TracedError {
             inner: Box::new(root),
+            #[cfg(feature = "backtrace")]
             backtrace,
+            #[cfg(feature = "context")]
             context,
         }
     }
