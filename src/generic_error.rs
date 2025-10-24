@@ -185,8 +185,12 @@ impl<T: AnyError> fmt::Debug for TracedError<T> {
         }
         #[cfg(feature = "backtrace")]
         {
-            write!(formatter, "\n\nBacktrace:\n")?;
-            fmt::Display::fmt(&self.backtrace, formatter)?;
+            use std::backtrace::BacktraceStatus;
+
+            if matches!(self.backtrace.status(), BacktraceStatus::Captured) {
+                write!(formatter, "\n\nBacktrace:\n")?;
+                fmt::Display::fmt(&self.backtrace, formatter)?;
+            }
         }
         Ok(())
     }
