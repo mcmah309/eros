@@ -276,9 +276,28 @@ impl<T: AnyError> std::error::Error for &mut TracedError<T> {
 
 //************************************************************************//
 
+// impl<T: AnyError> From<T> for TracedError<T> {
+//     fn from(e: T) -> Self {
+//         TracedError::new(e)
+//     }
+// }
+
 impl<T: AnyError> From<T> for TracedError {
+    #[cfg(feature = "min_specialization")]
+    default fn from(e: T) -> Self {
+        TracedError::boxed(e)
+    }
+
+    #[cfg(not(feature = "min_specialization"))]
     fn from(e: T) -> Self {
         TracedError::boxed(e)
+    }
+}
+
+#[cfg(feature = "min_specialization")]
+impl From<Box<dyn AnyError + '_>> for TracedError {
+    fn from(e: Box<dyn AnyError>) -> Self {
+        TracedError::new(e)
     }
 }
 
