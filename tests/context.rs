@@ -2,7 +2,7 @@
 
 use std::any::Any;
 
-use eros::{AbsentValueError, Context, ErrorUnion, Union, TracedDyn};
+use eros::{AbsentValueError, Context, ErrorUnion, TracedDyn, Union};
 
 #[cfg(feature = "min_specialization")]
 #[cfg(test)]
@@ -287,4 +287,36 @@ fn nesting_traced_dyn_calls() {
 
     let count = message.match_indices("Context:").count();
     assert_eq!(count, 1, "Expected only one 'Context:', got:\n{}", message);
+}
+
+#[cfg(feature = "anyhow")]
+#[test]
+fn integration_with_anyhow() {
+    fn anyhow_result() -> anyhow::Result<()> {
+        use anyhow::Context;
+        // Err(anyhow::anyhow!("This is the root from anyhow")).context("This is context from anyhow")
+        Err(anyhow::Error::from(std::io::Error::new(
+            std::io::ErrorKind::AddrInUse,
+            "This is the root",
+        ))).context("This is some anyhow context")
+    }
+
+    // let error: Box<std::io::Error> = anyhow_result()
+    //     .unwrap_err()
+    //     .reallocate_into_boxed_dyn_error_without_backtrace().downcast::<std::io::Error>().unwrap();
+    // let error = anyhow_result()
+    //     .unwrap_err()
+    //     .into_boxed_dyn_error();
+    // let bind = anyhow_result().unwrap_err();
+    // let error = bind.chain().next().unwrap();
+    // println!("{error:?}");
+
+    fn eros_result() -> eros::Result<()> {
+        anyhow_result()?;
+        Ok(())
+    }
+
+    let result = eros_result().context("eros context");
+
+    println!("{:?}", result.as_ref().unwrap_err());
 }

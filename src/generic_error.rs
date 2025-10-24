@@ -255,6 +255,36 @@ impl<T: AnyError> From<T> for TracedError<T> {
     }
 }
 
+#[cfg(feature = "anyhow")]
+impl From<anyhow::Error> for TracedError {
+    fn from(value: anyhow::Error) -> Self {
+        let backtrace: &Backtrace = value.backtrace();
+        let mut chain = value.chain();
+        let root = chain.next().unwrap().to_string();
+        let (root, backtrace) = if matches!(
+            backtrace.status(),
+            std::backtrace::BacktraceStatus::Captured
+        ) {
+            // Since we cannot get a `Backtrace` from a `&Backtrace`, we add it to root instead
+            (
+                StrError::Owned(format!("{root}\n\nBacktrace:\n{}", backtrace.to_string())),
+                Backtrace::disabled(),
+            )
+        } else {
+            (StrError::Owned(root), Backtrace::capture())
+        };
+        let mut context = Vec::new();
+        for link in chain {
+            context.push(StrError::Owned(link.to_string()));
+        }
+        TracedError {
+            inner: Box::new(root),
+            backtrace,
+            context,
+        }
+    }
+}
+
 //************************************************************************//
 
 /// Into a type with a dynamic [`TracedError`]
@@ -349,8 +379,7 @@ where
 //     }
 // }
 
-impl<S, E> Traced<Result<S, TracedError<E>>>
-    for Result<S, ErrorUnion<(TracedError<E>,)>>
+impl<S, E> Traced<Result<S, TracedError<E>>> for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
     E: AnyError,
 {
@@ -369,11 +398,11 @@ where
 // ```
 // The target type becomes undeterminable for the compiler.
 pub trait IntoTraced<O1> {
-        /// Convert Error to a type containing a [`TracedError`] mapping the underlying type
+    /// Convert Error to a type containing a [`TracedError`] mapping the underlying type
     fn into_traced(self) -> O1;
 }
 
-impl<E1,E2> IntoTraced<TracedError<E2>> for E1
+impl<E1, E2> IntoTraced<TracedError<E2>> for E1
 where
     E1: AnyError,
     E2: AnyError,
@@ -405,8 +434,7 @@ where
     }
 }
 
-impl<S, E> IntoTraced<Result<S, TracedError<E>>>
-    for Result<S, ErrorUnion<(TracedError<E>,)>>
+impl<S, E> IntoTraced<Result<S, TracedError<E>>> for Result<S, ErrorUnion<(TracedError<E>,)>>
 where
     E: AnyError,
 {
