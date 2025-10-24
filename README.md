@@ -87,7 +87,7 @@ The above code is precisely typed for what we care about and there was no need t
 
 `UResult` and the underlying `ErrorUnion`, work with regular types as well, not just `TracedError`. Thus the error type could consist of non-traced errors as well. e.g.
 ```rust,ignore
-fn func1() -> eros::UResult<(), (io::Error, my_crate::Error)>;
+fn func1() -> eros::UResult<(), (io::Error, my_crate::Error)> { todo!() }
 ```
 
 ### Seamless Transitions Between Error Types
