@@ -43,7 +43,7 @@ mod min_specialization {
         let result: Result<(), ErrorUnion<(std::io::Error, i32, bool)>> = func3();
         println!("{:?}", result.as_ref().unwrap_err());
         assert!(result.is_err());
-        let message = result.unwrap_err().to_string();
+        let message = format!("{:?}", result.unwrap_err());
         assert!(
             !message.contains("Context:"),
             "Expected no context in message:\n{}",
@@ -52,7 +52,7 @@ mod min_specialization {
         let result: Result<(), ErrorUnion<(std::io::Error, bool)>> = func4();
         println!("{:?}", result.as_ref().unwrap_err());
         assert!(result.is_err());
-        let message = result.unwrap_err().to_string();
+        let message = format!("{:?}", result.unwrap_err());
         assert!(
             !message.contains("Context:"),
             "Expected no context in message:\n{}",
@@ -61,7 +61,7 @@ mod min_specialization {
         let result: Result<(), ErrorUnion<(std::io::Error, bool, TracedError)>> = func5();
         println!("{:?}", result.as_ref().unwrap_err());
         assert!(result.is_err());
-        let message = result.unwrap_err().to_string();
+        let message = format!("{:?}", result.unwrap_err());
         assert!(
             message.contains("Context:"),
             "Expected context in message:\n{}",
@@ -87,7 +87,7 @@ fn generic_context_error_to_error_union() {
     let result: Result<(), ErrorUnion<(std::io::Error, eros::TracedError)>> = func3();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         message.contains("Context:"),
         "Expected context in message:\n{}",
@@ -108,7 +108,7 @@ fn generic_error_to_error_union() {
     let result: Result<(), ErrorUnion<(std::io::Error, eros::TracedError)>> = func2();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         !message.contains("Context:"),
         "Expected no context in message:\n{}",
@@ -140,7 +140,7 @@ fn bail() {
     let result: Result<(), ErrorUnion<(eros::TracedError, i32, bool)>> = func3();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         message.contains("Context:"),
         "Expected context in message:\n{}",
@@ -149,7 +149,7 @@ fn bail() {
     let result: eros::Result<()> = func4();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         !message.contains("Context:"),
         "Expected no context in message:\n{}",
@@ -182,7 +182,7 @@ fn ensure() {
     let result: Result<(), ErrorUnion<(eros::TracedError, i32, bool)>> = func3();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         message.contains("Context:"),
         "Expected context in message:\n{}",
@@ -191,7 +191,7 @@ fn ensure() {
     let result: eros::Result<()> = func4();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         !message.contains("Context:"),
         "Expected no context in message:\n{}",
@@ -227,7 +227,7 @@ fn context_directly_on_error() {
     let result: eros::Result<()> = on_error();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         message.contains("Context:"),
         "Expected context in message:\n{}",
@@ -236,7 +236,7 @@ fn context_directly_on_error() {
     let result: eros::Result<()> = on_result();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         message.contains("Context:"),
         "Expected context in message:\n{}",
@@ -245,7 +245,7 @@ fn context_directly_on_error() {
     let result: eros::Result<()> = on_result_again();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
     assert!(
         message.contains("Context:"),
         "Expected context in message:\n{}",
@@ -283,7 +283,7 @@ fn nesting_traced_dyn_calls() {
     }
 
     let result: eros::Result<()> = func2();
-    let message = result.unwrap_err().to_string();
+    let message = format!("{:?}", result.unwrap_err());
 
     let count = message.match_indices("Context:").count();
     assert_eq!(count, 1, "Expected only one 'Context:', got:\n{}", message);
@@ -298,7 +298,8 @@ fn integration_with_anyhow() {
         Err(anyhow::Error::from(std::io::Error::new(
             std::io::ErrorKind::AddrInUse,
             "This is the root",
-        ))).context("This is some anyhow context")
+        )))
+        .context("This is some anyhow context")
     }
 
     // let error: Box<std::io::Error> = anyhow_result()
