@@ -199,15 +199,6 @@ impl TracedError {
 impl<T: AnyError> fmt::Display for TracedError<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.inner)?;
-        #[cfg(feature = "context")]
-        {
-            if !self.context.is_empty() {
-                write!(formatter, "\n\nContext:")?;
-                for context_item in self.context.iter() {
-                    write!(formatter, "\n\t- {}", context_item)?;
-                }
-            }
-        }
         Ok(())
     }
 }
