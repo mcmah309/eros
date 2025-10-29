@@ -1,12 +1,12 @@
 use std::{
     borrow::Cow,
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
 };
 
-/// An Error type that is just a message. 
-/// It can hold a string in either a static or owned form. 
+/// An Error type that is just a message.
+/// It can hold a string in either a static or owned form.
 /// No unnecessary allocation for static strings compared to `String`.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StrError {
     Static(&'static str),
     Owned(String),
@@ -19,6 +19,15 @@ impl StrError {
         match self {
             StrError::Static(s) => s,
             StrError::Owned(s) => s,
+        }
+    }
+}
+
+impl Debug for StrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StrError::Static(s) => f.write_str(&s),
+            StrError::Owned(s) => f.write_str(&s),
         }
     }
 }
