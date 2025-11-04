@@ -1,6 +1,9 @@
 use core::any::Any;
 use core::fmt;
+use std::backtrace::Backtrace;
 use std::error::Error;
+
+use crate::StrContext;
 
 /* ------------------------- Helpers ----------------------- */
 
@@ -100,11 +103,21 @@ where
 /* ------------------------- Debug support ----------------------- */
 
 pub trait DebugFold {
-    fn debug_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
+    fn debug_fold(
+        any: &dyn Any,
+        formatter: &mut fmt::Formatter<'_>,
+        #[cfg(feature = "context")] context: &Vec<StrContext>,
+        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+    ) -> fmt::Result;
 }
 
 impl DebugFold for End {
-    fn debug_fold(_: &dyn Any, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn debug_fold(
+        _: &dyn Any,
+        _: &mut fmt::Formatter<'_>,
+        #[cfg(feature = "context")] context: &Vec<StrContext>,
+        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+    ) -> fmt::Result {
         unreachable!("debug_fold called on End");
     }
 }
@@ -115,11 +128,42 @@ where
     Head: 'static + fmt::Debug,
     Tail: DebugFold,
 {
-    fn debug_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn debug_fold(
+        any: &dyn Any,
+        formatter: &mut fmt::Formatter<'_>,
+        #[cfg(feature = "context")] context: &Vec<StrContext>,
+        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+    ) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.fmt(formatter)
+            head_ref.fmt(formatter)?;
+            #[cfg(feature = "context")]
+            {
+                if !context.is_empty() {
+                    write!(formatter, "\n\nContext:")?;
+                    for context_item in context.iter() {
+                        write!(formatter, "\n\t- {}", context_item)?;
+                    }
+                }
+            }
+            #[cfg(feature = "backtrace")]
+            {
+                use std::backtrace::BacktraceStatus;
+
+                if matches!(backtrace.status(), BacktraceStatus::Captured) {
+                    write!(formatter, "\n\nBacktrace:\n")?;
+                    fmt::Display::fmt(backtrace, formatter)?;
+                }
+            }
+            Ok(())
         } else {
-            Tail::debug_fold(any, formatter)
+            Tail::debug_fold(
+                any,
+                formatter,
+                #[cfg(feature = "context")]
+                context,
+                #[cfg(feature = "backtrace")]
+                backtrace,
+            )
         }
     }
 }
@@ -155,7 +199,10 @@ where
 pub trait TypeSet {
     type Variants: TupleForm;
     type Enum;
-    type EnumRef<'a>
+    type RefEnum<'a>
+    where
+        Self: 'a;
+    type MutEnum<'a>
     where
         Self: 'a;
 }
@@ -163,7 +210,11 @@ pub trait TypeSet {
 impl TypeSet for () {
     type Variants = End;
     type Enum = E0;
-    type EnumRef<'a>
+    type RefEnum<'a>
+        = E0
+    where
+        Self: 'a;
+    type MutEnum<'a>
         = E0
     where
         Self: 'a;
@@ -172,8 +223,12 @@ impl TypeSet for () {
 impl<A> TypeSet for (A,) {
     type Variants = Cons<A, End>;
     type Enum = E1<A>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E1<&'a A>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E1<&'a mut A>
     where
         Self: 'a;
 }
@@ -181,8 +236,12 @@ impl<A> TypeSet for (A,) {
 impl<A, B> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
     type Enum = E2<A, B>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E2<&'a A, &'a B>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E2<&'a mut A, &'a mut B>
     where
         Self: 'a;
 }
@@ -190,8 +249,12 @@ impl<A, B> TypeSet for (A, B) {
 impl<A, B, C> TypeSet for (A, B, C) {
     type Variants = Cons<A, Cons<B, Cons<C, End>>>;
     type Enum = E3<A, B, C>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E3<&'a A, &'a B, &'a C>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E3<&'a mut A, &'a mut B, &'a mut C>
     where
         Self: 'a;
 }
@@ -199,8 +262,12 @@ impl<A, B, C> TypeSet for (A, B, C) {
 impl<A, B, C, D> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
     type Enum = E4<A, B, C, D>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E4<&'a A, &'a B, &'a C, &'a D>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E4<&'a mut A, &'a mut B, &'a mut C, &'a mut D>
     where
         Self: 'a;
 }
@@ -208,8 +275,12 @@ impl<A, B, C, D> TypeSet for (A, B, C, D) {
 impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>;
     type Enum = E5<A, B, C, D, E>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E5<&'a A, &'a B, &'a C, &'a D, &'a E>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E5<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E>
     where
         Self: 'a;
 }
@@ -217,8 +288,12 @@ impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
 impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
     type Enum = E6<A, B, C, D, E, F>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E6<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F>
     where
         Self: 'a;
 }
@@ -226,8 +301,12 @@ impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
 impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>;
     type Enum = E7<A, B, C, D, E, F, G>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E7<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G>
     where
         Self: 'a;
 }
@@ -235,8 +314,12 @@ impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
 impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
     type Enum = E8<A, B, C, D, E, F, G, H>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E8<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H>
     where
         Self: 'a;
 }
@@ -245,8 +328,22 @@ impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
     type Variants =
         Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
     type Enum = E9<A, B, C, D, E, F, G, H, I>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E9<
+        &'a mut A,
+        &'a mut B,
+        &'a mut C,
+        &'a mut D,
+        &'a mut E,
+        &'a mut F,
+        &'a mut G,
+        &'a mut H,
+        &'a mut I,
+    >
     where
         Self: 'a;
 }

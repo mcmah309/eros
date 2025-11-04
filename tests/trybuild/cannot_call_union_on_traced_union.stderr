@@ -1,0 +1,5 @@
+error[E0599]: no method named `union` found for struct `TracedUnion` in the current scope
+ --> tests/trybuild/cannot_call_union_on_traced_union.rs:7:24
+  |
+7 |     let _error = error.union();
+  |                        ^^^^^ method not found in `TracedUnion`

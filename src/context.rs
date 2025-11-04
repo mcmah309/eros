@@ -1,57 +1,21 @@
 use std::{any::Any, fmt::Display};
 
-use crate::{
-    generic_error::{AnyError, TracedError},
-    str_error::StrError,
-};
-#[cfg(feature = "min_specialization")]
-use crate::{type_set::TypeSet, ErrorUnion};
+use crate::{str_error::StrContext, type_set::TypeSet, SendSyncError, TracedUnion};
 
 /// Provides `context` methods to add context to `Result`.
 pub trait Context<O> {
     /// Adds additional context. This becomes a no-op if the `traced` feature is disabled.
-    fn context<C: Into<StrError>>(self, context: C) -> O;
+    fn context<C: Into<StrContext>>(self, context: C) -> O;
 
     /// Lazily adds additional context. This becomes a no-op if the `traced` feature is disabled.
-    fn with_context<F, C: Into<StrError>>(self, f: F) -> O
+    fn with_context<F, C: Into<StrContext>>(self, f: F) -> O
     where
         F: FnOnce() -> C;
 }
 
-#[cfg(feature = "min_specialization")]
-impl<T, E> Context<Result<T, ErrorUnion<E>>> for Result<T, ErrorUnion<E>>
-where
-    E: TypeSet,
-{
+impl<T, E: TypeSet> Context<Result<T, TracedUnion<E>>> for Result<T, TracedUnion<E>> {
     #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<E>> {
-        #[cfg(feature = "context")]
-        return self.map_err(|mut e| {
-            e.value.add_context(context.into());
-            e
-        });
-        #[cfg(not(feature = "context"))]
-        return self;
-    }
-
-    #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, ErrorUnion<E>>
-    where
-        F: FnOnce() -> C,
-    {
-        #[cfg(feature = "context")]
-        return self.map_err(|mut e| {
-            e.value.add_context(context().into());
-            e
-        });
-        #[cfg(not(feature = "context"))]
-        return self;
-    }
-}
-
-impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedError<E>> {
-    #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError<E>> {
+    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion<E>> {
         #[cfg(feature = "context")]
         return self.map_err(|e| e.context(context));
         #[cfg(not(feature = "context"))]
@@ -59,7 +23,7 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError<E>>
+    fn with_context<F, C: Into<StrContext>>(self, context: F) -> Result<T, TracedUnion<E>>
     where
         F: FnOnce() -> C,
     {
@@ -70,51 +34,53 @@ impl<T, E: AnyError> Context<Result<T, TracedError<E>>> for Result<T, TracedErro
     }
 }
 
-impl<T, E: AnyError> Context<Result<T, TracedError>> for Result<T, E> {
+impl<T, E: SendSyncError> Context<Result<T, TracedUnion>> for Result<T, E> {
     #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError> {
+    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion> {
         #[cfg(feature = "context")]
-        return self.map_err(|e| TracedError::boxed(e).context(context));
+        return self.map_err(|e| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(e).context(context));
         #[cfg(not(feature = "context"))]
-        return self.map_err(TracedError::boxed);
+        return self.map_err(TracedUnion::<(Box<dyn SendSyncError>,)>::any_error);
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError>
+    fn with_context<F, C: Into<StrContext>>(self, context: F) -> Result<T, TracedUnion>
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        return self.map_err(|e| TracedError::boxed(e).with_context(context));
+        return self.map_err(|e| {
+            TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(e).with_context(context)
+        });
         #[cfg(not(feature = "context"))]
-        return self.map_err(TracedError::boxed);
+        return self.map_err(TracedUnion::<(Box<dyn SendSyncError>,)>::any_error);
     }
 }
 
-impl<E: AnyError> Context<TracedError> for E {
+impl<E: SendSyncError> Context<TracedUnion> for E {
     #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> TracedError {
+    fn context<C: Into<StrContext>>(self, context: C) -> TracedUnion {
         #[cfg(feature = "context")]
-        return TracedError::boxed(self).context(context);
+        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self).context(context);
         #[cfg(not(feature = "context"))]
-        return TracedError::boxed(self);
+        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self);
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> TracedError
+    fn with_context<F, C: Into<StrContext>>(self, context: F) -> TracedUnion
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        return TracedError::boxed(self).with_context(context);
+        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self).with_context(context);
         #[cfg(not(feature = "context"))]
-        return TracedError::boxed(self);
+        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self);
     }
 }
 
 //************************************************************************//
 
-impl<T> Context<Result<T, TracedError>> for Option<T> {
+impl<T> Context<Result<T, TracedUnion>> for Option<T> {
     /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
     /// and it is desired to propagate this information rather than immediately
     /// panic with `.expect(..)` - presumably to capture additional context up the call stack.
@@ -124,11 +90,11 @@ impl<T> Context<Result<T, TracedError>> for Option<T> {
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
     #[allow(unused_variables)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, TracedError> {
+    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion> {
         #[cfg(feature = "context")]
-        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())).context(context));
+        return self.ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())).context(context));
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())));
+        return self.ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())));
     }
 
     /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
@@ -140,14 +106,15 @@ impl<T> Context<Result<T, TracedError>> for Option<T> {
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrError>>(self, context: F) -> Result<T, TracedError>
+    fn with_context<F, C: Into<StrContext>>(self, context: F) -> Result<T, TracedUnion>
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())).with_context(context));
+        return self
+            .ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())).with_context(context));
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| TracedError::boxed(AbsentValueError(())));
+        return self.ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())));
     }
 }
 
@@ -168,36 +135,3 @@ impl Display for AbsentValueError {
 }
 
 impl std::error::Error for AbsentValueError {}
-
-//************************************************************************//
-
-/// Used internally to allow adding context directly to a `ErrorUnion`
-pub trait Contextable: Any {
-    #[allow(unused_variables)]
-    fn add_context(&mut self, context: StrError);
-}
-
-impl<T: 'static> Contextable for T {
-    #[cfg(feature = "min_specialization")]
-    #[allow(unused_variables)]
-    default fn add_context(&mut self, context: StrError) {}
-    #[cfg(not(feature = "min_specialization"))]
-    #[allow(unused_variables)]
-    fn add_context(&mut self, context: StrError) {}
-}
-#[cfg(feature = "min_specialization")]
-impl Contextable for Box<dyn Contextable + '_> {
-    #[allow(unused_variables)]
-    fn add_context(&mut self, context: StrError) {
-        #[cfg(feature = "context")]
-        (**self).add_context(context);
-    }
-}
-#[cfg(feature = "min_specialization")]
-impl<T: AnyError> Contextable for TracedError<T> {
-    #[allow(unused_variables)]
-    fn add_context(&mut self, context: StrError) {
-        #[cfg(feature = "context")]
-        self.context.push(context);
-    }
-}

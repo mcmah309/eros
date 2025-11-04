@@ -1,0 +1,19 @@
+error[E0599]: the method `union` exists for enum `Result<(), TracedUnion>`, but its trait bounds were not satisfied
+ --> tests/trybuild/cannot_call_union_on_traced_union_result.rs:8:25
+  |
+8 |     let _error = result.union();
+  |                         ^^^^^
+  |
+ ::: $RUST/core/src/result.rs
+  |
+  | pub enum Result<T, E> {
+  | --------------------- doesn't satisfy `_: Union<(), TracedUnion<(Box<dyn SendSyncError>,)>>`
+  |
+ ::: src/traced_union.rs
+  |
+  | pub struct TracedUnion<E: TypeSet = (Box<dyn SendSyncError>,)> {
+  | -------------------------------------------------------------- doesn't satisfy `_: SendSyncError`
+  |
+  = note: the following trait bounds were not satisfied:
+          `TracedUnion<(Box<dyn SendSyncError>,)>: SendSyncError`
+          which is required by `Result<(), TracedUnion<(Box<dyn SendSyncError>,)>>: eros::Union<(), TracedUnion<(Box<dyn SendSyncError>,)>>`
