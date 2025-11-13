@@ -17,11 +17,11 @@ impl std::error::Error for End {}
 /// A compile-time list of types, similar to other basic functional list structures.
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct Cons<Head, Tail>(core::marker::PhantomData<Head>, Tail);
+pub struct Cons<Head: ?Sized, Tail: ?Sized>(core::marker::PhantomData<Head>, Tail);
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct Recurse<Tail>(Tail);
+pub struct Recurse<Tail: ?Sized>(Tail);
 
 /* ------------------------- std::error::Error support ----------------------- */
 
@@ -197,291 +197,111 @@ where
 /* ------------------------- TypeSet implemented for tuples ----------------------- */
 
 pub trait TypeSet {
-    type Variants: TupleForm;
-    type Enum;
-    type RefEnum<'a>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-    where
-        Self: 'a;
+    type Variants: TupleForm + ?Sized;
 }
 
 impl TypeSet for () {
     type Variants = End;
-    type Enum = E0;
-    type RefEnum<'a>
-        = E0
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E0
-    where
-        Self: 'a;
 }
 
-impl<A> TypeSet for (A,) {
+impl<A: ?Sized> TypeSet for (A,) {
     type Variants = Cons<A, End>;
-    type Enum = E1<A>;
-    type RefEnum<'a>
-        = E1<&'a A>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E1<&'a mut A>
-    where
-        Self: 'a;
 }
 
-impl<A, B> TypeSet for (A, B) {
+impl<A, B: ?Sized> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
-    type Enum = E2<A, B>;
-    type RefEnum<'a>
-        = E2<&'a A, &'a B>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E2<&'a mut A, &'a mut B>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C> TypeSet for (A, B, C) {
+impl<A, B, C: ?Sized> TypeSet for (A, B, C) {
     type Variants = Cons<A, Cons<B, Cons<C, End>>>;
-    type Enum = E3<A, B, C>;
-    type RefEnum<'a>
-        = E3<&'a A, &'a B, &'a C>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E3<&'a mut A, &'a mut B, &'a mut C>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C, D> TypeSet for (A, B, C, D) {
+impl<A, B, C, D: ?Sized> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
-    type Enum = E4<A, B, C, D>;
-    type RefEnum<'a>
-        = E4<&'a A, &'a B, &'a C, &'a D>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E4<&'a mut A, &'a mut B, &'a mut C, &'a mut D>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
+impl<A, B, C, D, E: ?Sized> TypeSet for (A, B, C, D, E) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>;
-    type Enum = E5<A, B, C, D, E>;
-    type RefEnum<'a>
-        = E5<&'a A, &'a B, &'a C, &'a D, &'a E>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E5<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
+impl<A, B, C, D, E, F: ?Sized> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
-    type Enum = E6<A, B, C, D, E, F>;
-    type RefEnum<'a>
-        = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E6<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
+impl<A, B, C, D, E, F, G: ?Sized> TypeSet for (A, B, C, D, E, F, G) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>;
-    type Enum = E7<A, B, C, D, E, F, G>;
-    type RefEnum<'a>
-        = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E7<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
+impl<A, B, C, D, E, F, G, H: ?Sized> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
-    type Enum = E8<A, B, C, D, E, F, G, H>;
-    type RefEnum<'a>
-        = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E8<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H>
-    where
-        Self: 'a;
 }
 
-impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
+impl<A, B, C, D, E, F, G, H, I: ?Sized> TypeSet for (A, B, C, D, E, F, G, H, I) {
     type Variants =
         Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
-    type Enum = E9<A, B, C, D, E, F, G, H, I>;
-    type RefEnum<'a>
-        = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E9<
-        &'a mut A,
-        &'a mut B,
-        &'a mut C,
-        &'a mut D,
-        &'a mut E,
-        &'a mut F,
-        &'a mut G,
-        &'a mut H,
-        &'a mut I,
-    >
-    where
-        Self: 'a;
 }
 
 /* ------------------------- TupleForm implemented for TypeSet ----------------------- */
 
 pub trait TupleForm {
-    type Tuple: TypeSet;
+    type Tuple: TypeSet + ?Sized;
 }
 
 impl TupleForm for End {
     type Tuple = ();
 }
 
-impl<A> TupleForm for Cons<A, End> {
+impl<A: ?Sized> TupleForm for Cons<A, End> {
     type Tuple = (A,);
 }
 
-impl<A, B> TupleForm for Cons<A, Cons<B, End>> {
+impl<A, B: ?Sized> TupleForm for Cons<A, Cons<B, End>> {
     type Tuple = (A, B);
 }
 
-impl<A, B, C> TupleForm for Cons<A, Cons<B, Cons<C, End>>> {
+impl<A, B, C: ?Sized> TupleForm for Cons<A, Cons<B, Cons<C, End>>> {
     type Tuple = (A, B, C);
 }
 
-impl<A, B, C, D> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, End>>>> {
+impl<A, B, C, D: ?Sized> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, End>>>> {
     type Tuple = (A, B, C, D);
 }
 
-impl<A, B, C, D, E> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>> {
+impl<A, B, C, D, E: ?Sized> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>> {
     type Tuple = (A, B, C, D, E);
 }
 
-impl<A, B, C, D, E, F> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>> {
+impl<A, B, C, D, E, F: ?Sized> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>> {
     type Tuple = (A, B, C, D, E, F);
 }
 
-impl<A, B, C, D, E, F, G> TupleForm
+impl<A, B, C, D, E, F, G: ?Sized> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G);
 }
 
-impl<A, B, C, D, E, F, G, H> TupleForm
+impl<A, B, C, D, E, F, G, H: ?Sized> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G, H);
 }
 
-impl<A, B, C, D, E, F, G, H, I> TupleForm
+impl<A, B, C, D, E, F, G, H, I: ?Sized> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G, H, I);
 }
-
-/* ------------------------- Lifted ----------------------- */
-
-pub enum E0 {}
-pub enum E1<A> {
-    A(A),
-}
-impl<A> From<A> for E1<A> {
-    fn from(a: A) -> E1<A> {
-        E1::A(a)
-    }
-}
-pub enum E2<A, B> {
-    A(A),
-    B(B),
-}
-pub enum E3<A, B, C> {
-    A(A),
-    B(B),
-    C(C),
-}
-pub enum E4<A, B, C, D> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-}
-pub enum E5<A, B, C, D, E> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-}
-pub enum E6<A, B, C, D, E, F> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-}
-pub enum E7<A, B, C, D, E, F, G> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-    G(G),
-}
-pub enum E8<A, B, C, D, E, F, G, H> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-    G(G),
-    H(H),
-}
-pub enum E9<A, B, C, D, E, F, G, H, I> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-    G(G),
-    H(H),
-    I(I),
-}
-
 /* ------------------------- Contains ----------------------- */
 
 /// A trait that assists with compile-time type set inclusion testing.
 /// The `Index` parameter is either `End` or `Cons<...>` depending on
 /// whether the trait implementation is a base case or the recursive
 /// case.
-pub trait Contains<T, Index> {}
+pub trait Contains<T: ?Sized, Index> {}
 
 /// Base case implementation for when the Cons Head is T.
-impl<T, Tail> Contains<T, End> for Cons<T, Tail> {}
+impl<T: ?Sized, Tail: ?Sized> Contains<T, End> for Cons<T, Tail> {}
 
 /// Recursive case for when the Cons Tail contains T.
 impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> where
@@ -493,7 +313,7 @@ impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> whe
 
 /// A trait for pulling a specific type out of a Variants at compile-time
 /// and having access to the other types as the Remainder.
-pub trait Narrow<Target, Index>: TupleForm {
+pub trait Narrow<Target: ?Sized, Index>: TupleForm {
     type Remainder: TupleForm;
 }
 
@@ -533,7 +353,7 @@ fn _narrow_test() {
 /* ------------------------- SupersetOf ----------------------- */
 
 /// When all types in a Variants are present in a second Variants
-pub trait SupersetOf<Other, Index> {
+pub trait SupersetOf<Other: ?Sized, Index: ?Sized> {
     type Remainder: TupleForm;
 }
 

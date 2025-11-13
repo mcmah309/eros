@@ -16,6 +16,7 @@ impl<T> SendSyncError for T where T: std::error::Error + Send + Sync + 'static {
 
 impl std::error::Error for Box<dyn SendSyncError> {}
 
+
 /* ------------------------- ErrorUnion ----------------------- */
 
 /// `ErrorUnion` is an open sum type. It differs from an enum
@@ -35,7 +36,7 @@ impl std::error::Error for Box<dyn SendSyncError> {}
 /// involving a precise subset of errors that the caller
 /// can clearly reason about. Providing maximum composability with
 /// no boilerplate.
-pub struct TracedUnion<E: TypeSet = (Box<dyn SendSyncError>,)> {
+pub struct TracedUnion<E: TypeSet + ?Sized = (dyn SendSyncError,)> {
     pub(crate) inner: Box<dyn Any>,
     _pd: PhantomData<E>,
     #[cfg(feature = "backtrace")]
@@ -172,7 +173,7 @@ where
 
 impl<E> TracedUnion<E>
 where
-    E: TypeSet,
+    E: TypeSet + ?Sized,
 {
     pub fn new<T, Index>(t: T) -> TracedUnion<E>
     where
@@ -209,9 +210,16 @@ where
     pub fn any_error<T, Index>(source: T) -> TracedUnion<E>
     where
         T: SendSyncError,
-        E::Variants: Contains<Box<dyn SendSyncError>, Index>,
+        E::Variants: Contains<dyn SendSyncError, Index>,
     {
-        TracedUnion::error(Box::new(source) as Box<dyn SendSyncError>)
+        TracedUnion {
+            inner: Box::new(source),
+            _pd: PhantomData,
+            #[cfg(feature = "backtrace")]
+            backtrace: std::backtrace::Backtrace::capture(),
+            #[cfg(feature = "context")]
+            context: Vec::new(),
+        }
     }
 
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
@@ -301,31 +309,6 @@ where
         E: TypeSet<Variants = Cons<Target, End>>,
     {
         *(self.inner as Box<dyn Any>).downcast::<Target>().unwrap()
-    }
-
-    /// Convert the `ErrorUnion` to an owned enum for
-    /// use in pattern matching etc...
-    pub fn to_enum(self) -> E::Enum
-    where
-        E::Enum: From<Self>,
-    {
-        E::Enum::from(self)
-    }
-
-    /// Borrow the enum as an enum for use in
-    /// pattern matching etc...
-    pub fn ref_enum<'a>(&'a self) -> E::RefEnum<'a>
-    where
-        E::RefEnum<'a>: From<&'a Self>,
-    {
-        E::RefEnum::from(self)
-    }
-
-    pub fn mut_enum<'a>(&'a mut self) -> E::MutEnum<'a>
-    where
-        E::MutEnum<'a>: From<&'a mut Self>,
-    {
-        E::MutEnum::from(self)
     }
 
     #[allow(unused_mut)]
@@ -494,7 +477,6 @@ where
 // todo better name?
 pub trait IntoUnionSingle<S, F> {
     fn into_union(self) -> Result<S, TracedUnion<(F,)>>;
-
 }
 
 impl<S, F1, F2> IntoUnionSingle<S, F2> for Result<S, TracedUnion<(F1,)>>
@@ -502,8 +484,7 @@ where
     F1: Into<F2> + 'static,
     F2: 'static,
 {
-    fn into_union(self) -> Result<S, TracedUnion<(F2,)>>
-    {
+    fn into_union(self) -> Result<S, TracedUnion<(F2,)>> {
         self.map_err(|e| e.map(|e| e.into()))
     }
 }

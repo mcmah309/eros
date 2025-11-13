@@ -2,10 +2,10 @@
 #[macro_export]
 macro_rules! bail {
     ($error:literal) => {
-        return Err($crate::TracedUnion::<(Box<dyn eros::SendSyncError>,)>::any_error($crate::StrContext::Static($error)))
+        return Err($crate::TracedUnion::<(dyn eros::SendSyncError,)>::any_error($crate::StrContext::Static($error)))
     };
     ($($error:tt)+) => {
-        return Err($crate::TracedUnion::<(Box<dyn eros::SendSyncError>,)>::any_error($crate::StrContext::Owned(format!($($error)*))));
+        return Err($crate::TracedUnion::<(dyn eros::SendSyncError,)>::any_error($crate::StrContext::Owned(format!($($error)*))));
     };
 }
 
@@ -13,10 +13,10 @@ macro_rules! bail {
 #[macro_export]
 macro_rules! traced {
     ($error:literal) => {
-        $crate::TracedUnion::<(Box<dyn eros::SendSyncError>,)>::any_error($crate::StrContext::Static($error))
+        $crate::TracedUnion::<(dyn eros::SendSyncError,)>::any_error($crate::StrContext::Static($error))
     };
     ($($error:tt)+) => {
-        $crate::TracedUnion::<(Box<dyn eros::SendSyncError>,)>::any_error($crate::StrContext::Owned(format!($($error)*)))
+        $crate::TracedUnion::<(dyn eros::SendSyncError,)>::any_error($crate::StrContext::Owned(format!($($error)*)))
     };
 }
 
