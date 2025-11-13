@@ -301,10 +301,10 @@ impl<A, B, C, D, E, F, G, H, I: ?Sized> TupleForm
 pub trait Contains<T: ?Sized, Index> {}
 
 /// Base case implementation for when the Cons Head is T.
-impl<T: ?Sized, Tail: ?Sized> Contains<T, End> for Cons<T, Tail> {}
+impl<T: ?Sized, Tail> Contains<T, End> for Cons<T, Tail> {}
 
 /// Recursive case for when the Cons Tail contains T.
-impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> where
+impl<T: ?Sized, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> where
     Tail: Contains<T, Index>
 {
 }
@@ -318,7 +318,7 @@ pub trait Narrow<Target: ?Sized, Index>: TupleForm {
 }
 
 /// Base case where the search Target is in the Head of the Variants.
-impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
+impl<Target: ?Sized, Tail> Narrow<Target, End> for Cons<Target, Tail>
 where
     Tail: TupleForm,
     Cons<Target, Tail>: TupleForm,
@@ -327,7 +327,7 @@ where
 }
 
 /// Recursive case where the search Target is in the Tail of the Variants.
-impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
+impl<Head: ?Sized, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
 where
     Tail: Narrow<Target, Index>,
     Tail: TupleForm,
@@ -353,7 +353,7 @@ fn _narrow_test() {
 /* ------------------------- SupersetOf ----------------------- */
 
 /// When all types in a Variants are present in a second Variants
-pub trait SupersetOf<Other: ?Sized, Index: ?Sized> {
+pub trait SupersetOf<Other: ?Sized, Index> {
     type Remainder: TupleForm;
 }
 

@@ -138,7 +138,7 @@ unsafe impl<T> Sync for TracedUnion<T> where T: TypeSet + Sync {}
 
 impl<E> core::error::Error for &TracedUnion<E>
 where
-    E: TypeSet,
+    E: TypeSet, // todo
     E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
@@ -148,7 +148,7 @@ where
 
 impl<E> TracedUnion<E>
 where
-    E: TypeSet,
+    E: TypeSet, // todo sized wont work
     E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
     /// Returns the lower-level source of this error, if any.
@@ -254,7 +254,7 @@ where
     /// the same set of variants, but in a different order.
     pub fn widen<Other, Index>(self) -> TracedUnion<Other>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
         TracedUnion {
@@ -277,7 +277,7 @@ where
         TracedUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
-        TargetList: TypeSet,
+        TargetList: TypeSet + ?Sized,
         E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
     {
         if E::Variants::is_fold(self.inner.as_ref() as &dyn Any) {
@@ -369,14 +369,14 @@ impl<A: 'static> TracedUnion<(A,)> {
 /// Run widen and narrow directly on Results with ErrorUnions
 pub trait ReshapeUnion<S, E>
 where
-    E: TypeSet,
+    E: TypeSet + ?Sized,
 {
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
     fn widen<Other, Index>(self) -> Result<S, TracedUnion<Other>>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         Other::Variants: SupersetOf<E::Variants, Index>;
 
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
@@ -398,11 +398,11 @@ where
 
 impl<S, E> ReshapeUnion<S, E> for Result<S, TracedUnion<E>>
 where
-    E: TypeSet,
+    E: TypeSet + ?Sized,
 {
     fn widen<Other, Index>(self) -> Result<S, TracedUnion<Other>>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
         self.map_err(|e| e.widen())
@@ -437,14 +437,14 @@ pub trait Union<S, F> {
     /// Creates an `ErrorUnion` for this type.
     fn union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         Other::Variants: Contains<F, Index>;
 }
 
 impl<S, F: SendSyncError> Union<S, F> for Result<S, F> {
     fn union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         // Other::Variants: SupersetOf<Cons<F, End>, Index>,
         Other::Variants: Contains<F, Index>,
     {
@@ -456,7 +456,7 @@ pub trait IntoUnion<S, F> {
     /// Creates an `ErrorUnion` for this type.
     fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         Other::Variants: Contains<F, Index>;
 }
 
@@ -467,7 +467,7 @@ where
 {
     fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
     where
-        Other: TypeSet,
+        Other: TypeSet + ?Sized,
         Other::Variants: Contains<F2, Index>,
     {
         self.map_err(|e| TracedUnion::new(e.into()))
