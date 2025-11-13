@@ -147,7 +147,7 @@ where
 
 impl<E> TracedUnion<E>
 where
-    E: TypeSet,
+    E: TypeSet + 'static,
     E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
     /// Returns the lower-level source of this error, if any.
@@ -157,7 +157,12 @@ where
     pub fn source<'a>(&'a self) -> Option<&'a (dyn std::error::Error + 'static)> {
         let this: &&TracedUnion<E> = &self;
         let source = core::error::Error::source(this);
-        // SAFETY: We need to call with `&&` since we need the `&` specialization trick. This resolves lifetimes correctly back to `&`
+        // SAFETY: We need to call with `&&` since we need the `&` specialization trick to get the source,
+        // since `TracedUnion` directly can't implement `Error` due to trait collisions.
+        // This resolves lifetimes correctly back to this call.
+        // The underlying `source` will still exist as long as this exists.
+        // Since T is `'static` and borrowed for `'a`, and the underlying source is owned
+        // by this type, so it can't be moved or dropped while this is borrowed
         let source = unsafe {
             std::mem::transmute::<
                 Option<&(dyn core::error::Error + 'static)>,
