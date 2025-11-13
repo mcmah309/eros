@@ -366,7 +366,8 @@ use eros::ErrorUnion;
 use std::{fmt, io};
 
 fn main() {
-    let error: ErrorUnion<(fmt::Error, io::Error)>;
+    type MyError = (fmt::Error, io::Error); // Optional type alias
+    let error: ErrorUnion<MyError>;
 }
 ```
 vs
@@ -413,6 +414,7 @@ impl From<io::Error> for CustomError {
     }
 }
 ```
+Additionally, the complexity of the second option grow exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for apis and instead choose a single error enum or struct for the entire crate.
 
 ## Use In Libraries
 
