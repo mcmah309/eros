@@ -1,5 +1,7 @@
 use std::{any::Any, fmt::Display};
 
+#[cfg(feature = "context")]
+use crate::AnyError;
 use crate::{str_error::StrContext, type_set::TypeSet, SendSyncError, TracedUnion};
 
 /// Provides `context` methods to add context to `Result`.
@@ -38,9 +40,9 @@ impl<T, E: SendSyncError> Context<Result<T, TracedUnion>> for Result<T, E> {
     #[allow(unused_variables)]
     fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion> {
         #[cfg(feature = "context")]
-        return self.map_err(|e| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(e).context(context));
+        return self.map_err(|e| TracedUnion::<(AnyError,)>::any_error(e).context(context));
         #[cfg(not(feature = "context"))]
-        return self.map_err(TracedUnion::<(Box<dyn SendSyncError>,)>::any_error);
+        return self.map_err(TracedUnion::<(AnyError,)>::any_error);
     }
 
     #[allow(unused_variables)]
@@ -50,10 +52,10 @@ impl<T, E: SendSyncError> Context<Result<T, TracedUnion>> for Result<T, E> {
     {
         #[cfg(feature = "context")]
         return self.map_err(|e| {
-            TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(e).with_context(context)
+            TracedUnion::<(AnyError,)>::any_error(e).with_context(context)
         });
         #[cfg(not(feature = "context"))]
-        return self.map_err(TracedUnion::<(Box<dyn SendSyncError>,)>::any_error);
+        return self.map_err(TracedUnion::<(AnyError,)>::any_error);
     }
 }
 
@@ -61,9 +63,9 @@ impl<E: SendSyncError> Context<TracedUnion> for E {
     #[allow(unused_variables)]
     fn context<C: Into<StrContext>>(self, context: C) -> TracedUnion {
         #[cfg(feature = "context")]
-        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self).context(context);
+        return TracedUnion::<(AnyError,)>::any_error(self).context(context);
         #[cfg(not(feature = "context"))]
-        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self);
+        return TracedUnion::<(AnyError,)>::any_error(self);
     }
 
     #[allow(unused_variables)]
@@ -72,9 +74,9 @@ impl<E: SendSyncError> Context<TracedUnion> for E {
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self).with_context(context);
+        return TracedUnion::<(AnyError,)>::any_error(self).with_context(context);
         #[cfg(not(feature = "context"))]
-        return TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(self);
+        return TracedUnion::<(AnyError,)>::any_error(self);
     }
 }
 
@@ -92,9 +94,9 @@ impl<T> Context<Result<T, TracedUnion>> for Option<T> {
     #[allow(unused_variables)]
     fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion> {
         #[cfg(feature = "context")]
-        return self.ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())).context(context));
+        return self.ok_or_else(|| TracedUnion::<(AnyError,)>::any_error(AbsentValueError(())).context(context));
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())));
+        return self.ok_or_else(|| TracedUnion::<(AnyError,)>::any_error(AbsentValueError(())));
     }
 
     /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
@@ -112,9 +114,9 @@ impl<T> Context<Result<T, TracedUnion>> for Option<T> {
     {
         #[cfg(feature = "context")]
         return self
-            .ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())).with_context(context));
+            .ok_or_else(|| TracedUnion::<(AnyError,)>::any_error(AbsentValueError(())).with_context(context));
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| TracedUnion::<(Box<dyn SendSyncError>,)>::any_error(AbsentValueError(())));
+        return self.ok_or_else(|| TracedUnion::<(AnyError,)>::any_error(AbsentValueError(())));
     }
 }
 

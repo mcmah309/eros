@@ -2,42 +2,41 @@
 
 use std::any::Any;
 
-use eros::{
-    traced, AbsentValueError, AnyError, Context, ReshapeUnion, SendSyncError, TracedUnion,
-};
+use eros::{AbsentValueError, AnyError, Context, IntoUnion, ReshapeUnion, SendSyncError, TracedUnion, Union, traced};
 
 #[test]
 fn traced_error_union() {
-    fn func1() -> eros::Result<(), (std::io::Error,)> {
-        return Err(std::io::Error::new(
+    fn can_yeet_from_regular_result() -> eros::Result<(), (std::io::Error,)> {
+        Err(std::io::Error::new(
             std::io::ErrorKind::AddrInUse,
             "Address in use message here",
-        )
-        .into());
+        )).union()?;
+        Ok(())
     }
 
-    fn func2() -> Result<(), TracedUnion<(i32, std::io::Error)>> {
-        func1().widen().context("From func2".to_string())
+    fn widen_then_context() -> Result<(), TracedUnion<(i32, std::io::Error)>> {
+        can_yeet_from_regular_result().widen().context("From func2".to_string())
     }
 
-    fn func3() -> eros::Result<(), (std::io::Error, i32, bool)> {
-        return func2()
+    fn map_widen() -> eros::Result<(), (std::io::Error, i32, bool)> {
+        widen_then_context()
             .with_context(|| "From func3")
-            .map_err(TracedUnion::widen);
+            .map_err(TracedUnion::widen)?;
+        Ok(())
     }
 
-    fn func4() -> eros::Result<(), (std::io::Error, bool)> {
-        return match func3().with_context(|| "From func4").narrow::<i32, _>() {
+    fn narrow() -> eros::Result<(), (std::io::Error, bool)> {
+        return match map_widen().with_context(|| "From func4").narrow::<i32, _>() {
             Ok(_) => panic!("should exist"),
             Err(result) => result,
         };
     }
 
-    fn func5() -> eros::Result<(), (std::io::Error, bool, AnyError)> {
+    fn traced_macro() -> eros::Result<(), (std::io::Error, bool, AnyError)> {
         return Err(traced!("Error")).context("From func5").widen();
     }
 
-    let result: Result<(), TracedUnion<(std::io::Error, i32, bool)>> = func3();
+    let result: Result<(), TracedUnion<(std::io::Error, i32, bool)>> = map_widen();
     assert!(result.is_err());
     let error = result.unwrap_err();
     let message = format!("{:?}", error);
@@ -52,7 +51,7 @@ fn traced_error_union() {
         "Expected no context in message:\n{}",
         message
     );
-    let result: Result<(), TracedUnion<(std::io::Error, bool)>> = func4();
+    let result: Result<(), TracedUnion<(std::io::Error, bool)>> = narrow();
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
@@ -60,7 +59,7 @@ fn traced_error_union() {
         "Expected context in message:\n{}",
         message
     );
-    let result: Result<(), TracedUnion<(std::io::Error, bool, AnyError)>> = func5();
+    let result: Result<(), TracedUnion<(std::io::Error, bool, AnyError)>> = traced_macro();
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
@@ -72,12 +71,34 @@ fn traced_error_union() {
 
 #[test]
 fn generic_context_error_to_traced_error_union() {
-    fn func1() -> Result<(), eros::TracedUnion> {
-        return Err(eros::traced!("This is root error message"));
+    fn yeet_a_regular() -> Result<(), std::io::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::AddrInUse,
+            "Address in use message here",
+        ))?;
+        Ok(())
+    }
+
+    fn regular_into_traced_union_untyped() -> Result<(), eros::TracedUnion> {
+        yeet_a_regular()?;
+        Ok(())
+    }
+
+    fn regular_into_traced_union_typed() -> Result<(), eros::TracedUnion<(std::io::Error,)>> {
+        yeet_a_regular()?;
+        Ok(())
+    }
+
+    fn regular_into_traced_union_typed_multiple() -> Result<(), eros::TracedUnion<(std::io::Error,std::fmt::Error)>> {
+        yeet_a_regular()?;
+        Ok(())
     }
 
     fn func2() -> eros::Result<()> {
-        func1().context("Generic context")
+        regular_into_traced_union_untyped().context("Generic context")?;
+        // regular_into_traced_union_typed().map_err(|e| e.collapse()); // todo
+        regular_into_traced_union_typed_multiple().unwrap(); // todo
+        Ok(())
     }
 
     fn func3() -> Result<(), TracedUnion<(std::io::Error, AnyError)>> {
@@ -122,7 +143,7 @@ fn bail() {
         eros::bail!("This is a bailing message {}", 1);
     }
 
-    fn func2() -> eros::Result<(), (Box<dyn SendSyncError>,)> {
+    fn func2() -> eros::Result<(), (AnyError,)> {
         func1().context("From func2".to_string())
     }
 
@@ -165,7 +186,7 @@ fn ensure() {
         Ok(())
     }
 
-    fn func2() -> eros::Result<(), (Box<dyn SendSyncError>,)> {
+    fn func2() -> eros::Result<(), (AnyError,)> {
         func1().context("From func2".to_string())
     }
 
@@ -214,7 +235,7 @@ fn context_directly_on_error() {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
-        let value = result.context("This is some context")?;
+        let value = result.into_union().context("This is some context")?;
         return Ok(value);
     }
 
@@ -222,7 +243,7 @@ fn context_directly_on_error() {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
         let result: Result<(), std::io::Error> = Err(error);
-        let value = result.context("This is some context")?;
+        let value = result.into_union().context("This is some context")?;
         return Ok(value);
     }
 
@@ -264,7 +285,7 @@ fn absent_value_error() {
     let result = func1().context("Some context");
     println!("{:?}", result);
     let error = result.unwrap_err();
-    let inner_error = error.into_inner() as Box<dyn Any>;
+    let inner_error = error.into_inner();
     assert!(inner_error.downcast::<AbsentValueError>().is_ok());
 }
 
