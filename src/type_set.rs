@@ -85,7 +85,7 @@ impl DisplayFold for End {
     }
 }
 
-pub(crate) fn write_display<T: fmt::Display>(
+pub(crate) fn write_display<T: fmt::Display + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
@@ -129,7 +129,7 @@ impl DebugFold for End {
     }
 }
 
-pub(crate) fn write_debug<T: fmt::Debug>(
+pub(crate) fn write_debug<T: fmt::Debug + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
     #[cfg(feature = "context")] context: &Vec<StrContext>,

@@ -10,67 +10,10 @@ mod union_to_enum;
 // aliases
 pub type Result<T, E = AnyError> = std::result::Result<T, TracedUnion<E>>;
 
-/// The typeset representing all possible errors
+/// A marker type for `TracedUnion` representing all possible errors
 #[derive(Debug)]
-pub struct AnyError(Box<dyn SendSyncError>);
+pub struct AnyError;
 
-impl AnyError {
-    pub fn new<T: SendSyncError>(t: T) -> Self {
-        AnyError(Box::new(t))
-    }
-
-    pub fn downcast<T: 'static>(self) -> std::result::Result<Box<T>, AnyError> {
-        if (self.0.as_ref() as &dyn Any).is::<T>() {
-            Ok((self.0 as Box<dyn Any>).downcast::<T>().unwrap())
-        } else {
-            Err(self)
-        }
-    }
-}
-
-impl Deref for AnyError {
-    type Target = dyn SendSyncError;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.as_ref()
-    }
-}
-
-impl DerefMut for AnyError {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut()
-    }
-}
-
-impl Display for AnyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-// Needs to be ref so can be used below
-// impl Error for &AnyError {} //todo
-// todo remove error fold and all error logic, clean up tests
-// todo look into yeeting into multiple types
-
-// Now `Result<_,AnyError>` can be converted to `Result<_,TracedUnion>`
-impl From<AnyError> for TracedUnion {
-    fn from(value: AnyError) -> Self {
-        TracedUnion::internal(value)
-    }
-}
-
-// Now `Result<_,T>` can be converted to `Result<_,AnyError>`
-impl<T> From<T> for AnyError
-where
-    T: SendSyncError,
-{
-    fn from(value: T) -> Self {
-        AnyError(Box::new(value))
-    }
-}
-
-// A
 //************************************************************************//
 
 impl<A> From<A> for TracedUnion<AnyError>
@@ -244,9 +187,9 @@ pub use type_set::{E1, E2, E3, E4, E5, E6, E7, E8, E9};
 
 // traits
 pub use context::Context;
-// pub use traced_union::IntoUnion;
+pub use traced_union::IntoUnion;
 // pub use traced_union::InnerInto;
 pub use traced_union::ReshapeUnion;
 
 use crate::type_set::TypeSet;
-// pub use traced_union::Union;
+pub use traced_union::Union;

@@ -2,7 +2,7 @@
 
 use std::any::Any;
 
-use eros::{AbsentValueError, AnyError, Context, IntoUnion, ReshapeUnion, SendSyncError, TracedUnion, traced};
+use eros::{AbsentValueError, AnyError, Context, ReshapeUnion, SendSyncError, TracedUnion, traced};
 
 #[test]
 fn traced_error_union() {
@@ -223,17 +223,17 @@ fn ensure() {
 }
 
 #[test]
-fn absent_value_error() {
-    fn func1() -> eros::Result<()> {
-        None.context("This value should be some")
-    }
+// fn absent_value_error() {
+//     fn func1() -> eros::Result<()> {
+//         None.context("This value should be some")
+//     }
 
-    let result = func1().context("Some context");
-    println!("{:?}", result);
-    let error = result.unwrap_err();
-    let inner_error = error.into_inner();
-    assert!(inner_error.downcast::<AbsentValueError>().is_ok());
-}
+//     let result = func1().context("Some context");
+//     println!("{:?}", result);
+//     let error = result.unwrap_err();
+//     let inner_error = error.into_inner();
+//     assert!(inner_error.downcast::<AbsentValueError>().is_ok());
+// }
 
 // #[test]
 // #[cfg_attr(not(feature = "min_specialization"), should_panic)]

@@ -9,7 +9,7 @@ where
     A: 'static,
 {
     fn from(union_of: TracedUnion<(A,)>) -> Self {
-        E1::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        E1::A(unsafe { union_of.inner.downcast_error_unchecked() })
     }
 }
 
@@ -18,11 +18,7 @@ where
     A: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A,)>) -> Self {
-        E1::A(
-            (union_of.inner.0.as_ref() as &dyn Any)
-                .downcast_ref()
-                .unwrap(),
-        )
+        E1::A(union_of.inner.downcast_error_ref())
     }
 }
 
@@ -31,11 +27,7 @@ where
     A: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A,)>) -> Self {
-        E1::A(
-            (union_of.inner.0.as_mut() as &mut dyn Any)
-                .downcast_mut()
-                .unwrap(),
-        )
+        E1::A(union_of.inner.downcast_error_mut())
     }
 }
 
@@ -45,10 +37,10 @@ where
     B: 'static,
 {
     fn from(union_of: TracedUnion<(A, B)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E2::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E2::A(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E2::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E2::B(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -59,18 +51,10 @@ where
     B: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E2::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E2::A(union_of.inner.downcast_error_ref())
         } else {
-            E2::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E2::B(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -81,18 +65,10 @@ where
     B: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E2::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E2::A(union_of.inner.downcast_error_mut())
         } else {
-            E2::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E2::B(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -104,12 +80,12 @@ where
     C: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E3::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E3::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E3::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E3::B(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E3::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E3::C(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -121,24 +97,12 @@ where
     C: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E3::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E3::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E3::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E3::B(union_of.inner.downcast_error_ref())
         } else {
-            E3::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E3::C(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -150,24 +114,12 @@ where
     C: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E3::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E3::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E3::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E3::B(union_of.inner.downcast_error_mut())
         } else {
-            E3::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E3::C(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -180,14 +132,14 @@ where
     D: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C, D)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E4::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E4::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E4::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E4::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E4::B(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<C>() {
+            E4::C(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E4::D(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E4::D(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -200,30 +152,14 @@ where
     D: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C, D)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E4::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E4::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E4::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E4::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E4::B(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<C>() {
+            E4::C(union_of.inner.downcast_error_ref())
         } else {
-            E4::D(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E4::D(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -237,30 +173,14 @@ where
     D: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C, D)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E4::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E4::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E4::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E4::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E4::B(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<C>() {
+            E4::C(union_of.inner.downcast_error_mut())
         } else {
-            E4::D(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E4::D(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -274,16 +194,16 @@ where
     E: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C, D, E)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E5::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E5::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E5::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E5::D(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E5::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E5::B(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<C>() {
+            E5::C(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<D>() {
+            E5::D(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E5::E(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E5::E(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -298,36 +218,16 @@ where
     E: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C, D, E)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E5::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E5::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E5::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E5::D(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E5::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E5::B(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<C>() {
+            E5::C(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<D>() {
+            E5::D(union_of.inner.downcast_error_ref())
         } else {
-            E5::E(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E5::E(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -342,36 +242,16 @@ where
     E: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C, D, E)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E5::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E5::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E5::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E5::D(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E5::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E5::B(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<C>() {
+            E5::C(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<D>() {
+            E5::D(union_of.inner.downcast_error_mut())
         } else {
-            E5::E(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E5::E(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -386,18 +266,18 @@ where
     F: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C, D, E, F)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E6::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E6::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E6::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E6::D(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E6::E(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E6::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E6::B(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<C>() {
+            E6::C(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<D>() {
+            E6::D(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<E>() {
+            E6::E(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E6::F(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E6::F(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -413,42 +293,18 @@ where
     F: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C, D, E, F)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E6::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E6::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E6::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E6::D(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E6::E(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E6::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E6::B(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<C>() {
+            E6::C(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<D>() {
+            E6::D(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<E>() {
+            E6::E(union_of.inner.downcast_error_ref())
         } else {
-            E6::F(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E6::F(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -464,42 +320,18 @@ where
     F: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C, D, E, F)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E6::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E6::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E6::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E6::D(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E6::E(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E6::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E6::B(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<C>() {
+            E6::C(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<D>() {
+            E6::D(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<E>() {
+            E6::E(union_of.inner.downcast_error_mut())
         } else {
-            E6::F(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E6::F(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -515,20 +347,20 @@ where
     G: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C, D, E, F, G)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E7::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E7::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E7::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E7::D(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E7::E(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E7::F(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E7::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E7::B(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<C>() {
+            E7::C(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<D>() {
+            E7::D(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<E>() {
+            E7::E(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<F>() {
+            E7::F(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E7::G(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E7::G(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -545,48 +377,20 @@ where
     G: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C, D, E, F, G)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E7::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E7::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E7::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E7::D(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E7::E(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E7::F(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E7::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E7::B(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<C>() {
+            E7::C(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<D>() {
+            E7::D(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<E>() {
+            E7::E(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<F>() {
+            E7::F(union_of.inner.downcast_error_mut())
         } else {
-            E7::G(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E7::G(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -603,48 +407,20 @@ where
     G: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C, D, E, F, G)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E7::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E7::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E7::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E7::D(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E7::E(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E7::F(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E7::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E7::B(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<C>() {
+            E7::C(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<D>() {
+            E7::D(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<E>() {
+            E7::E(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<F>() {
+            E7::F(union_of.inner.downcast_error_ref())
         } else {
-            E7::G(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E7::G(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -662,22 +438,22 @@ where
     H: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C, D, E, F, G, H)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E8::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E8::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E8::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E8::D(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E8::E(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E8::F(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<G>() {
-            E8::G(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E8::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E8::B(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<C>() {
+            E8::C(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<D>() {
+            E8::D(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<E>() {
+            E8::E(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<F>() {
+            E8::F(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<G>() {
+            E8::G(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E8::H(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E8::H(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -695,54 +471,22 @@ where
     H: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C, D, E, F, G, H)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E8::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E8::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E8::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E8::D(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E8::E(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E8::F(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<G>() {
-            E8::G(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E8::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E8::B(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<C>() {
+            E8::C(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<D>() {
+            E8::D(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<E>() {
+            E8::E(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<F>() {
+            E8::F(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<G>() {
+            E8::G(union_of.inner.downcast_error_ref())
         } else {
-            E8::H(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E8::H(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -760,54 +504,22 @@ where
     H: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C, D, E, F, G, H)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E8::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E8::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E8::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E8::D(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E8::E(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E8::F(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<G>() {
-            E8::G(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E8::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E8::B(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<C>() {
+            E8::C(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<D>() {
+            E8::D(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<E>() {
+            E8::E(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<F>() {
+            E8::F(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<G>() {
+            E8::G(union_of.inner.downcast_error_mut())
         } else {
-            E8::H(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E8::H(union_of.inner.downcast_error_mut())
         }
     }
 }
@@ -826,24 +538,24 @@ where
     I: 'static,
 {
     fn from(union_of: TracedUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E9::A(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E9::B(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E9::C(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E9::D(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E9::E(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E9::F(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<G>() {
-            E9::G(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<H>() {
-            E9::H(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+        if union_of.inner.is_error::<A>() {
+            E9::A(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<B>() {
+            E9::B(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<C>() {
+            E9::C(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<D>() {
+            E9::D(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<E>() {
+            E9::E(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<F>() {
+            E9::F(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<G>() {
+            E9::G(unsafe { union_of.inner.downcast_error_unchecked() })
+        } else if union_of.inner.is_error::<H>() {
+            E9::H(unsafe { union_of.inner.downcast_error_unchecked() })
         } else {
-            E9::I(*(union_of.inner.0 as Box<dyn Any>).downcast().unwrap())
+            E9::I(unsafe { union_of.inner.downcast_error_unchecked() })
         }
     }
 }
@@ -862,60 +574,24 @@ where
     I: 'static,
 {
     fn from(union_of: &'a TracedUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E9::A(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E9::B(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E9::C(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E9::D(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E9::E(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E9::F(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<G>() {
-            E9::G(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<H>() {
-            E9::H(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E9::A(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<B>() {
+            E9::B(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<C>() {
+            E9::C(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<D>() {
+            E9::D(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<E>() {
+            E9::E(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<F>() {
+            E9::F(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<G>() {
+            E9::G(union_of.inner.downcast_error_ref())
+        } else if union_of.inner.is_error::<H>() {
+            E9::H(union_of.inner.downcast_error_ref())
         } else {
-            E9::I(
-                (union_of.inner.0.as_ref() as &dyn Any)
-                    .downcast_ref()
-                    .unwrap(),
-            )
+            E9::I(union_of.inner.downcast_error_ref())
         }
     }
 }
@@ -944,60 +620,24 @@ where
     I: 'static,
 {
     fn from(union_of: &'a mut TracedUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
-        if (union_of.inner.0.as_ref() as &dyn Any).is::<A>() {
-            E9::A(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<B>() {
-            E9::B(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<C>() {
-            E9::C(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<D>() {
-            E9::D(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<E>() {
-            E9::E(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<F>() {
-            E9::F(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<G>() {
-            E9::G(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
-        } else if (union_of.inner.0.as_ref() as &dyn Any).is::<H>() {
-            E9::H(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+        if union_of.inner.is_error::<A>() {
+            E9::A(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<B>() {
+            E9::B(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<C>() {
+            E9::C(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<D>() {
+            E9::D(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<E>() {
+            E9::E(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<F>() {
+            E9::F(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<G>() {
+            E9::G(union_of.inner.downcast_error_mut())
+        } else if union_of.inner.is_error::<H>() {
+            E9::H(union_of.inner.downcast_error_mut())
         } else {
-            E9::I(
-                (union_of.inner.0.as_mut() as &mut dyn Any)
-                    .downcast_mut()
-                    .unwrap(),
-            )
+            E9::I(union_of.inner.downcast_error_mut())
         }
     }
 }
