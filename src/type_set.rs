@@ -3,7 +3,7 @@ use core::fmt;
 use std::backtrace::Backtrace;
 use std::error::Error;
 
-use crate::StrContext;
+use crate::{AnyError, StrContext};
 
 /* ------------------------- Helpers ----------------------- */
 
@@ -85,6 +85,13 @@ impl DisplayFold for End {
     }
 }
 
+pub(crate) fn write_display<T: fmt::Display>(
+    t: &T,
+    formatter: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    t.fmt(formatter)
+}
+
 impl<Head, Tail> DisplayFold for Cons<Head, Tail>
 where
     Cons<Head, Tail>: fmt::Display,
@@ -93,7 +100,7 @@ where
 {
     fn display_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.fmt(formatter)
+            write_display(head_ref, formatter)
         } else {
             Tail::display_fold(any, formatter)
         }
@@ -122,6 +129,34 @@ impl DebugFold for End {
     }
 }
 
+pub(crate) fn write_debug<T: fmt::Debug>(
+    t: &T,
+    formatter: &mut fmt::Formatter<'_>,
+    #[cfg(feature = "context")] context: &Vec<StrContext>,
+    #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+) -> fmt::Result {
+    t.fmt(formatter)?;
+    #[cfg(feature = "context")]
+    {
+        if !context.is_empty() {
+            write!(formatter, "\n\nContext:")?;
+            for context_item in context.iter() {
+                write!(formatter, "\n\t- {}", context_item)?;
+            }
+        }
+    }
+    #[cfg(feature = "backtrace")]
+    {
+        use std::backtrace::BacktraceStatus;
+
+        if matches!(backtrace.status(), BacktraceStatus::Captured) {
+            write!(formatter, "\n\nBacktrace:\n")?;
+            fmt::Display::fmt(backtrace, formatter)?;
+        }
+    }
+    Ok(())
+}
+
 impl<Head, Tail> DebugFold for Cons<Head, Tail>
 where
     Cons<Head, Tail>: fmt::Debug,
@@ -135,26 +170,7 @@ where
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
     ) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.fmt(formatter)?;
-            #[cfg(feature = "context")]
-            {
-                if !context.is_empty() {
-                    write!(formatter, "\n\nContext:")?;
-                    for context_item in context.iter() {
-                        write!(formatter, "\n\t- {}", context_item)?;
-                    }
-                }
-            }
-            #[cfg(feature = "backtrace")]
-            {
-                use std::backtrace::BacktraceStatus;
-
-                if matches!(backtrace.status(), BacktraceStatus::Captured) {
-                    write!(formatter, "\n\nBacktrace:\n")?;
-                    fmt::Display::fmt(backtrace, formatter)?;
-                }
-            }
-            Ok(())
+            write_debug(head_ref, formatter, context, backtrace)
         } else {
             Tail::debug_fold(
                 any,
@@ -203,6 +219,25 @@ pub trait TypeSet {
     where
         Self: 'a;
     type MutEnum<'a>
+    where
+        Self: 'a;
+}
+
+impl TupleForm for AnyError {
+    type Tuple = AnyError;
+}
+
+impl TypeSet for AnyError {
+    type Variants = AnyError;
+    type Enum = AnyError;
+
+    type RefEnum<'a>
+        = &'a AnyError
+    where
+        Self: 'a;
+
+    type MutEnum<'a>
+        = &'a mut AnyError
     where
         Self: 'a;
 }
@@ -489,6 +524,8 @@ impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> whe
 {
 }
 
+impl<T> Contains<T, End> for AnyError {}
+
 /* ------------------------- Narrow ----------------------- */
 
 /// A trait for pulling a specific type out of a Variants at compile-time
@@ -556,6 +593,10 @@ where
             SubTail,
             TailIndex,
         >>::Remainder;
+}
+
+impl SupersetOf<AnyError, End> for AnyError {
+    type Remainder = AnyError;
 }
 
 fn _superset_test() {
