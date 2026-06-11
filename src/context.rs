@@ -50,6 +50,7 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
     type Okay = T;
     type OutSet = (E,);
 
+    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
     fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion<Self::OutSet>> {
         #[cfg(feature = "context")]
@@ -61,6 +62,7 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
         return self.map_err(|e| TracedUnion::new(e));
     }
 
+    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
     fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, TracedUnion<Self::OutSet>>
     where
@@ -119,6 +121,7 @@ impl<T> Context for Option<T> {
     /// Constructing this type is always paired with information ([`context`])
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
+    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
     fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion<Self::OutSet>>
 where {
@@ -139,6 +142,7 @@ where {
     /// Constructing this type is always paired with information ([`context`])
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
+    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
     fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, TracedUnion<Self::OutSet>>
     where

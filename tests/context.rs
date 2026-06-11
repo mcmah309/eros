@@ -217,7 +217,7 @@ fn integration_with_anyhow() {
 
     let bind = anyhow_result().unwrap_err();
     let error = bind.chain().next().unwrap();
-    println!("{error:?}");
+    // println!("{error:?}");
 
     fn eros_result() -> eros::Result<()> {
         use eros::TracedUnion;
@@ -229,6 +229,6 @@ fn integration_with_anyhow() {
     let result = eros_result().context("eros context");
     let error = result.as_ref().unwrap_err();
 
-    println!("{:?}", error);
+    // println!("{:?}", error);
 
 }

@@ -115,6 +115,7 @@ pub trait DebugFold {
         formatter: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] context: &[StrContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> fmt::Result;
 }
 
@@ -124,6 +125,7 @@ impl DebugFold for End {
         _: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] _context: &[StrContext],
         #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
+        #[cfg(feature = "location")] _location: &'static std::panic::Location<'static>,
     ) -> fmt::Result {
         unreachable!("debug_fold called on End");
     }
@@ -134,7 +136,18 @@ pub(crate) fn write_debug<T: fmt::Debug + ?Sized>(
     formatter: &mut fmt::Formatter<'_>,
     #[cfg(feature = "context")] context: &[StrContext],
     #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+    #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
 ) -> fmt::Result {
+    #[cfg(feature = "location")]
+    {
+        write!(
+            formatter,
+            "{}:{}:{}\t",
+            location.file(),
+            location.line(),
+            location.column()
+        )?;
+    }
     t.fmt(formatter)?;
     #[cfg(feature = "context")]
     {
@@ -168,9 +181,19 @@ where
         formatter: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] context: &[StrContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
-            write_debug(head_ref, formatter, context, backtrace)
+            write_debug(
+                head_ref,
+                formatter,
+                #[cfg(feature = "context")]
+                context,
+                #[cfg(feature = "backtrace")]
+                backtrace,
+                #[cfg(feature = "location")]
+                location,
+            )
         } else {
             Tail::debug_fold(
                 any,
@@ -179,6 +202,8 @@ where
                 context,
                 #[cfg(feature = "backtrace")]
                 backtrace,
+                #[cfg(feature = "location")]
+                location,
             )
         }
     }

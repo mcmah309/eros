@@ -3,7 +3,7 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
 use std::any::TypeId;
-use std::{mem, ptr};
+use std::{backtrace, mem, ptr};
 
 use crate::type_set::{
     write_debug, write_display, Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow,
@@ -24,10 +24,13 @@ pub(crate) struct TracedUnionInner<T: ?Sized> {
     pub(crate) backtrace: std::backtrace::Backtrace,
     #[cfg(feature = "context")]
     pub(crate) context: Vec<StrContext>,
+    #[cfg(feature = "location")]
+    pub(crate) location: &'static std::panic::Location<'static>,
     pub(crate) error: T,
 }
 
 impl TracedUnionInner<dyn SendSyncError> {
+    #[cfg_attr(feature = "location", track_caller)]
     pub(crate) fn new<T>(t: T) -> Box<TracedUnionInner<dyn SendSyncError>>
     where
         T: SendSyncError,
@@ -37,6 +40,29 @@ impl TracedUnionInner<dyn SendSyncError> {
             backtrace: std::backtrace::Backtrace::capture(),
             #[cfg(feature = "context")]
             context: Vec::new(),
+            #[cfg(feature = "location")]
+            location: std::panic::Location::caller(),
+            error: t,
+        })
+    }
+
+    #[cfg_attr(feature = "location", track_caller)]
+    pub(crate) fn new_from_parts<T>(
+        t: T,
+        #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
+        #[cfg(feature = "context")] context: Vec<StrContext>,
+        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+    ) -> Box<TracedUnionInner<dyn SendSyncError>>
+    where
+        T: SendSyncError,
+    {
+        Box::new(TracedUnionInner {
+            #[cfg(feature = "backtrace")]
+            backtrace,
+            #[cfg(feature = "context")]
+            context,
+            #[cfg(feature = "location")]
+            location,
             error: t,
         })
     }
@@ -63,6 +89,8 @@ impl TracedUnionInner<dyn SendSyncError> {
         ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).backtrace));
         #[cfg(feature = "context")]
         ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).context));
+        #[cfg(feature = "location")]
+        ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).location));
 
         // Deallocate the Box allocation itself.
         // We reconstruct a Box containing uninitialized/dead data, but wrapped in
@@ -72,6 +100,46 @@ impl TracedUnionInner<dyn SendSyncError> {
             Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
 
         downcasted_value
+    }
+
+    pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
+        self: Box<Self>,
+    ) -> TracedUnionInner<T> {
+        debug_assert!(self.is_error::<T>());
+
+        // Note: this prevents the Box from automatically dropping at the end of the function.
+        let raw_container: *mut Self = Box::into_raw(self);
+
+        // Thin the fat pointer directly — no intermediate dyn Any cast needed.
+        // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
+        let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
+        // Copy to the stack
+        let downcasted_value: T = ptr::read(thin_ptr);
+
+        // Read the additional parts before dropping
+        #[cfg(feature = "backtrace")]
+        let backtrace = ptr::read(ptr::addr_of!((*raw_container).backtrace));
+        #[cfg(feature = "context")]
+        let context = ptr::read(ptr::addr_of!((*raw_container).context));
+        #[cfg(feature = "location")]
+        let location = ptr::read(ptr::addr_of!((*raw_container).location));
+
+        // Deallocate the Box allocation itself.
+        // We reconstruct a Box containing uninitialized/dead data, but wrapped in
+        // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
+        // it frees the underlying heap memory without touching the fields.
+        let _dead_box: Box<mem::ManuallyDrop<Self>> =
+            Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
+
+        TracedUnionInner {
+            #[cfg(feature = "backtrace")]
+            backtrace,
+            #[cfg(feature = "context")]
+            context,
+            #[cfg(feature = "location")]
+            location,
+            error: downcasted_value,
+        }
     }
 
     #[allow(dead_code)]
@@ -139,6 +207,8 @@ impl fmt::Debug for TracedUnion<AnyError> {
             &self.inner.context,
             #[cfg(feature = "backtrace")]
             &self.inner.backtrace,
+            #[cfg(feature = "location")]
+            self.inner.location,
         )
     }
 }
@@ -156,6 +226,8 @@ where
             &self.inner.context,
             #[cfg(feature = "backtrace")]
             &self.inner.backtrace,
+            #[cfg(feature = "location")]
+            self.inner.location,
         )?;
         Ok(())
     }
@@ -201,6 +273,7 @@ unsafe impl<T> Sync for TracedUnion<T> where T: TypeSet + Sync {}
 
 impl TracedUnion {
     /// Create a new `ErrorUnion`.
+    #[cfg_attr(feature = "location", track_caller)]
     pub fn new<T, OutSet, Index>(t: T) -> TracedUnion<OutSet>
     where
         T: SendSyncError,
@@ -209,6 +282,31 @@ impl TracedUnion {
     {
         TracedUnion {
             inner: TracedUnionInner::new(t),
+            _pd: PhantomData,
+        }
+    }
+
+    pub fn new_from_parts<T, OutSet, Index>(
+        t: T,
+        #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
+        #[cfg(feature = "context")] context: Vec<StrContext>,
+        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+    ) -> TracedUnion<OutSet>
+    where
+        T: SendSyncError,
+        OutSet: TypeSet,
+        OutSet::Variants: Contains<T, Index>,
+    {
+        TracedUnion {
+            inner: TracedUnionInner::new_from_parts(
+                t,
+                #[cfg(feature = "backtrace")]
+                backtrace,
+                #[cfg(feature = "context")]
+                context,
+                #[cfg(feature = "location")]
+                location,
+            ),
             _pd: PhantomData,
         }
     }
@@ -445,8 +543,18 @@ impl<A: 'static> TracedUnion<(A,)> {
         U: SendSyncError,
         F: FnOnce(A) -> U,
     {
+        // SAFETY: We know that the inner error is only of type A, so we can safely downcast it
+        let inner = unsafe { self.inner.downcast_error_unchecked_with_parts::<A>() };
         TracedUnion {
-            inner: TracedUnionInner::new(f(self.into_inner())),
+            inner: TracedUnionInner::new_from_parts(
+                f(inner.error),
+                #[cfg(feature = "backtrace")]
+                inner.backtrace,
+                #[cfg(feature = "context")]
+                inner.context,
+                #[cfg(feature = "location")]
+                inner.location,
+            ),
             _pd: PhantomData,
         }
     }
@@ -531,6 +639,7 @@ pub trait IntoUnion<S, F> {
 }
 
 impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
+    #[cfg_attr(feature = "location", track_caller)]
     fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
     where
         Other: TypeSet,
@@ -624,7 +733,8 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, TracedUnion<E>> {
 
 #[cfg(feature = "anyhow")]
 impl TracedUnion {
-    // todo improve this: Change backtrace to be an enum that is a string or a real backtrace
+    // todo improve this: Change to at display time and debug time instead of here
+    #[cfg_attr(feature = "location", track_caller)]
     pub fn anyhow(error: anyhow::Error) -> TracedUnion {
         let mut chain = error.chain().rev();
         let root = chain.next().unwrap().to_string();
@@ -653,15 +763,14 @@ impl TracedUnion {
             }
             context
         };
-        TracedUnion {
-            inner: Box::new(TracedUnionInner {
-                #[cfg(feature = "backtrace")]
-                backtrace,
-                #[cfg(feature = "context")]
-                context,
-                error: root,
-            }),
-            _pd: PhantomData,
-        }
+        TracedUnion::new_from_parts(
+            root,
+            #[cfg(feature = "backtrace")]
+            backtrace,
+            #[cfg(feature = "context")]
+            context,
+            #[cfg(feature = "location")]
+            std::panic::Location::caller(),
+        )
     }
 }
