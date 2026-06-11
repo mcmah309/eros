@@ -1,36 +1,47 @@
-/// `format!` like macro to return early from a function with a [`crate::TracedError`]
+/// `format!` like macro to return early from a function with a [`crate::TracedUnion`]
 #[macro_export]
 macro_rules! bail {
-    ($error:literal) => {
-        return Err($crate::TracedUnion::<eros::AnyError>::new($crate::StrContext::Static($error)))
+    ($msg:literal $(,)?) => {
+        return $crate::Result::Err($crate::traced!($msg))
     };
-    ($($error:tt)+) => {
-        return Err($crate::TracedUnion::<eros::AnyError>::new($crate::StrContext::Owned(format!($($error)*))));
+    ($err:expr $(,)?) => {
+        return $crate::Result::Err($crate::traced!($err))
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        return $crate::Result::Err($crate::traced!($fmt, $($arg)*))
     };
 }
 
-/// `format!` like macro to create a [`crate::TracedError`]
+/// `format!` like macro to create a [`crate::TracedUnion`]
 #[macro_export]
 macro_rules! traced {
-    ($error:literal) => {
-        $crate::TracedUnion::<eros::AnyError>::new($crate::StrContext::Static($error))
+    ($msg:literal $(,)?) => {
+        $crate::TracedUnion::new::<_, eros::AnyError, _>($crate::StrContext::Static($msg))
     };
-    ($($error:tt)+) => {
-        $crate::TracedUnion::<eros::AnyError>::new($crate::StrContext::Owned(format!($($error)*)))
+    ($err:expr $(,)?) => {
+        $crate::TracedUnion::new::<_, eros::AnyError, _>($err)
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        $crate::TracedUnion::new::<_, eros::AnyError, _>($crate::StrContext::Owned(format!($fmt, $($arg)*)))
     };
 }
 
 /// `assert!` like macro for bailing on a condition failure
 #[macro_export]
 macro_rules! ensure {
-    ($test:expr, $error:literal) => {
+    ($test:expr, $msg:literal $(,)?) => {
         if !($test) {
-            $crate::bail!($error)
+            $crate::bail!($msg);
         }
     };
-    ($test:expr, $($error:tt)+) => {
+    ($test:expr, $err:expr $(,)?) => {
         if !($test) {
-            $crate::bail!($($error)*)
+            $crate::bail!($err);
+        }
+    };
+    ($test:expr, $fmt:expr, $($arg:tt)*) => {
+        if !($test) {
+            $crate::bail!($fmt, $($arg)*);
         }
     };
 }

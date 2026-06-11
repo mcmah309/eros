@@ -113,7 +113,7 @@ pub trait DebugFold {
     fn debug_fold(
         any: &dyn Any,
         formatter: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &Vec<StrContext>,
+        #[cfg(feature = "context")] context: &[StrContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
     ) -> fmt::Result;
 }
@@ -122,8 +122,8 @@ impl DebugFold for End {
     fn debug_fold(
         _: &dyn Any,
         _: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &Vec<StrContext>,
-        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+        #[cfg(feature = "context")] _context: &[StrContext],
+        #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
     ) -> fmt::Result {
         unreachable!("debug_fold called on End");
     }
@@ -132,7 +132,7 @@ impl DebugFold for End {
 pub(crate) fn write_debug<T: fmt::Debug + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
-    #[cfg(feature = "context")] context: &Vec<StrContext>,
+    #[cfg(feature = "context")] context: &[StrContext],
     #[cfg(feature = "backtrace")] backtrace: &Backtrace,
 ) -> fmt::Result {
     t.fmt(formatter)?;
@@ -166,7 +166,7 @@ where
     fn debug_fold(
         any: &dyn Any,
         formatter: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &Vec<StrContext>,
+        #[cfg(feature = "context")] context: &[StrContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
     ) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {

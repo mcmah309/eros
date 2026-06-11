@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{traced, AnyError, IntoUnion, SendSyncError, TracedUnion, Union};
+use eros::{traced, SendSyncError, TracedUnion, IntoUnion};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -38,12 +38,12 @@ impl std::error::Error for RetriesExhausted {}
 #[test]
 fn retry_example() {
     fn does_stuff() -> Result<(), TracedUnion<(NotEnoughMemory, Timeout)>> {
-        let _allocation = match allocates() {
+        let _allocation: () = match allocates() {
             Ok(a) => a,
             Err(e) => return Err(e.widen()),
         };
 
-        let _chat = match chats() {
+        let _chat: () = match chats() {
             Ok(c) => c,
             Err(e) => return Err(TracedUnion::new(e)),
         };
@@ -125,7 +125,6 @@ fn widen_narrow() {
 
 #[test]
 fn debug() {
-    use std::error::Error;
     use std::io;
 
     let o_1: TracedUnion<(NotEnoughMemory, Timeout)> = TracedUnion::new(NotEnoughMemory);
@@ -137,7 +136,7 @@ fn debug() {
     println!("{}", o_1);
 
     type E = io::Error;
-    let e = io::Error::new(io::ErrorKind::Other, "wuaaaaahhhzzaaaaaaaa");
+    let e = io::Error::other("wuaaaaahhhzzaaaaaaaa");
 
     let o_2: TracedUnion<(E,)> = TracedUnion::new(e);
 
@@ -153,26 +152,18 @@ fn multi_match() {
     use eros::E2;
 
     let o_1: TracedUnion<(NotEnoughMemory, Timeout)> = TracedUnion::new(NotEnoughMemory);
-    let mut is_hit = false;
     match o_1.ref_enum() {
-        E2::A(u) => {
-            is_hit = true;
-        }
-        E2::B(s) => {
+        E2::A(_u) => {}
+        E2::B(_s) => {
             unreachable!()
         }
     }
-    assert!(is_hit);
-    is_hit = false;
     match o_1.to_enum() {
-        E2::A(u) => {
-            is_hit = true;
-        }
-        E2::B(s) => {
+        E2::A(_u) => {}
+        E2::B(_s) => {
             unreachable!()
         }
     }
-    assert!(is_hit);
 }
 
 #[test]
@@ -181,26 +172,23 @@ fn multi_narrow() {
 
     let o_1: TracedUnion<(u8, u16, NotEnoughMemory, u64, u128)> = TracedUnion::new(NotEnoughMemory);
 
+    #[allow(clippy::type_complexity)]
     let _narrow_res: Result<TracedUnion<(u8, u128)>, TracedUnion<(u16, NotEnoughMemory, u64)>> =
         o_1.subset();
 
     let o_2: TracedUnion<(u8, u16, Timeout, NotEnoughMemory, u64, u128)> =
         TracedUnion::new(Timeout);
 
-    let mut is_hit: bool = false;
     match o_2
         .subset::<(Timeout, NotEnoughMemory), _>()
         .unwrap()
         .to_enum()
     {
-        E2::A(Timeout {}) => {
-            is_hit = true;
-        }
+        E2::A(Timeout {}) => {}
         E2::B(NotEnoughMemory {}) => {
             unreachable!()
         }
     }
-    assert!(is_hit);
 }
 
 #[derive(Debug)]
@@ -219,7 +207,7 @@ impl std::error::Error for IoErrorWrapper {
 }
 
 #[derive(Debug)]
-struct MyErrorType;
+struct MyErrorType(Box<dyn SendSyncError>);
 
 impl Display for MyErrorType {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -228,54 +216,55 @@ impl Display for MyErrorType {
 }
 
 impl std::error::Error for MyErrorType {
-    // fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-    //     Some(&self.0) //todo
-    // }
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
 }
 
 #[test]
 fn map_inner() {
     let error: TracedUnion<(std::io::Error,)> =
-        TracedUnion::new(std::io::Error::new(std::io::ErrorKind::Other, "wuaaaaahhh"));
-    let error: TracedUnion<(IoErrorWrapper,)> = error.map(|e| IoErrorWrapper(e));
+        TracedUnion::new(std::io::Error::other("wuaaaaahhh"));
+    let error: TracedUnion<(IoErrorWrapper,)> = error.map(IoErrorWrapper);
     let message = format!("{:?}", error);
     assert!(
         !message.contains("Context:"),
         "Expected no context in message:\n{}",
         message
     );
-    // let error: TracedUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e))); // todo
-    // let message = format!("{:?}", error);
-    // assert!(
-    //     !message.contains("Context:"),
-    //     "Expected no context in message:\n{}",
-    //     message
-    // );
-    // let error: TracedUnion =
-    //     TracedUnion::any_error(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
-    // let error: TracedUnion<(MyErrorType,)> = error.map(|e| MyErrorType(e));
-    // let message = format!("{:?}", error);
-    // assert!(
-    //     !message.contains("Context:"),
-    //     "Expected no context in message:\n{}",
-    //     message
-    // );
+    let error: TracedUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e.0)));
+    let message = format!("{:?}", error);
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
+    let error: TracedUnion<(std::io::Error,)> = TracedUnion::new(std::io::Error::other("io error"));
+    let error: TracedUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e)));
+    let message = format!("{:?}", error);
+    assert!(
+        !message.contains("Context:"),
+        "Expected no context in message:\n{}",
+        message
+    );
 }
 
+// This source check is used to ensure that This works with the `error_set` crate, which uses source.
+// We expose the same source method as `std::error::Error` even though the type does not implement it.
 #[test]
 fn source_lives_long_enough() {
-    // enum Wrapper {
-    //     TracedUnion(TracedUnion),
-    // }
+    enum Wrapper {
+        TracedUnion(TracedUnion),
+    }
 
-    // let error = traced!("Error");
-    // let wrapper_binding = Wrapper::TracedUnion(error);
-    // let wrapper = &wrapper_binding;
-    // let source = match wrapper {
-    //     // Wrapper::TracedUnion(traced_union) => std::error::Error::source(&traced_union), // does not work
-    //     Wrapper::TracedUnion(traced_error) => traced_error.source(), // todo
-    // };
-    // let _source = source;
+    let error = traced!("Error");
+    let wrapper_binding = Wrapper::TracedUnion(error);
+    let wrapper = &wrapper_binding;
+    let source = match wrapper {
+        // Wrapper::TracedUnion(traced_union) => std::error::Error::source(&traced_union), // does not work since does not implement error directly
+        Wrapper::TracedUnion(traced_error) => traced_error.source(),
+    };
+    let _source = source;
 }
 
 // //************************************************************************//
@@ -302,19 +291,19 @@ fn union() {
     fn regular_union() -> TracedUnion<(std::io::Error,)> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
-        return error.into();
+        error.into()
     }
 
     fn result_union() -> Result<(), TracedUnion<(std::io::Error,)>> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
-        return Err(error).union();
+        Err(error).into_union()
     }
 
     fn mapped_result_union() -> Result<(), TracedUnion<(MyCustomError,)>> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
-        return Err(error).into_union();
+        Err(error).map_err(|e| TracedUnion::new(e.into()))
     }
 
     let error = regular_union();

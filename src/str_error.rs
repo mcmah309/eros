@@ -26,8 +26,8 @@ impl StrContext {
 impl Debug for StrContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StrContext::Static(s) => f.write_str(&s),
-            StrContext::Owned(s) => f.write_str(&s),
+            StrContext::Static(s) => f.write_str(s),
+            StrContext::Owned(s) => f.write_str(s),
         }
     }
 }

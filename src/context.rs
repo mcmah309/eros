@@ -1,10 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
-    str_error::StrContext,
-    type_set::{SupersetOf, TypeSet},
-    SendSyncError, TracedUnion,
-};
+use crate::{str_error::StrContext, type_set::TypeSet, SendSyncError, TracedUnion};
 
 /// Provides `context` methods to add context to `Result`.
 pub trait Context {

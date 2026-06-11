@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use super::{TracedUnion, E1, E2, E3, E4, E5, E6, E7, E8, E9};
 
 /* ------------------------- Enum conversions ----------------------- */

@@ -27,3 +27,5 @@ default = ["context", "backtrace"]
 context = []
 # Enables backtrace for `TracedError`
 backtrace = []
+# Add integration with anyhow
+anyhow = ["dep:anyhow"]
