@@ -346,6 +346,10 @@ pub fn public_api() -> Result<(), MyErrorType> {
 
 </details>
 
+## Backtrace vs Location
+
+`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location of the code that the error and context were created from. `location` is more efficient than `backtrace` since call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+
 ## Special Thanks
 
 Special thank you to the authors and contributors of the following crates that inspired `eros`:

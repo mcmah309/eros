@@ -26,7 +26,7 @@ default = ["context", "backtrace"]
 context = []
 # Enables backtrace
 backtrace = []
-# Enables location capture 
+# Enables location capture
 location = []
 # Add integration with anyhow
 anyhow = ["dep:anyhow"]
