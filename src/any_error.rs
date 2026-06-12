@@ -1,30 +1,30 @@
-use crate::{SendSyncError, TracedUnion};
+use crate::{SendSyncError, ErrorUnion};
 
-/// A marker type for `TracedUnion` representing all possible errors
+/// A marker type for `ErrorUnion` representing all possible errors
 #[derive(Debug)]
 pub struct AnyError;
 
 //************************************************************************//
 
-impl<A> From<A> for TracedUnion<AnyError>
+impl<A> From<A> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
 {
     fn from(value: A) -> Self {
-        TracedUnion::new(value)
+        ErrorUnion::new(value)
     }
 }
 
 // (A,)
 //************************************************************************//
 
-impl<T, A> From<T> for TracedUnion<(A,)>
+impl<T, A> From<T> for ErrorUnion<(A,)>
 where
     T: SendSyncError + Into<A>,
     A: SendSyncError,
 {
     fn from(value: T) -> Self {
-        TracedUnion::new(value.into())
+        ErrorUnion::new(value.into())
     }
 }
 
@@ -39,33 +39,33 @@ where
 // to be explicit and `?` won't make an implicit conversion.
 //************************************************************************//
 
-// impl<A, B> From<A> for TracedUnion<(A, B)>
+// impl<A, B> From<A> for ErrorUnion<(A, B)>
 // where
 //     A: SendSyncError,
 //     B: SendSyncError,
 // {
 //     fn from(value: A) -> Self {
-//         TracedUnion::new(value)
+//         ErrorUnion::new(value)
 //     }
 // }
 
-// impl<A, B> From<TracedUnion<(A,)>> for TracedUnion<(A, B)>
+// impl<A, B> From<ErrorUnion<(A,)>> for ErrorUnion<(A, B)>
 // where
 //     A: SendSyncError,
 //     B: SendSyncError,
 // {
-//     fn from(value: TracedUnion<(A,)>) -> Self {
+//     fn from(value: ErrorUnion<(A,)>) -> Self {
 //         value.widen()
 //     }
 // }
 
 // Conflicts with above
-// impl<A, B> From<TracedUnion<(B,)>> for TracedUnion<(A, B)>
+// impl<A, B> From<ErrorUnion<(B,)>> for ErrorUnion<(A, B)>
 // where
 //     A: SendSyncError,
 //     B: SendSyncError,
 // {
-//     fn from(value: TracedUnion<(B,)>) -> Self {
+//     fn from(value: ErrorUnion<(B,)>) -> Self {
 //         value.widen()
 //     }
 // }
@@ -73,49 +73,49 @@ where
 // Convert explicit to any with just into
 //************************************************************************//
 
-impl<A> From<TracedUnion<(A,)>> for TracedUnion<AnyError>
+impl<A> From<ErrorUnion<(A,)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
 {
-    fn from(value: TracedUnion<(A,)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A,)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B> From<TracedUnion<(A, B)>> for TracedUnion<AnyError>
+impl<A, B> From<ErrorUnion<(A, B)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C> From<TracedUnion<(A, B, C)>> for TracedUnion<AnyError>
+impl<A, B, C> From<ErrorUnion<(A, B, C)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
     C: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C, D> From<TracedUnion<(A, B, C, D)>> for TracedUnion<AnyError>
+impl<A, B, C, D> From<ErrorUnion<(A, B, C, D)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
     C: SendSyncError,
     D: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C, D)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C, D)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C, D, E> From<TracedUnion<(A, B, C, D, E)>> for TracedUnion<AnyError>
+impl<A, B, C, D, E> From<ErrorUnion<(A, B, C, D, E)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
@@ -123,12 +123,12 @@ where
     D: SendSyncError,
     E: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C, D, E)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C, D, E)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C, D, E, F> From<TracedUnion<(A, B, C, D, E, F)>> for TracedUnion<AnyError>
+impl<A, B, C, D, E, F> From<ErrorUnion<(A, B, C, D, E, F)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
@@ -137,12 +137,12 @@ where
     E: SendSyncError,
     F: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C, D, E, F)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C, D, E, F)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C, D, E, F, G> From<TracedUnion<(A, B, C, D, E, F, G)>> for TracedUnion<AnyError>
+impl<A, B, C, D, E, F, G> From<ErrorUnion<(A, B, C, D, E, F, G)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
@@ -152,12 +152,12 @@ where
     F: SendSyncError,
     G: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C, D, E, F, G)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C, D, E, F, G, H> From<TracedUnion<(A, B, C, D, E, F, G, H)>> for TracedUnion<AnyError>
+impl<A, B, C, D, E, F, G, H> From<ErrorUnion<(A, B, C, D, E, F, G, H)>> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
@@ -168,13 +168,13 @@ where
     G: SendSyncError,
     H: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C, D, E, F, G, H)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }
 
-impl<A, B, C, D, E, F, G, H, I> From<TracedUnion<(A, B, C, D, E, F, G, H, I)>>
-    for TracedUnion<AnyError>
+impl<A, B, C, D, E, F, G, H, I> From<ErrorUnion<(A, B, C, D, E, F, G, H, I)>>
+    for ErrorUnion<AnyError>
 where
     A: SendSyncError,
     B: SendSyncError,
@@ -186,7 +186,7 @@ where
     H: SendSyncError,
     I: SendSyncError,
 {
-    fn from(value: TracedUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
-        TracedUnion::erase(value)
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
+        ErrorUnion::erase(value)
     }
 }

@@ -1,4 +1,4 @@
-/// `format!` like macro to return early from a function with a [`crate::TracedUnion`]
+/// `format!` like macro to return early from a function with a [`crate::ErrorUnion`]
 #[macro_export]
 macro_rules! bail {
     ($msg:literal $(,)?) => {
@@ -12,17 +12,17 @@ macro_rules! bail {
     };
 }
 
-/// `format!` like macro to create a [`crate::TracedUnion`]
+/// `format!` like macro to create a [`crate::ErrorUnion`]
 #[macro_export]
 macro_rules! traced {
     ($msg:literal $(,)?) => {
-        $crate::TracedUnion::new::<_, eros::AnyError, _>($crate::StrContext::Static($msg))
+        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrContext::Static($msg))
     };
     ($err:expr $(,)?) => {
-        $crate::TracedUnion::new::<_, eros::AnyError, _>($err)
+        $crate::ErrorUnion::new::<_, eros::AnyError, _>($err)
     };
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::TracedUnion::new::<_, eros::AnyError, _>($crate::StrContext::Owned(format!($fmt, $($arg)*)))
+        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrContext::Owned(format!($fmt, $($arg)*)))
     };
 }
 

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{str_error::StrContext, type_set::TypeSet, SendSyncError, TracedUnion};
+use crate::{str_error::StrContext, type_set::TypeSet, SendSyncError, ErrorUnion};
 
 /// Provides `context` methods to add context to `Result`.
 pub trait Context {
@@ -11,23 +11,23 @@ pub trait Context {
     fn context<C: Into<StrContext>>(
         self,
         context: C,
-    ) -> Result<Self::Okay, TracedUnion<Self::OutSet>>;
+    ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>;
 
     /// Lazily adds additional context. This becomes a no-op if the `traced` feature is disabled.
     fn with_context<F, C: Into<StrContext>>(
         self,
         f: F,
-    ) -> Result<Self::Okay, TracedUnion<Self::OutSet>>
+    ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C;
 }
 
-impl<T, InSet: TypeSet> Context for Result<T, TracedUnion<InSet>> {
+impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
     type Okay = T;
     type OutSet = InSet;
 
     #[allow(unused_variables)]
-    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion<Self::OutSet>> {
+    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         #[cfg(feature = "context")]
         return self.map_err(|e| e.context(context));
         #[cfg(not(feature = "context"))]
@@ -35,7 +35,7 @@ impl<T, InSet: TypeSet> Context for Result<T, TracedUnion<InSet>> {
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, TracedUnion<Self::OutSet>>
+    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
@@ -52,29 +52,29 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
 
     #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion<Self::OutSet>> {
+    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         #[cfg(feature = "context")]
         return self.map_err(|e| {
-            let widened: TracedUnion<Self::OutSet> = TracedUnion::new(e);
+            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(e);
             widened.context(context)
         });
         #[cfg(not(feature = "context"))]
-        return self.map_err(|e| TracedUnion::new(e));
+        return self.map_err(|e| ErrorUnion::new(e));
     }
 
     #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, TracedUnion<Self::OutSet>>
+    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
         return self.map_err(|e| {
-            let widened: TracedUnion<Self::OutSet> = TracedUnion::new(e);
+            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(e);
             widened.with_context(f)
         });
         #[cfg(not(feature = "context"))]
-        return self.map_err(|e| TracedUnion::new(e));
+        return self.map_err(|e| ErrorUnion::new(e));
     }
 }
 
@@ -87,21 +87,21 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
 //     fn context<OutSet, Index, C: Into<StrContext>>(
 //         self,
 //         context: C,
-//     ) -> Result<Self::Okay, TracedUnion<OutSet>>
+//     ) -> Result<Self::Okay, ErrorUnion<OutSet>>
 //     where
 //         OutSet: TypeSet,
 //         OutSet::Variants: SupersetOf<<Self::InSet as TypeSet>::Variants, Index>,
-//         TracedUnion<Self::InSet>: Into<TracedUnion<OutSet>> {
+//         ErrorUnion<Self::InSet>: Into<ErrorUnion<OutSet>> {
 //         todo!()
 //     }
 
 //     fn with_context<OutSet: TypeSet, Index, F, C: Into<StrContext>>(
 //         self,
 //         f: F,
-//     ) -> Result<Self::Okay, TracedUnion<OutSet>>
+//     ) -> Result<Self::Okay, ErrorUnion<OutSet>>
 //     where
 //         OutSet::Variants: SupersetOf<<Self::InSet as TypeSet>::Variants, Index>,
-//         TracedUnion<Self::InSet>: Into<TracedUnion<OutSet>>,
+//         ErrorUnion<Self::InSet>: Into<ErrorUnion<OutSet>>,
 //         F: FnOnce() -> C {
 //         todo!()
 //     }
@@ -123,15 +123,15 @@ impl<T> Context for Option<T> {
     /// around the operation.
     #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, TracedUnion<Self::OutSet>>
+    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>>
 where {
         #[cfg(feature = "context")]
         return self.ok_or_else(|| {
-            let widened: TracedUnion<Self::OutSet> = TracedUnion::new(AbsentValueError);
+            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(AbsentValueError);
             widened.context(context)
         });
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| TracedUnion::new(AbsentValueError));
+        return self.ok_or_else(|| ErrorUnion::new(AbsentValueError));
     }
 
     /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
@@ -144,17 +144,17 @@ where {
     /// around the operation.
     #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, TracedUnion<Self::OutSet>>
+    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
         return self.ok_or_else(|| {
-            let widened: TracedUnion<Self::OutSet> = TracedUnion::new(AbsentValueError);
+            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(AbsentValueError);
             widened.with_context(f)
         });
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| TracedUnion::new(AbsentValueError));
+        return self.ok_or_else(|| ErrorUnion::new(AbsentValueError));
     }
 }
 

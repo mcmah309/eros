@@ -4,7 +4,7 @@ use std::any::Any;
 
 use eros::{
     traced, AbsentValueError, AnyError, Context, IntoDynUnion, IntoUnion, ReshapeUnion,
-    SendSyncError, TracedUnion,
+    SendSyncError, ErrorUnion,
 };
 
 #[test]
@@ -17,7 +17,7 @@ fn traced_error_union() {
         Ok(())
     }
 
-    fn widen_then_context() -> Result<(), TracedUnion<(std::sync::mpsc::RecvError, std::io::Error)>>
+    fn widen_then_context() -> Result<(), ErrorUnion<(std::sync::mpsc::RecvError, std::io::Error)>>
     {
         can_yeet_from_regular_result()
             .widen()
@@ -28,7 +28,7 @@ fn traced_error_union() {
     {
         widen_then_context()
             .with_context(|| "From func3")
-            .map_err(TracedUnion::widen)?;
+            .map_err(ErrorUnion::widen)?;
         Ok(())
     }
 
@@ -48,7 +48,7 @@ fn traced_error_union() {
 
     let result: Result<
         (),
-        TracedUnion<(std::io::Error, std::sync::mpsc::RecvError, std::fmt::Error)>,
+        ErrorUnion<(std::io::Error, std::sync::mpsc::RecvError, std::fmt::Error)>,
     > = map_widen();
     assert!(result.is_err());
     let error = result.unwrap_err();
@@ -64,7 +64,7 @@ fn traced_error_union() {
         "Expected no context in message:\n{}",
         message
     );
-    let result: Result<(), TracedUnion<(std::io::Error, std::sync::mpsc::RecvError)>> = narrow();
+    let result: Result<(), ErrorUnion<(std::io::Error, std::sync::mpsc::RecvError)>> = narrow();
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
@@ -72,7 +72,7 @@ fn traced_error_union() {
         "Expected context in message:\n{}",
         message
     );
-    let result: Result<(), TracedUnion<AnyError>> = traced_macro();
+    let result: Result<(), ErrorUnion<AnyError>> = traced_macro();
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
@@ -92,25 +92,25 @@ fn generic_context_error_to_traced_error_union() {
         Ok(())
     }
 
-    fn yeet_regular_into_union_any_error() -> Result<(), eros::TracedUnion> {
+    fn yeet_regular_into_union_any_error() -> Result<(), eros::ErrorUnion> {
         yeet_a_regular()?;
         Ok(())
     }
 
-    fn yeet_regular_into_union_explicit() -> Result<(), eros::TracedUnion<(std::io::Error,)>> {
+    fn yeet_regular_into_union_explicit() -> Result<(), eros::ErrorUnion<(std::io::Error,)>> {
         yeet_a_regular()?;
         Ok(())
     }
 
     fn yeet_regular_into_union_multiple_explicit(
-    ) -> Result<(), eros::TracedUnion<(std::sync::mpsc::RecvError, std::io::Error, std::fmt::Error)>>
+    ) -> Result<(), eros::ErrorUnion<(std::sync::mpsc::RecvError, std::io::Error, std::fmt::Error)>>
     {
         // yeet_a_regular()?; // todo ideally this should work
         yeet_a_regular().into_union()?;
         Ok(())
     }
 
-    fn yeet_widen_union() -> Result<(), eros::TracedUnion<(std::fmt::Error, std::io::Error)>> {
+    fn yeet_widen_union() -> Result<(), eros::ErrorUnion<(std::fmt::Error, std::io::Error)>> {
         // yeet_regular_into_union_explicit()?; // todo ideally this should work
         yeet_regular_into_union_explicit().widen()?;
         Ok(())
@@ -133,7 +133,7 @@ fn bail() {
         func1().context("From func2".to_string())
     }
 
-    let result: Result<(), TracedUnion> = func2();
+    let result: Result<(), ErrorUnion> = func2();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
@@ -155,7 +155,7 @@ fn ensure() {
         func1().context("From func2".to_string())
     }
 
-    let result: Result<(), TracedUnion> = func2();
+    let result: Result<(), ErrorUnion> = func2();
     println!("{:?}", result.as_ref().unwrap_err());
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
@@ -228,9 +228,9 @@ fn integration_with_anyhow() {
     // println!("{error:?}");
 
     fn eros_result() -> eros::Result<()> {
-        use eros::TracedUnion;
+        use eros::ErrorUnion;
 
-        anyhow_result().map_err(TracedUnion::anyhow)?;
+        anyhow_result().map_err(ErrorUnion::anyhow)?;
         Ok(())
     }
 

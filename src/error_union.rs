@@ -12,7 +12,7 @@ use crate::type_set::{
 
 use crate::{AnyError, Cons, End, StrContext};
 
-/// Any error that satisfies this trait's bounds can be used in a `TracedError`
+/// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
     fn as_any(&self) -> &dyn std::any::Any;
 }
@@ -32,7 +32,7 @@ impl std::error::Error for Box<dyn SendSyncError> {
     }
 }
 
-pub(crate) struct TracedUnionInner<T: ?Sized> {
+pub(crate) struct ErrorUnionInner<T: ?Sized> {
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
     #[cfg(feature = "context")]
@@ -42,13 +42,13 @@ pub(crate) struct TracedUnionInner<T: ?Sized> {
     pub(crate) error: T,
 }
 
-impl TracedUnionInner<dyn SendSyncError> {
+impl ErrorUnionInner<dyn SendSyncError> {
     #[cfg_attr(feature = "location", track_caller)]
-    pub(crate) fn new<T>(t: T) -> Box<TracedUnionInner<dyn SendSyncError>>
+    pub(crate) fn new<T>(t: T) -> Box<ErrorUnionInner<dyn SendSyncError>>
     where
         T: SendSyncError,
     {
-        Box::new(TracedUnionInner {
+        Box::new(ErrorUnionInner {
             #[cfg(feature = "backtrace")]
             backtrace: std::backtrace::Backtrace::capture(),
             #[cfg(feature = "context")]
@@ -65,11 +65,11 @@ impl TracedUnionInner<dyn SendSyncError> {
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
         #[cfg(feature = "context")] context: Vec<StrContext>,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
-    ) -> Box<TracedUnionInner<dyn SendSyncError>>
+    ) -> Box<ErrorUnionInner<dyn SendSyncError>>
     where
         T: SendSyncError,
     {
-        Box::new(TracedUnionInner {
+        Box::new(ErrorUnionInner {
             #[cfg(feature = "backtrace")]
             backtrace,
             #[cfg(feature = "context")]
@@ -117,7 +117,7 @@ impl TracedUnionInner<dyn SendSyncError> {
 
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
         self: Box<Self>,
-    ) -> TracedUnionInner<T> {
+    ) -> ErrorUnionInner<T> {
         debug_assert!(self.is_error::<T>());
 
         // Note: this prevents the Box from automatically dropping at the end of the function.
@@ -144,7 +144,7 @@ impl TracedUnionInner<dyn SendSyncError> {
         let _dead_box: Box<mem::ManuallyDrop<Self>> =
             Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
 
-        TracedUnionInner {
+        ErrorUnionInner {
             #[cfg(feature = "backtrace")]
             backtrace,
             #[cfg(feature = "context")]
@@ -195,12 +195,12 @@ impl TracedUnionInner<dyn SendSyncError> {
 /// involving a precise subset of errors that the caller
 /// can clearly reason about. Providing maximum composability with
 /// no boilerplate.
-pub struct TracedUnion<E: TypeSet = AnyError> {
-    pub(crate) inner: Box<TracedUnionInner<dyn SendSyncError>>,
+pub struct ErrorUnion<E: TypeSet = AnyError> {
+    pub(crate) inner: Box<ErrorUnionInner<dyn SendSyncError>>,
     pub(crate) _pd: PhantomData<E>,
 }
 
-impl<T> Deref for TracedUnion<(T,)>
+impl<T> Deref for ErrorUnion<(T,)>
 where
     T: 'static,
 {
@@ -211,7 +211,7 @@ where
     }
 }
 
-impl fmt::Debug for TracedUnion<AnyError> {
+impl fmt::Debug for ErrorUnion<AnyError> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_debug(
             &self.inner.error,
@@ -226,7 +226,7 @@ impl fmt::Debug for TracedUnion<AnyError> {
     }
 }
 
-impl<E> fmt::Debug for TracedUnion<E>
+impl<E> fmt::Debug for ErrorUnion<E>
 where
     E: TypeSet,
     E::Variants: fmt::Debug + DebugFold,
@@ -246,13 +246,13 @@ where
     }
 }
 
-impl fmt::Display for TracedUnion<AnyError> {
+impl fmt::Display for ErrorUnion<AnyError> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_display(&self.inner.error, formatter)
     }
 }
 
-impl<E> fmt::Display for TracedUnion<E>
+impl<E> fmt::Display for ErrorUnion<E>
 where
     E: TypeSet,
     E::Variants: fmt::Display + DisplayFold,
@@ -272,29 +272,29 @@ fn _send_sync_error_assert() {
     fn is_sync<T: Sync>(_: &T) {}
     fn is_error<T: core::error::Error>(_: &T) {}
 
-    let error_union: TracedUnion<(io::Error, fmt::Error)> =
-        TracedUnion::new(io::Error::other("yooo"));
+    let error_union: ErrorUnion<(io::Error, fmt::Error)> =
+        ErrorUnion::new(io::Error::other("yooo"));
     is_send(&error_union);
     is_sync(&error_union);
     // is_error(&error_union); //todo
 }
 
-unsafe impl<T> Send for TracedUnion<T> where T: TypeSet + Send {}
-unsafe impl<T> Sync for TracedUnion<T> where T: TypeSet + Sync {}
+unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
+unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
 
 //************************************************************************//
 
-impl TracedUnion {
+impl ErrorUnion {
     /// Create a new `ErrorUnion`.
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn new<T, OutSet, Index>(t: T) -> TracedUnion<OutSet>
+    pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
     where
         T: SendSyncError,
         OutSet: TypeSet,
         OutSet::Variants: Contains<T, Index>,
     {
-        TracedUnion {
-            inner: TracedUnionInner::new(t),
+        ErrorUnion {
+            inner: ErrorUnionInner::new(t),
             _pd: PhantomData,
         }
     }
@@ -304,14 +304,14 @@ impl TracedUnion {
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
         #[cfg(feature = "context")] context: Vec<StrContext>,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
-    ) -> TracedUnion<OutSet>
+    ) -> ErrorUnion<OutSet>
     where
         T: SendSyncError,
         OutSet: TypeSet,
         OutSet::Variants: Contains<T, Index>,
     {
-        TracedUnion {
-            inner: TracedUnionInner::new_from_parts(
+        ErrorUnion {
+            inner: ErrorUnionInner::new_from_parts(
                 t,
                 #[cfg(feature = "backtrace")]
                 backtrace,
@@ -324,11 +324,11 @@ impl TracedUnion {
         }
     }
 
-    pub(crate) fn erase<E>(t: TracedUnion<E>) -> TracedUnion
+    pub(crate) fn erase<E>(t: ErrorUnion<E>) -> ErrorUnion
     where
         E: TypeSet,
     {
-        TracedUnion {
+        ErrorUnion {
             inner: t.inner,
             _pd: PhantomData,
         }
@@ -337,11 +337,11 @@ impl TracedUnion {
 
 //************************************************************************//
 
-struct TracedUnionErrorWrapper<E>(TracedUnion<E>)
+struct ErrorUnionErrorWrapper<E>(ErrorUnion<E>)
 where
     E: TypeSet;
 
-impl<E> std::error::Error for TracedUnionErrorWrapper<E>
+impl<E> std::error::Error for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
     E::Variants: std::error::Error + DebugFold + DisplayFold + ErrorFold,
@@ -351,7 +351,7 @@ where
     }
 }
 
-impl<E> fmt::Display for TracedUnionErrorWrapper<E>
+impl<E> fmt::Display for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
     E::Variants: fmt::Display + DisplayFold,
@@ -361,7 +361,7 @@ where
     }
 }
 
-impl<E> fmt::Debug for TracedUnionErrorWrapper<E>
+impl<E> fmt::Debug for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
     E::Variants: fmt::Debug + DebugFold,
@@ -371,34 +371,34 @@ where
     }
 }
 
-impl<E> TracedUnion<E>
+impl<E> ErrorUnion<E>
 where
     E: TypeSet + Send + Sync + 'static,
     E::Variants: std::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
-    /// Creates a `Box<dyn SendSyncError>` error from this [`crate::TracedUnion`]. This is used since
-    /// [`crate::TracedUnion`] cannot implement [`std::error::Error`] directly, otherwise trait implementations
-    /// that require this bounds would conflict. To convert back into a [`crate::TracedUnion`],
-    /// [`crate::TracedUnion::from_dyn_error`] must be used.
+    /// Creates a `Box<dyn SendSyncError>` error from this [`crate::ErrorUnion`]. This is used since
+    /// [`crate::ErrorUnion`] cannot implement [`std::error::Error`] directly, otherwise trait implementations
+    /// that require this bounds would conflict. To convert back into a [`crate::ErrorUnion`],
+    /// [`crate::ErrorUnion::from_dyn_error`] must be used.
     pub fn into_dyn_error(self) -> Box<dyn SendSyncError> {
-        Box::new(TracedUnionErrorWrapper(self)) as Box<dyn SendSyncError>
+        Box::new(ErrorUnionErrorWrapper(self)) as Box<dyn SendSyncError>
     }
 
-    /// See [`crate::TracedUnion::into_dyn_error`].
+    /// See [`crate::ErrorUnion::into_dyn_error`].
     pub fn from_dyn_error(error: Box<dyn SendSyncError>) -> Result<Self, Box<dyn SendSyncError>> {
         let error_ref = &*error as &dyn Any;
-        if !error_ref.is::<TracedUnionErrorWrapper<E>>() {
+        if !error_ref.is::<ErrorUnionErrorWrapper<E>>() {
             return Err(error);
         }
         let error = error as Box<dyn Any>;
-        let traced_union_wrapper = error.downcast::<TracedUnionErrorWrapper<E>>().unwrap();
-        Ok(traced_union_wrapper.0)
+        let error_union_wrapper = error.downcast::<ErrorUnionErrorWrapper<E>>().unwrap();
+        Ok(error_union_wrapper.0)
     }
 }
 
 //************************************************************************//
 
-impl<E> TracedUnion<E>
+impl<E> ErrorUnion<E>
 where
     E: TypeSet,
 {
@@ -410,7 +410,7 @@ where
         self,
     ) -> Result<
         Target,
-        TracedUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
         Target: 'static,
@@ -419,7 +419,7 @@ where
         if self.inner.is_error::<Target>() {
             Ok(unsafe { self.inner.downcast_error_unchecked::<Target>() })
         } else {
-            Err(TracedUnion {
+            Err(ErrorUnion {
                 inner: self.inner,
                 _pd: PhantomData,
             })
@@ -429,12 +429,12 @@ where
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    pub fn widen<Other, Index>(self) -> TracedUnion<Other>
+    pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
-        TracedUnion {
+        ErrorUnion {
             inner: self.inner,
             _pd: PhantomData,
         }
@@ -447,20 +447,20 @@ where
     pub fn subset<TargetList, Index>(
         self,
     ) -> Result<
-        TracedUnion<TargetList>,
-        TracedUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
+        ErrorUnion<TargetList>,
+        ErrorUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
     >
     where
         TargetList: TypeSet,
         E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
     {
         if E::Variants::is_fold(&self.inner.error as &dyn Any) {
-            Ok(TracedUnion {
+            Ok(ErrorUnion {
                 inner: self.inner,
                 _pd: PhantomData,
             })
         } else {
-            Err(TracedUnion {
+            Err(ErrorUnion {
                 inner: self.inner,
                 _pd: PhantomData,
             })
@@ -535,7 +535,7 @@ where
     }
 }
 
-impl<A: 'static> TracedUnion<(A,)> {
+impl<A: 'static> ErrorUnion<(A,)> {
     /// Convert to the inner type of an ErrorUnion with a single possible type.
     pub fn into_inner(self) -> A {
         unsafe { self.inner.downcast_error_unchecked() }
@@ -551,15 +551,15 @@ impl<A: 'static> TracedUnion<(A,)> {
         self.inner.downcast_error_mut()
     }
 
-    pub fn map<U, F>(self, f: F) -> TracedUnion<(U,)>
+    pub fn map<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
         F: FnOnce(A) -> U,
     {
         // SAFETY: We know that the inner error is only of type A, so we can safely downcast it
         let inner = unsafe { self.inner.downcast_error_unchecked_with_parts::<A>() };
-        TracedUnion {
-            inner: TracedUnionInner::new_from_parts(
+        ErrorUnion {
+            inner: ErrorUnionInner::new_from_parts(
                 f(inner.error),
                 #[cfg(feature = "backtrace")]
                 inner.backtrace,
@@ -583,7 +583,7 @@ where
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
-    fn widen<Other, Index>(self) -> Result<S, TracedUnion<Other>>
+    fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>;
@@ -598,7 +598,7 @@ where
         Target,
         Result<
             S,
-            TracedUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+            ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
         >,
     >
     where
@@ -606,11 +606,11 @@ where
         E::Variants: Narrow<Target, Index>;
 }
 
-impl<S, E> ReshapeUnion<S, E> for Result<S, TracedUnion<E>>
+impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
-    fn widen<Other, Index>(self) -> Result<S, TracedUnion<Other>>
+    fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>,
@@ -624,7 +624,7 @@ where
         Target,
         Result<
             S,
-            TracedUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+            ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
         >,
     >
     where
@@ -645,7 +645,7 @@ where
 
 pub trait IntoUnion<S, F> {
     /// Creates an `ErrorUnion` for this type.
-    fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
+    fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: Contains<F, Index>;
@@ -653,35 +653,35 @@ pub trait IntoUnion<S, F> {
 
 impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
     #[cfg_attr(feature = "location", track_caller)]
-    fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
+    fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: Contains<F, Index>,
     {
-        self.map_err(TracedUnion::new)
+        self.map_err(ErrorUnion::new)
     }
 }
 
 pub trait IntoDynUnion<S> {
     /// Creates an `ErrorUnion` for this type.
-    fn into_dyn_union(self) -> Result<S, TracedUnion>;
+    fn into_dyn_union(self) -> Result<S, ErrorUnion>;
 }
 
 impl<S, F: SendSyncError> IntoDynUnion<S> for Result<S, F> {
-    fn into_dyn_union(self) -> Result<S, TracedUnion> {
+    fn into_dyn_union(self) -> Result<S, ErrorUnion> {
         self.map_err(|e| e.into())
     }
 }
 
-impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, TracedUnion<E>> {
-    fn into_dyn_union(self) -> Result<S, TracedUnion> {
-        self.map_err(|e| TracedUnion::erase(e))
+impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
+    fn into_dyn_union(self) -> Result<S, ErrorUnion> {
+        self.map_err(|e| ErrorUnion::erase(e))
     }
 }
 
 // pub trait IntoUnion<S, F> {
 //     /// Con `Err` to i
-//     fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
+//     fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
 //     where
 //         Other: TypeSet,
 //         Other::Variants: Contains<F, Index>;
@@ -692,26 +692,26 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, TracedUnion<E>> {
 //     F1: Into<F2> + SendSyncError, // `SendSyncError` is used to ensure it does not overlap with below
 //     F2: SendSyncError,
 // {
-//     fn into_union<Index, Other>(self) -> Result<S, TracedUnion<Other>>
+//     fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
 //     where
 //         Other: TypeSet,
 //         Other::Variants: Contains<F2, Index>,
 //     {
-//         self.map_err(|e| TracedUnion::new(e.into()))
+//         self.map_err(|e| ErrorUnion::new(e.into()))
 //     }
 // }
 
 // pub trait InnerInto<S, F> {
-//     /// Converts the inner type of an `TracedUnion` into another type
-//     fn inner_into(self) -> Result<S, TracedUnion<(F,)>>;
+//     /// Converts the inner type of an `ErrorUnion` into another type
+//     fn inner_into(self) -> Result<S, ErrorUnion<(F,)>>;
 // }
 
-// impl<S, F1, F2> InnerInto<S, F2> for Result<S, TracedUnion<(F1,)>>
+// impl<S, F1, F2> InnerInto<S, F2> for Result<S, ErrorUnion<(F1,)>>
 // where
 //     F1: Into<F2> + SendSyncError,
 //     F2: SendSyncError,
 // {
-//     fn inner_into(self) -> Result<S, TracedUnion<(F2,)>> {
+//     fn inner_into(self) -> Result<S, ErrorUnion<(F2,)>> {
 //         self.map_err(|e| e.map(|e| e.into()))
 //     }
 // }
@@ -761,11 +761,11 @@ impl std::error::Error for AnyhowError {
 }
 
 #[cfg(feature = "anyhow")]
-impl TracedUnion {
+impl ErrorUnion {
     // todo improve this: Change to at display time and debug time instead of here
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn anyhow(error: anyhow::Error) -> TracedUnion {
-        TracedUnion::new_from_parts(
+    pub fn anyhow(error: anyhow::Error) -> ErrorUnion {
+        ErrorUnion::new_from_parts(
             AnyhowError(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
@@ -778,9 +778,9 @@ impl TracedUnion {
 }
 
 // Needs specialization
-// impl From<anyhow::Error> for TracedUnion {
+// impl From<anyhow::Error> for ErrorUnion {
 //     fn from(value: anyhow::Error) -> Self {
-//         TracedUnion::anyhow(value)
+//         ErrorUnion::anyhow(value)
 //     }
 // }
 
@@ -814,7 +814,7 @@ mod tests {
 
     #[test]
     fn downcast_error_unchecked_correct_type_recovers_value() {
-        let inner = TracedUnionInner::new(FooError("hello".into()));
+        let inner = ErrorUnionInner::new(FooError("hello".into()));
         assert!(inner.is_error::<FooError>());
         let recovered: FooError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered, FooError("hello".into()));
@@ -833,7 +833,7 @@ mod tests {
         }
         impl std::error::Error for VecError {}
 
-        let inner = TracedUnionInner::new(VecError(payload.clone()));
+        let inner = ErrorUnionInner::new(VecError(payload.clone()));
         let recovered: VecError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered.0, payload);
     }
@@ -841,15 +841,15 @@ mod tests {
     #[test]
     #[should_panic]
     fn downcast_error_panics_on_wrong_type() {
-        let inner = TracedUnionInner::new(FooError("oops".into()));
+        let inner = ErrorUnionInner::new(FooError("oops".into()));
         inner.downcast_error::<BarError>(); // safe wrapper should panic
     }
 
     #[test]
     fn downcast_error_unchecked_with_parts_preserves_context() {
-        let inner = TracedUnionInner::new(FooError("ctx".into()));
+        let inner = ErrorUnionInner::new(FooError("ctx".into()));
 
-        let mut union: TracedUnion<(FooError,)> = TracedUnion {
+        let mut union: ErrorUnion<(FooError,)> = ErrorUnion {
             inner,
             _pd: PhantomData,
         };
@@ -860,7 +860,7 @@ mod tests {
             union.inner.context.push("step two".into());
         }
 
-        let parts: TracedUnionInner<FooError> =
+        let parts: ErrorUnionInner<FooError> =
             unsafe { union.inner.downcast_error_unchecked_with_parts() };
 
         assert_eq!(parts.error, FooError("ctx".into()));
@@ -871,35 +871,35 @@ mod tests {
 
     #[test]
     fn downcast_error_unchecked_with_parts_correct_error_value() {
-        let inner = TracedUnionInner::new(BarError(42));
-        let parts: TracedUnionInner<BarError> =
+        let inner = ErrorUnionInner::new(BarError(42));
+        let parts: ErrorUnionInner<BarError> =
             unsafe { inner.downcast_error_unchecked_with_parts() };
         assert_eq!(parts.error, BarError(42));
     }
 
     #[test]
     fn into_dyn_error_and_back_roundtrips() {
-        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("roundtrip".into()));
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("roundtrip".into()));
         let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
 
-        let recovered: TracedUnion<(FooError,)> =
-            TracedUnion::from_dyn_error(dyn_err).expect("round-trip should succeed");
+        let recovered: ErrorUnion<(FooError,)> =
+            ErrorUnion::from_dyn_error(dyn_err).expect("round-trip should succeed");
 
         assert_eq!(recovered.inner(), &FooError("roundtrip".into()));
     }
 
     #[test]
     fn from_dyn_error_wrong_type_returns_err() {
-        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("mismatch".into()));
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("mismatch".into()));
         let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
 
-        let result: Result<TracedUnion<(BarError,)>, _> = TracedUnion::from_dyn_error(dyn_err);
+        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::from_dyn_error(dyn_err);
         assert!(result.is_err(), "mismatched type should be returned as Err");
     }
 
     #[test]
     fn into_dyn_error_display_delegates_to_inner() {
-        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("display".into()));
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("display".into()));
         let dyn_err = union.into_dyn_error();
         assert!(dyn_err.to_string().contains("FooError(display)"));
     }
@@ -907,20 +907,20 @@ mod tests {
     #[test]
     fn into_dyn_error_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>(_: T) {}
-        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("traits".into()));
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("traits".into()));
         assert_send_sync(union.into_dyn_error());
     }
 
     #[test]
     fn from_dyn_error_preserves_context() {
-        let mut union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("ctx".into()));
+        let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("ctx".into()));
         #[cfg(feature = "context")]
         {
             union = union.context("some context");
         }
         let dyn_err = union.into_dyn_error();
-        let recovered: TracedUnion<(FooError,)> =
-            TracedUnion::from_dyn_error(dyn_err).unwrap();
+        let recovered: ErrorUnion<(FooError,)> =
+            ErrorUnion::from_dyn_error(dyn_err).unwrap();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -930,12 +930,12 @@ mod tests {
 
     #[test]
     fn multi_variant_union_into_dyn_error_roundtrips() {
-        let union: TracedUnion<(FooError, BarError)> =
-            TracedUnion::new(BarError(99));
+        let union: ErrorUnion<(FooError, BarError)> =
+            ErrorUnion::new(BarError(99));
         let dyn_err = union.into_dyn_error();
 
-        let recovered: TracedUnion<(FooError, BarError)> =
-            TracedUnion::from_dyn_error(dyn_err).unwrap();
+        let recovered: ErrorUnion<(FooError, BarError)> =
+            ErrorUnion::from_dyn_error(dyn_err).unwrap();
 
         let bar: BarError = recovered.narrow().unwrap();
         assert_eq!(bar, BarError(99));
