@@ -7,7 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-  # Your existing test job remains unchanged
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -30,7 +29,6 @@ jobs:
           cargo test
           cargo test --no-default-features
 
-  # New dedicated job for Miri
   miri:
     runs-on: ubuntu-latest
     steps:
