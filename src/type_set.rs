@@ -3,7 +3,9 @@ use core::fmt;
 use std::backtrace::Backtrace;
 use std::error::Error;
 
-use crate::{AnyError, SendSyncError, StrContext};
+#[cfg(feature = "context")]
+use crate::context::ErosContext;
+use crate::{AnyError, SendSyncError, StrError};
 
 /* ------------------------- Helpers ----------------------- */
 
@@ -113,7 +115,7 @@ pub trait DebugFold {
     fn debug_fold(
         any: &dyn SendSyncError,
         formatter: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &[StrContext],
+        #[cfg(feature = "context")] context: &[ErosContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> fmt::Result;
@@ -123,7 +125,7 @@ impl DebugFold for End {
     fn debug_fold(
         _: &dyn SendSyncError,
         _: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] _context: &[StrContext],
+        #[cfg(feature = "context")] _context: &[ErosContext],
         #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
         #[cfg(feature = "location")] _location: &'static std::panic::Location<'static>,
     ) -> fmt::Result {
@@ -134,15 +136,35 @@ impl DebugFold for End {
 pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
-    #[cfg(feature = "context")] context: &[StrContext],
+    #[cfg(feature = "context")] context: &[ErosContext],
     #[cfg(feature = "backtrace")] mut backtrace: &Backtrace,
     #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
 ) -> fmt::Result {
+    fn write_eros_context(
+        context: &ErosContext,
+        formatter: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        #[cfg(feature = "location")]
+        {
+            writeln!(
+                formatter,
+                "{}:{}:{}\n\t- {}",
+                context.location.file(),
+                context.location.line(),
+                context.location.column(),
+                context.context
+            )
+        }
+        #[cfg(not(feature = "location"))]
+        {
+            writeln!(formatter, "\t- {}", context.context)
+        }
+    }
     #[cfg(feature = "location")]
     {
-        write!(
+        writeln!(
             formatter,
-            "{}:{}:{}\t",
+            "{}:{}:{}",
             location.file(),
             location.line(),
             location.column()
@@ -155,19 +177,19 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
             let anyhow_error: &anyhow::Error = &anyhow_error.0;
             let mut chain = anyhow_error.chain().rev();
             let root = chain.next().unwrap();
-            write!(formatter, "{root}")?;
+            writeln!(formatter, "{root}")?;
             #[cfg(feature = "context")]
             {
                 let next = chain.next();
                 if let Some(context_item) = next {
-                    write!(formatter, "\n\nContext:")?;
-                    write!(formatter, "\n\t- {}", context_item)?;
+                    writeln!(formatter, "\nContext:")?;
+                    writeln!(formatter, "\t- {}", context_item)?;
                     for context_item in chain {
-                        write!(formatter, "\n\t- {}", context_item)?;
+                        writeln!(formatter, "\t- {}", context_item)?;
                     }
                 }
                 for context_item in context.iter() {
-                    write!(formatter, "\n\t- {}", context_item)?;
+                    write_eros_context(context_item, formatter)?;
                 }
             }
             #[cfg(feature = "backtrace")]
@@ -176,7 +198,7 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
 
                 let backtrace = anyhow_error.backtrace();
                 if matches!(backtrace.status(), BacktraceStatus::Captured) {
-                    write!(formatter, "\n\nBacktrace:\n")?;
+                    writeln!(formatter, "\nBacktrace:")?;
                     fmt::Display::fmt(backtrace, formatter)?;
                 }
             }
@@ -187,9 +209,9 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     #[cfg(feature = "context")]
     {
         if !context.is_empty() {
-            write!(formatter, "\n\nContext:")?;
+            writeln!(formatter, "\nContext:")?;
             for context_item in context.iter() {
-                write!(formatter, "\n\t- {}", context_item)?;
+                write_eros_context(context_item, formatter)?;
             }
         }
     }
@@ -198,7 +220,7 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
         use std::backtrace::BacktraceStatus;
 
         if matches!(backtrace.status(), BacktraceStatus::Captured) {
-            write!(formatter, "\n\nBacktrace:\n")?;
+            writeln!(formatter, "\nBacktrace:")?;
             fmt::Display::fmt(backtrace, formatter)?;
         }
     }
@@ -214,7 +236,7 @@ where
     fn debug_fold(
         any: &dyn SendSyncError,
         formatter: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &[StrContext],
+        #[cfg(feature = "context")] context: &[ErosContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> fmt::Result {

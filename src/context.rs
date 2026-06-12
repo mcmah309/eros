@@ -1,6 +1,25 @@
+use core::fmt;
 use std::fmt::Display;
 
-use crate::{str_error::StrContext, type_set::TypeSet, SendSyncError, ErrorUnion};
+use crate::{str_error::StrError, type_set::TypeSet, ErrorUnion, SendSyncError};
+
+#[derive(Debug)]
+pub struct ErosContext {
+    pub(crate) context: StrError,
+    #[cfg(feature = "location")]
+    pub(crate) location: &'static std::panic::Location<'static>,
+}
+
+impl ErosContext {
+    #[cfg_attr(feature = "location", track_caller)]
+    pub fn new(context: StrError) -> Self {
+        Self {
+            context,
+            #[cfg(feature = "location")]
+            location: std::panic::Location::caller(),
+        }
+    }
+}
 
 /// Provides `context` methods to add context to `Result`.
 pub trait Context {
@@ -8,13 +27,11 @@ pub trait Context {
     type OutSet: TypeSet;
 
     /// Adds additional context. This becomes a no-op if the `traced` feature is disabled.
-    fn context<C: Into<StrContext>>(
-        self,
-        context: C,
-    ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>;
+    fn context<C: Into<StrError>>(self, context: C)
+        -> Result<Self::Okay, ErrorUnion<Self::OutSet>>;
 
     /// Lazily adds additional context. This becomes a no-op if the `traced` feature is disabled.
-    fn with_context<F, C: Into<StrContext>>(
+    fn with_context<F, C: Into<StrError>>(
         self,
         f: F,
     ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>
@@ -27,20 +44,30 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
     type OutSet = InSet;
 
     #[allow(unused_variables)]
-    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    #[cfg_attr(feature = "location", track_caller)]
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+        // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
-        return self.map_err(|e| e.context(context));
+        return match self {
+            Ok(val) => Ok(val),
+            Err(e) => Err(e.context(context)),
+        };
         #[cfg(not(feature = "context"))]
         return self;
     }
 
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    #[cfg_attr(feature = "location", track_caller)]
+    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
+        // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
-        return self.map_err(|e| e.with_context(f));
+        return match self {
+            Ok(val) => Ok(val),
+            Err(e) => Err(e.with_context(f)),
+        };
         #[cfg(not(feature = "context"))]
         return self;
     }
@@ -50,31 +77,47 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
     type Okay = T;
     type OutSet = (E,);
 
-    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    #[cfg_attr(feature = "location", track_caller)]
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+        // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
-        return self.map_err(|e| {
-            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(e);
-            widened.context(context)
-        });
+        return match self {
+            Ok(val) => Ok(val),
+            Err(e) => {
+                let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(e);
+                Err(widened.context(context))
+            }
+        };
+        // Note: We use match so the call location gets passed through
         #[cfg(not(feature = "context"))]
-        return self.map_err(|e| ErrorUnion::new(e));
+        return match self {
+            Ok(val) => Ok(val),
+            Err(e) => Err(ErrorUnion::new(e)),
+        };
     }
 
-    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    #[cfg_attr(feature = "location", track_caller)]
+    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
+        // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
-        return self.map_err(|e| {
-            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(e);
-            widened.with_context(f)
-        });
+        return match self {
+            Ok(val) => Ok(val),
+            Err(e) => {
+                let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(e);
+                Err(widened.with_context(f))
+            }
+        };
+        // Note: We use match so the call location gets passed through
         #[cfg(not(feature = "context"))]
-        return self.map_err(|e| ErrorUnion::new(e));
+        return match self {
+            Ok(val) => Ok(val),
+            Err(e) => Err(ErrorUnion::new(e)),
+        };
     }
 }
 
@@ -121,17 +164,24 @@ impl<T> Context for Option<T> {
     /// Constructing this type is always paired with information ([`context`])
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
-    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn context<C: Into<StrContext>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>>
-where {
+    #[cfg_attr(feature = "location", track_caller)]
+    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+        // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
-        return self.ok_or_else(|| {
-            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(AbsentValueError);
-            widened.context(context)
-        });
+        return match self {
+            Some(val) => Ok(val),
+            None => {
+                let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(AbsentValueError);
+                Err(widened.context(context))
+            }
+        };
+        // Note: We use match so the call location gets passed through
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| ErrorUnion::new(AbsentValueError));
+        return match self {
+            Some(val) => Ok(val),
+            None => Err(ErrorUnion::new(AbsentValueError)),
+        };
     }
 
     /// This is used for unwrapping an `Option` that is `None`, but expected to be `Some`
@@ -142,19 +192,27 @@ where {
     /// Constructing this type is always paired with information ([`context`])
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
-    #[cfg_attr(feature = "location", track_caller)]
     #[allow(unused_variables)]
-    fn with_context<F, C: Into<StrContext>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    #[cfg_attr(feature = "location", track_caller)]
+    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
+        // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
-        return self.ok_or_else(|| {
-            let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(AbsentValueError);
-            widened.with_context(f)
-        });
+        return match self {
+            Some(val) => Ok(val),
+            None => {
+                let widened: ErrorUnion<Self::OutSet> = ErrorUnion::new(AbsentValueError);
+                Err(widened.with_context(f))
+            }
+        };
+        // Note: We use match so the call location gets passed through
         #[cfg(not(feature = "context"))]
-        return self.ok_or_else(|| ErrorUnion::new(AbsentValueError));
+        return match self {
+            Some(val) => Ok(val),
+            None => Err(ErrorUnion::new(AbsentValueError)),
+        };
     }
 }
 

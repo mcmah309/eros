@@ -11,7 +11,7 @@ keywords = ["error", "error-handling"]
 readme = "README.md"
 
 [dependencies]
-# Adds `TracedError::anyhow` for converting `anyhow::Error`s into a `TracedError`
+# Adds `ErrorUnion::anyhow` for converting `anyhow::Error`s into a `ErrorUnion`
 anyhow = { version = "1", optional = true }
 
 [dev-dependencies]
@@ -19,10 +19,9 @@ reqwest = { version = "0.12", features = ["blocking"] }
 trybuild = "1"
 
 [features]
-# Disabling "context" and "backtrace" turns `TracedError` into a new type that may be optimized away. 
-# Libraries should consider disabling this, allowing downstream crates to decide.
+# Libraries should consider disabling these defaults, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
-default = ["context", "backtrace", "location"]
+default = ["context", "backtrace"]
 # Enables context
 context = []
 # Enables backtrace

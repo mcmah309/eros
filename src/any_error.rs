@@ -1,4 +1,4 @@
-use crate::{SendSyncError, ErrorUnion};
+use crate::{ErrorUnion, SendSyncError};
 
 /// A marker type for `ErrorUnion` representing all possible errors
 #[derive(Debug)]
@@ -10,6 +10,7 @@ impl<A> From<A> for ErrorUnion<AnyError>
 where
     A: SendSyncError,
 {
+    #[cfg_attr(feature = "location", track_caller)]
     fn from(value: A) -> Self {
         ErrorUnion::new(value)
     }
@@ -23,6 +24,7 @@ where
     T: SendSyncError + Into<A>,
     A: SendSyncError,
 {
+    #[cfg_attr(feature = "location", track_caller)]
     fn from(value: T) -> Self {
         ErrorUnion::new(value.into())
     }

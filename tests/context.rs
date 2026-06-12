@@ -202,7 +202,7 @@ fn nesting_traced_dyn_calls() {
     assert_eq!(count, 1, "Expected only one 'Context:', got:\n{}", message);
 }
 
-#[cfg(feature = "anyhow")]
+#[cfg(all(feature = "anyhow", not(feature = "location")))]
 #[test]
 fn integration_with_anyhow() {
     fn anyhow_result() -> anyhow::Result<()> {

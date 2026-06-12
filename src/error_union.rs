@@ -5,12 +5,14 @@ use core::ops::Deref;
 use std::any::TypeId;
 use std::{backtrace, mem, ptr};
 
+#[cfg(feature = "context")]
+use crate::context::ErosContext;
 use crate::type_set::{
     write_debug, write_display, Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow,
     SupersetOf, TupleForm, TypeSet,
 };
 
-use crate::{AnyError, Cons, End, StrContext};
+use crate::{AnyError, Cons, End, StrError};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
@@ -36,7 +38,7 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
     #[cfg(feature = "context")]
-    pub(crate) context: Vec<StrContext>,
+    pub(crate) context: Vec<ErosContext>,
     #[cfg(feature = "location")]
     pub(crate) location: &'static std::panic::Location<'static>,
     pub(crate) error: T,
@@ -59,11 +61,10 @@ impl ErrorUnionInner<dyn SendSyncError> {
         })
     }
 
-    #[cfg_attr(feature = "location", track_caller)]
     pub(crate) fn new_from_parts<T>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "context")] context: Vec<StrContext>,
+        #[cfg(feature = "context")] context: Vec<ErosContext>,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> Box<ErrorUnionInner<dyn SendSyncError>>
     where
@@ -302,7 +303,7 @@ impl ErrorUnion {
     pub fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "context")] context: Vec<StrContext>,
+        #[cfg(feature = "context")] context: Vec<ErosContext>,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> ErrorUnion<OutSet>
     where
@@ -516,21 +517,27 @@ where
 
     #[allow(unused_mut)]
     #[allow(unused_variables)]
-    pub fn context<C: Into<StrContext>>(mut self, context: C) -> Self {
+    #[cfg_attr(feature = "location", track_caller)]
+    pub fn context<C: Into<StrError>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
-        self.inner.context.push(context.into());
+        self.inner
+            .context
+            .push(crate::context::ErosContext::new(context.into()));
         self
     }
 
     /// Adds additional context lazily. This becomes a no-op if the `traced` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
-    pub fn with_context<F, C: Into<StrContext>>(mut self, f: F) -> Self
+    #[cfg_attr(feature = "location", track_caller)]
+    pub fn with_context<F, C: Into<StrError>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        self.inner.context.push(f().into());
+        self.inner
+            .context
+            .push(crate::context::ErosContext::new(f().into()));
         self
     }
 }
@@ -658,7 +665,11 @@ impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
         Other: TypeSet,
         Other::Variants: Contains<F, Index>,
     {
-        self.map_err(ErrorUnion::new)
+        // Note: We use match so the call location gets passed through
+        match self {
+            Ok(value) => Ok(value),
+            Err(err) => Err(ErrorUnion::new(err)),
+        }
     }
 }
 
@@ -668,8 +679,12 @@ pub trait IntoDynUnion<S> {
 }
 
 impl<S, F: SendSyncError> IntoDynUnion<S> for Result<S, F> {
+    #[cfg_attr(feature = "location", track_caller)]
     fn into_dyn_union(self) -> Result<S, ErrorUnion> {
-        self.map_err(|e| e.into())
+        match self {
+            Ok(value) => Ok(value),
+            Err(err) => Err(ErrorUnion::new(err)),
+        }
     }
 }
 
@@ -745,15 +760,18 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
 //************************************************************************//
 
 // anyhow::Error does not implement `std::error::Error` so we need to wrap it
+#[cfg(feature = "anyhow")]
 #[derive(Debug)]
 pub(crate) struct AnyhowError(pub(crate) anyhow::Error);
 
+#[cfg(feature = "anyhow")]
 impl fmt::Display for AnyhowError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "{}", self.0)
     }
 }
 
+#[cfg(feature = "anyhow")]
 impl std::error::Error for AnyhowError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.0.source()
@@ -783,7 +801,6 @@ impl ErrorUnion {
 //         ErrorUnion::anyhow(value)
 //     }
 // }
-
 
 #[cfg(test)]
 mod tests {
@@ -856,8 +873,14 @@ mod tests {
 
         #[cfg(feature = "context")]
         {
-            union.inner.context.push("step one".into());
-            union.inner.context.push("step two".into());
+            union
+                .inner
+                .context
+                .push(ErosContext::new("step one".into()));
+            union
+                .inner
+                .context
+                .push(ErosContext::new("step two".into()));
         }
 
         let parts: ErrorUnionInner<FooError> =
@@ -919,8 +942,7 @@ mod tests {
             union = union.context("some context");
         }
         let dyn_err = union.into_dyn_error();
-        let recovered: ErrorUnion<(FooError,)> =
-            ErrorUnion::from_dyn_error(dyn_err).unwrap();
+        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::from_dyn_error(dyn_err).unwrap();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -930,8 +952,7 @@ mod tests {
 
     #[test]
     fn multi_variant_union_into_dyn_error_roundtrips() {
-        let union: ErrorUnion<(FooError, BarError)> =
-            ErrorUnion::new(BarError(99));
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(99));
         let dyn_err = union.into_dyn_error();
 
         let recovered: ErrorUnion<(FooError, BarError)> =

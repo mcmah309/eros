@@ -16,13 +16,13 @@ macro_rules! bail {
 #[macro_export]
 macro_rules! traced {
     ($msg:literal $(,)?) => {
-        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrContext::Static($msg))
+        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrError::Static($msg))
     };
     ($err:expr $(,)?) => {
         $crate::ErrorUnion::new::<_, eros::AnyError, _>($err)
     };
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrContext::Owned(format!($fmt, $($arg)*)))
+        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrError::Owned(format!($fmt, $($arg)*)))
     };
 }
 
