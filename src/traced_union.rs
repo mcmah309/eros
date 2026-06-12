@@ -783,3 +783,161 @@ impl TracedUnion {
 //         TracedUnion::anyhow(value)
 //     }
 // }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fmt;
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    #[derive(Debug, PartialEq)]
+    struct FooError(String);
+
+    impl fmt::Display for FooError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "FooError({})", self.0)
+        }
+    }
+    impl std::error::Error for FooError {}
+
+    #[derive(Debug, PartialEq)]
+    struct BarError(u32);
+
+    impl fmt::Display for BarError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "BarError({})", self.0)
+        }
+    }
+    impl std::error::Error for BarError {}
+
+    #[test]
+    fn downcast_error_unchecked_correct_type_recovers_value() {
+        let inner = TracedUnionInner::new(FooError("hello".into()));
+        assert!(inner.is_error::<FooError>());
+        let recovered: FooError = unsafe { inner.downcast_error_unchecked() };
+        assert_eq!(recovered, FooError("hello".into()));
+    }
+
+    #[test]
+    fn downcast_error_unchecked_does_not_leak_or_double_drop() {
+        let payload = vec![1u8, 2, 3, 4, 5];
+
+        #[derive(Debug, PartialEq)]
+        struct VecError(Vec<u8>);
+        impl fmt::Display for VecError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:?}", self.0)
+            }
+        }
+        impl std::error::Error for VecError {}
+
+        let inner = TracedUnionInner::new(VecError(payload.clone()));
+        let recovered: VecError = unsafe { inner.downcast_error_unchecked() };
+        assert_eq!(recovered.0, payload);
+    }
+
+    #[test]
+    #[should_panic]
+    fn downcast_error_panics_on_wrong_type() {
+        let inner = TracedUnionInner::new(FooError("oops".into()));
+        inner.downcast_error::<BarError>(); // safe wrapper should panic
+    }
+
+    #[test]
+    fn downcast_error_unchecked_with_parts_preserves_context() {
+        let inner = TracedUnionInner::new(FooError("ctx".into()));
+
+        let mut union: TracedUnion<(FooError,)> = TracedUnion {
+            inner,
+            _pd: PhantomData,
+        };
+
+        #[cfg(feature = "context")]
+        {
+            union.inner.context.push("step one".into());
+            union.inner.context.push("step two".into());
+        }
+
+        let parts: TracedUnionInner<FooError> =
+            unsafe { union.inner.downcast_error_unchecked_with_parts() };
+
+        assert_eq!(parts.error, FooError("ctx".into()));
+
+        #[cfg(feature = "context")]
+        assert_eq!(parts.context.len(), 2);
+    }
+
+    #[test]
+    fn downcast_error_unchecked_with_parts_correct_error_value() {
+        let inner = TracedUnionInner::new(BarError(42));
+        let parts: TracedUnionInner<BarError> =
+            unsafe { inner.downcast_error_unchecked_with_parts() };
+        assert_eq!(parts.error, BarError(42));
+    }
+
+    #[test]
+    fn into_dyn_error_and_back_roundtrips() {
+        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("roundtrip".into()));
+        let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
+
+        let recovered: TracedUnion<(FooError,)> =
+            TracedUnion::from_dyn_error(dyn_err).expect("round-trip should succeed");
+
+        assert_eq!(recovered.inner(), &FooError("roundtrip".into()));
+    }
+
+    #[test]
+    fn from_dyn_error_wrong_type_returns_err() {
+        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("mismatch".into()));
+        let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
+
+        let result: Result<TracedUnion<(BarError,)>, _> = TracedUnion::from_dyn_error(dyn_err);
+        assert!(result.is_err(), "mismatched type should be returned as Err");
+    }
+
+    #[test]
+    fn into_dyn_error_display_delegates_to_inner() {
+        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("display".into()));
+        let dyn_err = union.into_dyn_error();
+        assert!(dyn_err.to_string().contains("FooError(display)"));
+    }
+
+    #[test]
+    fn into_dyn_error_is_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>(_: T) {}
+        let union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("traits".into()));
+        assert_send_sync(union.into_dyn_error());
+    }
+
+    #[test]
+    fn from_dyn_error_preserves_context() {
+        let mut union: TracedUnion<(FooError,)> = TracedUnion::new(FooError("ctx".into()));
+        #[cfg(feature = "context")]
+        {
+            union = union.context("some context");
+        }
+        let dyn_err = union.into_dyn_error();
+        let recovered: TracedUnion<(FooError,)> =
+            TracedUnion::from_dyn_error(dyn_err).unwrap();
+
+        #[cfg(feature = "context")]
+        assert_eq!(recovered.inner.context.len(), 1);
+
+        assert_eq!(recovered.inner(), &FooError("ctx".into()));
+    }
+
+    #[test]
+    fn multi_variant_union_into_dyn_error_roundtrips() {
+        let union: TracedUnion<(FooError, BarError)> =
+            TracedUnion::new(BarError(99));
+        let dyn_err = union.into_dyn_error();
+
+        let recovered: TracedUnion<(FooError, BarError)> =
+            TracedUnion::from_dyn_error(dyn_err).unwrap();
+
+        let bar: BarError = recovered.narrow().unwrap();
+        assert_eq!(bar, BarError(99));
+    }
+}
