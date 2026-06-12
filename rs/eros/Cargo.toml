@@ -1,0 +1,32 @@
+[package]
+name = "eros"
+version = "0.5.0"
+edition = "2021"
+documentation = "https://docs.rs/eros/"
+description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
+license = "Apache-2.0"
+repository = "https://github.com/mcmah309/eros"
+categories = ["rust-patterns"]
+keywords = ["error", "error-handling"]
+readme = "README.md"
+
+[dependencies]
+# Adds `ErrorUnion::anyhow` for converting `anyhow::Error`s into a `ErrorUnion`
+anyhow = { version = "1", optional = true }
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["blocking"] }
+trybuild = "1"
+
+[features]
+# Libraries should consider disabling these defaults, allowing downstream crates to decide.
+# Or when trying to optimize the binary.
+default = ["context", "backtrace"]
+# Enables context
+context = []
+# Enables backtrace
+backtrace = []
+# Enables location capture 
+location = []
+# Add integration with anyhow
+anyhow = ["dep:anyhow"]

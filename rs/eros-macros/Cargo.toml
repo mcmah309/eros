@@ -1,0 +1,25 @@
+[package]
+name = "eros-macros"
+# description = ""
+version = "0.0.1"
+edition = "2024"
+# repository = ""
+# license = "" # e.g. `Apache-2.0`
+# categories = []
+# keywords = []
+# documentation = "" # Alternative documentation
+# rust-version = "" # Min required rust version
+
+[lib]
+proc-macro = true
+
+[dependencies]
+
+[dev-dependencies]
+
+[features]
+default = []
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"] # Used in the root .rs file to enable `#![cfg_attr(docsrs, feature(doc_cfg))]`
