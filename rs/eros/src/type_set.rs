@@ -247,7 +247,7 @@ where
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> fmt::Result {
-        if let Some(head_ref) = any.as_any().downcast_ref::<Head>() {
+        if let Some(head_ref) = (any as &dyn Any).downcast_ref::<Head>() {
             write_debug(
                 head_ref,
                 formatter,

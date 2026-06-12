@@ -6,7 +6,7 @@ fn test_function(arg1: &str, arg2: String, arg3: i32) -> eros::Result<String> {
 #[test]
 fn test() {
     let error = test_function("test", "arg2".to_owned(), 42).unwrap_err();
-    let inner_error = error.error_ref();
+    let inner_error = error.inner_ref();
     assert_eq!(inner_error.to_string(), "This is the error");
     assert!(format!("{:?}", error).contains("\t- arg1 is test\n"));
 }

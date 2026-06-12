@@ -1,8 +1,8 @@
 use crate::{ErrorUnion, SendSyncError};
 
 /// A marker type for `ErrorUnion` representing all possible errors
-#[derive(Debug)]
-pub struct AnyError;
+// Note: `AnyError` is not constructable. If so we could have correctness issues
+pub enum AnyError {}
 
 //************************************************************************//
 

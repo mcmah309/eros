@@ -3,30 +3,21 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
 use std::any::TypeId;
-use std::{backtrace, mem, ptr};
+use std::{mem, ptr};
 
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
 use crate::type_set::{
-    write_debug, write_display, Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow,
-    SupersetOf, TupleForm, TypeSet,
+    Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
+    write_debug, write_display,
 };
 
 use crate::{AnyError, Cons, End, StrError};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
-pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
-    fn as_any(&self) -> &dyn std::any::Any;
-}
+pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {}
 
-impl<T> SendSyncError for T
-where
-    T: std::error::Error + Send + Sync + 'static,
-{
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl<T> SendSyncError for T where T: std::error::Error + Send + Sync + 'static {}
 
 impl std::error::Error for Box<dyn SendSyncError> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
@@ -41,7 +32,16 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     pub(crate) context: Vec<ErosContext>,
     #[cfg(feature = "location")]
     pub(crate) location: &'static std::panic::Location<'static>,
+    /// Re-boxes the error field into a fresh allocation.
+    /// Stored at construction so the concrete type is still known.
+    pub(crate) into_box_fn: fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
     pub(crate) error: T,
+}
+
+fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
+    // SAFETY: caller guarantees ptr points to a live T
+    let value: T = unsafe { ptr::read(ptr as *const dyn SendSyncError as *const T) };
+    Box::new(value)
 }
 
 impl ErrorUnionInner<dyn SendSyncError> {
@@ -57,6 +57,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             context: Vec::new(),
             #[cfg(feature = "location")]
             location: std::panic::Location::caller(),
+            into_box_fn: make_box::<T>,
             error: t,
         })
     }
@@ -77,6 +78,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             context,
             #[cfg(feature = "location")]
             location,
+            into_box_fn: make_box::<T>,
             error: t,
         })
     }
@@ -138,6 +140,8 @@ impl ErrorUnionInner<dyn SendSyncError> {
         #[cfg(feature = "location")]
         let location = ptr::read(ptr::addr_of!((*raw_container).location));
 
+        let into_box_fn = ptr::read(ptr::addr_of!((*raw_container).into_box_fn));
+
         // Deallocate the Box allocation itself.
         // We reconstruct a Box containing uninitialized/dead data, but wrapped in
         // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
@@ -152,6 +156,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             context,
             #[cfg(feature = "location")]
             location,
+            into_box_fn,
             error: downcasted_value,
         }
     }
@@ -478,11 +483,13 @@ where
         unsafe { self.inner.downcast_error_unchecked::<Target>() }
     }
 
-    pub fn error_ref(&self) -> &dyn SendSyncError {
+    /// Gets a reference to the inner underlying error
+    pub fn inner_ref(&self) -> &dyn SendSyncError {
         &self.inner.error
     }
 
-    pub fn error_ref_any(&self) -> &dyn Any {
+    /// Gets a reference to the inner underlying error as `Any`
+    pub fn inner_ref_any(&self) -> &dyn Any {
         &self.inner.error
     }
 
@@ -493,6 +500,30 @@ where
 
     pub fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.error.source()
+    }
+
+    /// Into the inner underlying error
+    pub fn into_inner_dyn_error(self) -> Box<dyn SendSyncError> {
+        let raw = Box::into_raw(self.inner);
+        unsafe {
+            let into_box_fn = (*raw).into_box_fn;
+            let error_ptr = ptr::addr_of_mut!((*raw).error) as *mut dyn SendSyncError;
+
+            let boxed = (into_box_fn)(error_ptr);
+
+            // Drop remaining fields, free the allocation (same pattern as downcast_error_unchecked)
+            #[cfg(feature = "backtrace")]
+            ptr::drop_in_place(ptr::addr_of_mut!((*raw).backtrace));
+            #[cfg(feature = "context")]
+            ptr::drop_in_place(ptr::addr_of_mut!((*raw).context));
+            #[cfg(feature = "location")]
+            ptr::drop_in_place(ptr::addr_of_mut!((*raw).location));
+
+            let _dead: Box<mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>> =
+                Box::from_raw(raw as *mut _);
+
+            boxed
+        }
     }
 
     /// Convert the `ErrorUnion` to an owned enum for
@@ -909,7 +940,7 @@ mod tests {
     fn into_dyn_error_and_back_roundtrips() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("roundtrip".into()));
         let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
-
+        assert!((&*dyn_err as &dyn Any).is::<ErrorUnionErrorWrapper<(FooError,)>>());
         let recovered: ErrorUnion<(FooError,)> =
             ErrorUnion::from_dyn_error(dyn_err).expect("round-trip should succeed");
 
@@ -965,5 +996,110 @@ mod tests {
 
         let bar: BarError = recovered.narrow().unwrap();
         assert_eq!(bar, BarError(99));
+    }
+
+    #[test]
+    fn into_inner_dyn_error_returns_concrete_type_not_wrapper() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("concrete".into()));
+        let dyn_err = union.into_inner_dyn_error();
+
+        assert!(
+            (&*dyn_err as &dyn Any).is::<FooError>(),
+            "expected FooError, got a wrapper or wrong type"
+        );
+    }
+
+    #[test]
+    fn into_inner_dyn_error_value_is_preserved() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("preserved".into()));
+        let dyn_err = union.into_inner_dyn_error();
+
+        let foo = (&*dyn_err as &dyn Any).downcast_ref::<FooError>().unwrap();
+        assert_eq!(foo, &FooError("preserved".into()));
+    }
+
+    #[test]
+    fn into_inner_dyn_error_display_is_concrete_type() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("display".into()));
+        let dyn_err = union.into_inner_dyn_error();
+
+        assert_eq!(dyn_err.to_string(), "FooError(display)");
+    }
+
+    #[test]
+    fn into_inner_dyn_error_is_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>(_: T) {}
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("traits".into()));
+        assert_send_sync(union.into_inner_dyn_error());
+    }
+
+    #[test]
+    fn into_inner_dyn_error_differs_from_into_dyn_error() {
+        let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("a".into()));
+        let union_b: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("b".into()));
+
+        let inner_dyn = union_a.into_inner_dyn_error();
+        let wrapper_dyn = union_b.into_dyn_error();
+
+        assert!((&*inner_dyn as &dyn Any).is::<FooError>());
+        assert!(!(&*wrapper_dyn as &dyn Any).is::<FooError>());
+        assert!((&*wrapper_dyn as &dyn Any).is::<ErrorUnionErrorWrapper<(FooError,)>>());
+    }
+
+    #[test]
+    fn into_inner_dyn_error_multi_variant_foo() {
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("multi".into()));
+        let dyn_err = union.into_inner_dyn_error();
+
+        assert!((&*dyn_err as &dyn Any).is::<FooError>());
+        assert!(!(&*dyn_err as &dyn Any).is::<BarError>());
+        let foo = (&*dyn_err as &dyn Any).downcast_ref::<FooError>().unwrap();
+        assert_eq!(foo, &FooError("multi".into()));
+    }
+
+    #[test]
+    fn into_inner_dyn_error_multi_variant_bar() {
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(77));
+        let dyn_err = union.into_inner_dyn_error();
+
+        assert!((&*dyn_err as &dyn Any).is::<BarError>());
+        assert!(!(&*dyn_err as &dyn Any).is::<FooError>());
+        let bar = (&*dyn_err as &dyn Any).downcast_ref::<BarError>().unwrap();
+        assert_eq!(bar, &BarError(77));
+    }
+
+    #[test]
+    fn into_inner_dyn_error_does_not_leak_heap_allocation() {
+        // Uses a Vec payload so Miri / address-sanitizer can catch leaks or double-drops.
+        #[derive(Debug, PartialEq)]
+        struct VecError(Vec<u8>);
+        impl fmt::Display for VecError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:?}", self.0)
+            }
+        }
+        impl std::error::Error for VecError {}
+
+        let payload = vec![1u8, 2, 3, 4, 5];
+        let union: ErrorUnion<(VecError,)> = ErrorUnion::new(VecError(payload.clone()));
+        let dyn_err = union.into_inner_dyn_error();
+
+        let recovered = (&*dyn_err as &dyn Any).downcast_ref::<VecError>().unwrap();
+        assert_eq!(recovered.0, payload);
+        // `dyn_err` drops here — Miri will catch any double-free or leak.
+    }
+
+    #[test]
+    fn into_inner_dyn_error_not_roundtrippable_via_from_dyn_error() {
+        // Confirm that from_dyn_error correctly rejects a bare inner error
+        // (since it's not wrapped in ErrorUnionErrorWrapper).
+        let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
+        let bare_dyn = union_a.into_inner_dyn_error();
+
+        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::from_dyn_error(bare_dyn);
+        assert!(
+            result.is_err(),
+            "from_dyn_error should reject a bare inner error, not an ErrorUnionErrorWrapper"
+        );
     }
 }

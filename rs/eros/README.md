@@ -90,12 +90,12 @@ Users should be able to seamlessly transition to and from fully typed errors. An
 use eros::{IntoUnion, ReshapeUnion};
 use std::{io, sync};
 
-fn regular_typed_result1() -> Result<(), io::Error> {
-    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"));
+fn regular_typed_result1() -> Result<(), sync::mpsc::RecvError> {
+    return Err(sync::mpsc::RecvError);
 }
 
-fn regular_typed_result2() -> Result<(), sync::mpsc::RecvError> {
-    return Err(sync::mpsc::RecvError);
+fn regular_typed_result2() -> Result<(), io::Error> {
+    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"));
 }
 
 fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> {
@@ -339,7 +339,7 @@ fn internal_api() -> eros::Result<()> {
 }
 
 pub fn public_api() -> Result<(), MyErrorType> {
-    // Replace `TracedError` with your custom error type
+    // Replace `ErrorUnion` with your custom error type
     internal_api().map_err(|e| MyErrorType(e.into_inner_dyn_error()))
 }
 ```

@@ -176,7 +176,7 @@ fn absent_value_error() {
     let result = func1().context("Some context");
     println!("{:?}", result);
     let error = result.unwrap_err();
-    let inner_error = error.error_ref_any();
+    let inner_error = error.inner_ref_any();
     assert!(inner_error.is::<AbsentValueError>());
 }
 
