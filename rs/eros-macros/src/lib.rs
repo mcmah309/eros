@@ -49,6 +49,7 @@ impl syn::parse::Parse for ContextArgs {
 ///
 /// ```rust,ignore
 /// fn function_name(param1: &str, param2: i32) -> eros::Result<()> {
+///     #[track_caller]
 ///     fn __function_name_internal(param1: &str, param2: i32) -> eros::Result<()> {
 ///         // ...
 ///     }
@@ -108,6 +109,7 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
     let expanded = quote! {
         #(#attrs)*
         #vis #sig {
+            #[track_caller]
             #inner_sig #body
 
             use eros::Context as _;
