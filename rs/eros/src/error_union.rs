@@ -486,6 +486,11 @@ where
         &self.inner.error
     }
 
+    #[cfg(feature = "backtrace")]
+    pub fn backtrace(&self) -> &std::backtrace::Backtrace {
+        &self.inner.backtrace
+    }
+
     pub fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.error.source()
     }
