@@ -118,6 +118,12 @@ dependencies = [
 [[package]]
 name = "eros-macros"
 version = "0.0.1"
+dependencies = [
+ "eros",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "errno"

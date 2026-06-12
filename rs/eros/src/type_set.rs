@@ -175,29 +175,34 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
         use crate::error_union::AnyhowError;
         if let Some(anyhow_error) = t.as_any().downcast_ref::<AnyhowError>() {
             let anyhow_error: &anyhow::Error = &anyhow_error.0;
-            let mut chain = anyhow_error.chain().rev();
+            let mut chain = anyhow_error.chain().rev().peekable();
             let root = chain.next().unwrap();
             writeln!(formatter, "{root}")?;
             #[cfg(feature = "context")]
             {
-                let next = chain.next();
-                if let Some(context_item) = next {
+                let has_context = chain.peek().is_some() || !context.is_empty();
+                if has_context {
                     writeln!(formatter, "\nContext:")?;
-                    writeln!(formatter, "\t- {}", context_item)?;
-                    for context_item in chain {
-                        writeln!(formatter, "\t- {}", context_item)?;
-                    }
                 }
-                for context_item in context.iter() {
+                for context_item in chain {
+                    writeln!(formatter, "\t- {}", context_item)?;
+                }
+                for context_item in context {
                     write_eros_context(context_item, formatter)?;
+                }
+                if has_context {
+                    writeln!(formatter, "\n---")?;
                 }
             }
             #[cfg(feature = "backtrace")]
             {
                 use std::backtrace::BacktraceStatus;
 
-                let backtrace = anyhow_error.backtrace();
-                if matches!(backtrace.status(), BacktraceStatus::Captured) {
+                let anyhow_backtrace = anyhow_error.backtrace();
+                if matches!(anyhow_backtrace.status(), BacktraceStatus::Captured) {
+                    writeln!(formatter, "\nBacktrace:")?;
+                    fmt::Display::fmt(anyhow_backtrace, formatter)?;
+                } else if matches!(backtrace.status(), BacktraceStatus::Captured) {
                     writeln!(formatter, "\nBacktrace:")?;
                     fmt::Display::fmt(backtrace, formatter)?;
                 }
@@ -206,6 +211,7 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
         }
     }
     fmt::Debug::fmt(&t, formatter)?;
+    writeln!(formatter, "\n---")?;
     #[cfg(feature = "context")]
     {
         if !context.is_empty() {
@@ -213,6 +219,7 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
             for context_item in context.iter() {
                 write_eros_context(context_item, formatter)?;
             }
+            writeln!(formatter, "\n---")?;
         }
     }
     #[cfg(feature = "backtrace")]
