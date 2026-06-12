@@ -1,8 +1,7 @@
 [package]
 name = "eros"
 version = "0.5.0"
-edition = "2021"
-documentation = "https://docs.rs/eros/"
+edition = "2024"
 description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
 license = "Apache-2.0"
 repository = "https://github.com/mcmah309/eros"
@@ -11,6 +10,7 @@ keywords = ["error", "error-handling"]
 readme = "README.md"
 
 [dependencies]
+eros-macros = { version = "0.5", path = "../eros-macros" }
 # Adds `ErrorUnion::anyhow` for converting `anyhow::Error`s into a `ErrorUnion`
 anyhow = { version = "1", optional = true }
 

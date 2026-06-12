@@ -8,6 +8,9 @@ mod error_union;
 mod type_set;
 mod union_to_enum;
 
+// re-export macro
+pub use eros_macros::context;
+
 // aliases
 pub type Result<T, E = AnyError> = std::result::Result<T, ErrorUnion<E>>;
 

@@ -1,14 +1,13 @@
 [package]
 name = "eros-macros"
-# description = ""
-version = "0.0.1"
+description = "Macro for the eros crate"
+version = "0.5.0"
 edition = "2024"
-# repository = ""
-# license = "" # e.g. `Apache-2.0`
-# categories = []
-# keywords = []
-# documentation = "" # Alternative documentation
-# rust-version = "" # Min required rust version
+license = "Apache-2.0"
+repository = "https://github.com/mcmah309/eros"
+categories = ["rust-patterns"]
+keywords = ["error", "error-handling"]
+readme = "README.md"
 
 [lib]
 proc-macro = true
