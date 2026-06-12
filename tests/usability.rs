@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{traced, SendSyncError, TracedUnion, IntoUnion};
+use eros::{traced, IntoUnion, SendSyncError, TracedUnion};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -117,10 +117,16 @@ fn widen_narrow() {
     let o_8: TracedUnion<(Timeout, NotEnoughMemory)> = o_7.subset().unwrap();
     let _: TracedUnion<(NotEnoughMemory, Timeout)> = o_8.subset().unwrap();
 
-    let o_9: TracedUnion<(u8, u16, NotEnoughMemory)> = TracedUnion::new(NotEnoughMemory);
-    let _: Result<TracedUnion<(u16,)>, TracedUnion<(u8, NotEnoughMemory)>> = o_9.subset();
-    let o_10: TracedUnion<(u8, u16, NotEnoughMemory)> = TracedUnion::new(NotEnoughMemory);
-    let _: Result<u16, TracedUnion<(u8, NotEnoughMemory)>> = o_10.narrow();
+    let o_9: TracedUnion<(std::sync::mpsc::RecvError, std::fmt::Error, NotEnoughMemory)> =
+        TracedUnion::new(NotEnoughMemory);
+    let _: Result<
+        TracedUnion<(std::fmt::Error,)>,
+        TracedUnion<(std::sync::mpsc::RecvError, NotEnoughMemory)>,
+    > = o_9.subset();
+    let o_10: TracedUnion<(std::sync::mpsc::RecvError, std::fmt::Error, NotEnoughMemory)> =
+        TracedUnion::new(NotEnoughMemory);
+    let _: Result<std::fmt::Error, TracedUnion<(std::sync::mpsc::RecvError, NotEnoughMemory)>> =
+        o_10.narrow();
 }
 
 #[test]
@@ -170,14 +176,28 @@ fn multi_match() {
 fn multi_narrow() {
     use eros::E2;
 
-    let o_1: TracedUnion<(u8, u16, NotEnoughMemory, u64, u128)> = TracedUnion::new(NotEnoughMemory);
+    let o_1: TracedUnion<(
+        std::sync::mpsc::RecvError,
+        std::fmt::Error,
+        NotEnoughMemory,
+        std::io::Error,
+        std::cell::BorrowError,
+    )> = TracedUnion::new(NotEnoughMemory);
 
     #[allow(clippy::type_complexity)]
-    let _narrow_res: Result<TracedUnion<(u8, u128)>, TracedUnion<(u16, NotEnoughMemory, u64)>> =
-        o_1.subset();
+    let _narrow_res: Result<
+        TracedUnion<(std::sync::mpsc::RecvError, std::cell::BorrowError)>,
+        TracedUnion<(std::fmt::Error, NotEnoughMemory, std::io::Error)>,
+    > = o_1.subset();
 
-    let o_2: TracedUnion<(u8, u16, Timeout, NotEnoughMemory, u64, u128)> =
-        TracedUnion::new(Timeout);
+    let o_2: TracedUnion<(
+        std::sync::mpsc::RecvError,
+        std::fmt::Error,
+        Timeout,
+        NotEnoughMemory,
+        std::io::Error,
+        std::cell::BorrowError,
+    )> = TracedUnion::new(Timeout);
 
     match o_2
         .subset::<(Timeout, NotEnoughMemory), _>()

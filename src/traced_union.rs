@@ -13,11 +13,24 @@ use crate::type_set::{
 use crate::{AnyError, Cons, End, StrContext};
 
 /// Any error that satisfies this trait's bounds can be used in a `TracedError`
-pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {}
+pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
+    fn as_any(&self) -> &dyn std::any::Any;
+}
 
-impl<T> SendSyncError for T where T: std::error::Error + Send + Sync + 'static {}
+impl<T> SendSyncError for T
+where
+    T: std::error::Error + Send + Sync + 'static,
+{
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
-impl std::error::Error for Box<dyn SendSyncError> {}
+impl std::error::Error for Box<dyn SendSyncError> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&**self)
+    }
+}
 
 pub(crate) struct TracedUnionInner<T: ?Sized> {
     #[cfg(feature = "backtrace")]
@@ -731,46 +744,42 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, TracedUnion<E>> {
 
 //************************************************************************//
 
+// anyhow::Error does not implement `std::error::Error` so we need to wrap it
+#[derive(Debug)]
+pub(crate) struct AnyhowError(pub(crate) anyhow::Error);
+
+impl fmt::Display for AnyhowError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{}", self.0)
+    }
+}
+
+impl std::error::Error for AnyhowError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.source()
+    }
+}
+
 #[cfg(feature = "anyhow")]
 impl TracedUnion {
     // todo improve this: Change to at display time and debug time instead of here
     #[cfg_attr(feature = "location", track_caller)]
     pub fn anyhow(error: anyhow::Error) -> TracedUnion {
-        let mut chain = error.chain().rev();
-        let root = chain.next().unwrap().to_string();
-        #[cfg(feature = "backtrace")]
-        let (root, backtrace) = {
-            let backtrace: &std::backtrace::Backtrace = error.backtrace();
-            if matches!(
-                backtrace.status(),
-                std::backtrace::BacktraceStatus::Captured
-            ) {
-                // Since we cannot get a `Backtrace` from a `&Backtrace`, we add it to root instead
-                (
-                    format!("{root}\n\nBacktrace:\n{}", backtrace.to_string()),
-                    std::backtrace::Backtrace::disabled(),
-                )
-            } else {
-                (root, std::backtrace::Backtrace::capture())
-            }
-        };
-        let root = StrContext::Owned(root);
-        #[cfg(feature = "context")]
-        let context = {
-            let mut context = Vec::new();
-            for link in chain {
-                context.push(StrContext::Owned(link.to_string()));
-            }
-            context
-        };
         TracedUnion::new_from_parts(
-            root,
+            AnyhowError(error),
             #[cfg(feature = "backtrace")]
-            backtrace,
+            std::backtrace::Backtrace::disabled(),
             #[cfg(feature = "context")]
-            context,
+            Vec::new(),
             #[cfg(feature = "location")]
             std::panic::Location::caller(),
         )
     }
 }
+
+// Needs specialization
+// impl From<anyhow::Error> for TracedUnion {
+//     fn from(value: anyhow::Error) -> Self {
+//         TracedUnion::anyhow(value)
+//     }
+// }

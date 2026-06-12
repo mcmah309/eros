@@ -17,21 +17,26 @@ fn traced_error_union() {
         Ok(())
     }
 
-    fn widen_then_context() -> Result<(), TracedUnion<(i32, std::io::Error)>> {
+    fn widen_then_context() -> Result<(), TracedUnion<(std::sync::mpsc::RecvError, std::io::Error)>>
+    {
         can_yeet_from_regular_result()
             .widen()
             .context("From func2".to_string())
     }
 
-    fn map_widen() -> eros::Result<(), (std::io::Error, i32, bool)> {
+    fn map_widen() -> eros::Result<(), (std::io::Error, std::sync::mpsc::RecvError, std::fmt::Error)>
+    {
         widen_then_context()
             .with_context(|| "From func3")
             .map_err(TracedUnion::widen)?;
         Ok(())
     }
 
-    fn narrow() -> eros::Result<(), (std::io::Error, bool)> {
-        match map_widen().with_context(|| "From func4").narrow::<i32, _>() {
+    fn narrow() -> eros::Result<(), (std::io::Error, std::sync::mpsc::RecvError)> {
+        match map_widen()
+            .with_context(|| "From func4")
+            .narrow::<std::fmt::Error, _>()
+        {
             Ok(_) => panic!("should exist"),
             Err(result) => result,
         }
@@ -41,7 +46,10 @@ fn traced_error_union() {
         Err(traced!("Error")).context("From func5")
     }
 
-    let result: Result<(), TracedUnion<(std::io::Error, i32, bool)>> = map_widen();
+    let result: Result<
+        (),
+        TracedUnion<(std::io::Error, std::sync::mpsc::RecvError, std::fmt::Error)>,
+    > = map_widen();
     assert!(result.is_err());
     let error = result.unwrap_err();
     let message = format!("{:?}", error);
@@ -56,7 +64,7 @@ fn traced_error_union() {
         "Expected no context in message:\n{}",
         message
     );
-    let result: Result<(), TracedUnion<(std::io::Error, bool)>> = narrow();
+    let result: Result<(), TracedUnion<(std::io::Error, std::sync::mpsc::RecvError)>> = narrow();
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
@@ -230,5 +238,15 @@ fn integration_with_anyhow() {
     let error = result.as_ref().unwrap_err();
 
     // println!("{:?}", error);
-
+    let message = format!("{:?}", error);
+    assert!(
+        message.contains("This is the root"),
+        "Expected root error in message:\n{}",
+        message
+    );
+    assert!(
+        message.contains("Context:\n\t- This is some anyhow context\n\t- eros context"),
+        "Expected context in message:\n{}",
+        message
+    );
 }

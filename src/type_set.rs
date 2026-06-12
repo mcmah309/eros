@@ -3,7 +3,7 @@ use core::fmt;
 use std::backtrace::Backtrace;
 use std::error::Error;
 
-use crate::{AnyError, StrContext};
+use crate::{AnyError, SendSyncError, StrContext};
 
 /* ------------------------- Helpers ----------------------- */
 
@@ -111,7 +111,7 @@ where
 
 pub trait DebugFold {
     fn debug_fold(
-        any: &dyn Any,
+        any: &dyn SendSyncError,
         formatter: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] context: &[StrContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
@@ -121,7 +121,7 @@ pub trait DebugFold {
 
 impl DebugFold for End {
     fn debug_fold(
-        _: &dyn Any,
+        _: &dyn SendSyncError,
         _: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] _context: &[StrContext],
         #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
@@ -131,11 +131,11 @@ impl DebugFold for End {
     }
 }
 
-pub(crate) fn write_debug<T: fmt::Debug + ?Sized>(
+pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
     #[cfg(feature = "context")] context: &[StrContext],
-    #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+    #[cfg(feature = "backtrace")] mut backtrace: &Backtrace,
     #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
 ) -> fmt::Result {
     #[cfg(feature = "location")]
@@ -148,7 +148,42 @@ pub(crate) fn write_debug<T: fmt::Debug + ?Sized>(
             location.column()
         )?;
     }
-    t.fmt(formatter)?;
+    #[cfg(feature = "anyhow")]
+    {
+        use crate::traced_union::AnyhowError;
+        if let Some(anyhow_error) = t.as_any().downcast_ref::<AnyhowError>() {
+            let anyhow_error: &anyhow::Error = &anyhow_error.0;
+            let mut chain = anyhow_error.chain().rev();
+            let root = chain.next().unwrap();
+            write!(formatter, "{root}")?;
+            #[cfg(feature = "context")]
+            {
+                let next = chain.next();
+                if let Some(context_item) = next {
+                    write!(formatter, "\n\nContext:")?;
+                    write!(formatter, "\n\t- {}", context_item)?;
+                    for context_item in chain {
+                        write!(formatter, "\n\t- {}", context_item)?;
+                    }
+                }
+                for context_item in context.iter() {
+                    write!(formatter, "\n\t- {}", context_item)?;
+                }
+            }
+            #[cfg(feature = "backtrace")]
+            {
+                use std::backtrace::BacktraceStatus;
+
+                let backtrace = anyhow_error.backtrace();
+                if matches!(backtrace.status(), BacktraceStatus::Captured) {
+                    write!(formatter, "\n\nBacktrace:\n")?;
+                    fmt::Display::fmt(backtrace, formatter)?;
+                }
+            }
+            return Ok(());
+        }
+    }
+    fmt::Debug::fmt(&t, formatter)?;
     #[cfg(feature = "context")]
     {
         if !context.is_empty() {
@@ -173,17 +208,17 @@ pub(crate) fn write_debug<T: fmt::Debug + ?Sized>(
 impl<Head, Tail> DebugFold for Cons<Head, Tail>
 where
     Cons<Head, Tail>: fmt::Debug,
-    Head: 'static + fmt::Debug,
+    Head: SendSyncError,
     Tail: DebugFold,
 {
     fn debug_fold(
-        any: &dyn Any,
+        any: &dyn SendSyncError,
         formatter: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] context: &[StrContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
         #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
     ) -> fmt::Result {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
+        if let Some(head_ref) = any.as_any().downcast_ref::<Head>() {
             write_debug(
                 head_ref,
                 formatter,
