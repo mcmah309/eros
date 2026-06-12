@@ -15,9 +15,28 @@ use crate::type_set::{
 use crate::{AnyError, Cons, End, StrError};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
-pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {}
+pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
+    /// Converts this `SendSynError` to `Any`. 
+    /// 
+    /// Warning: Use carefully since `Any` is this type,
+    /// not the underlying type. e.g. For `x: Box<dyn SendSyncError>` with `x.as_any()`,
+    /// the type yielded is `Box<dyn SendSyncError>` so functions like `x.is::<T>()` will not work as expected.
+    /// While one would probably want `(&*x as &dyn Any)` which is the underlying and `x.is::<T>()`
+    /// will work as expected. 
+    /// 
+    /// The main use case for this function is when `x: &dyn SendSyncError`.
+    /// In such case `x.is::<T>()` will likely work as intended.
+    fn as_any(&self) -> &dyn Any;
+}
 
-impl<T> SendSyncError for T where T: std::error::Error + Send + Sync + 'static {}
+impl<T> SendSyncError for T
+where
+    T: std::error::Error + Send + Sync + 'static,
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 impl std::error::Error for Box<dyn SendSyncError> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
