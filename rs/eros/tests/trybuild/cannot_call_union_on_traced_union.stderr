@@ -1,0 +1,5 @@
+error[E0599]: no method named `into_union` found for struct `ErrorUnion<E>` in the current scope
+ --> tests/trybuild/cannot_call_union_on_traced_union.rs:7:24
+  |
+7 |     let _error = error.into_union();
+  |                        ^^^^^^^^^^ method not found in `ErrorUnion`

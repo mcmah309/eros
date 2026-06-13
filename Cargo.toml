@@ -1,33 +1,4 @@
-[package]
-name = "eros"
-version = "0.5.0"
-edition = "2021"
-documentation = "https://docs.rs/eros/"
-description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
-license = "Apache-2.0"
-repository = "https://github.com/mcmah309/eros"
-categories = ["rust-patterns"]
-keywords = ["error", "error-handling"]
-readme = "README.md"
-
-[dependencies]
-# Adds `TracedError::anyhow` for converting `anyhow::Error`s into a `TracedError`
-anyhow = { version = "1", optional = true }
-
-[dev-dependencies]
-reqwest = { version = "0.12", features = ["blocking"] }
-trybuild = "1"
-
-[features]
-# Disabling "context" and "backtrace" turns `TracedError` into a new type that may be optimized away. 
-# Libraries should consider disabling this, allowing downstream crates to decide.
-# Or when trying to optimize the binary.
-default = ["context", "backtrace"]
-# Enables context for `TracedError`
-context = []
-# Enables backtrace for `TracedError`
-backtrace = []
-# This requires the `min_specialization` feature. 
-# Enabling this feature will allow you to call `context` on an `ErrorUnion` to delegate to the underlying type. 
-# And improve some operations.
-min_specialization = []
+[workspace]
+resolver = "3"
+members = ["rs/eros", "rs/eros-macros"]
+exclude = []

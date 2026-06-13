@@ -4,31 +4,44 @@
 	"image": "rust",
 	"customizations": {
 		"vscode": {
+			"settings": {
+				"extensions.verifySignature": false
+			},
 			"extensions": [
 				// general tools
-				"chunsen.bracket-select",
-				"dzhavat.bracket-pair-toggler",
-				"oderwat.indent-rainbow",
-				"fabiospampinato.vscode-git-history",
-				"streetsidesoftware.code-spell-checker",
-				"rebornix.toggle", // used in settings.json to add a toggle for inlay hints in rust - `ctrl+q`
-				// language support tools
+				"usernamehw.errorlens", // Inline diagnostic errors
+				// "streetsidesoftware.code-spell-checker", // Spell check
+				"redhat.vscode-yaml", // yaml lsp
+                "qufiwefefwoyn.inline-sql-syntax", // sql syntax highlighting in strings with `--sql`
+				
+				// rust
 				"fill-labs.dependi", // dependency validation in Cargo.toml
-				// lsp, compilers, debuggers
-				"timonwong.shellcheck", // sh lsp
 				"tamasfe.even-better-toml", // toml lsp
 				"rust-lang.rust-analyzer", // rust lsp
 				"vadimcn.vscode-lldb", // rust debugger
+				
+				
+				
+				
+				
+				
+				
+				
 			]
 		}
 	},
 	"mounts": [
-		// ssh
-		"source=/home/henry/.ssh/,target=/root/.ssh,type=bind",
 	],
 	"runArgs": [
 		"--privileged",
 		"--net=host",
+		"--pids-limit=16384", // Some processes like rustc can spawn more than the default process/thread limit of 2048
+		// ssh
+		"-v", "/home/henry/.ssh/:/root/.ssh",
+		
+		
+		
 	],
+	
 	"remoteUser": "root",
 }

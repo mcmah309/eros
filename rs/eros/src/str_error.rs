@@ -26,8 +26,8 @@ impl StrError {
 impl Debug for StrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StrError::Static(s) => f.write_str(&s),
-            StrError::Owned(s) => f.write_str(&s),
+            StrError::Static(s) => f.write_str(s),
+            StrError::Owned(s) => f.write_str(s),
         }
     }
 }

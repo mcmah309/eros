@@ -1,6 +1,11 @@
 use core::any::Any;
 use core::fmt;
+use std::backtrace::Backtrace;
 use std::error::Error;
+
+#[cfg(feature = "context")]
+use crate::context::ErosContext;
+use crate::{AnyError, SendSyncError, StrError};
 
 /* ------------------------- Helpers ----------------------- */
 
@@ -82,6 +87,13 @@ impl DisplayFold for End {
     }
 }
 
+pub(crate) fn write_display<T: fmt::Display + ?Sized>(
+    t: &T,
+    formatter: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    t.fmt(formatter)
+}
+
 impl<Head, Tail> DisplayFold for Cons<Head, Tail>
 where
     Cons<Head, Tail>: fmt::Display,
@@ -90,7 +102,7 @@ where
 {
     fn display_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.fmt(formatter)
+            write_display(head_ref, formatter)
         } else {
             Tail::display_fold(any, formatter)
         }
@@ -100,26 +112,163 @@ where
 /* ------------------------- Debug support ----------------------- */
 
 pub trait DebugFold {
-    fn debug_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
+    fn debug_fold(
+        any: &dyn SendSyncError,
+        formatter: &mut fmt::Formatter<'_>,
+        #[cfg(feature = "context")] context: &[ErosContext],
+        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+    ) -> fmt::Result;
 }
 
 impl DebugFold for End {
-    fn debug_fold(_: &dyn Any, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn debug_fold(
+        _: &dyn SendSyncError,
+        _: &mut fmt::Formatter<'_>,
+        #[cfg(feature = "context")] _context: &[ErosContext],
+        #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
+        #[cfg(feature = "location")] _location: &'static std::panic::Location<'static>,
+    ) -> fmt::Result {
         unreachable!("debug_fold called on End");
     }
+}
+
+pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
+    t: &T,
+    formatter: &mut fmt::Formatter<'_>,
+    #[cfg(feature = "context")] context: &[ErosContext],
+    #[cfg(feature = "backtrace")] mut backtrace: &Backtrace,
+    #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+) -> fmt::Result {
+    fn write_eros_context(
+        context: &ErosContext,
+        formatter: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        #[cfg(feature = "location")]
+        {
+            writeln!(
+                formatter,
+                "{}:{}:{}\n\t- {}",
+                context.location.file(),
+                context.location.line(),
+                context.location.column(),
+                context.context
+            )
+        }
+        #[cfg(not(feature = "location"))]
+        {
+            writeln!(formatter, "\t- {}", context.context)
+        }
+    }
+    #[cfg(feature = "location")]
+    {
+        writeln!(
+            formatter,
+            "{}:{}:{}",
+            location.file(),
+            location.line(),
+            location.column()
+        )?;
+    }
+    #[cfg(feature = "anyhow")]
+    {
+        use crate::error_union::AnyhowError;
+        if let Some(anyhow_error) = t.as_any().downcast_ref::<AnyhowError>() {
+            let anyhow_error: &anyhow::Error = &anyhow_error.0;
+            let mut chain = anyhow_error.chain().rev().peekable();
+            let root = chain.next().unwrap();
+            writeln!(formatter, "{root}")?;
+            #[cfg(feature = "context")]
+            {
+                let has_context = chain.peek().is_some() || !context.is_empty();
+                if has_context {
+                    writeln!(formatter, "\nContext:")?;
+                }
+                for context_item in chain {
+                    writeln!(formatter, "\t- {}", context_item)?;
+                }
+                for context_item in context {
+                    write_eros_context(context_item, formatter)?;
+                }
+                if has_context {
+                    writeln!(formatter, "\n---")?;
+                }
+            }
+            #[cfg(feature = "backtrace")]
+            {
+                use std::backtrace::BacktraceStatus;
+
+                let anyhow_backtrace = anyhow_error.backtrace();
+                if matches!(anyhow_backtrace.status(), BacktraceStatus::Captured) {
+                    writeln!(formatter, "\nBacktrace:")?;
+                    fmt::Display::fmt(anyhow_backtrace, formatter)?;
+                } else if matches!(backtrace.status(), BacktraceStatus::Captured) {
+                    writeln!(formatter, "\nBacktrace:")?;
+                    fmt::Display::fmt(backtrace, formatter)?;
+                }
+            }
+            return Ok(());
+        }
+    }
+    fmt::Debug::fmt(&t, formatter)?;
+    writeln!(formatter, "\n---")?;
+    #[cfg(feature = "context")]
+    {
+        if !context.is_empty() {
+            writeln!(formatter, "\nContext:")?;
+            for context_item in context.iter() {
+                write_eros_context(context_item, formatter)?;
+            }
+            writeln!(formatter, "\n---")?;
+        }
+    }
+    #[cfg(feature = "backtrace")]
+    {
+        use std::backtrace::BacktraceStatus;
+
+        if matches!(backtrace.status(), BacktraceStatus::Captured) {
+            writeln!(formatter, "\nBacktrace:")?;
+            fmt::Display::fmt(backtrace, formatter)?;
+        }
+    }
+    Ok(())
 }
 
 impl<Head, Tail> DebugFold for Cons<Head, Tail>
 where
     Cons<Head, Tail>: fmt::Debug,
-    Head: 'static + fmt::Debug,
+    Head: SendSyncError,
     Tail: DebugFold,
 {
-    fn debug_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.fmt(formatter)
+    fn debug_fold(
+        any: &dyn SendSyncError,
+        formatter: &mut fmt::Formatter<'_>,
+        #[cfg(feature = "context")] context: &[ErosContext],
+        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
+        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+    ) -> fmt::Result {
+        if let Some(head_ref) = (any as &dyn Any).downcast_ref::<Head>() {
+            write_debug(
+                head_ref,
+                formatter,
+                #[cfg(feature = "context")]
+                context,
+                #[cfg(feature = "backtrace")]
+                backtrace,
+                #[cfg(feature = "location")]
+                location,
+            )
         } else {
-            Tail::debug_fold(any, formatter)
+            Tail::debug_fold(
+                any,
+                formatter,
+                #[cfg(feature = "context")]
+                context,
+                #[cfg(feature = "backtrace")]
+                backtrace,
+                #[cfg(feature = "location")]
+                location,
+            )
         }
     }
 }
@@ -155,7 +304,29 @@ where
 pub trait TypeSet {
     type Variants: TupleForm;
     type Enum;
-    type EnumRef<'a>
+    type RefEnum<'a>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+    where
+        Self: 'a;
+}
+
+impl TupleForm for AnyError {
+    type Tuple = AnyError;
+}
+
+impl TypeSet for AnyError {
+    type Variants = AnyError;
+    type Enum = AnyError;
+
+    type RefEnum<'a>
+        = &'a AnyError
+    where
+        Self: 'a;
+
+    type MutEnum<'a>
+        = &'a mut AnyError
     where
         Self: 'a;
 }
@@ -163,7 +334,11 @@ pub trait TypeSet {
 impl TypeSet for () {
     type Variants = End;
     type Enum = E0;
-    type EnumRef<'a>
+    type RefEnum<'a>
+        = E0
+    where
+        Self: 'a;
+    type MutEnum<'a>
         = E0
     where
         Self: 'a;
@@ -172,8 +347,12 @@ impl TypeSet for () {
 impl<A> TypeSet for (A,) {
     type Variants = Cons<A, End>;
     type Enum = E1<A>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E1<&'a A>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E1<&'a mut A>
     where
         Self: 'a;
 }
@@ -181,8 +360,12 @@ impl<A> TypeSet for (A,) {
 impl<A, B> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
     type Enum = E2<A, B>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E2<&'a A, &'a B>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E2<&'a mut A, &'a mut B>
     where
         Self: 'a;
 }
@@ -190,8 +373,12 @@ impl<A, B> TypeSet for (A, B) {
 impl<A, B, C> TypeSet for (A, B, C) {
     type Variants = Cons<A, Cons<B, Cons<C, End>>>;
     type Enum = E3<A, B, C>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E3<&'a A, &'a B, &'a C>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E3<&'a mut A, &'a mut B, &'a mut C>
     where
         Self: 'a;
 }
@@ -199,8 +386,12 @@ impl<A, B, C> TypeSet for (A, B, C) {
 impl<A, B, C, D> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
     type Enum = E4<A, B, C, D>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E4<&'a A, &'a B, &'a C, &'a D>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E4<&'a mut A, &'a mut B, &'a mut C, &'a mut D>
     where
         Self: 'a;
 }
@@ -208,8 +399,12 @@ impl<A, B, C, D> TypeSet for (A, B, C, D) {
 impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>;
     type Enum = E5<A, B, C, D, E>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E5<&'a A, &'a B, &'a C, &'a D, &'a E>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E5<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E>
     where
         Self: 'a;
 }
@@ -217,8 +412,12 @@ impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
 impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
     type Enum = E6<A, B, C, D, E, F>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E6<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F>
     where
         Self: 'a;
 }
@@ -226,8 +425,12 @@ impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
 impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>;
     type Enum = E7<A, B, C, D, E, F, G>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E7<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G>
     where
         Self: 'a;
 }
@@ -235,8 +438,12 @@ impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
 impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
     type Enum = E8<A, B, C, D, E, F, G, H>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E8<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H>
     where
         Self: 'a;
 }
@@ -245,8 +452,22 @@ impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
     type Variants =
         Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
     type Enum = E9<A, B, C, D, E, F, G, H, I>;
-    type EnumRef<'a>
+    type RefEnum<'a>
         = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I>
+    where
+        Self: 'a;
+    type MutEnum<'a>
+        = E9<
+        &'a mut A,
+        &'a mut B,
+        &'a mut C,
+        &'a mut D,
+        &'a mut E,
+        &'a mut F,
+        &'a mut G,
+        &'a mut H,
+        &'a mut I,
+    >
     where
         Self: 'a;
 }
@@ -392,6 +613,8 @@ impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> whe
 {
 }
 
+impl<T> Contains<T, End> for AnyError {}
+
 /* ------------------------- Narrow ----------------------- */
 
 /// A trait for pulling a specific type out of a Variants at compile-time
@@ -459,6 +682,10 @@ where
             SubTail,
             TailIndex,
         >>::Remainder;
+}
+
+impl SupersetOf<AnyError, End> for AnyError {
+    type Remainder = AnyError;
 }
 
 fn _superset_test() {
