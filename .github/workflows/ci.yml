@@ -24,6 +24,8 @@ jobs:
           override: true
 
       - name: Run tests
+        env:
+          RUSTFLAGS: "--cfg test_in_ci"
         run: |
           cargo test --all-features
           cargo test
@@ -43,5 +45,7 @@ jobs:
           override: true
 
       - name: Run Miri tests
+        env:
+          RUSTFLAGS: "--cfg test_in_ci"
         run: |
           cargo miri test
