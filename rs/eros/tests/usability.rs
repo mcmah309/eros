@@ -282,7 +282,7 @@ fn source_lives_long_enough() {
     let wrapper = &wrapper_binding;
     let source = match wrapper {
         // Wrapper::ErrorUnion(error_union) => std::error::Error::source(&error_union), // does not work since does not implement error directly
-        Wrapper::ErrorUnion(traced_error) => traced_error.source(),
+        Wrapper::ErrorUnion(error_union) => error_union.source(),
     };
     let _source = source;
 }

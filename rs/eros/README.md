@@ -18,7 +18,7 @@ Built on the following philosophy:
 
 ### Optional Typed Errors
 
-Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. This is where [TracedError](#tracederror) helps.
+Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. This is where [ErrorUnion](#errorunion) helps.
 
 ```rust
 use eros::bail;

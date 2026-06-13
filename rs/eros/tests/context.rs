@@ -8,7 +8,7 @@ use eros::{
 };
 
 #[test]
-fn traced_error_union() {
+fn error_union() {
     fn can_yeet_from_regular_result() -> eros::Result<(), (std::io::Error,)> {
         Err(std::io::Error::new(
             std::io::ErrorKind::AddrInUse,
@@ -200,6 +200,7 @@ fn nesting_traced_dyn_calls() {
 
     let count = message.match_indices("Context:").count();
     assert_eq!(count, 1, "Expected only one 'Context:', got:\n{}", message);
+    println!("{}", message);
 }
 
 #[cfg(all(feature = "anyhow", not(feature = "location")))]
@@ -237,7 +238,7 @@ fn integration_with_anyhow() {
     let result = eros_result().context("eros context");
     let error = result.as_ref().unwrap_err();
 
-    // println!("{:?}", error);
+    panic!("{:?}", error);
     let message = format!("{:?}", error);
     assert!(
         message.contains("This is the root"),

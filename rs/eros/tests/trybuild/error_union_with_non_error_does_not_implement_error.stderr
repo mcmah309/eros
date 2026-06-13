@@ -1,5 +1,5 @@
 error[E0277]: the trait bound `{integer}: SendSyncError` is not satisfied
- --> tests/trybuild/traced_error_with_non_error_does_not_implement_error.rs:5:76
+ --> tests/trybuild/error_union_with_non_error_does_not_implement_error.rs:5:76
   |
 5 |     let x: eros::ErrorUnion<(u16, std::io::Error)> = eros::ErrorUnion::new(1);
   |                                                      --------------------- ^ the trait `std::error::Error` is not implemented for `{integer}`
@@ -17,7 +17,7 @@ note: required by a bound in `ErrorUnion::new`
   |            ^^^^^^^^^^^^^ required by this bound in `ErrorUnion::new`
 
 error[E0277]: the trait bound `ErrorUnion<(u16, std::io::Error)>: std::error::Error` is not satisfied
- --> tests/trybuild/traced_error_with_non_error_does_not_implement_error.rs:6:15
+ --> tests/trybuild/error_union_with_non_error_does_not_implement_error.rs:6:15
   |
 6 |     is_error(&&x);
   |     --------  ^^ the trait `std::error::Error` is not implemented for `ErrorUnion<(u16, std::io::Error)>`
@@ -26,7 +26,7 @@ error[E0277]: the trait bound `ErrorUnion<(u16, std::io::Error)>: std::error::Er
   |
   = note: required for `&ErrorUnion<(u16, std::io::Error)>` to implement `std::error::Error`
 note: required by a bound in `is_error`
- --> tests/trybuild/traced_error_with_non_error_does_not_implement_error.rs:2:16
+ --> tests/trybuild/error_union_with_non_error_does_not_implement_error.rs:2:16
   |
 2 | fn is_error<T: core::error::Error>(_: &T) {}
   |                ^^^^^^^^^^^^^^^^^^ required by this bound in `is_error`
