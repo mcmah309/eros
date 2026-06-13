@@ -212,6 +212,7 @@ Backtrace:
                                at /workspaces/eros/tests/x.rs:28:15
 ...
 ```
+In addition, the `location` feature flag adds the location at compile time to for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments).
 
 ### Optimizations
 
