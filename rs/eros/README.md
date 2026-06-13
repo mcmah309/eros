@@ -182,7 +182,7 @@ fn adding_more_context() -> eros::Result<()> {
 }
 
 fn main() {
-    let out = adding_more_context().unwrap_err();
+    let out = adding_more_context().context("final context").unwrap_err();
     println!("{out:#?}");
 }
 ```
@@ -322,25 +322,69 @@ When one wants the error union to encompass the set off all possible error's use
 
 `ErrorUnion` also allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
 
-## Use In Libraries
+## Context Macro
+
+It can be cumbersome to add context to every function. e.g.
+```rust
+use eros::Context;
+
+fn result1() -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn context_on_each_call(param: &str) -> eros::Result<()> {
+    result1().with_context(|| format!("param was {}", param))?;
+    result1().with_context(|| format!("param was {}", param))?;
+    result1().with_context(|| format!("param was {}", param))?;
+    Ok(())
+}
+
+fn main() {
+    context_on_each_call("value").unwrap_err();
+}
+```
+To help one can use the `context` macro which adds the context to any error returned from the function. e.g.
+```rust
+use eros::{Context, context};
+
+fn result1() -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+#[context("param was {}", param)]
+fn context_added_once(param: &str) -> eros::Result<()> {
+    result1()?;
+    result1()?;
+    result1()?;
+    Ok(())
+}
+
+fn main() {
+    context_added_once("value").unwrap_err();
+}
+```
+
+## Misc
+
+### Use In Libraries
 
 `eros`'s flexibility and optimizations make it a the perfect option for both libraries and binaries.
 
 *Libraries should consider disabling default features* and allowing downstream crates to enable this. This can then be enabled for tests only in the library.
 
-### Suggested Route
+#### Suggested Route
 
 Exposing `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
 
-### Alternatives
+#### Alternatives
 
-#### Wrapper Error Types
+##### Wrapper Error Types
 
 An alternative to exposing `ErrorUnion` is a wrapper type like a new type - `MyErrorType(ErrorUnion)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_union` method as a way to to convert to the underlying `ErrorUnion`. That way, if a downstream uses Eros they can get the `ErrorUnion` rather than wrapping it in another `ErrorUnion`. 
 
 The downside is wrapping/nesting `ErrorUnion` may still unintentionally occur, that is why exposing the `ErrorUnion` in the api is usually preferred, since `ErrorUnion` cannot be nested within itself. Additionally the `into_union` api can no longer be used across api boundaries which limits composability.
 
-#### Non-Wrapper Error Types
+##### Non-Wrapper Error Types
 
 If one wants to add their own custom error type for all public api's without exposing constructs like `ErrorUnion`, use the `into_inner` method at these boundaries.
 
@@ -378,7 +422,7 @@ pub fn public_api() -> Result<(), MyErrorType> {
 
 </details>
 
-## Backtrace vs Location
+### Backtrace vs Location
 
 `eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location of the code that the error and context were created from. `location` is more efficient than `backtrace` since call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
 
