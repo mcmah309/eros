@@ -200,11 +200,15 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
 
                 let anyhow_backtrace = anyhow_error.backtrace();
                 if matches!(anyhow_backtrace.status(), BacktraceStatus::Captured) {
-                    writeln!(formatter, "\nBacktrace:")?;
-                    fmt::Display::fmt(anyhow_backtrace, formatter)?;
+                    #[cfg(feature = "better_backtrace")]
+                    write_better_backtrace(anyhow_backtrace, formatter)?;
+                    #[cfg(not(feature = "better_backtrace"))]
+                    write_backtrace(anyhow_backtrace, formatter)?;
                 } else if matches!(backtrace.status(), BacktraceStatus::Captured) {
-                    writeln!(formatter, "\nBacktrace:")?;
-                    fmt::Display::fmt(backtrace, formatter)?;
+                    #[cfg(feature = "better_backtrace")]
+                    write_better_backtrace(backtrace, formatter)?;
+                    #[cfg(not(feature = "better_backtrace"))]
+                    write_backtrace(backtrace, formatter)?;
                 }
             }
             return Ok(());
@@ -227,10 +231,51 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
         use std::backtrace::BacktraceStatus;
 
         if matches!(backtrace.status(), BacktraceStatus::Captured) {
-            writeln!(formatter, "\nBacktrace:")?;
-            fmt::Display::fmt(backtrace, formatter)?;
+            #[cfg(feature = "better_backtrace")]
+            write_better_backtrace(backtrace, formatter)?;
+            #[cfg(not(feature = "better_backtrace"))]
+            write_backtrace(backtrace, formatter)?;
         }
     }
+    Ok(())
+}
+
+fn write_backtrace(
+    backtrace: &std::backtrace::Backtrace,
+    formatter: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    use std::backtrace::BacktraceStatus;
+
+    if matches!(backtrace.status(), BacktraceStatus::Captured) {
+        writeln!(formatter, "\nBacktrace:")?;
+        fmt::Display::fmt(&backtrace, formatter)?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "better_backtrace")]
+fn write_better_backtrace(
+    backtrace: &std::backtrace::Backtrace,
+    formatter: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    let printer = color_backtrace::BacktracePrinter::new().add_frame_filter(Box::new(
+        |frames: &mut Vec<&color_backtrace::Frame>| {
+            frames.retain(|frame| {
+                !(frame.is_dependency_code()
+                    || frame.is_post_panic_code()
+                    || frame.is_runtime_init_code())
+            });
+        },
+    ));
+    let Ok(btparse_backtrace) = btparse::deserialize(backtrace) else {
+        write_backtrace(backtrace, formatter)?;
+        return Ok(());
+    };
+    let Ok(backtrace_string) = printer.format_trace_to_string(&btparse_backtrace) else {
+        write_backtrace(backtrace, formatter)?;
+        return Ok(());
+    };
+    fmt::Display::fmt(&backtrace_string, formatter)?;
     Ok(())
 }
 

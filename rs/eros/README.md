@@ -161,7 +161,7 @@ fn main() {
 
 ### Errors Have Context
 
-Errors should always provided context of the operations in the call stack that lead to the error.
+Errors should always provided context of the operations in the call stack that lead to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
 ```rust
 use eros::{Context, bail};
@@ -189,30 +189,61 @@ fn main() {
 
 ```console
 Something went wrong
+---
 
 Context:
         - This is some lazy context
+        - final context
+
+---
 
 Backtrace:
-   0:     0x5561eb054735 - std::backtrace_rs::backtrace::libunwind::trace::hc389a5f23f39a50d
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
-   1:     0x5561eb054735 - std::backtrace_rs::backtrace::trace_unsynchronized::h6eca87dcd6d323d8
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
-   2:     0x5561eb054735 - std::backtrace::Backtrace::create::h1c21bf982658ba83
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/backtrace.rs:331:13
-   3:     0x5561eb054685 - std::backtrace::Backtrace::force_capture::h09cde9fcccebf215
-                               at /rustc/8f08b3a32478b8d0507732800ecb548a76e0fd0c/library/std/src/backtrace.rs:312:9
-   4:     0x5561eb02e4e2 - eros::generic_error::TracedError<T>::new::h41e2123d6cf4fdd5
-                               at /workspaces/eros/src/generic_error.rs:36:24
-   5:     0x5561eafe8246 - x::func2::hc5bcba8eff1a9abd
-                               at /workspaces/eros/tests/x.rs:17:5
-   6:     0x5561eafe7f19 - x::func1::hc86226443a9fa2c0
-                               at /workspaces/eros/tests/x.rs:7:15
-   7:     0x5561eafe82dc - x::main::h6b82c0c63f51d406
-                               at /workspaces/eros/tests/x.rs:28:15
+... 4 lines removed for the example
+   4:     0x5639a19ef19d - eros::error_union::ErrorUnionInner<dyn eros::error_union::SendSyncError>::new::h2b7d357ac3fa4dc2
+                               at /workspaces/eros/rs/eros/src/error_union.rs:74:24
+   5:     0x5639a19eeccc - eros::error_union::ErrorUnion::new::h7248c6cf6e9aac05
+                               at /workspaces/eros/rs/eros/src/error_union.rs:322:20
+   6:     0x5639a19f0cbf - example::eros_result1::h38d1b0e1c5450c1f
+                               at /workspaces/eros/rs/eros/tests/example.rs:5:5
+   7:     0x5639a19f0d99 - example::adding_more_context::hddf805cbc7e3056c
+                               at /workspaces/eros/rs/eros/tests/example.rs:13:15
+   8:     0x5639a19f0ec9 - example::main::hf13f943154472682
+                               at /workspaces/eros/rs/eros/tests/example.rs:20:15
+   9:     0x5639a19efb37 - example::main::{{closure}}::h4cab7eede14f8495
+                               at /workspaces/eros/rs/eros/tests/example.rs:19:10
+... 21 lines removed for example
 ...
 ```
-In addition, the `location` feature flag adds the location at compile time to for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments).
+#### Better Backtrace
+
+The previous backtrace in the example was shortened for brevity, thus the "...". For a better backtrace experience while developing, enable the `better_backtrace` feature flag. Resulting in
+```console
+Something went wrong
+---
+
+Context:
+        - This is some lazy context
+        - final context
+
+---
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BACKTRACE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1: eros::error_union::ErrorUnionInner<dyn eros::error_union::SendSyncError>::new
+    at ./src/error_union.rs:74
+ 2: eros::error_union::ErrorUnion::new
+    at ./src/error_union.rs:322
+ 3: example::eros_result1
+    at ./tests/example.rs:5
+ 4: example::adding_more_context
+    at ./tests/example.rs:13
+ 5: example::main
+    at ./tests/example.rs:20
+ 6: example::main::{{closure}}
+    at ./tests/example.rs:19
+                              ⋮ 21 frames hidden ⋮   
+```
+#### Location
+
+The `location` feature flag adds the location at compile time to for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments).
 
 ### Optimizations
 
