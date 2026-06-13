@@ -1,4 +1,3 @@
-use core::fmt;
 use std::fmt::Display;
 
 use crate::{str_error::StrError, type_set::TypeSet, ErrorUnion, SendSyncError};

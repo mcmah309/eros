@@ -5,7 +5,7 @@ use std::error::Error;
 
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
-use crate::{AnyError, SendSyncError, StrError};
+use crate::{AnyError, SendSyncError};
 
 /* ------------------------- Helpers ----------------------- */
 
@@ -137,7 +137,7 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
     #[cfg(feature = "context")] context: &[ErosContext],
-    #[cfg(feature = "backtrace")] mut backtrace: &Backtrace,
+    #[cfg(feature = "backtrace")] backtrace: &Backtrace,
     #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
 ) -> fmt::Result {
     fn write_eros_context(
