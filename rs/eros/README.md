@@ -109,7 +109,7 @@ fn regular_result() -> Result<(), sync::mpsc::RecvError> {
     // Narrow the `ErrorUnion` and handle to only handle `io::Error` case!
     match error_union_result().narrow::<io::Error, _>() {
         Ok(io_error) => {
-            // This statement is not need, just to show the type explictly for this example.
+            // This statement is not needed, just to show the type explicitly for this example.
             let _: io::Error = io_error;
             todo!()
         }
@@ -117,7 +117,7 @@ fn regular_result() -> Result<(), sync::mpsc::RecvError> {
         // It is now a union with a single type (`ErrorUnion<(sync::mpsc::RecvError,)>`),
         // thus we can convert into the inner traced type.
         Err(result) => {
-            // This statement is not need, just to show the type explictly for this example.
+            // This statement is not needed, just to show the type explicitly for this example.
             let result: eros::Result<(), (sync::mpsc::RecvError,)> = result;
             result.map_err(|e| e.into_inner())
         }
@@ -243,7 +243,7 @@ Context:
 ```
 #### Location
 
-The `location` feature flag adds the location at compile time to for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments).
+The `location` feature flag adds a location at compile time for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments).
 
 ### Optimizations
 
@@ -259,7 +259,7 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 
 `ErrorUnion` is an open sum type. An open sum type takes full advantage of rust's powerful type system. It differs from an enum in that you do not need to define any actual new type in order to hold some specific combination of variants, but rather you simply describe the ErrorUnion as holding one value out of several specific possibilities. This is declared by using a tuple of those possible variants as the generic parameter for the `ErrorUnion`. 
 
-For example, a `ErrorUnion<(String, u32)>` contains either a `String` or a `u32`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate. E.g.
+For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either a `io::Error` or a `fmt::Error`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate. E.g.
 
 ```rust
 use eros::ErrorUnion;
@@ -324,7 +324,7 @@ When one wants the error union to encompass the set off all possible error's use
 
 ## Context Macro
 
-It can be cumbersome to add context to every function. e.g.
+For some functions, one may want to add the same context on wherever an error can occur. In such a scenario, this can become cumbersome. e.g.
 ```rust
 use eros::Context;
 
@@ -424,7 +424,7 @@ pub fn public_api() -> Result<(), MyErrorType> {
 
 ### Backtrace vs Location
 
-`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location of the code that the error and context were created from. `location` is more efficient than `backtrace` since call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location of the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
 
 ### Anyhow
 
