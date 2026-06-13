@@ -203,7 +203,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
     }
 }
 
-/// `ErrorUnion` is an open sum type. It differs from an enum
+/// `ErrorUnion` is an open sum type of errors. It differs from an enum
 /// in that you do not need to define any actual new type
 /// in order to hold some specific combination of variants,
 /// but rather you simply describe the ErrorUnion as holding
@@ -211,8 +211,8 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// defined by using a tuple of those possible variants
 /// as the generic parameter for the `ErrorUnion`.
 ///
-/// For example, a `ErrorUnion<(String, u32)>` contains either
-/// a `String` or a `u32`. The benefit of this over creating
+/// For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either
+/// a `io::Error` or a `fmt::Error`. The benefit of this over creating
 /// specific enums for each function become apparent in larger
 /// codebases where error handling needs to occur in
 /// different places for different errors. As such, `ErrorUnion` allows
@@ -220,6 +220,13 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// involving a precise subset of errors that the caller
 /// can clearly reason about. Providing maximum composability with
 /// no boilerplate.
+/// 
+/// When the exact error type does not matter, `ErrorUnion<AnyError>` represents
+/// the set of all possible errors.
+/// 
+/// `ErrorUnion` also holds information surrounding the error depending on feature
+/// flags enabled. This may include `Backtrace` and/or `Location`. Context can be added throughout
+/// the call stack.
 pub struct ErrorUnion<E: TypeSet = AnyError> {
     pub(crate) inner: Box<ErrorUnionInner<dyn SendSyncError>>,
     pub(crate) _pd: PhantomData<E>,
