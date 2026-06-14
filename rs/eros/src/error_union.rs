@@ -16,14 +16,14 @@ use crate::{AnyError, Cons, End, StrError};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
-    /// Converts this `SendSynError` to `Any`. 
-    /// 
+    /// Converts this `SendSynError` to `Any`.
+    ///
     /// Warning: Use carefully since `Any` is this type,
     /// not the underlying type. e.g. For `x: Box<dyn SendSyncError>` with `x.as_any()`,
     /// the type yielded is `Box<dyn SendSyncError>` so functions like `x.is::<T>()` will not work as expected.
     /// While one would probably want `(&*x as &dyn Any)` which is the underlying and `x.is::<T>()`
-    /// will work as expected. 
-    /// 
+    /// will work as expected.
+    ///
     /// The main use case for this function is when `x: &dyn SendSyncError`.
     /// In such case `x.is::<T>()` will likely work as intended.
     fn as_any(&self) -> &dyn Any;
@@ -220,10 +220,10 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// involving a precise subset of errors that the caller
 /// can clearly reason about. Providing maximum composability with
 /// no boilerplate.
-/// 
+///
 /// When the exact error type does not matter, `ErrorUnion<AnyError>` represents
 /// the set of all possible errors.
-/// 
+///
 /// `ErrorUnion` also holds information surrounding the error depending on feature
 /// flags enabled. This may include `Backtrace` and/or `Location`. Context can be added throughout
 /// the call stack.
@@ -841,12 +841,42 @@ impl std::error::Error for AnyhowError {
 }
 
 #[cfg(feature = "anyhow")]
+#[derive(Debug)]
+pub(crate) struct AnyhowErrorArc(pub(crate) std::sync::Arc<anyhow::Error>);
+
+#[cfg(feature = "anyhow")]
+impl fmt::Display for AnyhowErrorArc {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{}", self.0)
+    }
+}
+
+#[cfg(feature = "anyhow")]
+impl std::error::Error for AnyhowErrorArc {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.source()
+    }
+}
+
+#[cfg(feature = "anyhow")]
 impl ErrorUnion {
-    // todo improve this: Change to at display time and debug time instead of here
     #[cfg_attr(feature = "location", track_caller)]
     pub fn anyhow(error: anyhow::Error) -> ErrorUnion {
         ErrorUnion::new_from_parts(
             AnyhowError(error),
+            #[cfg(feature = "backtrace")]
+            std::backtrace::Backtrace::disabled(),
+            #[cfg(feature = "context")]
+            Vec::new(),
+            #[cfg(feature = "location")]
+            std::panic::Location::caller(),
+        )
+    }
+
+    #[cfg_attr(feature = "location", track_caller)]
+    pub fn anyhow_arc(error: std::sync::Arc<anyhow::Error>) -> ErrorUnion {
+        ErrorUnion::new_from_parts(
+            AnyhowErrorArc(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
             #[cfg(feature = "context")]

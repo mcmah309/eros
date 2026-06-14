@@ -172,9 +172,16 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     }
     #[cfg(feature = "anyhow")]
     {
-        use crate::error_union::AnyhowError;
-        if let Some(anyhow_error) = t.as_any().downcast_ref::<AnyhowError>() {
-            let anyhow_error: &anyhow::Error = &anyhow_error.0;
+        use crate::error_union::{AnyhowError, AnyhowErrorArc};
+        let anyhow_error: Option<&anyhow::Error> =
+            if let Some(err) = t.as_any().downcast_ref::<AnyhowError>() {
+                Some(&err.0)
+            } else if let Some(err) = t.as_any().downcast_ref::<AnyhowErrorArc>() {
+                Some(&*err.0)
+            } else {
+                None
+            };
+        if let Some(anyhow_error) = anyhow_error {
             let mut chain = anyhow_error.chain().rev().peekable();
             let root = chain.next().unwrap();
             writeln!(formatter, "{root}")?;
