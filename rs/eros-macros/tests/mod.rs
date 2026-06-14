@@ -270,11 +270,11 @@ fn test_context_with_debug_format_specifier() {
     assert!(format!("{:?}", error).contains("[1, 2, 3]"));
 }
 
-// ── Auto format string (#[display] / #[debug]) ───────────────────────────────
+// ── Auto format string (#[fmt("{}")] / #[fmt("{:?}")]) ───────────────────────────────
 
-// Single #[display] param
+// Single #[fmt("{}")] param
 #[eros_macros::context]
-fn auto_display(#[display] name: &str, ignored: u32) -> eros::Result<()> {
+fn auto_display(#[fmt("{}")] name: &str, ignored: u32) -> eros::Result<()> {
     eros::bail!("inner error")
 }
 
@@ -285,12 +285,12 @@ fn test_auto_display_single_param() {
     assert!(format!("{:?}", error).contains("\t- name: alice\n"));
 }
 
-// Single #[debug] param
+// Single #[fmt("{:?}")] param
 #[derive(Debug)]
 struct Flags(u8);
 
 #[eros_macros::context]
-fn auto_debug(#[debug] flags: &Flags) -> eros::Result<()> {
+fn auto_debug(#[fmt("{:?}")] flags: &Flags) -> eros::Result<()> {
     eros::bail!("debug error")
 }
 
@@ -308,9 +308,9 @@ struct Mode(String);
 
 #[eros_macros::context]
 fn auto_mixed(
-    #[display] user: &str,
+    #[fmt("{}")] user: &str,
     count: usize, // unannotated — should NOT appear in context
-    #[debug] mode: &Mode,
+    #[fmt("{:?}")] mode: &Mode,
 ) -> eros::Result<()> {
     eros::bail!("mixed error")
 }
@@ -332,7 +332,7 @@ fn test_auto_mixed_params_order_and_content() {
 
 // Ok path — no context noise on success
 #[eros_macros::context]
-fn auto_ok(#[display] value: &str) -> eros::Result<String> {
+fn auto_ok(#[fmt("{}")] value: &str) -> eros::Result<String> {
     Ok(value.to_owned())
 }
 
@@ -348,7 +348,7 @@ struct Processor {
 
 impl Processor {
     #[eros_macros::context]
-    fn run(&self, #[display] job: &str) -> eros::Result<()> {
+    fn run(&self, #[fmt("{}")] job: &str) -> eros::Result<()> {
         eros::bail!("process failed")
     }
 }
@@ -365,7 +365,7 @@ fn test_auto_display_on_self_method() {
 
 // Auto format on async fn
 #[eros_macros::context]
-async fn auto_async(#[display] endpoint: &str) -> eros::Result<()> {
+async fn auto_async(#[fmt("{}")] endpoint: &str) -> eros::Result<()> {
     eros::bail!("async auto error")
 }
 
@@ -382,7 +382,7 @@ struct Pipeline {
 
 impl Pipeline {
     #[eros_macros::context]
-    async fn execute(&mut self, #[debug] input: &Vec<u8>) -> eros::Result<()> {
+    async fn execute(&mut self, #[fmt("{:?}")] input: &Vec<u8>) -> eros::Result<()> {
         eros::bail!("pipeline failed")
     }
 }

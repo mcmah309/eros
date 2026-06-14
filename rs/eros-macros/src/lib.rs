@@ -10,7 +10,7 @@ use syn::{
 };
 
 /// Arguments parsed from `#[context("format string", arg1, arg2, ...)]`
-/// or `#[context]` / `#[context()]` (auto-build from `#[display]`/`#[debug]`
+/// or `#[context]` / `#[context()]` (auto-build from `#[fmt("...")]`
 /// parameter attributes).
 enum ContextArgs {
     /// Explicit format string (and optional extra arguments).
@@ -18,14 +18,13 @@ enum ContextArgs {
         format_str: LitStr,
         format_args: Punctuated<Expr, Comma>,
     },
-    /// No format string supplied — derive from `#[display]` / `#[debug]`
+    /// No format string supplied — derive from `#[fmt("...")]`
     /// annotations on individual parameters.
     Auto,
 }
 
 impl syn::parse::Parse for ContextArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // Empty attribute: `#[context]` or `#[context()]`
         if input.is_empty() {
             return Ok(ContextArgs::Auto);
         }
@@ -46,11 +45,10 @@ impl syn::parse::Parse for ContextArgs {
     }
 }
 
-/// How a single parameter contributes to the auto-format string
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ParamFmt {
-    Display, // `{}`
-    Debug,   // `{:?}`
+/// The custom format specifier string extracted from `#[fmt("...")]`.
+struct ParamFmt {
+    /// The raw format string contents, e.g. `"{}"`, `"{:?}"`, `"{:.2}"`.
+    specifier: String,
 }
 
 /// Automatically wraps a function body with `eros` context.
@@ -64,31 +62,15 @@ enum ParamFmt {
 /// }
 /// ```
 ///
-/// Expands to:
-///
-/// ```rust,ignore
-/// #[doc(hidden)]
-/// #[track_caller]
-/// fn __function_name_internal(param1: &str, param2: i32) -> eros::Result<()> {
-///     // ...
-/// }
-///
-/// fn function_name(param1: &str, param2: i32) -> eros::Result<()> {
-///     use eros::Context as _;
-///     __function_name_internal(param1, param2)
-///         .with_context(|| format!("Param 1 is {} and param2 is {:?}", param1, param2))
-/// }
-/// ```
-///
 /// ## Auto format string from parameter attributes
 ///
 /// When no format string is provided, annotate individual parameters with
-/// `#[display]` or `#[debug]` to build the context string automatically.
-/// Each annotated parameter contributes one `"<name>: {}\n"` (or `{:?}`) line.
+/// `#[fmt("...")]` to build the context string automatically.
+/// Each annotated parameter contributes one `"<name>: <specifier>\n"` line.
 ///
 /// ```rust,ignore
 /// #[context]
-/// fn process(#[display] name: &str, count: usize, #[debug] flags: Flags) -> eros::Result<()> {
+/// fn process(#[fmt("{}")] name: &str, count: usize, #[fmt("{:?}")] flags: Flags) -> eros::Result<()> {
 ///     // ...
 /// }
 /// ```
@@ -112,7 +94,7 @@ enum ParamFmt {
 /// ## Async and `self` receivers
 ///
 /// Both modes work with `async fn` and all receiver kinds (`self`, `&self`,
-/// `&mut self`).  Two sibling items are emitted so that `self` in the body
+/// `&mut self`). Two sibling items are emitted so that `self` in the body
 /// always refers to the real receiver — no aliasing required.
 #[proc_macro_attribute]
 pub fn context(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -133,13 +115,11 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
     let has_receiver = matches!(func.sig.inputs.first(), Some(syn::FnArg::Receiver(_)));
 
     struct AnnotatedParam {
-        /// The simple identifier extracted from the pattern (e.g. `name`).
         ident: syn::Ident,
         fmt: ParamFmt,
     }
 
     let mut func = func;
-
     let mut annotated: Vec<AnnotatedParam> = Vec::new();
 
     for arg in func.sig.inputs.iter_mut() {
@@ -147,47 +127,55 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
             continue;
         };
 
-        let mut display_found = false;
-        let mut debug_found = false;
+        let mut fmt_specifier: Option<String> = None;
+        let mut duplicate = false;
 
         pat_type.attrs.retain(|attr| {
-            if attr.path().is_ident("display") {
-                display_found = true;
-                false
-            } else if attr.path().is_ident("debug") {
-                debug_found = true;
-                false
-            } else {
-                true
+            if !attr.path().is_ident("fmt") {
+                return true;
             }
+
+            if fmt_specifier.is_some() {
+                duplicate = true;
+                return false;
+            }
+
+            let lit = attr.parse_args::<LitStr>();
+            match lit {
+                Ok(l) => {
+                    fmt_specifier = Some(l.value());
+                }
+                Err(_) => {
+                    duplicate = true;
+                }
+            }
+
+            false
         });
 
-        // Both on the same param is a user error.
-        if display_found && debug_found {
+        if duplicate {
             return Err(syn::Error::new_spanned(
                 &pat_type.pat,
-                "a parameter may have at most one of `#[display]` or `#[debug]`",
+                "a parameter may have at most one `#[fmt(\"...\")]` attribute, \
+                 and it must contain a single string literal",
             ));
         }
 
-        let fmt = if display_found {
-            ParamFmt::Display
-        } else if debug_found {
-            ParamFmt::Debug
-        } else {
-            continue;
+        let specifier = match fmt_specifier {
+            Some(s) => s,
+            None => continue,
         };
 
         let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref() else {
             return Err(syn::Error::new_spanned(
                 &pat_type.pat,
-                "`#[display]` and `#[debug]` are only supported on simple identifier patterns",
+                "`#[fmt(\"...\")]` is only supported on simple identifier patterns",
             ));
         };
 
         annotated.push(AnnotatedParam {
             ident: pat_ident.ident.clone(),
-            fmt,
+            fmt: ParamFmt { specifier },
         });
     }
 
@@ -208,20 +196,16 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
                 return Err(syn::Error::new_spanned(
                     &func.sig.ident,
                     "`#[context]` with no format string requires at least one parameter \
-                     annotated with `#[display]` or `#[debug]`",
+                     annotated with `#[fmt(\"...\")]`",
                 ));
             }
 
-            // Build `"param1: {}\nparam2: {:?}\n"` and the matching arg list.
+            // Build `"param1: {}\nparam2: {:.2}\n"` and the matching arg list.
             let mut fmt_str = String::new();
             let mut arg_idents: Vec<&syn::Ident> = Vec::new();
 
             for ap in &annotated {
-                let specifier = match ap.fmt {
-                    ParamFmt::Display => "{}",
-                    ParamFmt::Debug => "{:?}",
-                };
-                fmt_str.push_str(&format!("{}: {}\n", ap.ident, specifier));
+                fmt_str.push_str(&format!("{}: {}\n", ap.ident, ap.fmt.specifier));
                 arg_idents.push(&ap.ident);
             }
 

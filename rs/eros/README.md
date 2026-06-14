@@ -373,7 +373,7 @@ This behaves as though each `?` in the function had been followed by the same `.
 
 When the context simply consists of "which arguments was this function called with?", the format string can often be inferred automatically.
 
-Instead of providing an explicit format string, use `#[context]` and annotate the parameters that should appear in the generated context with either `#[display]` or `#[debug]`:
+Instead of providing an explicit format string, use `#[context]` and annotate the parameters that should appear in the generated context with `#[fmt(...)]` where `...` is the desired formatting:
 
 ```rust
 use eros::{context, Context};
@@ -389,9 +389,9 @@ fn result1() -> eros::Result<()> {
 
 #[context]
 fn process(
-    #[display] name: &str,
+    #[fmt("{}")] name: &str,
     count: usize,
-    #[debug] flags: &Flags,
+    #[fmt("{:?}")] flags: &Flags,
 ) -> eros::Result<()> {
     result1()?;
     result1()?;
