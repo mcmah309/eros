@@ -1,10 +1,7 @@
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
-use std::any::Any;
-
 use eros::{
-    traced, AbsentValueError, AnyError, Context, IntoDynUnion, IntoUnion, ReshapeUnion,
-    SendSyncError, ErrorUnion,
+    AbsentValueError, AnyError, Context, ErrorUnion, IntoDynUnion, IntoUnion, ReshapeUnion, error,
 };
 
 #[test]
@@ -43,7 +40,7 @@ fn error_union() {
     }
 
     fn traced_macro() -> eros::Result<()> {
-        Err(traced!("Error")).context("From func5")
+        Err(error!("Error")).context("From func5")
     }
 
     let result: Result<
@@ -102,8 +99,8 @@ fn generic_context_error_to_traced_error_union() {
         Ok(())
     }
 
-    fn yeet_regular_into_union_multiple_explicit(
-    ) -> Result<(), eros::ErrorUnion<(std::sync::mpsc::RecvError, std::io::Error, std::fmt::Error)>>
+    fn yeet_regular_into_union_multiple_explicit()
+    -> Result<(), eros::ErrorUnion<(std::sync::mpsc::RecvError, std::io::Error, std::fmt::Error)>>
     {
         // yeet_a_regular()?; // todo ideally this should work
         yeet_a_regular().into_union()?;

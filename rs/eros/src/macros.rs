@@ -2,19 +2,19 @@
 #[macro_export]
 macro_rules! bail {
     ($msg:literal $(,)?) => {
-        return $crate::Result::Err($crate::traced!($msg))
+        return $crate::Result::Err($crate::error!($msg))
     };
     ($err:expr $(,)?) => {
-        return $crate::Result::Err($crate::traced!($err))
+        return $crate::Result::Err($crate::error!($err))
     };
     ($fmt:expr, $($arg:tt)*) => {
-        return $crate::Result::Err($crate::traced!($fmt, $($arg)*))
+        return $crate::Result::Err($crate::error!($fmt, $($arg)*))
     };
 }
 
 /// `format!` like macro to create a [`crate::ErrorUnion`]
 #[macro_export]
-macro_rules! traced {
+macro_rules! error {
     ($msg:literal $(,)?) => {
         $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrError::Static($msg))
     };

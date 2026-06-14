@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eros::{traced, IntoUnion, SendSyncError, ErrorUnion};
+use eros::{ErrorUnion, IntoUnion, SendSyncError, error};
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotEnoughMemory;
@@ -243,8 +243,7 @@ impl std::error::Error for MyErrorType {
 
 #[test]
 fn map_inner() {
-    let error: ErrorUnion<(std::io::Error,)> =
-        ErrorUnion::new(std::io::Error::other("wuaaaaahhh"));
+    let error: ErrorUnion<(std::io::Error,)> = ErrorUnion::new(std::io::Error::other("wuaaaaahhh"));
     let error: ErrorUnion<(IoErrorWrapper,)> = error.map(IoErrorWrapper);
     let message = format!("{:?}", error);
     assert!(
@@ -277,7 +276,7 @@ fn source_lives_long_enough() {
         ErrorUnion(ErrorUnion),
     }
 
-    let error = traced!("Error");
+    let error = error!("Error");
     let wrapper_binding = Wrapper::ErrorUnion(error);
     let wrapper = &wrapper_binding;
     let source = match wrapper {
