@@ -44,9 +44,9 @@ fn using_normal_and_eros_results() -> eros::Result<()> {
 }
 
 fn main() {
-    eros_result().unwrap_err();
-    normal_result().unwrap_err();
-    using_normal_and_eros_results().unwrap_err();
+    eros_result();
+    normal_result();
+    using_normal_and_eros_results();
 }
 ```
 
@@ -77,7 +77,7 @@ fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> 
 }
 
 fn main() {
-    error_union_result().unwrap_err();
+    error_union_result();
 }
 ```
 The above code is precisely typed for what we care about and there was no need to create an error enum for each case. See the [ErrorUnion](#errorunion) section for more details how it works.
@@ -125,7 +125,7 @@ fn regular_result() -> Result<(), sync::mpsc::RecvError> {
 }
 
 fn main() {
-    regular_result().unwrap_err();
+    regular_result();
 }
 ```
 
@@ -182,7 +182,7 @@ fn adding_more_context() -> eros::Result<()> {
 }
 
 fn main() {
-    let out = adding_more_context().context("final context").unwrap_err();
+    let out = adding_more_context().context("final context");
     println!("{out:#?}");
 }
 ```
@@ -341,7 +341,7 @@ fn context_on_each_call(param: &str) -> eros::Result<()> {
 }
 
 fn main() {
-    context_on_each_call("value").unwrap_err();
+    context_on_each_call("value");
 }
 ```
 
@@ -363,7 +363,7 @@ fn context_added_once(param: &str) -> eros::Result<()> {
 }
 
 fn main() {
-    context_added_once("value").unwrap_err();
+    context_added_once("value");
 }
 ```
 
@@ -403,8 +403,7 @@ fn main() {
         "example",
         42,
         &Flags { enabled: true },
-    )
-    .unwrap_err();
+    );
 }
 ```
 
