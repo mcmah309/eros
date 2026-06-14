@@ -324,7 +324,8 @@ When one wants the error union to encompass the set off all possible error's use
 
 ## Context Macro
 
-For some functions, one may want to add the same context on wherever an error can occur. In such a scenario, this can become cumbersome. e.g.
+For some functions, one may want to attach the same context to every error that can be returned from that function. Writing `.with_context(...)` on each fallible call quickly becomes repetitive and can obscure the intent of the function. For example:
+
 ```rust
 use eros::Context;
 
@@ -343,7 +344,9 @@ fn main() {
     context_on_each_call("value").unwrap_err();
 }
 ```
-To help one can use the `context` macro which adds the context to any error returned from the function. e.g.
+
+To help with this, `eros` provides the `context` attribute macro. The macro wraps the function and automatically adds the supplied context to any error returned from it:
+
 ```rust
 use eros::{Context, context};
 
@@ -363,6 +366,59 @@ fn main() {
     context_added_once("value").unwrap_err();
 }
 ```
+
+This behaves as though each `?` in the function had been followed by the same `.with_context(...)` call, while keeping the function body focused on the actual logic.
+
+### Automatic Context from Parameters
+
+When the context simply consists of "which arguments was this function called with?", the format string can often be inferred automatically.
+
+Instead of providing an explicit format string, use `#[context]` and annotate the parameters that should appear in the generated context with either `#[display]` or `#[debug]`:
+
+```rust
+use eros::{context, Context};
+
+#[derive(Debug)]
+struct Flags {
+    enabled: bool,
+}
+
+fn result1() -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+#[context]
+fn process(
+    #[display] name: &str,
+    count: usize,
+    #[debug] flags: &Flags,
+) -> eros::Result<()> {
+    result1()?;
+    result1()?;
+    Ok(())
+}
+
+fn main() {
+    process(
+        "example",
+        42,
+        &Flags { enabled: true },
+    )
+    .unwrap_err();
+}
+```
+
+The generated context is equivalent to:
+
+```rust,ignore
+format!(
+    "name: {}\nflags: {:?}\n",
+    name,
+    flags,
+)
+```
+
+Only annotated parameters are included in the generated context. Parameters without `#[display]` or `#[debug]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
 
 ## Misc
 
