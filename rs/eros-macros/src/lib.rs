@@ -36,8 +36,6 @@ impl syn::parse::Parse for ContextArgs {
 
 /// Automatically wraps a function body with `eros` context.
 ///
-/// # Example
-///
 /// ```rust,ignore
 /// #[context("Param 1 is {} and param2 is {:?}", param1, param2)]
 /// fn function_name(param1: &str, param2: i32) -> eros::Result<()> {
@@ -48,14 +46,42 @@ impl syn::parse::Parse for ContextArgs {
 /// Expands to:
 ///
 /// ```rust,ignore
+/// #[doc(hidden)]
+/// #[track_caller]
+/// fn __function_name_internal(param1: &str, param2: i32) -> eros::Result<()> {
+///     // ...
+/// }
+///
 /// fn function_name(param1: &str, param2: i32) -> eros::Result<()> {
-///     #[track_caller]
-///     fn __function_name_internal(param1: &str, param2: i32) -> eros::Result<()> {
-///         // ...
-///     }
-///     use eros::Context;
+///     use eros::Context as _;
 ///     __function_name_internal(param1, param2)
 ///         .with_context(|| format!("Param 1 is {} and param2 is {:?}", param1, param2))
+/// }
+/// ```
+///
+/// # Example — async method with `&mut self`
+///
+/// ```rust,ignore
+/// #[context("push failed, queue len {}", self.items.len())]
+/// async fn push(&mut self, item: String) -> eros::Result<()> {
+///     // ...
+/// }
+/// ```
+///
+/// Expands to (inside the same `impl` block):
+///
+/// ```rust,ignore
+/// #[doc(hidden)]
+/// #[track_caller]
+/// async fn __push_internal(&mut self, item: String) -> eros::Result<()> {
+///     // original body — `self` is the real receiver, no renaming needed
+/// }
+///
+/// async fn push(&mut self, item: String) -> eros::Result<()> {
+///     use eros::Context as _;
+///     self.__push_internal(item)
+///         .await
+///         .with_context(|| format!("push failed, queue len {}", self.items.len()))
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -78,9 +104,22 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
     let vis = &func.vis;
     let sig = &func.sig;
     let attrs = &func.attrs;
+    let is_async = sig.asyncness.is_some();
 
     let outer_name = &sig.ident;
-    let inner_name = syn::Ident::new(&format!("__{}_internal", outer_name), outer_name.span());
+    let inner_name = syn::Ident::new(
+        &format!("__{}_internal", outer_name),
+        outer_name.span(),
+    );
+
+    let has_receiver = matches!(
+        sig.inputs.first(),
+        Some(syn::FnArg::Receiver(_))
+    );
+
+    let mut inner_sig = sig.clone();
+    inner_sig.ident = inner_name.clone();
+    let body = &func.block;
 
     let call_args: Vec<TokenStream2> = sig
         .inputs
@@ -90,15 +129,11 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
                 let pat = &pat_type.pat;
                 Some(quote! { #pat })
             }
-            // `self` receivers are not forwarded; the inner fn won't have one.
             syn::FnArg::Receiver(_) => None,
         })
         .collect();
 
-    let mut inner_sig = sig.clone();
-    inner_sig.ident = inner_name.clone();
-
-    let body = &func.block;
+    // ── Format call ─────────────────────────────────────────────────────────
 
     let format_call = if format_args.is_empty() {
         quote! { format!(#format_str) }
@@ -106,14 +141,27 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
         quote! { format!(#format_str, #format_args) }
     };
 
+    let raw_call = if has_receiver {
+        quote! { self.#inner_name(#(#call_args),*) }
+    } else {
+        quote! { #inner_name(#(#call_args),*) }
+    };
+
+    let awaited_call = if is_async {
+        quote! { #raw_call.await }
+    } else {
+        raw_call
+    };
+
     let expanded = quote! {
+        #[doc(hidden)]
+        #[track_caller]
+        #inner_sig #body
+
         #(#attrs)*
         #vis #sig {
-            #[track_caller]
-            #inner_sig #body
-
             use eros::Context as _;
-            #inner_name(#(#call_args),*).with_context(|| #format_call)
+            #awaited_call.with_context(|| #format_call)
         }
     };
 
