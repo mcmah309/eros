@@ -1,4 +1,4 @@
-// ── Existing baseline ────────────────────────────────────────────────────────
+// ── Baseline ────────────────────────────────────────────────────────
 
 #[eros_macros::context("arg1 is {}", arg1)]
 fn test_function(arg1: &str, arg2: String, arg3: i32) -> eros::Result<String> {
@@ -268,4 +268,130 @@ fn debug_format_function(value: &Vec<u8>) -> eros::Result<()> {
 fn test_context_with_debug_format_specifier() {
     let error = debug_format_function(&vec![1, 2, 3]).unwrap_err();
     assert!(format!("{:?}", error).contains("[1, 2, 3]"));
+}
+
+// ── Auto format string (#[display] / #[debug]) ───────────────────────────────
+
+// Single #[display] param
+#[eros_macros::context]
+fn auto_display(#[display] name: &str, ignored: u32) -> eros::Result<()> {
+    eros::bail!("inner error")
+}
+
+#[test]
+fn test_auto_display_single_param() {
+    let error = auto_display("alice", 0).unwrap_err();
+    assert_eq!(error.inner_ref().to_string(), "inner error");
+    assert!(format!("{:?}", error).contains("\t- name: alice\n"));
+}
+
+// Single #[debug] param
+#[derive(Debug)]
+struct Flags(u8);
+
+#[eros_macros::context]
+fn auto_debug(#[debug] flags: &Flags) -> eros::Result<()> {
+    eros::bail!("debug error")
+}
+
+#[test]
+fn test_auto_debug_single_param() {
+    let error = auto_debug(&Flags(0b1010)).unwrap_err();
+    let debug_out = format!("{:?}", error);
+    // The context line should contain the Debug output of Flags
+    assert!(debug_out.contains("flags: Flags(10)"));
+}
+
+// Multiple annotated params — both display and debug present
+#[derive(Debug)]
+struct Mode(String);
+
+#[eros_macros::context]
+fn auto_mixed(
+    #[display] user: &str,
+    count: usize, // unannotated — should NOT appear in context
+    #[debug] mode: &Mode,
+) -> eros::Result<()> {
+    eros::bail!("mixed error")
+}
+
+#[test]
+fn test_auto_mixed_params_order_and_content() {
+    let error = auto_mixed("bob", 99, &Mode("fast".into())).unwrap_err();
+    let debug_out = format!("{:?}", error);
+    // Both annotated params appear
+    assert!(debug_out.contains("user: bob"));
+    assert!(debug_out.contains("mode: Mode(\"fast\")"));
+    // Unannotated param does NOT appear
+    assert!(!debug_out.contains("count:"));
+    // user appears before mode (declaration order preserved)
+    let user_pos = debug_out.find("user: bob").unwrap();
+    let mode_pos = debug_out.find("mode: Mode").unwrap();
+    assert!(user_pos < mode_pos);
+}
+
+// Ok path — no context noise on success
+#[eros_macros::context]
+fn auto_ok(#[display] value: &str) -> eros::Result<String> {
+    Ok(value.to_owned())
+}
+
+#[test]
+fn test_auto_ok_passes_through() {
+    assert_eq!(auto_ok("hello").unwrap(), "hello");
+}
+
+// Auto format on &self method
+struct Processor {
+    name: String,
+}
+
+impl Processor {
+    #[eros_macros::context]
+    fn run(&self, #[display] job: &str) -> eros::Result<()> {
+        eros::bail!("process failed")
+    }
+}
+
+#[test]
+fn test_auto_display_on_self_method() {
+    let p = Processor {
+        name: "worker".into(),
+    };
+    let error = p.run("batch-42").unwrap_err();
+    let debug_out = format!("{:?}", error);
+    assert!(debug_out.contains("job: batch-42"));
+}
+
+// Auto format on async fn
+#[eros_macros::context]
+async fn auto_async(#[display] endpoint: &str) -> eros::Result<()> {
+    eros::bail!("async auto error")
+}
+
+#[tokio::test]
+async fn test_auto_display_async() {
+    let error = auto_async("https://api.example.com/v1").await.unwrap_err();
+    assert!(format!("{:?}", error).contains("endpoint: https://api.example.com/v1"));
+}
+
+// Auto format on async &mut self method
+struct Pipeline {
+    stage: String,
+}
+
+impl Pipeline {
+    #[eros_macros::context]
+    async fn execute(&mut self, #[debug] input: &Vec<u8>) -> eros::Result<()> {
+        eros::bail!("pipeline failed")
+    }
+}
+
+#[tokio::test]
+async fn test_auto_debug_async_mut_self() {
+    let mut p = Pipeline {
+        stage: "encode".into(),
+    };
+    let error = p.execute(&vec![1, 2, 3]).await.unwrap_err();
+    assert!(format!("{:?}", error).contains("input: [1, 2, 3]"));
 }
