@@ -497,3 +497,5 @@ Special thank you to the authors and contributors of the following crates that i
 - [terrors](https://github.com/komora-io/terrors)
 - [error_set](https://github.com/mcmah309/error_set)
 - [thiserror](https://github.com/dtolnay/thiserror)
+- [tracing](https://github.com/tokio-rs/tracing)
+- [color-eyre](https://github.com/eyre-rs/eyre/tree/master/color-eyre)
