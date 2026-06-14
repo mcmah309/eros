@@ -485,6 +485,11 @@ pub fn public_api() -> Result<(), MyErrorType> {
 
 `eros` comes with an `anyhow` feature flag. This adds a `ErrorUnion::anyhow` function for converting an `anyhow::Error` to an `ErrorUnion`. This can help integrate with legacy code.
 
+`eros` can also quickly replace `anyhow` in any crate as simple as replacing all occurrences of:
+- `anyhow!` with `error!`
+- `anyhow::Error` with `eros::ErrorUnion`
+- `anyhow::` with `eros::`
+
 ## Special Thanks
 
 Special thank you to the authors and contributors of the following crates that inspired `eros`:
