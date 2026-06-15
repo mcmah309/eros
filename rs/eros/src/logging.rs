@@ -63,3 +63,66 @@ where
         tracing::warn!("{:#?}", self);
     }
 }
+
+impl ErrorUnion
+{
+    /// Logs this error as "error". The logging backend is configured by feature flag, as well as
+    /// if the error is logged as its display or debug version
+    #[cfg(feature = "logging")]
+    pub fn log_error(&self) {
+        #[cfg(all(
+            feature = "log_display",
+            not(feature = "log_debug"),
+            feature = "tracing"
+        ))]
+        tracing::error!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::error!("{:#?}", self);
+    }
+
+    /// Logs this error as "warn". The logging backend is configured by feature flag, as well as
+    /// if the error is logged as its display or debug version
+    #[cfg(feature = "logging")]
+    pub fn log_warn(&self) {
+        #[cfg(all(
+            feature = "log_display",
+            not(feature = "log_debug"),
+            feature = "tracing"
+        ))]
+        tracing::warn!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::warn!("{:#?}", self);
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::any_error::AnyError;
+
+    // Just testing it compiles
+    #[test]
+    #[should_panic]
+    fn test_anyerror_log_error() {
+        let error_union: ErrorUnion<AnyError> = todo!();
+        error_union.log_error();
+    }
+
+    // Just testing it compiles
+    #[test]
+    #[should_panic]
+    fn test_anyeror_log_warn() {
+        let error_union: ErrorUnion<AnyError> = todo!();
+        error_union.log_warn();
+    }
+
+    #[test]
+    fn test_normal_error_union_log_error() {
+        let error_union: ErrorUnion<(std::io::Error,)> = ErrorUnion::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Test error",
+        ));
+        error_union.log_error();
+    }
+}

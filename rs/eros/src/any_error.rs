@@ -4,21 +4,21 @@ use crate::{ErrorUnion, SendSyncError};
 // Note: `AnyError` is not constructable. If so we could have correctness issues
 pub enum AnyError {}
 
-impl std::fmt::Display for AnyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unreachable!(
-            "AnyError is a marker type and it should not be possible to be constructed or used directly."
-        )
-    }
-}
+// impl std::fmt::Display for AnyError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         unreachable!(
+//             "AnyError is a marker type and it should not be possible to be constructed or used directly."
+//         )
+//     }
+// }
 
-impl std::fmt::Debug for AnyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unreachable!(
-            "AnyError is a marker type and it should not be possible to be constructed or used directly."
-        )
-    }
-}
+// impl std::fmt::Debug for AnyError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         unreachable!(
+//             "AnyError is a marker type and it should not be possible to be constructed or used directly."
+//         )
+//     }
+// }
 
 //************************************************************************//
 
