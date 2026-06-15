@@ -534,3 +534,4 @@ Special thank you to the authors and contributors of the following crates that i
 - [thiserror](https://github.com/dtolnay/thiserror)
 - [tracing](https://github.com/tokio-rs/tracing)
 - [color-eyre](https://github.com/eyre-rs/eyre/tree/master/color-eyre)
+- [err_trail](https://github.com/mcmah309/err_trail)
