@@ -431,7 +431,7 @@ fn do_some_action(param: &str) -> eros::Result<()> {
 
 fn func1() -> eros::Result<()> {
     let param = "xyz";
-    do_some_action(param).with_context(|| format!("Failed to do some action. param was {}", param)))
+    do_some_action(param).with_context(|| format!("Failed to do some action. param was {}", param))
 }
 
 fn func2() -> eros::Result<()> {
