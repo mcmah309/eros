@@ -423,7 +423,7 @@ Only annotated parameters are included in the generated context. Parameters with
 
 Eros provides built-in logging integration via the `logging` feature flag. This enables `log_*` methods on `ErrorUnion` directly, as well as the `LogExt` trait for chaining log calls on `Result`.
 
-```rust
+```rust,ignore
 use eros::{LogExt, bail};
 
 fn eros_result() -> eros::Result<()> {
@@ -437,15 +437,13 @@ fn main() {
     }
 
     // Or chain logging on a Result without consuming it
-    let result = eros_result().log_warn();
+    let _result = eros_result().log_warn();
 }
 ```
 
-Five log levels are available: `log_error`, `log_warn`, `log_info`, `log_debug`, and `log_trace`.
-
 ### Feature Flags
 
-The `logging` feature enables the `log_*` methods and `LogExt` trait, but does not wire up a backend. Libraries can enable `logging` and let downstream crates decide on a backend.
+The `logging` feature enables the `log*` methods and `LogExt` trait, but does not wire up a backend. Libraries can enable `logging` and let downstream crates decide on a backend.
 
 To use `tracing` as the backend, enable the `tracing` feature. Additionally, control the format of logged messages with `log_display` (uses `Display`) or `log_debug` (uses `Debug`). These are backend-facing flags that libraries should not set.
 

@@ -552,44 +552,32 @@ where
         }
     }
 
+    /// Logs this error as "error". The logging backend is configured by feature flag, as well as
+    /// if the error is logged as its display or debug version
     #[cfg(feature = "logging")]
     pub fn log_error(&self) {
-        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        #[cfg(all(
+            feature = "log_display",
+            not(feature = "log_debug"),
+            feature = "tracing"
+        ))]
         tracing::error!("{}", self);
         #[cfg(all(feature = "log_debug", feature = "tracing"))]
         tracing::error!("{:#?}", self);
     }
 
+    /// Logs this error as "warn". The logging backend is configured by feature flag, as well as
+    /// if the error is logged as its display or debug version
     #[cfg(feature = "logging")]
     pub fn log_warn(&self) {
-        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        #[cfg(all(
+            feature = "log_display",
+            not(feature = "log_debug"),
+            feature = "tracing"
+        ))]
         tracing::warn!("{}", self);
         #[cfg(all(feature = "log_debug", feature = "tracing"))]
         tracing::warn!("{:#?}", self);
-    }
-
-    #[cfg(feature = "logging")]
-    pub fn log_info(&self) {
-        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
-        tracing::info!("{}", self);
-        #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::info!("{:#?}", self);
-    }
-
-    #[cfg(feature = "logging")]
-    pub fn log_debug(&self) {
-        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
-        tracing::debug!("{}", self);
-        #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::debug!("{:#?}", self);
-    }
-
-    #[cfg(feature = "logging")]
-    pub fn log_trace(&self) {
-        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
-        tracing::trace!("{}", self);
-        #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::trace!("{:#?}", self);
     }
 
     /// Convert the `ErrorUnion` to an owned enum for
