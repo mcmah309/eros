@@ -7,6 +7,8 @@ mod str_error;
 mod error_union;
 mod type_set;
 mod union_to_enum;
+#[cfg(feature = "user_context")]
+mod user_context;
 #[cfg(feature = "logging")]
 mod logging;
 
@@ -25,6 +27,7 @@ pub use context::AbsentValueError;
 pub use str_error::StrError;
 pub use error_union::SendSyncError;
 pub use error_union::ErrorUnion;
+pub use type_set::TypeSet;
 pub use type_set::Cons;
 pub use type_set::End;
 pub use type_set::Recurse;

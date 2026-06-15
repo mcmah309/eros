@@ -604,6 +604,103 @@ pub fn public_api() -> Result<(), MyErrorType> {
 - `anyhow::Error` with `eros::ErrorUnion`
 - `anyhow::` with `eros::`
 
+## Exposing Errors To Application Users
+
+Not every error message should be shown directly to end users of an application.
+
+Operational details such as SQL queries, filesystem paths, internal identifiers, etc. often make poor user experiences and may even leak sensitive information. Conversely, some errors are intentionally designed to be presented directly to users.
+
+Instead, construct a user-facing message from two sources:
+
+1. User context attached throughout the call stack. Enabled through the `user_context` feature flag
+2. The underlying error itself, if the application recognizes it as safe to display.
+
+```rust,ignore
+use eros::{Context, ErrorUnion, IntoDynUnion, SendSyncError, TypeSet};
+
+#[derive(Debug)]
+struct SystemDiskError;
+
+impl std::fmt::Display for SystemDiskError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Critical IO failure at block 0x7FA3")
+    }
+}
+
+impl std::error::Error for SystemDiskError {}
+
+#[derive(Debug)]
+struct InvalidPasswordError;
+
+impl std::fmt::Display for InvalidPasswordError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Your password must be at least 8 characters long.")
+    }
+}
+
+impl std::error::Error for InvalidPasswordError {}
+
+// Add valid errors to display to the user here
+fn root_error_message(error: &dyn SendSyncError) -> String {
+    if let Some(error) = error.as_any().downcast_ref::<InvalidPasswordError>() {
+        error.to_string()
+    } else {
+        "An internal error occurred.".to_owned()
+    }
+}
+
+fn build_user_error_message<E>(error: &ErrorUnion<E>) -> String
+where
+    E: TypeSet,
+{
+    let mut message = String::new();
+    let error_message = root_error_message(error.inner_ref());
+    message.push_str(&error_message);
+
+    for context in error.get_user_context() {
+        message.push('\n');
+        message.push_str(&context.to_string());
+    }
+
+    message
+}
+
+fn validate_password(password: &str) -> eros::Result<()> {
+    if password.len() < 8 {
+        return Err(InvalidPasswordError)
+            .context("Password validation failed")
+            // This context is marked as "user facing" meaning it is safe to expose to the user
+            .user_context("Please choose a stronger password.")
+            .into_dyn_union();
+    }
+    Ok(())
+}
+fn load_configuration() -> eros::Result<()> {
+    Err(SystemDiskError)
+        .context("Failed to read configuration from /etc/my-app/config.toml")
+        .into_dyn_union()
+}
+#[test]
+fn main() {
+    let password_error = validate_password("123").unwrap_err();
+    println!("User message:");
+    println!("{}", build_user_error_message(&password_error));
+    let system_error = load_configuration().unwrap_err();
+    println!("\nUser message:");
+    println!("{}", build_user_error_message(&system_error));
+}
+```
+
+```text
+User Message:
+Your password must be at least 8 characters long.
+Please choose a stronger password.
+User Message:
+An internal error occurred.
+```
+
+This approach keeps internal diagnostics while making the user-facing experience explicit. Applications remain free to decide which information is safe to expose, while `ErrorUnion` continues to focus on error composition, tracing, and context propagation.
+
 ## Special Thanks
 
 Special thank you to the authors and contributors of the following crates that inspired `eros`:

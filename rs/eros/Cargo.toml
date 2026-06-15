@@ -47,3 +47,5 @@ tracing = ["dep:tracing", "logging"]
 log_debug = []
 # Each `ErrorUnion::log_*` statement will log as display. Libraries should not set this.
 log_display = []
+# Adds context methods that are user facing. Useful for applications reporting error messages to users.
+user_context = ["context"]

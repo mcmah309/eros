@@ -577,6 +577,7 @@ where
         E::MutEnum::from(self)
     }
 
+    /// Adds additional context. This becomes a no-op if the `context` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
@@ -588,7 +589,20 @@ where
         self
     }
 
-    /// Adds additional context lazily. This becomes a no-op if the `traced` feature is disabled.
+    /// Adds additional context that is user facing. This becomes a no-op if the `context` feature is disabled.
+    #[cfg(feature = "user_context")]
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
+    #[cfg_attr(feature = "location", track_caller)]
+    pub fn user_context<C: Into<StrError>>(mut self, context: C) -> Self {
+        #[cfg(feature = "context")]
+        self.inner
+            .context
+            .push(crate::context::ErosContext::new_user_facing(context.into()));
+        self
+    }
+
+    /// Lazily adds additional context. This becomes a no-op if the `context` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
@@ -600,6 +614,22 @@ where
         self.inner
             .context
             .push(crate::context::ErosContext::new(f().into()));
+        self
+    }
+
+    /// Lazily adds additional user facing context. This becomes a no-op if the `context` feature is disabled.
+    #[cfg(feature = "user_context")]
+    #[allow(unused_mut)]
+    #[allow(unused_variables)]
+    #[cfg_attr(feature = "location", track_caller)]
+    pub fn with_user_context<F, C: Into<StrError>>(mut self, f: F) -> Self
+    where
+        F: FnOnce() -> C,
+    {
+        #[cfg(feature = "context")]
+        self.inner
+            .context
+            .push(crate::context::ErosContext::new_user_facing(f().into()));
         self
     }
 }
