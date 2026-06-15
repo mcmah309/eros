@@ -350,15 +350,15 @@ To help with this, `eros` provides the `context` attribute macro. The macro wrap
 ```rust
 use eros::{Context, context};
 
-fn result1() -> eros::Result<()> {
+fn result() -> eros::Result<()> {
     eros::bail!("This is an error")
 }
 
 #[context("param was {}", param)]
 fn context_added_once(param: &str) -> eros::Result<()> {
-    result1()?;
-    result1()?;
-    result1()?;
+    result()?;
+    result()?;
+    result()?;
     Ok(())
 }
 
@@ -383,7 +383,7 @@ struct Flags {
     enabled: bool,
 }
 
-fn result1() -> eros::Result<()> {
+fn result() -> eros::Result<()> {
     eros::bail!("This is an error")
 }
 
@@ -393,8 +393,8 @@ fn process(
     count: usize,
     #[fmt("{:?}")] flags: &Flags,
 ) -> eros::Result<()> {
-    result1()?;
-    result1()?;
+    result()?;
+    result()?;
     Ok(())
 }
 
@@ -417,7 +417,60 @@ format!(
 )
 ```
 
-Only annotated parameters are included in the generated context. Parameters without `#[display]` or `#[debug]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
+Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
+
+### Anti-Pattern
+
+A common anti-pattern is to add the context at the call-site rather than on the function:
+```rust
+use eros::{Context, context};
+
+fn do_some_action(param: &str) -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn func1() -> eros::Result<()> {
+    let param = "xyz";
+    do_some_action(param).with_context(|| format!("Failed to do some action. param was {}", param)))
+}
+
+fn func2() -> eros::Result<()> {
+    let param = "abc";
+    do_some_action(param).with_context(|| format!("Some action failed with param {}", param))
+}
+
+fn main() {
+    func1();
+    func2();
+}
+```
+Notice how it is easy to accidentally add almost the same context in two different places. The context in this case is also just describing what the function is doing. Therefore, one should add the context directly to the function instead:
+```rust
+use eros::{Context, context};
+
+#[context("Failed to do some action. param was {}", param)]
+fn do_some_action(param: &str) -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn func1() -> eros::Result<()> {
+    let param = "xyz";
+    do_some_action(param)
+}
+
+fn func2() -> eros::Result<()> {
+    let param = "abc";
+    do_some_action(param)
+}
+
+fn main() {
+    func1();
+    func2();
+}
+```
+Rule of Thumb: Use `#[context]` on the function to capture what the operation is and how its inputs look.
+
+Use `.context*` at the call-site only when one needs to inject broader state or architectural boundaries that the internal function has no knowledge of (e.g., "Failed to process incoming background job #12").
 
 ## Logging
 
