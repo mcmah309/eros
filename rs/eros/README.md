@@ -659,7 +659,7 @@ where
 
     for context in error.get_user_context() {
         message.push('\n');
-        message.push_str(&context.to_string());
+        message.push_str(context.as_str());
     }
 
     message
