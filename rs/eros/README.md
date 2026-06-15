@@ -440,6 +440,32 @@ fn main() {
     let _result = eros_result().log_warn();
 }
 ```
+The recommended pattern in practice is to use when consuming an error:
+```rust,ignore
+use eros::{LogExt, bail};
+
+fn eros_result() -> eros::Result<()> {
+    bail!("Something went wrong")
+}
+
+fn old_way() {
+    if let Err(error) = eros_result().context("Context around function") {
+        tracing::error!("{:#?}", error);
+    }
+}
+
+fn recommended_way() {
+    eros_result()
+        .context("Context around function")
+        .log_error()
+        .ok();
+}
+
+fn main() {
+    old_way();
+    recommended_way();
+}
+```
 
 ### Feature Flags
 
