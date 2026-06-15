@@ -604,7 +604,7 @@ pub fn public_api() -> Result<(), MyErrorType> {
 - `anyhow::Error` with `eros::ErrorUnion`
 - `anyhow::` with `eros::`
 
-## Exposing Errors To Application Users
+### Exposing Errors To Application Users
 
 Not every error message should be shown directly to end users of an application.
 
