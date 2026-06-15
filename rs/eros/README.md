@@ -615,6 +615,10 @@ Instead, construct a user-facing message from two sources:
 1. User context attached throughout the call stack. Enabled through the `user_context` feature flag
 2. The underlying error itself, if the application recognizes it as safe to display.
 
+<details>
+
+<summary>Example Implementation</summary>
+
 ```rust,ignore
 use eros::{Context, ErrorUnion, IntoDynUnion, SendSyncError, TypeSet};
 
@@ -698,6 +702,8 @@ Please choose a stronger password.
 User Message:
 An internal error occurred.
 ```
+
+</details>
 
 This approach keeps internal diagnostics while making the user-facing experience explicit. Applications remain free to decide which information is safe to expose, while `ErrorUnion` continues to focus on error composition, tracing, and context propagation.
 
