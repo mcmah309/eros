@@ -552,6 +552,46 @@ where
         }
     }
 
+    #[cfg(feature = "logging")]
+    pub fn log_error(&self) {
+        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        tracing::error!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::error!("{:#?}", self);
+    }
+
+    #[cfg(feature = "logging")]
+    pub fn log_warn(&self) {
+        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        tracing::warn!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::warn!("{:#?}", self);
+    }
+
+    #[cfg(feature = "logging")]
+    pub fn log_info(&self) {
+        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        tracing::info!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::info!("{:#?}", self);
+    }
+
+    #[cfg(feature = "logging")]
+    pub fn log_debug(&self) {
+        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        tracing::debug!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::debug!("{:#?}", self);
+    }
+
+    #[cfg(feature = "logging")]
+    pub fn log_trace(&self) {
+        #[cfg(all(feature = "log_display", not(feature = "log_debug"), feature = "tracing"))]
+        tracing::trace!("{}", self);
+        #[cfg(all(feature = "log_debug", feature = "tracing"))]
+        tracing::trace!("{:#?}", self);
+    }
+
     /// Convert the `ErrorUnion` to an owned enum for
     /// use in pattern matching etc...
     pub fn to_enum(self) -> E::Enum
