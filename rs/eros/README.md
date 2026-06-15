@@ -524,7 +524,7 @@ fn main() {
 
 The `logging` feature enables the `log*` methods and `LogExt` trait, but does not wire up a backend. Libraries can enable `logging` and let downstream crates decide on a backend.
 
-To use `tracing` as the backend, enable the `tracing` feature. Additionally, control the format of logged messages with `log_display` (uses `Display`) or `log_debug` (uses `Debug`). These are backend-facing flags that libraries should not set.
+To use `tracing` as the backend, enable the `tracing` feature. Additionally, control the format of logged messages with `log_display` (uses `Display`) or `log_debug` (uses `Debug`) feature flags. These are backend-facing flags that libraries should not set.
 
 ```toml
 [dependencies]
