@@ -552,34 +552,6 @@ where
         }
     }
 
-    /// Logs this error as "error". The logging backend is configured by feature flag, as well as
-    /// if the error is logged as its display or debug version
-    #[cfg(feature = "logging")]
-    pub fn log_error(&self) {
-        #[cfg(all(
-            feature = "log_display",
-            not(feature = "log_debug"),
-            feature = "tracing"
-        ))]
-        tracing::error!("{}", self);
-        #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::error!("{:#?}", self);
-    }
-
-    /// Logs this error as "warn". The logging backend is configured by feature flag, as well as
-    /// if the error is logged as its display or debug version
-    #[cfg(feature = "logging")]
-    pub fn log_warn(&self) {
-        #[cfg(all(
-            feature = "log_display",
-            not(feature = "log_debug"),
-            feature = "tracing"
-        ))]
-        tracing::warn!("{}", self);
-        #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::warn!("{:#?}", self);
-    }
-
     /// Convert the `ErrorUnion` to an owned enum for
     /// use in pattern matching etc...
     pub fn to_enum(self) -> E::Enum
