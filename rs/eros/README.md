@@ -661,9 +661,9 @@ where
     let error_message = root_error_message(error.inner_ref());
     message.push_str(&error_message);
 
-    for context in error.get_user_context() {
+    for context in error.user_contexts() {
         message.push('\n');
-        message.push_str(context.as_str());
+        message.push_str(&context.to_string());
     }
 
     message

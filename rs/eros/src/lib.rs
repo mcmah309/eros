@@ -23,6 +23,8 @@ pub type Result<T, E = AnyError> = std::result::Result<T, ErrorUnion<E>>;
 
 // data structures
 pub use any_error::AnyError;
+pub use context::ContextSource;
+#[cfg(feature = "context")]
 pub use context::AbsentValueError;
 pub use str_error::StrError;
 pub use error_union::SendSyncError;
