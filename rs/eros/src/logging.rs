@@ -30,6 +30,24 @@ where
     }
 }
 
+impl<T> LogExt<Result<T, ErrorUnion>> for Result<T, ErrorUnion> {
+    /// If `Err`, logs this error as "error". The logging backend is configured by feature flag, as well as
+    /// if the error is logged as its display or debug version
+    fn log_error(self) -> Result<T, ErrorUnion> {
+        self.inspect_err(|e| {
+            e.log_error();
+        })
+    }
+
+    /// If `Err`, logs this error as "warn". The logging backend is configured by feature flag, as well as
+    /// if the error is logged as its display or debug version
+    fn log_warn(self) -> Result<T, ErrorUnion> {
+        self.inspect_err(|e| {
+            e.log_warn();
+        })
+    }
+}
+
 impl<E> ErrorUnion<E>
 where
     E: TypeSet,
@@ -64,8 +82,7 @@ where
     }
 }
 
-impl ErrorUnion
-{
+impl ErrorUnion {
     /// Logs this error as "error". The logging backend is configured by feature flag, as well as
     /// if the error is logged as its display or debug version
     #[cfg(feature = "logging")]
@@ -95,9 +112,10 @@ impl ErrorUnion
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use std::f32::consts::E;
+
     use super::*;
     use crate::any_error::AnyError;
 
@@ -107,6 +125,8 @@ mod tests {
     fn test_anyerror_log_error() {
         let error_union: ErrorUnion<AnyError> = todo!();
         error_union.log_error();
+        let result = Err::<(), _>(error_union);
+        result.log_error();
     }
 
     // Just testing it compiles
@@ -115,14 +135,16 @@ mod tests {
     fn test_anyeror_log_warn() {
         let error_union: ErrorUnion<AnyError> = todo!();
         error_union.log_warn();
+        let result = Err::<(), _>(error_union);
+        result.log_warn();
     }
 
     #[test]
     fn test_normal_error_union_log_error() {
-        let error_union: ErrorUnion<(std::io::Error,)> = ErrorUnion::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Test error",
-        ));
+        let error_union: ErrorUnion<(std::io::Error,)> =
+            ErrorUnion::new(std::io::Error::new(std::io::ErrorKind::Other, "Test error"));
         error_union.log_error();
+        let result = Err::<(), _>(error_union);
+        result.log_error();
     }
 }
