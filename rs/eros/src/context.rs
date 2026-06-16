@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
-use crate::{ErrorUnion, SendSyncError, str_error::StrError, type_set::TypeSet};
+use crate::{ErrorUnion, SendSyncError, type_set::TypeSet};
 
 #[derive(Debug)]
 pub struct ErosContext {
-    pub(crate) context: StrError,
+    pub(crate) context: ContextSource,
     #[cfg(feature = "location")]
     pub(crate) location: &'static std::panic::Location<'static>,
     #[cfg(feature = "user_context")]
@@ -13,7 +13,7 @@ pub struct ErosContext {
 
 impl ErosContext {
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn new(context: StrError) -> Self {
+    pub fn new(context: ContextSource) -> Self {
         Self {
             context,
             #[cfg(feature = "location")]
@@ -25,7 +25,7 @@ impl ErosContext {
 
     #[cfg(feature = "user_context")]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn new_user_facing(context: StrError) -> Self {
+    pub fn new_user_facing(context: ContextSource) -> Self {
         Self {
             context,
             #[cfg(feature = "location")]
@@ -35,17 +35,64 @@ impl ErosContext {
     }
 }
 
+/// The underlying data
+#[derive(Debug)]
+pub enum ContextSource {
+    Static(&'static str),
+    Owned(String),
+    Error(Box<dyn SendSyncError>),
+}
+
+impl std::fmt::Display for ContextSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContextSource::Static(s) => write!(f, "{}", s),
+            ContextSource::Owned(s) => write!(f, "{}", s),
+            ContextSource::Error(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl From<&'static str> for ContextSource {
+    fn from(s: &'static str) -> ContextSource {
+        ContextSource::Static(s)
+    }
+}
+
+impl From<String> for ContextSource {
+    fn from(s: String) -> ContextSource {
+        ContextSource::Owned(s)
+    }
+}
+
+impl From<Cow<'static, str>> for ContextSource {
+    fn from(s: Cow<'static, str>) -> ContextSource {
+        match s {
+            Cow::Borrowed(s) => ContextSource::Static(s),
+            Cow::Owned(s) => ContextSource::Owned(s),
+        }
+    }
+}
+
+impl From<Box<dyn SendSyncError>> for ContextSource {
+    fn from(e: Box<dyn SendSyncError>) -> Self {
+        ContextSource::Error(e)
+    }
+}
+
 /// Provides `context` methods to add context to `Result`.
 pub trait Context {
     type Okay;
     type OutSet: TypeSet;
 
     /// Adds additional context. This becomes a no-op if the `context` feature is disabled.
-    fn context<C: Into<StrError>>(self, context: C)
-    -> Result<Self::Okay, ErrorUnion<Self::OutSet>>;
+    fn context<C: Into<ContextSource>>(
+        self,
+        context: C,
+    ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>;
 
     /// Lazily adds additional context. This becomes a no-op if the `context` feature is disabled.
-    fn with_context<F, C: Into<StrError>>(
+    fn with_context<F, C: Into<ContextSource>>(
         self,
         f: F,
     ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>
@@ -54,14 +101,14 @@ pub trait Context {
 
     /// Adds additional context that is user facing. This becomes a no-op if the `context` feature is disabled.
     #[cfg(feature = "user_context")]
-    fn user_context<C: Into<StrError>>(
+    fn user_context<C: Into<ContextSource>>(
         self,
         context: C,
     ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>;
 
     /// Lazily adds additional user facing context. This becomes a no-op if the `context` feature is disabled.
     #[cfg(feature = "user_context")]
-    fn with_user_context<F, C: Into<StrError>>(
+    fn with_user_context<F, C: Into<ContextSource>>(
         self,
         f: F,
     ) -> Result<Self::Okay, ErrorUnion<Self::OutSet>>
@@ -75,7 +122,7 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
 
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    fn context<C: Into<ContextSource>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
         return match self {
@@ -88,7 +135,7 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
 
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    fn with_context<F, C: Into<ContextSource>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
@@ -105,7 +152,10 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn user_context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    fn user_context<C: Into<ContextSource>>(
+        self,
+        context: C,
+    ) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
         return match self {
@@ -119,7 +169,10 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn with_user_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    fn with_user_context<F, C: Into<ContextSource>>(
+        self,
+        f: F,
+    ) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
@@ -140,7 +193,7 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
 
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    fn context<C: Into<ContextSource>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
         return match self {
@@ -160,7 +213,7 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
 
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    fn with_context<F, C: Into<ContextSource>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
@@ -184,7 +237,10 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn user_context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    fn user_context<C: Into<ContextSource>>(
+        self,
+        context: C,
+    ) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
         return match self {
@@ -205,7 +261,10 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn with_user_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    fn with_user_context<F, C: Into<ContextSource>>(
+        self,
+        f: F,
+    ) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
@@ -272,7 +331,7 @@ impl<T> Context for Option<T> {
     /// around the operation.
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    fn context<C: Into<ContextSource>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
         return match self {
@@ -300,7 +359,7 @@ impl<T> Context for Option<T> {
     /// around the operation.
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn with_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    fn with_context<F, C: Into<ContextSource>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {
@@ -324,7 +383,10 @@ impl<T> Context for Option<T> {
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn user_context<C: Into<StrError>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
+    fn user_context<C: Into<ContextSource>>(
+        self,
+        context: C,
+    ) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
         return match self {
@@ -345,7 +407,10 @@ impl<T> Context for Option<T> {
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    fn with_user_context<F, C: Into<StrError>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
+    fn with_user_context<F, C: Into<ContextSource>>(
+        self,
+        f: F,
+    ) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
     {

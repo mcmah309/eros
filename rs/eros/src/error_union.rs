@@ -5,6 +5,7 @@ use core::ops::Deref;
 use std::any::TypeId;
 use std::{mem, ptr};
 
+use crate::context::ContextSource;
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
 use crate::type_set::{
@@ -552,6 +553,18 @@ where
         }
     }
 
+    /// Returns the latest error.
+    /// This takes into consideration errors added as context
+    pub fn latest_error(&self) -> &dyn SendSyncError {
+        #[cfg(feature = "context")]
+        for context in self.inner.context.iter().rev() {
+            if let crate::context::ContextSource::Error(err) = &context.context {
+                return err.as_ref();
+            }
+        }
+        self.inner_ref()
+    }
+
     /// Convert the `ErrorUnion` to an owned enum for
     /// use in pattern matching etc...
     pub fn to_enum(self) -> E::Enum
@@ -581,7 +594,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn context<C: Into<StrError>>(mut self, context: C) -> Self {
+    pub fn context<C: Into<ContextSource>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
             .context
@@ -594,7 +607,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn user_context<C: Into<StrError>>(mut self, context: C) -> Self {
+    pub fn user_context<C: Into<ContextSource>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
             .context
@@ -606,7 +619,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn with_context<F, C: Into<StrError>>(mut self, f: F) -> Self
+    pub fn with_context<F, C: Into<ContextSource>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
     {
@@ -622,7 +635,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn with_user_context<F, C: Into<StrError>>(mut self, f: F) -> Self
+    pub fn with_user_context<F, C: Into<ContextSource>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
     {
@@ -1187,5 +1200,116 @@ mod tests {
             result.is_err(),
             "from_dyn_error should reject a bare inner error, not an ErrorUnionErrorWrapper"
         );
+    }
+}
+
+#[cfg(test)]
+mod latest_error_tests {
+    use super::*;
+    use std::fmt;
+
+    #[derive(Debug, PartialEq)]
+    struct PrimaryError(String);
+    impl fmt::Display for PrimaryError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "PrimaryError({})", self.0)
+        }
+    }
+    impl std::error::Error for PrimaryError {}
+
+    #[derive(Debug, PartialEq)]
+    struct ContextError(String);
+    impl fmt::Display for ContextError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "ContextError({})", self.0)
+        }
+    }
+    impl std::error::Error for ContextError {}
+
+    fn box_err(e: impl SendSyncError) -> Box<dyn SendSyncError> {
+        Box::new(e)
+    }
+
+    #[test]
+    fn latest_error_with_no_context_returns_inner() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+
+        assert_eq!(union.latest_error().to_string(), "PrimaryError(base)");
+    }
+
+    #[test]
+    fn latest_error_with_no_context_returns_correct_type() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+
+        assert!(union.latest_error().as_any().is::<PrimaryError>());
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_with_string_context_only_returns_inner() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+        let union = union.context("just a string message");
+
+        assert_eq!(union.latest_error().to_string(), "PrimaryError(base)");
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_with_error_context_returns_context_error() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+        let union = union.context(box_err(ContextError("ctx-1".into())));
+
+        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_returns_most_recently_added_error_context() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+        let union = union
+            .context(box_err(ContextError("ctx-1".into())))
+            .context(box_err(ContextError("ctx-2".into())))
+            .context(box_err(ContextError("ctx-3".into())));
+
+        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-3)");
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_skips_trailing_string_contexts_to_find_error_context() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+        let union = union
+            .context(box_err(ContextError("ctx-1".into())))
+            .context("a string note added after");
+
+        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_with_only_string_contexts_falls_back_to_inner() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+        let union = union.context("note one").context("note two");
+
+        assert_eq!(union.latest_error().to_string(), "PrimaryError(base)");
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_error_context_correct_concrete_type() {
+        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
+        let union = union.context(box_err(ContextError("typed".into())));
+
+        assert!(union.latest_error().as_any().is::<ContextError>());
+    }
+
+    #[cfg(feature = "context")]
+    #[test]
+    fn latest_error_multi_variant_union_with_error_context() {
+        let union: ErrorUnion<(PrimaryError, ContextError)> =
+            ErrorUnion::new(PrimaryError("base".into()));
+        let union = union.context(box_err(ContextError("ctx-1".into())));
+
+        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
     }
 }
