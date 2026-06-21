@@ -47,5 +47,6 @@ jobs:
       - name: Run Miri tests
         env:
           RUSTFLAGS: "--cfg test_in_ci"
+        # todo temporary workaround. Remove `--workspace --exclude eros-macros`. Right now there is github runner bug, getting "Permission denied" when trying to access a build file related to eros-macros. Works locally. Busting cache on the runner has no effect. eros-macros uses no unsafe so this is fine.
         run: |
-          cargo miri test
+          cargo miri test --workspace --exclude eros-macros
