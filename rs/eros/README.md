@@ -421,59 +421,6 @@ format!(
 
 Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
 
-### Anti-Pattern
-
-A common anti-pattern is to add the context at the call-site rather than on the function:
-```rust
-use eros::{Context, context};
-
-fn do_some_action(param: &str) -> eros::Result<()> {
-    eros::bail!("This is an error")
-}
-
-fn func1() -> eros::Result<()> {
-    let param = "xyz";
-    do_some_action(param).with_context(|| format!("Failed to do some action. param was {}", param))
-}
-
-fn func2() -> eros::Result<()> {
-    let param = "abc";
-    do_some_action(param).with_context(|| format!("Some action failed with param {}", param))
-}
-
-fn main() {
-    func1();
-    func2();
-}
-```
-Notice how it is easy to accidentally add almost the same context in two different places. The context in this case is also just describing what the function is doing. Therefore, one should add the context directly to the function instead:
-```rust
-use eros::{Context, context};
-
-#[context("Failed to do some action. param was {}", param)]
-fn do_some_action(param: &str) -> eros::Result<()> {
-    eros::bail!("This is an error")
-}
-
-fn func1() -> eros::Result<()> {
-    let param = "xyz";
-    do_some_action(param)
-}
-
-fn func2() -> eros::Result<()> {
-    let param = "abc";
-    do_some_action(param)
-}
-
-fn main() {
-    func1();
-    func2();
-}
-```
-Rule of Thumb: Use `#[context]` on the function to capture what the operation is and how its inputs look.
-
-Use `.context*` at the call-site only when one needs to inject broader state or architectural boundaries that the internal function has no knowledge of (e.g., "Failed to process incoming background job #12").
-
 ## Logging
 
 Eros provides built-in logging integration via the `logging` feature flag. This enables `log_*` methods on `ErrorUnion` directly, as well as the `LogExt` trait for chaining log calls on `Result`.
@@ -708,6 +655,74 @@ An internal error occurred.
 </details>
 
 This approach keeps internal diagnostics while making the user-facing experience explicit. Applications remain free to decide which information is safe to expose, while `ErrorUnion` continues to focus on error composition, tracing, and context propagation.
+
+### Context Placement: Two Approaches
+
+There are two reasonable philosophies for *where* in the call stack context should be attached. Eros is flexible enough to support either, but it's worth picking one and being consistent within a codebase.
+
+#### Approach 1: Attach Context at the Function
+
+Under this approach, a function attaches context describing itself and its own parameters via `#[context]`. The function "owns" its own description, so every caller gets the same context for free, with no risk of forgetting it or duplicating it slightly differently at each call-site.
+
+```rust
+use eros::{Context, context};
+
+#[context("Failed to do some action. param was {}", param)]
+fn do_some_action(param: &str) -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn func1() -> eros::Result<()> {
+    let param = "xyz";
+    do_some_action(param)
+}
+
+fn func2() -> eros::Result<()> {
+    let param = "abc";
+    do_some_action(param)
+}
+
+fn main() {
+    func1();
+    func2();
+}
+```
+
+**Why:** it removes ambiguity about whose job it is to attach context. If every function attaches context describing its own operation and inputs, nothing needs to be re-derived or duplicated by callers, and nothing is silently dropped because every caller assumed some other layer would handle it.
+
+**Tradeoff:** if a function's parameter is itself just forwarded from its caller (and that caller already attaches it too), the same value can appear in context more than once as the error bubbles up. Note if the `context` feature is disabled `with_context` becomes a no-op, so the cost is avoidable.
+
+#### Approach 2: Attach Context Only at the Boundary Where Information Would Otherwise Be Lost
+
+A function should only attach context that the caller doesn't already have. If a caller already knows the value of `param`, then a callee re-stating `param` in its own context adds no new information, just noise.
+
+Responsibility for attaching a given piece of context passes transitively up the stack to whichever function is the last one that still has access to the information, even if that's several layers above where the error actually originated. In the example below, `func2` attaches nothing — it leaves that to its callers — and the context only gets attached at `func1` and `func1b`, the two places where `param` would otherwise be lost:
+
+```rust
+use eros::Context;
+
+fn do_some_action(param: &str) -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn func2(param: &str) -> eros::Result<()> {
+    do_some_action(param)
+}
+
+fn func1() -> eros::Result<()> {
+    let param = "xyz";
+    func2(param).with_context(|| format!("Failed to do some action. param was {}", param))
+}
+
+fn func1b() -> eros::Result<()> {
+    let param = "abc";
+    func2(param).with_context(|| format!("Some action failed with param {}", param))
+}
+```
+
+**Why:** it keeps individual error messages lean, avoids restating the same value at every layer, and sidesteps the classic `connection failed: connection failed: connection failed: no route to host` style of redundant, nested context.
+
+**Tradeoff:** because no single function is locally responsible for attaching a given piece of context, it takes discipline and more time has to be spent at each call-site — you have to ask "would this information otherwise be lost going up the stack from here?" If a function is called from many places, that question has to be answered (and the same context written) at each call-site rather than once at the function's own definition. It's also easy to accidentally end up restating context slightly differently at two call-sites — in the example above, `func1` and `func1b` phrase the same underlying fact as `"Failed to do some action. param was {}"` and `"Some action failed with param {}"` — since nothing enforces a single canonical phrasing the way `#[context]` on the function itself does. It is also easy to get lazy and skip attaching context altogether at a given call-site, silently losing information that would have been captured automatically under Approach 1.
 
 ### Why Traditional Enum Errors Scale Poorly
 
