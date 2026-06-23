@@ -266,51 +266,54 @@ use eros::ErrorUnion;
 use std::{fmt, io};
 
 fn main() {
-    type MyError = (fmt::Error, io::Error); // Optional type alias
     let error: ErrorUnion<MyError>;
+    let result: eros::Result<(), MyError>;
 }
+
+type MyError = (fmt::Error, io::Error); // A type alias can be used to make statements more concise
 ```
 vs
 ```rust
 use std::{fmt, io};
 
 fn main() {
-    let error: CustomError;
+    let error: MyError;
+    let result: Result<(), MyError>;
 }
 
 #[derive(Debug)]
-pub enum CustomError {
+pub enum MyError {
     FmtError(fmt::Error),
     IoError(io::Error),
 }
 
-impl std::fmt::Display for CustomError {
+impl std::fmt::Display for MyError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CustomError::FmtError(e) => write!(fmt, "{}", e),
-            CustomError::IoError(e) => write!(fmt, "{}", e),
+            MyError::FmtError(e) => write!(fmt, "{}", e),
+            MyError::IoError(e) => write!(fmt, "{}", e),
         }
     }
 }
 
-impl std::error::Error for CustomError {
+impl std::error::Error for MyError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            CustomError::FmtError(e) => e.source(),
-            CustomError::IoError(e) => e.source(),
+            MyError::FmtError(e) => e.source(),
+            MyError::IoError(e) => e.source(),
         }
     }
 }
 
-impl From<fmt::Error> for CustomError {
+impl From<fmt::Error> for MyError {
     fn from(error: fmt::Error) -> Self {
-        CustomError::FmtError(error)
+        MyError::FmtError(error)
     }
 }
 
-impl From<io::Error> for CustomError {
+impl From<io::Error> for MyError {
     fn from(error: io::Error) -> Self {
-        CustomError::IoError(error)
+        MyError::IoError(error)
     }
 }
 ```
