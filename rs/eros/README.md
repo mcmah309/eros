@@ -69,7 +69,7 @@ fn regular_typed_result2() -> Result<(), sync::mpsc::RecvError> {
 
 // `ErrorUnion` is used to track each possible error type,
 // instead of creating a enum for each possible error variant.
-// `eros::Result<_,(..)>` == `Result<_,ErrorUnion<(..)>>`.
+// `eros::Result<_,(..)>` is shorthand for  `Result<_,ErrorUnion<(..)>>`.
 fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> {
     let val = regular_typed_result1().into_union()?;
     let val = regular_typed_result2().into_union()?;
@@ -314,9 +314,11 @@ impl From<io::Error> for MyError {
     }
 }
 ```
-Additionally, the complexity of the second option grow exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for apis and instead choose a single error enum or struct for the entire crate.
+Additionally, the complexity of the second option grow exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for apis and instead choose a single error enum or struct for the entire crate. See the [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly] section for a deeper dive into this.
 
-When one wants the error union to encompass the set off all possible error's use `AnyError` -- `eros::Result<()> == eros::Result<(), AnyError> == Result<(), ErrorUnion<AnyError>>`
+When the error union should encompass the full set of possible errors, use `AnyError`:
+
+`eros::Result<()>` is shorthand for `eros::Result<(), AnyError>`, which is itself shorthand for `Result<(), ErrorUnion<AnyError>>`.
 
 ### Tracing
 
@@ -706,6 +708,119 @@ An internal error occurred.
 </details>
 
 This approach keeps internal diagnostics while making the user-facing experience explicit. Applications remain free to decide which information is safe to expose, while `ErrorUnion` continues to focus on error composition, tracing, and context propagation.
+
+### Why Traditional Enum Errors Scale Poorly
+
+Traditional enum-based error handling breaks down as soon as you compose functions, because each new layer of composition demands its own enum.
+
+#### The Problem
+
+Suppose three low-level functions each return a precise error enum:
+
+```rust
+use std::io;
+use std::num::ParseIntError;
+use std::net::AddrParseError;
+
+#[derive(Debug)]
+pub enum ReadError {
+    Io(io::Error),
+    Format(String),
+}
+fn read_file() -> Result<String, ReadError> { todo!() }
+
+#[derive(Debug)]
+pub enum ParseError {
+    InvalidInt(ParseIntError),
+    MissingKey(String),
+}
+fn parse_config(_data: &str) -> Result<u16, ParseError> { todo!() }
+
+#[derive(Debug)]
+pub enum NetworkError {
+    BadAddr(AddrParseError),
+    Io(io::Error),
+}
+fn open_socket(_port: u16) -> Result<(), NetworkError> { todo!() }
+```
+
+To chain them in `initialize_system`, a precise return type requires a *fourth* enum wrapping the other three — plus a `From` impl for each, just to make `?` work:
+
+```rust,ignore
+#[derive(Debug)]
+pub enum InitError {
+    Read(ReadError),
+    Parse(ParseError),
+    Net(NetworkError),
+}
+
+impl From<ReadError> for InitError {
+    fn from(e: ReadError) -> Self { InitError::Read(e) }
+}
+impl From<ParseError> for InitError {
+    fn from(e: ParseError) -> Self { InitError::Parse(e) }
+}
+impl From<NetworkError> for InitError {
+    fn from(e: NetworkError) -> Self { InitError::Net(e) }
+}
+
+fn initialize_system() -> Result<(), InitError> {
+    let data = read_file()?;
+    let port = parse_config(&data)?;
+    open_socket(port)?;
+    Ok(())
+}
+```
+
+Note that `io::Error` is now buried two levels deep in two different places (`InitError::Read(ReadError::Io(_))` and `InitError::Net(NetworkError::Io(_))`), so callers who just want to handle IO errors have to match both paths:
+
+```rust,ignore
+match initialize_system() {
+    Ok(()) => println!("Success!"),
+    Err(InitError::Read(ReadError::Io(_))) => { /* handle */ }
+    Err(InitError::Net(NetworkError::Io(_))) => { /* handle */ }
+    Err(other) => println!("Some other error occurred: {:?}", other),
+}
+```
+
+Add a fourth step that returns a `DatabaseError` and the cycle repeats: a new enum, new `From` impls, and every downstream `match` needs updating.
+
+#### Why Crates Give Up
+
+Faced with this growth, most crates abandon precision entirely and adopt one monolithic, crate-wide error enum:
+
+```rust,ignore
+#[derive(Debug, thiserror::Error)]
+pub enum CrateError {
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+    #[error("Parse error: {0}")]
+    Parse(#[from] ParseIntError),
+    #[error("Network error: {0}")]
+    Network(#[from] AddrParseError),
+    #[error("Custom error: {0}")]
+    General(String),
+}
+```
+
+This kills the boilerplate, but it also kills accuracy: every function now claims it can return *any* crate error, even when most are impossible for that particular call path. `parse_config`'s caller has to account for a `NetworkError` that can never actually occur.
+
+#### How `ErrorUnion` Avoids This
+
+`ErrorUnion` sidesteps the dilemma entirely. No new enum is needed to combine errors, so precision and ergonomics stop being a trade-off.
+
+```rust,ignore
+type MyError (io::Error, ParseIntError, AddrParseError);
+
+fn initialize_system() -> eros::Result<(), MyError> {
+    let data = read_file().into_union()?;
+    let port = parse_config(&data).into_union()?;
+    open_socket(port).into_union()?;
+    Ok(())
+}
+```
+
+The signature stays exact — only the errors that can actually occur are listed — and adding a fourth fallible step just means adding one type to the tuple, not a new enum and a new set of `From` impls, or a rewritten `match`.
 
 ## Special Thanks
 
