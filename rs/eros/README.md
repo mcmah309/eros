@@ -494,17 +494,9 @@ eros = { version = "*", features = ["tracing", "log_debug"] }
 
 Exposing `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
 
-#### Alternatives
+#### Alternative
 
-##### Wrapper Error Types
-
-An alternative to exposing `ErrorUnion` is a wrapper type like a new type - `MyErrorType(ErrorUnion)`. If such a route is taken, consider implementing `Deref`/`DerefMut`. That way, a downstream can also add additional context. Additionally/alternatively, consider adding an `into_union` method as a way to to convert to the underlying `ErrorUnion`. That way, if a downstream uses Eros they can get the `ErrorUnion` rather than wrapping it in another `ErrorUnion`. 
-
-The downside is wrapping/nesting `ErrorUnion` may still unintentionally occur, that is why exposing the `ErrorUnion` in the api is usually preferred, since `ErrorUnion` cannot be nested within itself. Additionally the `into_union` api can no longer be used across api boundaries which limits composability.
-
-##### Non-Wrapper Error Types
-
-If one wants to add their own custom error type for all public api's without exposing constructs like `ErrorUnion`, use the `into_inner` method at these boundaries.
+If one wants to add a custom error type for all public APIs without exposing constructs like `ErrorUnion`, use the `into_inner` method at these boundaries. This is a common pattern, since most crates already define their own error type for public-facing APIs.
 
 <details>
 
@@ -514,15 +506,15 @@ If one wants to add their own custom error type for all public api's without exp
 use eros::{SendSyncError, ErrorUnion};
 
 #[derive(Debug)]
-struct MyErrorType(Box<dyn SendSyncError>);
+struct CrateError(Box<dyn SendSyncError>);
 
-impl std::fmt::Display for MyErrorType {
+impl std::fmt::Display for CrateError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "MyErrorType: {}", self.0)
+        write!(fmt, "CrateError: {}", self.0)
     }
 }
 
-impl std::error::Error for MyErrorType {
+impl std::error::Error for CrateError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&self.0)
     }
@@ -532,13 +524,90 @@ fn internal_api() -> eros::Result<()> {
     Err(ErrorUnion::new(std::io::Error::new(std::io::ErrorKind::Other, "io error")))
 }
 
-pub fn public_api() -> Result<(), MyErrorType> {
-    // Replace `ErrorUnion` with your custom error type
-    internal_api().map_err(|e| MyErrorType(e.into_inner_dyn_error()))
+pub fn public_api() -> Result<(), CrateError> {
+    internal_api().map_err(|e| CrateError(e.into_inner_dyn_error()))
 }
 ```
 
 </details>
+
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a thin wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally.
+
+This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `to_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
+
+<details>
+
+<summary>Example Implementation</summary>
+
+```rust
+use eros::{IntoUnion, E2};
+use std::{fmt, io};
+
+#[derive(Debug)]
+pub enum CrateError {
+    Io(io::Error),
+    Format(fmt::Error),
+}
+
+impl std::fmt::Display for CrateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CrateError::Io(e) => write!(f, "{}", e),
+            CrateError::Format(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl std::error::Error for CrateError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            CrateError::Io(e) => e.source(),
+            CrateError::Format(e) => e.source(),
+        }
+    }
+}
+
+impl From<E2<io::Error, fmt::Error>> for CrateError {
+    fn from(error: E2<io::Error, fmt::Error>) -> Self {
+        match error {
+            E2::A(e) => CrateError::Io(e),
+            E2::B(e) => CrateError::Format(e),
+        }
+    }
+}
+
+fn regular_typed_result1() -> Result<(), io::Error> {
+    Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"))
+}
+
+fn regular_typed_result2() -> Result<(), fmt::Error> {
+    Err(fmt::Error)
+}
+
+fn internal_api() -> eros::Result<(), (io::Error, fmt::Error)> {
+    regular_typed_result1().into_union()?;
+    regular_typed_result2().into_union()?;
+    Ok(())
+}
+
+// `to_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
+// which then converts into the crate's own `CrateError` via `From`.
+pub fn public_api() -> Result<(), CrateError> {
+    internal_api().map_err(|e| e.to_enum().into())
+}
+
+fn main() {
+    match public_api() {
+        Ok(()) => println!("Success!"),
+        Err(CrateError::Io(e)) => println!("IO error: {}", e),
+        Err(CrateError::Format(e)) => println!("Format error: {}", e),
+    }
+}
+```
+
+</details>
+
+With this, internal composing of errors can remain precise and ergonomic vs traditional enums, as outlined in [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly) section. And downstream users are not exposed to the `ErrorUnion` type and instead see a traditional error enum. Note even if typed tuples are used internally, it is still completely valid to choose to type erase at the boundary with `into_inner`.
 
 ### Backtrace vs Location
 
