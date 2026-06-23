@@ -5,20 +5,20 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 
-Eros is the swiss army knife of error handling approaches. It fits perfectly well into libraries and binaries.
+Eros is the swiss army knife of error handling approaches. It works well in both libraries and binaries.
 
 Built on the following philosophy:
 1. Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. [Link](#optional-typed-errors)
 2. There should be no boilerplate needed when handling any number of errors - no need to create an error enum for each case. [Link](#no-boilerplate)
-3. Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about. [Link](#seamless-transitions-between-error-types)
+3. Users should be able to seamlessly transition to and from fully typed errors and handle any cases they care about. [Link](#seamless-transitions-between-error-types)
 4. Errors should always provided context of the operations in the call stack that lead to the error. [Link](#errors-have-context)
-5. Error constructs should performant. [Link](#optimizations)
+5. Error constructs should be performant. [Link](#optimizations)
 
 ## Philosophy In Action
 
 ### Optional Typed Errors
 
-Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable apis. This is where [ErrorUnion](#errorunion) helps.
+Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable APIs. This is where [ErrorUnion](#errorunion) helps.
 
 ```rust
 use eros::bail;
@@ -68,7 +68,7 @@ fn regular_typed_result2() -> Result<(), sync::mpsc::RecvError> {
 }
 
 // `ErrorUnion` is used to track each possible error type,
-// instead of creating a enum for each possible error variant.
+// instead of creating an enum for each possible error variant.
 // `eros::Result<_,(..)>` is shorthand for  `Result<_,ErrorUnion<(..)>>`.
 fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> {
     let val = regular_typed_result1().into_union()?;
@@ -84,7 +84,7 @@ The above code is precisely typed for what we care about and there was no need t
 
 ### Seamless Transitions Between Error Types
 
-Users should be able to seamlessly transition to and from fully typed errors. And handle any cases they care about.
+Users should be able to seamlessly transition to and from fully typed errors and handle any cases they care about.
 
 ```rust
 use eros::{IntoUnion, ReshapeUnion};
@@ -106,7 +106,7 @@ fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> 
 
 // Error type is no longer tracked, we handled internally.
 fn regular_result() -> Result<(), sync::mpsc::RecvError> {
-    // Narrow the `ErrorUnion` and handle to only handle `io::Error` case!
+    // Narrow the `ErrorUnion` and handle the `io::Error` case!
     match error_union_result().narrow::<io::Error, _>() {
         Ok(io_error) => {
             // let _: io::Error = io_error;
@@ -158,7 +158,7 @@ fn main() {
 
 ### Errors Have Context
 
-Errors should always provided context of the operations in the call stack that lead to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
+Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
 ```rust
 use eros::{Context, bail};
@@ -244,7 +244,7 @@ The `location` feature flag adds a location at compile time for error creation a
 
 ### Optimizations
 
-Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `ErrorUnion<T>` and all context methods become a no-opt. Thus it may be optimized away by the compiler. 
+Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `ErrorUnion<T>` and all context methods become a no-op. Thus it may be optimized away by the compiler. 
 
 `ErrorUnion`'s stack size is pointer size (uses a `Box`). Boxing errors is a common trick to increase performance and decrease stack memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
 
@@ -256,7 +256,7 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 
 `ErrorUnion` is an open sum type. An open sum type takes full advantage of rust's powerful type system. It differs from an enum in that you do not need to define any actual new type in order to hold some specific combination of variants, but rather you simply describe the ErrorUnion as holding one value out of several specific possibilities. This is declared by using a tuple of those possible variants as the generic parameter for the `ErrorUnion`. 
 
-For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either a `io::Error` or a `fmt::Error`. The benefit of this over creating specific enums for each function become apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. Providing maximum composability with no boilerplate. E.g.
+For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either a `io::Error` or a `fmt::Error`. The benefit of this over creating specific enums for each function becomes apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. This Provides maximum composability with no boilerplate. E.g.
 
 ```rust
 use eros::ErrorUnion;
@@ -314,15 +314,15 @@ impl From<io::Error> for MyError {
     }
 }
 ```
-Additionally, the complexity of the second option grow exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for apis and instead choose a single error enum or struct for the entire crate. See the [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly) section for a deeper dive into this.
+Additionally, the complexity of the second option grows exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for APIs and instead choose a single error enum or struct for the entire crate. See the [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly) section for a deeper dive into this.
 
 When the error union should encompass the full set of possible errors, use `AnyError`:
 
-`eros::Result<()>` is shorthand for `eros::Result<(), AnyError>`, which is itself shorthand for `Result<(), ErrorUnion<AnyError>>`.
+`eros::Result<()>` is shorthand for `eros::Result<(), AnyError>`, which in turn is shorthand for `Result<(), ErrorUnion<AnyError>>`.
 
 ### Tracing
 
-`ErrorUnion` also allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and added to the log if `RUST_BACKTRACE` is set.
+`ErrorUnion` also allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and included with the error when `RUST_BACKTRACE` is set.
 
 ## Context Macro
 
@@ -486,13 +486,13 @@ eros = { version = "*", features = ["tracing", "log_debug"] }
 
 ### Use In Libraries
 
-`eros`'s flexibility and optimizations make it a the perfect option for both libraries and binaries.
+`eros`'s flexibility and optimizations make it the perfect option for both libraries and binaries.
 
 *Libraries should consider disabling default features* and allowing downstream crates to enable this. This can then be enabled for tests only in the library.
 
 #### Suggested Route
 
-Exposing `ErrorUnion` in a public api is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
+Exposing `ErrorUnion` in a public API is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
 
 #### Alternative
 
@@ -611,7 +611,7 @@ With this, internal composing of errors can remain precise and ergonomic vs trad
 
 ### Backtrace vs Location
 
-`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location of the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
 
 ### Anyhow
 
