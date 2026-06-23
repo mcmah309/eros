@@ -314,7 +314,7 @@ impl From<io::Error> for MyError {
     }
 }
 ```
-Additionally, the complexity of the second option grow exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for apis and instead choose a single error enum or struct for the entire crate. See the [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly] section for a deeper dive into this.
+Additionally, the complexity of the second option grow exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for apis and instead choose a single error enum or struct for the entire crate. See the [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly) section for a deeper dive into this.
 
 When the error union should encompass the full set of possible errors, use `AnyError`:
 
