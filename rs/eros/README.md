@@ -109,16 +109,13 @@ fn regular_result() -> Result<(), sync::mpsc::RecvError> {
     // Narrow the `ErrorUnion` and handle to only handle `io::Error` case!
     match error_union_result().narrow::<io::Error, _>() {
         Ok(io_error) => {
-            // This statement is not needed, just to show the type explicitly for this example.
-            let _: io::Error = io_error;
+            // let _: io::Error = io_error;
             todo!()
         }
         // The error type of the Result has been narrowed.
-        // It is now a union with a single type (`ErrorUnion<(sync::mpsc::RecvError,)>`),
-        // thus we can convert into the inner traced type.
+        // It is now a union with a single type, thus we can convert into the inner traced type.
         Err(result) => {
-            // This statement is not needed, just to show the type explicitly for this example.
-            let result: eros::Result<(), (sync::mpsc::RecvError,)> = result;
+            // let _: eros::Result<(), (sync::mpsc::RecvError,)> = result;
             result.map_err(|e| e.into_inner())
         }
     }
