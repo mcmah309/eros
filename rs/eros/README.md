@@ -894,7 +894,7 @@ This kills the boilerplate, but it also kills accuracy: every function now claim
 `ErrorUnion` sidesteps the dilemma entirely. No new enum is needed to combine errors, so precision and ergonomics stop being a trade-off.
 
 ```rust,ignore
-type MyError (io::Error, ParseIntError, AddrParseError);
+type MyError = (io::Error, ParseIntError, AddrParseError);
 
 fn initialize_system() -> eros::Result<(), MyError> {
     let data = read_file().into_union()?;
