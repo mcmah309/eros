@@ -1,0 +1,16 @@
+[package]
+name = "eros-no-std-test"
+version = "0.1.0"
+edition = "2024"
+description = "Verifies that the `eros` crate works in `#![no_std]` (with `alloc`) environments."
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+eros = { path = "../eros", default-features = false, features = [
+    "context",
+    "location",
+    "user_context",
+] }
