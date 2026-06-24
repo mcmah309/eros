@@ -211,13 +211,6 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     }
 }
 
-#[cfg(not(test))]
-#[cfg(target_arch = "arm")]
-#[lang = "eh_personality"]
-fn eh_personality() -> core::alloc::Layout {
-    core::alloc::Layout::new::<u8>()
-}
-
 #[cfg(test)]
 mod tests {
     use super::{CheckOutcome, InvalidPassword, NotEnoughMemory, Timeout, run_no_std_checks};
