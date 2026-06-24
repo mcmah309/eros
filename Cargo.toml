@@ -1,4 +1,4 @@
 [workspace]
 resolver = "3"
-members = ["rs/eros", "rs/eros-macros"]
+members = ["rs/eros", "rs/eros-macros", "rs/eros-no-std-test"]
 exclude = []

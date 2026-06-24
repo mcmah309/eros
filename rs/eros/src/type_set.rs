@@ -1,7 +1,8 @@
 use core::any::Any;
 use core::fmt;
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
-use std::error::Error;
+use core::error::Error;
 
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
@@ -14,7 +15,7 @@ use crate::{AnyError, SendSyncError};
 #[derive(Debug)]
 pub enum End {}
 
-impl std::error::Error for End {}
+impl core::error::Error for End {}
 
 /// A compile-time list of types, similar to other basic functional list structures.
 #[doc(hidden)]
@@ -117,7 +118,7 @@ pub trait DebugFold {
         formatter: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] context: &[ErosContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
-        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> fmt::Result;
 }
 
@@ -127,7 +128,7 @@ impl DebugFold for End {
         _: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] _context: &[ErosContext],
         #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
-        #[cfg(feature = "location")] _location: &'static std::panic::Location<'static>,
+        #[cfg(feature = "location")] _location: &'static core::panic::Location<'static>,
     ) -> fmt::Result {
         unreachable!("debug_fold called on End");
     }
@@ -138,8 +139,9 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     formatter: &mut fmt::Formatter<'_>,
     #[cfg(feature = "context")] context: &[ErosContext],
     #[cfg(feature = "backtrace")] backtrace: &Backtrace,
-    #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+    #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
 ) -> fmt::Result {
+    #[cfg(feature = "context")]
     fn write_eros_context(
         context: &ErosContext,
         formatter: &mut fmt::Formatter<'_>,
@@ -247,6 +249,7 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     Ok(())
 }
 
+#[cfg(feature = "backtrace")]
 fn write_backtrace(
     backtrace: &std::backtrace::Backtrace,
     formatter: &mut fmt::Formatter<'_>,
@@ -297,7 +300,7 @@ where
         formatter: &mut fmt::Formatter<'_>,
         #[cfg(feature = "context")] context: &[ErosContext],
         #[cfg(feature = "backtrace")] backtrace: &Backtrace,
-        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> fmt::Result {
         if let Some(head_ref) = (any as &dyn Any).downcast_ref::<Head>() {
             write_debug(
@@ -696,6 +699,7 @@ where
 }
 
 fn _narrow_test() {
+    use alloc::{string::String, vec::Vec};
     fn can_narrow<Types, Target, Remainder, Index>()
     where
         Types: Narrow<Target, Index, Remainder = Remainder>,
@@ -741,6 +745,7 @@ impl SupersetOf<AnyError, End> for AnyError {
 }
 
 fn _superset_test() {
+    use alloc::{string::String, vec::Vec};
     fn is_superset<S1, S2, Remainder, Index>()
     where
         S1: SupersetOf<S2, Index, Remainder = Remainder>,

@@ -28,16 +28,19 @@ trybuild = "1"
 # Libraries should consider disabling these defaults, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
 default = ["context", "backtrace"]
+# Enables the `std` library. Required for `backtrace` and `anyhow` features. When disabled,
+# `eros` is `no_std` (but still requires `alloc` for `Box`/`Vec`/`String` etc.).
+std = []
 # Enables context
 context = []
 # Enables backtrace
-backtrace = []
+backtrace = ["std"]
 # Parses and removes the unnecessary noise from the backtrace before printing
 better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
 # Enables location capture
 location = []
 # Add integration with anyhow
-anyhow = ["dep:anyhow"]
+anyhow = ["std", "dep:anyhow"]
 # Enables `ErrorUnion::log_*` statements and `LogExt` for `Result`. But does not enable a logging backend.
 # Libraries can enable this and let a downstream enable a backend.
 logging = []

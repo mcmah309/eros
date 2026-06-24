@@ -1,4 +1,19 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
+
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
+
+// Re-export alloc items so that the exported macros (e.g. `error!`/`bail!`) work in
+// both `std` and `no_std` (with `alloc`) consumer crates without requiring the
+// consumer to manually depend on `alloc`.
+#[doc(hidden)]
+pub mod __private {
+    pub use alloc::{borrow::Cow, boxed::Box, string::String, sync::Arc, vec::Vec};
+    pub use alloc::format;
+}
 
 mod any_error;
 mod context;
@@ -19,7 +34,7 @@ pub use logging::LogExt;
 pub use eros_macros::context;
 
 // aliases
-pub type Result<T, E = AnyError> = std::result::Result<T, ErrorUnion<E>>;
+pub type Result<T, E = AnyError> = core::result::Result<T, ErrorUnion<E>>;
 
 // data structures
 pub use any_error::AnyError;

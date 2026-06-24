@@ -1,9 +1,16 @@
+use alloc::boxed::Box;
+#[cfg(feature = "context")]
+use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
 use core::marker::PhantomData;
+use core::mem;
 use core::ops::Deref;
+use core::ptr;
+#[cfg(feature = "std")]
 use std::any::TypeId;
-use std::{mem, ptr};
+#[cfg(not(feature = "std"))]
+use core::any::TypeId;
 
 use crate::context::ContextSource;
 #[cfg(feature = "context")]
@@ -16,7 +23,7 @@ use crate::type_set::{
 use crate::{AnyError, Cons, End, StrError};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
-pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'static {
+pub trait SendSyncError: core::any::Any + core::error::Error + Send + Sync + 'static {
     /// Converts this `SendSynError` to `Any`.
     ///
     /// Warning: Use carefully since `Any` is this type,
@@ -32,15 +39,15 @@ pub trait SendSyncError: std::any::Any + std::error::Error + Send + Sync + 'stat
 
 impl<T> SendSyncError for T
 where
-    T: std::error::Error + Send + Sync + 'static,
+    T: core::error::Error + core::any::Any + Send + Sync + 'static,
 {
     fn as_any(&self) -> &dyn Any {
         self
     }
 }
 
-impl std::error::Error for Box<dyn SendSyncError> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for Box<dyn SendSyncError> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(&**self)
     }
 }
@@ -51,7 +58,7 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     #[cfg(feature = "context")]
     pub(crate) context: Vec<ErosContext>,
     #[cfg(feature = "location")]
-    pub(crate) location: &'static std::panic::Location<'static>,
+    pub(crate) location: &'static core::panic::Location<'static>,
     /// Re-boxes the error field into a fresh allocation.
     /// Stored at construction so the concrete type is still known.
     pub(crate) into_box_fn: fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
@@ -76,7 +83,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             #[cfg(feature = "context")]
             context: Vec::new(),
             #[cfg(feature = "location")]
-            location: std::panic::Location::caller(),
+            location: core::panic::Location::caller(),
             into_box_fn: make_box::<T>,
             error: t,
         })
@@ -86,7 +93,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
         #[cfg(feature = "context")] context: Vec<ErosContext>,
-        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> Box<ErrorUnionInner<dyn SendSyncError>>
     where
         T: SendSyncError,
@@ -188,7 +195,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
         } else {
             panic!(
                 "Attempted to downcast to {}, but actual type was different",
-                std::any::type_name::<T>()
+                core::any::type_name::<T>()
             );
         }
     }
@@ -298,6 +305,7 @@ where
 
 //************************************************************************//
 
+#[cfg(feature = "std")]
 fn _send_sync_error_assert() {
     use std::io;
 
@@ -336,7 +344,7 @@ impl ErrorUnion {
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
         #[cfg(feature = "context")] context: Vec<ErosContext>,
-        #[cfg(feature = "location")] location: &'static std::panic::Location<'static>,
+        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> ErrorUnion<OutSet>
     where
         T: SendSyncError,
@@ -374,12 +382,12 @@ struct ErrorUnionErrorWrapper<E>(ErrorUnion<E>)
 where
     E: TypeSet;
 
-impl<E> std::error::Error for ErrorUnionErrorWrapper<E>
+impl<E> core::error::Error for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
-    E::Variants: std::error::Error + DebugFold + DisplayFold + ErrorFold,
+    E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         E::Variants::source_fold(&self.0.inner.error as &dyn Any)
     }
 }
@@ -407,10 +415,10 @@ where
 impl<E> ErrorUnion<E>
 where
     E: TypeSet + Send + Sync + 'static,
-    E::Variants: std::error::Error + DebugFold + DisplayFold + ErrorFold,
+    E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
     /// Creates a `Box<dyn SendSyncError>` error from this [`crate::ErrorUnion`]. This is used since
-    /// [`crate::ErrorUnion`] cannot implement [`std::error::Error`] directly, otherwise trait implementations
+    /// [`crate::ErrorUnion`] cannot implement [`core::error::Error`] directly, otherwise trait implementations
     /// that require this bounds would conflict. To convert back into a [`crate::ErrorUnion`],
     /// [`crate::ErrorUnion::from_dyn_error`] must be used.
     pub fn into_dyn_error(self) -> Box<dyn SendSyncError> {
@@ -525,7 +533,7 @@ where
         &self.inner.backtrace
     }
 
-    pub fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.inner.error.source()
     }
 
@@ -864,39 +872,39 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
 
 //************************************************************************//
 
-// anyhow::Error does not implement `std::error::Error` so we need to wrap it
+// anyhow::Error does not implement `core::error::Error` so we need to wrap it
 #[cfg(feature = "anyhow")]
 #[derive(Debug)]
 pub(crate) struct AnyhowError(pub(crate) anyhow::Error);
 
 #[cfg(feature = "anyhow")]
 impl fmt::Display for AnyhowError {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.0)
     }
 }
 
 #[cfg(feature = "anyhow")]
-impl std::error::Error for AnyhowError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for AnyhowError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.0.source()
     }
 }
 
 #[cfg(feature = "anyhow")]
 #[derive(Debug)]
-pub(crate) struct AnyhowErrorArc(pub(crate) std::sync::Arc<anyhow::Error>);
+pub(crate) struct AnyhowErrorArc(pub(crate) alloc::sync::Arc<anyhow::Error>);
 
 #[cfg(feature = "anyhow")]
 impl fmt::Display for AnyhowErrorArc {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", self.0)
     }
 }
 
 #[cfg(feature = "anyhow")]
-impl std::error::Error for AnyhowErrorArc {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for AnyhowErrorArc {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.0.source()
     }
 }
@@ -912,12 +920,12 @@ impl ErrorUnion {
             #[cfg(feature = "context")]
             Vec::new(),
             #[cfg(feature = "location")]
-            std::panic::Location::caller(),
+            core::panic::Location::caller(),
         )
     }
 
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn anyhow_arc(error: std::sync::Arc<anyhow::Error>) -> ErrorUnion {
+    pub fn anyhow_arc(error: alloc::sync::Arc<anyhow::Error>) -> ErrorUnion {
         ErrorUnion::new_from_parts(
             AnyhowErrorArc(error),
             #[cfg(feature = "backtrace")]
@@ -925,7 +933,7 @@ impl ErrorUnion {
             #[cfg(feature = "context")]
             Vec::new(),
             #[cfg(feature = "location")]
-            std::panic::Location::caller(),
+            core::panic::Location::caller(),
         )
     }
 }

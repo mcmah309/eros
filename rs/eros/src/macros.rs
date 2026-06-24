@@ -22,7 +22,7 @@ macro_rules! error {
         $crate::ErrorUnion::new::<_, eros::AnyError, _>($err)
     };
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrError::Owned(format!($fmt, $($arg)*)))
+        $crate::ErrorUnion::new::<_, eros::AnyError, _>($crate::StrError::Owned($crate::__private::format!($fmt, $($arg)*)))
     };
 }
 

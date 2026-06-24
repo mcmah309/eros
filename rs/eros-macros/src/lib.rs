@@ -259,9 +259,9 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
                 .collect();
 
             let fmt_call = if context_args.is_empty() {
-                quote! { format!(#format_str) }
+                quote! { eros::__private::format!(#format_str) }
             } else {
-                quote! { format!(#format_str, #(#context_args),*) }
+                quote! { eros::__private::format!(#format_str, #(#context_args),*) }
             };
 
             (bindings, fmt_call)
@@ -286,7 +286,7 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
             }
 
             let fmt_lit = syn::LitStr::new(&fmt_str, proc_macro2::Span::call_site());
-            (vec![], quote! { format!(#fmt_lit, #(#arg_idents),*) })
+            (vec![], quote! { eros::__private::format!(#fmt_lit, #(#arg_idents),*) })
         }
     };
 

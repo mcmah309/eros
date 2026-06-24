@@ -1,3 +1,5 @@
+use core::result::Result;
+
 use crate::{
     ErrorUnion,
     type_set::{DebugFold, DisplayFold, TypeSet},
@@ -11,7 +13,7 @@ pub trait LogExt<O> {
 impl<T, E> LogExt<Result<T, ErrorUnion<E>>> for Result<T, ErrorUnion<E>>
 where
     E: TypeSet,
-    <E as TypeSet>::Variants: std::fmt::Debug + DebugFold + std::fmt::Display + DisplayFold,
+    <E as TypeSet>::Variants: core::fmt::Debug + DebugFold + core::fmt::Display + DisplayFold,
 {
     /// If `Err`, logs this error as "error". The logging backend is configured by feature flag, as well as
     /// if the error is logged as its display or debug version
@@ -51,7 +53,7 @@ impl<T> LogExt<Result<T, ErrorUnion>> for Result<T, ErrorUnion> {
 impl<E> ErrorUnion<E>
 where
     E: TypeSet,
-    <E as TypeSet>::Variants: std::fmt::Debug + DebugFold + std::fmt::Display + DisplayFold,
+    <E as TypeSet>::Variants: core::fmt::Debug + DebugFold + core::fmt::Display + DisplayFold,
 {
     /// Logs this error as "error". The logging backend is configured by feature flag, as well as
     /// if the error is logged as its display or debug version

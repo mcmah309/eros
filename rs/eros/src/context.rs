@@ -1,4 +1,6 @@
-use std::{borrow::Cow, fmt::Display};
+use alloc::{borrow::Cow, boxed::Box, string::String};
+use core::fmt::Display;
+use core::result::Result;
 
 use crate::{ErrorUnion, SendSyncError, type_set::TypeSet};
 
@@ -6,7 +8,7 @@ use crate::{ErrorUnion, SendSyncError, type_set::TypeSet};
 pub struct ErosContext {
     pub(crate) context: ContextSource,
     #[cfg(feature = "location")]
-    pub(crate) location: &'static std::panic::Location<'static>,
+    pub(crate) location: &'static core::panic::Location<'static>,
     #[cfg(feature = "user_context")]
     pub(crate) is_user_facing: bool,
 }
@@ -17,7 +19,7 @@ impl ErosContext {
         Self {
             context,
             #[cfg(feature = "location")]
-            location: std::panic::Location::caller(),
+            location: core::panic::Location::caller(),
             #[cfg(feature = "user_context")]
             is_user_facing: false,
         }
@@ -29,7 +31,7 @@ impl ErosContext {
         Self {
             context,
             #[cfg(feature = "location")]
-            location: std::panic::Location::caller(),
+            location: core::panic::Location::caller(),
             is_user_facing: true,
         }
     }
@@ -43,8 +45,8 @@ pub enum ContextSource {
     Error(Box<dyn SendSyncError>),
 }
 
-impl std::fmt::Display for ContextSource {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ContextSource {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ContextSource::Static(s) => write!(f, "{}", s),
             ContextSource::Owned(s) => write!(f, "{}", s),
@@ -443,9 +445,9 @@ impl<T> Context for Option<T> {
 pub struct AbsentValueError;
 
 impl Display for AbsentValueError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "An `Option` was unexpectedly `None`")
     }
 }
 
-impl std::error::Error for AbsentValueError {}
+impl core::error::Error for AbsentValueError {}

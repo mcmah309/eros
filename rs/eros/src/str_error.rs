@@ -1,7 +1,5 @@
-use std::{
-    borrow::Cow,
-    fmt::{self, Debug, Display},
-};
+use alloc::{borrow::Cow, string::String};
+use core::fmt::{self, Debug, Display};
 
 /// An Error type that is just a message.
 /// It can hold a string in either a static or owned form.
@@ -12,7 +10,7 @@ pub enum StrError {
     Owned(String),
 }
 
-impl std::error::Error for StrError {}
+impl core::error::Error for StrError {}
 
 impl StrError {
     pub fn as_str(&self) -> &str {

@@ -147,6 +147,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "eros-no-std-test"
+version = "0.1.0"
+dependencies = [
+ "eros",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
