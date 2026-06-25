@@ -915,6 +915,10 @@ fn initialize_system() -> eros::Result<(), MyError> {
 
 The signature stays exact — only the errors that can actually occur are listed — and adding a fourth fallible step just means adding one type to the tuple, not a new enum and a new set of `From` impls, or a rewritten `match`.
 
+## no_std
+
+This crate supports `#![no_std]`
+
 ## Special Thanks
 
 Special thank you to the authors and contributors of the following crates that inspired `eros`:

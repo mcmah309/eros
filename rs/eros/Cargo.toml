@@ -5,7 +5,7 @@ edition = "2024"
 description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
 license = "Apache-2.0"
 repository = "https://github.com/mcmah309/eros"
-categories = ["rust-patterns"]
+categories = ["rust-patterns", "no-std"]
 keywords = ["error", "error-handling"]
 readme = "README.md"
 
