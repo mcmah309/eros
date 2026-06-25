@@ -4,6 +4,7 @@
 [<img alt="crates.io" src="https://img.shields.io/crates/v/eros.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/eros)
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
+![no_std](https://img.shields.io/badge/no__std-compatible-success)
 
 Eros is the swiss army knife of error handling approaches. It works well in both libraries and binaries.
 
@@ -240,7 +241,7 @@ Context:
 ```
 #### Location
 
-The `location` feature flag adds a location at compile time for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments).
+The `location` feature flag adds a location at compile time for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments) and no_std environments.
 
 ### Optimizations
 
@@ -620,7 +621,7 @@ With this, internal composing of errors can remain precise and ergonomic vs trad
 
 ### Backtrace vs Location
 
-`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
 
 ### Anyhow
 
@@ -917,7 +918,9 @@ The signature stays exact — only the errors that can actually occur are listed
 
 ## no_std
 
-This crate supports `#![no_std]`
+This crate supports `#![no_std]`, but requires `alloc`.
+
+Default features also must be disabled and a global allocator available. The `backtrace` feature does not work with no std, but backtrace can be replaced with the `location` feature which does.
 
 ## Special Thanks
 
