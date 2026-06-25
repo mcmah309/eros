@@ -543,7 +543,7 @@ where
     }
 
     /// Returns true if the inner error is of type `T`
-    pub fn inner_is<T: 'static>(&self) -> bool {
+    pub fn is_inner<T: 'static>(&self) -> bool {
         self.inner.is_error::<T>()
     }
 
