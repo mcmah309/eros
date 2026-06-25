@@ -505,7 +505,7 @@ If one wants to add a custom error type for all public APIs without exposing con
 ```rust
 use std::io;
 
-use eros::{SendSyncError, ErrorUnion, bail};
+use eros::{ErrorUnion, SendSyncError, TypeSet, bail};
 
 #[derive(Debug)]
 struct CrateError(Box<dyn SendSyncError>);
@@ -522,8 +522,8 @@ impl std::error::Error for CrateError {
     }
 }
 
-impl From<ErrorUnion> for CrateError {
-    fn from(e: ErrorUnion) -> Self {
+impl<T: TypeSet> From<ErrorUnion<T>> for CrateError {
+    fn from(e: ErrorUnion<T>) -> Self {
         CrateError(e.into_inner_dyn_error())
     }
 }
