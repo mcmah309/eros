@@ -351,13 +351,8 @@ impl ErrorUnion {
         }
     }
 
-    // Dev Note: We did not need to expose this. Especially a function with conditionally compiled params.
-    // We should change to `pub(crate)` on next breaking release
-    #[deprecated(
-        since = "0.6.1",
-        note = "Will be removed in next breaking release. If you have an actual use case for this. Please create an issue."
-    )]
-    pub fn new_from_parts<T, OutSet, Index>(
+    #[allow(unused)] // Used with anyhow feature
+    pub(crate) fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
         #[cfg(feature = "context")] context: Vec<ErosContext>,
