@@ -208,11 +208,23 @@ impl ErrorUnionInner<dyn SendSyncError> {
         (&self.error as &dyn Any).downcast_ref::<T>().unwrap()
     }
 
+    // todo when https://github.com/rust-lang/rust/issues/90850 is stabilized
+    // pub(crate) unsafe fn downcast_unchecked_error_ref<T: 'static>(&self) -> &T {
+    //     debug_assert!(self.is_error::<T>());
+    //     unsafe { (&self.error as &dyn Any).downcast_unchecked_ref::<T>() }
+    // }
+
     pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> &mut T {
         (&mut self.error as &mut dyn Any)
             .downcast_mut::<T>()
             .unwrap()
     }
+
+    // todo when https://github.com/rust-lang/rust/issues/90850 is stabilized
+    // pub(crate) unsafe fn downcast_unchecked_error_mut<T: 'static>(&mut self) -> &mut T {
+    //     debug_assert!(self.is_error::<T>());
+    //     unsafe { (&mut self.error as &mut dyn Any).downcast_unchecked_mut::<T>() }
+    // }
 }
 
 /// `ErrorUnion` is an open sum type of errors. It differs from an enum
