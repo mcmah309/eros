@@ -38,6 +38,7 @@ mod tests {
     impl std::error::Error for InvalidPasswordError {}
 
     fn create_user_error_message(error: &dyn SendSyncError) -> Option<String> {
+        #[allow(clippy::manual_map)]
         if let Some(user_error) = error.as_any().downcast_ref::<InvalidPasswordError>() {
             Some(user_error.to_string())
         } else {
@@ -65,7 +66,7 @@ mod tests {
         let union_b = union_b.context("Normal context");
         let union_b = union_b.user_context("User context");
 
-        let user_contexts = union_b.user_contexts().collect::<Vec<_>>();
+        let _user_contexts = union_b.user_contexts().collect::<Vec<_>>();
 
         assert_eq!(user_context.len(), 1);
         assert_eq!(user_context[0].to_string(), "User context");

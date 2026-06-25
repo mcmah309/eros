@@ -2,6 +2,8 @@ use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
 use core::any::Any;
+#[cfg(not(feature = "std"))]
+use core::any::TypeId;
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
@@ -9,8 +11,6 @@ use core::ops::Deref;
 use core::ptr;
 #[cfg(feature = "std")]
 use std::any::TypeId;
-#[cfg(not(feature = "std"))]
-use core::any::TypeId;
 
 use crate::context::ContextSource;
 #[cfg(feature = "context")]
@@ -20,7 +20,7 @@ use crate::type_set::{
     write_debug, write_display,
 };
 
-use crate::{AnyError, Cons, End, StrError};
+use crate::{AnyError, Cons, End};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: core::any::Any + core::error::Error + Send + Sync + 'static {
@@ -121,28 +121,30 @@ impl ErrorUnionInner<dyn SendSyncError> {
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
 
-        // Thin the fat pointer directly — no intermediate dyn Any cast needed.
-        // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
-        let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
-        // Copy to the stack
-        let downcasted_value: T = ptr::read(thin_ptr);
+        unsafe {
+            // Thin the fat pointer directly — no intermediate dyn Any cast needed.
+            // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
+            let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
+            // Copy to the stack
+            let downcasted_value: T = ptr::read(thin_ptr);
 
-        // Destructively drop the remaining fields inside the container
-        #[cfg(feature = "backtrace")]
-        ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).backtrace));
-        #[cfg(feature = "context")]
-        ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).context));
-        #[cfg(feature = "location")]
-        ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).location));
+            // Destructively drop the remaining fields inside the container
+            #[cfg(feature = "backtrace")]
+            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).backtrace));
+            #[cfg(feature = "context")]
+            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).context));
+            #[cfg(feature = "location")]
+            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).location));
 
-        // Deallocate the Box allocation itself.
-        // We reconstruct a Box containing uninitialized/dead data, but wrapped in
-        // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
-        // it frees the underlying heap memory without touching the fields.
-        let _dead_box: Box<mem::ManuallyDrop<Self>> =
-            Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
+            // Deallocate the Box allocation itself.
+            // We reconstruct a Box containing uninitialized/dead data, but wrapped in
+            // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
+            // it frees the underlying heap memory without touching the fields.
+            let _dead_box: Box<mem::ManuallyDrop<Self>> =
+                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
 
-        downcasted_value
+            downcasted_value
+        }
     }
 
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
@@ -153,38 +155,40 @@ impl ErrorUnionInner<dyn SendSyncError> {
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
 
-        // Thin the fat pointer directly — no intermediate dyn Any cast needed.
-        // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
-        let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
-        // Copy to the stack
-        let downcasted_value: T = ptr::read(thin_ptr);
+        unsafe {
+            // Thin the fat pointer directly — no intermediate dyn Any cast needed.
+            // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
+            let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
+            // Copy to the stack
+            let downcasted_value: T = ptr::read(thin_ptr);
 
-        // Read the additional parts before dropping
-        #[cfg(feature = "backtrace")]
-        let backtrace = ptr::read(ptr::addr_of!((*raw_container).backtrace));
-        #[cfg(feature = "context")]
-        let context = ptr::read(ptr::addr_of!((*raw_container).context));
-        #[cfg(feature = "location")]
-        let location = ptr::read(ptr::addr_of!((*raw_container).location));
-
-        let into_box_fn = ptr::read(ptr::addr_of!((*raw_container).into_box_fn));
-
-        // Deallocate the Box allocation itself.
-        // We reconstruct a Box containing uninitialized/dead data, but wrapped in
-        // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
-        // it frees the underlying heap memory without touching the fields.
-        let _dead_box: Box<mem::ManuallyDrop<Self>> =
-            Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
-
-        ErrorUnionInner {
+            // Read the additional parts before dropping
             #[cfg(feature = "backtrace")]
-            backtrace,
+            let backtrace = ptr::read(ptr::addr_of!((*raw_container).backtrace));
             #[cfg(feature = "context")]
-            context,
+            let context = ptr::read(ptr::addr_of!((*raw_container).context));
             #[cfg(feature = "location")]
-            location,
-            into_box_fn,
-            error: downcasted_value,
+            let location = ptr::read(ptr::addr_of!((*raw_container).location));
+
+            let into_box_fn = ptr::read(ptr::addr_of!((*raw_container).into_box_fn));
+
+            // Deallocate the Box allocation itself.
+            // We reconstruct a Box containing uninitialized/dead data, but wrapped in
+            // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
+            // it frees the underlying heap memory without touching the fields.
+            let _dead_box: Box<mem::ManuallyDrop<Self>> =
+                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
+
+            ErrorUnionInner {
+                #[cfg(feature = "backtrace")]
+                backtrace,
+                #[cfg(feature = "context")]
+                context,
+                #[cfg(feature = "location")]
+                location,
+                into_box_fn,
+                error: downcasted_value,
+            }
         }
     }
 
@@ -542,7 +546,7 @@ where
         let raw = Box::into_raw(self.inner);
         unsafe {
             let into_box_fn = (*raw).into_box_fn;
-            let error_ptr = ptr::addr_of_mut!((*raw).error) as *mut dyn SendSyncError;
+            let error_ptr = ptr::addr_of_mut!((*raw).error);
 
             let boxed = (into_box_fn)(error_ptr);
 

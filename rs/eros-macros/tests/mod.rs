@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 // ── Baseline ────────────────────────────────────────────────────────
 
 #[eros_macros::context("arg1 is {}", arg1)]
@@ -260,13 +262,13 @@ fn test_context_with_three_format_args() {
 }
 
 #[eros_macros::context("debug value is {:?}", value)]
-fn debug_format_function(value: &Vec<u8>) -> eros::Result<()> {
+fn debug_format_function(value: &[u8]) -> eros::Result<()> {
     eros::bail!("debug format error")
 }
 
 #[test]
 fn test_context_with_debug_format_specifier() {
-    let error = debug_format_function(&vec![1, 2, 3]).unwrap_err();
+    let error = debug_format_function(&[1, 2, 3]).unwrap_err();
     assert!(format!("{:?}", error).contains("[1, 2, 3]"));
 }
 
@@ -382,7 +384,7 @@ struct Pipeline {
 
 impl Pipeline {
     #[eros_macros::context]
-    async fn execute(&mut self, #[fmt("{:?}")] input: &Vec<u8>) -> eros::Result<()> {
+    async fn execute(&mut self, #[fmt("{:?}")] input: &[u8]) -> eros::Result<()> {
         eros::bail!("pipeline failed")
     }
 }
@@ -392,7 +394,7 @@ async fn test_auto_debug_async_mut_self() {
     let mut p = Pipeline {
         stage: "encode".into(),
     };
-    let error = p.execute(&vec![1, 2, 3]).await.unwrap_err();
+    let error = p.execute(&[1, 2, 3]).await.unwrap_err();
     assert!(format!("{:?}", error).contains("input: [1, 2, 3]"));
 }
 

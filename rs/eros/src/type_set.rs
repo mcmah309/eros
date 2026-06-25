@@ -1,8 +1,8 @@
 use core::any::Any;
+use core::error::Error;
 use core::fmt;
 #[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
-use core::error::Error;
 
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
@@ -699,7 +699,7 @@ where
 }
 
 fn _narrow_test() {
-    use alloc::{string::String, vec::Vec};
+    use alloc::string::String;
     fn can_narrow<Types, Target, Remainder, Index>()
     where
         Types: Narrow<Target, Index, Remainder = Remainder>,

@@ -3,10 +3,7 @@
 extern crate alloc;
 
 use alloc::string::ToString;
-use eros::{
-    AnyError, Context, ErrorUnion, IntoDynUnion, IntoUnion, ReshapeUnion, SendSyncError, StrError,
-    TypeSet, error,
-};
+use eros::{AnyError, ErrorUnion, IntoDynUnion, IntoUnion, SendSyncError, StrError, error};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotEnoughMemory;
@@ -72,13 +69,13 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let widened: ErrorUnion<(NotEnoughMemory, Timeout)> = u.widen();
     match widened.narrow::<NotEnoughMemory, _>() {
         Ok(NotEnoughMemory) => {}
-        Ok(_) | Err(_) => return Err(CheckOutcome::Fail("narrow NotEnoughMemory")),
+        Err(_) => return Err(CheckOutcome::Fail("narrow NotEnoughMemory")),
     }
 
     let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(Timeout);
     match u.narrow::<Timeout, _>() {
         Ok(Timeout) => {}
-        Ok(_) | Err(_) => return Err(CheckOutcome::Fail("narrow Timeout")),
+        Err(_) => return Err(CheckOutcome::Fail("narrow Timeout")),
     }
     let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(Timeout);
     let remainder: Result<Timeout, ErrorUnion<(NotEnoughMemory,)>> = u.narrow::<Timeout, _>();
@@ -117,7 +114,9 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let outcome: Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> =
         chain_with_question();
     if outcome.is_ok() {
-        return Err(CheckOutcome::Fail("chain_with_question should have propogated the error"));
+        return Err(CheckOutcome::Fail(
+            "chain_with_question should have propogated the error",
+        ));
     }
 
     let outcome: Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> =
@@ -203,7 +202,7 @@ fn assert_display(error: &dyn SendSyncError, want: &'static str) -> Result<(), C
     }
 }
 
-#[cfg(not(test))]
+#[cfg(all(not(test), not(feature = "std")))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     loop {
@@ -213,8 +212,8 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
 
 #[cfg(test)]
 mod tests {
-    use super::{CheckOutcome, InvalidPassword, NotEnoughMemory, Timeout, run_no_std_checks};
-    use eros::{AnyError, Context, ErrorUnion, IntoUnion, SendSyncError, StrError, error};
+    use super::{NotEnoughMemory, Timeout, run_no_std_checks};
+    use eros::{AnyError, Context, ErrorUnion, SendSyncError, StrError};
 
     #[test]
     fn all_no_std_checks_pass() {

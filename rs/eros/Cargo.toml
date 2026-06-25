@@ -9,6 +9,9 @@ categories = ["rust-patterns"]
 keywords = ["error", "error-handling"]
 readme = "README.md"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test_in_ci)'] }
+
 [dependencies]
 eros-macros = { version = "0.6.0", path = "../eros-macros" }
 # Adds `ErrorUnion::anyhow` for converting `anyhow::Error`s into a `ErrorUnion`

@@ -64,7 +64,7 @@ jobs:
           override: true
 
       - name: Check builds without std
-        run: cargo build -p eros-no-std-test --target thumbv7em-none-eabihf --release
+        run: cargo build -p eros-no-std-test --no-default-features --target thumbv7em-none-eabihf --release
 
       - name: Run no_std tests (on host)
         env:
