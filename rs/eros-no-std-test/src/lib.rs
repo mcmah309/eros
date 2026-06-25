@@ -59,11 +59,11 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
         Err(NotEnoughMemory).into_union::<_, (NotEnoughMemory,)>();
     let union = r.unwrap_err();
     assert_type::<NotEnoughMemory>(union.inner_ref(), "NotEnoughMemory")?;
-    assert_eq(union.into_inner(), NotEnoughMemory)?;
+    assert_eq(union.into_single(), NotEnoughMemory)?;
 
     let u: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
-    assert_eq(u.inner(), &Timeout)?;
-    assert_eq(u.into_inner(), Timeout)?;
+    assert_eq(u.as_ref(), &Timeout)?;
+    assert_eq(u.into_single(), Timeout)?;
 
     let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
     let widened: ErrorUnion<(NotEnoughMemory, Timeout)> = u.widen();
@@ -109,7 +109,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
     let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
     let mapped: ErrorUnion<(Timeout,)> = u.map(|NotEnoughMemory| Timeout);
-    assert_eq(mapped.into_inner(), Timeout)?;
+    assert_eq(mapped.into_single(), Timeout)?;
 
     let outcome: Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> =
         chain_with_question();
@@ -125,7 +125,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_type::<NotEnoughMemory>(union.inner_ref(), "chain failure type")?;
 
     let u: ErrorUnion<(InvalidPassword,)> = ErrorUnion::new(InvalidPassword);
-    let dyn_err = u.into_inner_dyn_error();
+    let dyn_err = u.into_inner();
     if !(&*dyn_err as &dyn core::any::Any).is::<InvalidPassword>() {
         return Err(CheckOutcome::Fail("into_inner_dyn_error concrete type"));
     }
@@ -141,7 +141,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
         return Err(CheckOutcome::Fail("subset (Timeout,) should succeed"));
     }
     let sub_union = sub.unwrap();
-    assert_eq(sub_union.into_inner(), Timeout)?;
+    assert_eq(sub_union.into_single(), Timeout)?;
 
     Ok(())
 }
@@ -232,7 +232,7 @@ mod tests {
         let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
         assert_send::<ErrorUnion<(NotEnoughMemory,)>>();
         assert_sync::<ErrorUnion<(NotEnoughMemory,)>>();
-        let dyn_err = u.into_inner_dyn_error();
+        let dyn_err = u.into_inner();
         assert_send::<Box<dyn SendSyncError>>();
         assert_sync::<Box<dyn SendSyncError>>();
         assert!((&*dyn_err as &dyn core::any::Any).is::<NotEnoughMemory>());
@@ -258,7 +258,7 @@ mod tests {
         let r: Result<(), NotEnoughMemory> = Err(NotEnoughMemory);
         let widened: Result<(), ErrorUnion<(NotEnoughMemory,)>> = r.context("op failed");
         let u = widened.unwrap_err();
-        assert_eq!(u.into_inner(), NotEnoughMemory);
+        assert_eq!(u.into_single(), NotEnoughMemory);
     }
 
     #[test]

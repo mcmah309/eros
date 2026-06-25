@@ -326,13 +326,13 @@ fn union() {
     }
 
     let error = regular_union();
-    assert_eq!(error.into_inner().kind(), std::io::ErrorKind::AddrInUse);
+    assert_eq!(error.into_single().kind(), std::io::ErrorKind::AddrInUse);
     let result = result_union();
     assert!(result.is_err());
     let error = result.unwrap_err();
-    assert_eq!(error.into_inner().kind(), std::io::ErrorKind::AddrInUse);
+    assert_eq!(error.into_single().kind(), std::io::ErrorKind::AddrInUse);
     let result = mapped_result_union();
     assert!(result.is_err());
     let error = result.unwrap_err();
-    assert_eq!(error.into_inner().0.kind(), std::io::ErrorKind::AddrInUse);
+    assert_eq!(error.into_single().0.kind(), std::io::ErrorKind::AddrInUse);
 }

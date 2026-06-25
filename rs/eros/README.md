@@ -113,10 +113,10 @@ fn regular_result() -> Result<(), sync::mpsc::RecvError> {
             todo!()
         }
         // The error type of the Result has been narrowed.
-        // It is now a union with a single type, thus we can convert into the inner traced type.
+        // It is now a union with a single type, thus we can convert into that single type.
         Err(result) => {
             // let _: eros::Result<(), (sync::mpsc::RecvError,)> = result;
-            result.map_err(|e| e.into_inner())
+            result.map_err(|e| e.into_single())
         }
     }
 }
@@ -526,7 +526,7 @@ impl std::error::Error for CrateError {
 
 impl<T: TypeSet> From<ErrorUnion<T>> for CrateError {
     fn from(e: ErrorUnion<T>) -> Self {
-        CrateError(e.into_inner_dyn_error())
+        CrateError(e.into_inner())
     }
 }
 

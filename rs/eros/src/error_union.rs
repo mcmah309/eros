@@ -193,19 +193,16 @@ impl ErrorUnionInner<dyn SendSyncError> {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn downcast_error<T: 'static>(self: Box<Self>) -> T {
+    pub(crate) fn downcast_error<T: 'static>(self: Box<Self>) -> Option<T> {
         if self.is_error::<T>() {
-            unsafe { self.downcast_error_unchecked() }
+            Some(unsafe { self.downcast_error_unchecked::<T>() })
         } else {
-            panic!(
-                "Attempted to downcast to {}, but actual type was different",
-                core::any::type_name::<T>()
-            );
+            None
         }
     }
 
-    pub(crate) fn downcast_error_ref<T: 'static>(&self) -> &T {
-        (&self.error as &dyn Any).downcast_ref::<T>().unwrap()
+    pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
+        (&self.error as &dyn Any).downcast_ref::<T>()
     }
 
     // todo when https://github.com/rust-lang/rust/issues/90850 is stabilized
@@ -214,10 +211,8 @@ impl ErrorUnionInner<dyn SendSyncError> {
     //     unsafe { (&self.error as &dyn Any).downcast_unchecked_ref::<T>() }
     // }
 
-    pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> &mut T {
-        (&mut self.error as &mut dyn Any)
-            .downcast_mut::<T>()
-            .unwrap()
+    pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        (&mut self.error as &mut dyn Any).downcast_mut::<T>()
     }
 
     // todo when https://github.com/rust-lang/rust/issues/90850 is stabilized
@@ -358,7 +353,10 @@ impl ErrorUnion {
 
     // Dev Note: We did not need to expose this. Especially a function with conditionally compiled params.
     // We should change to `pub(crate)` on next breaking release
-    #[deprecated(since = "0.6.1", note = "Will be removed in next breaking release. If you have an actual use case for this. Please create an issue.")]
+    #[deprecated(
+        since = "0.6.1",
+        note = "Will be removed in next breaking release. If you have an actual use case for this. Please create an issue."
+    )]
     pub fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
@@ -537,14 +535,21 @@ where
         unsafe { self.inner.downcast_error_unchecked::<Target>() }
     }
 
-    /// Gets a reference to the inner underlying error
-    pub fn inner_ref(&self) -> &dyn SendSyncError {
-        &self.inner.error
+    pub fn downcast_inner<T: 'static>(self) -> Option<T> {
+        self.inner.downcast_error()
     }
 
-    /// Gets a reference to the inner underlying error as `Any`
-    pub fn inner_ref_any(&self) -> &dyn Any {
-        &self.inner.error
+    pub fn downcast_inner_ref<T: 'static>(&self) -> Option<&T> {
+        self.inner.downcast_error_ref()
+    }
+
+    pub fn downcast_inner_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.inner.downcast_error_mut()
+    }
+
+    /// Returns true if the inner error is of type `T`
+    pub fn inner_is<T: 'static>(&self) -> bool {
+        self.inner.is_error::<T>()
     }
 
     #[cfg(feature = "backtrace")]
@@ -556,8 +561,18 @@ where
         self.inner.error.source()
     }
 
+    /// Gets a reference to the inner underlying error
+    pub fn inner_ref(&self) -> &dyn SendSyncError {
+        &self.inner.error
+    }
+
+    /// Gets a mutable reference to the inner underlying error
+    pub fn inner_mut(&mut self) -> &mut dyn SendSyncError {
+        &mut self.inner.error
+    }
+
     /// Into the inner underlying error
-    pub fn into_inner_dyn_error(self) -> Box<dyn SendSyncError> {
+    pub fn into_inner(self) -> Box<dyn SendSyncError> {
         let raw = Box::into_raw(self.inner);
         unsafe {
             let into_box_fn = (*raw).into_box_fn;
@@ -674,20 +689,24 @@ where
     }
 }
 
+impl<A: 'static> AsRef<A> for ErrorUnion<(A,)> {
+    fn as_ref(&self) -> &A {
+        self.inner.downcast_error_ref().unwrap()
+    }
+}
+
+impl<A: 'static> AsMut<A> for ErrorUnion<(A,)> {
+    fn as_mut(&mut self) -> &mut A {
+        self.inner.downcast_error_mut().unwrap()
+    }
+}
+
 impl<A: 'static> ErrorUnion<(A,)> {
-    /// Convert to the inner type of an ErrorUnion with a single possible type.
-    pub fn into_inner(self) -> A {
+    /// Convert the inner type of an `ErrorUnion` with a single possible type to that type.
+    ///
+    /// Use `as_ref` or `as_mut` if you want to borrow the inner type instead of consuming the `ErrorUnion`.
+    pub fn into_single(self) -> A {
         unsafe { self.inner.downcast_error_unchecked() }
-    }
-
-    /// Gets a reference to the inner type
-    pub fn inner(&self) -> &A {
-        self.inner.downcast_error_ref()
-    }
-
-    /// Gets a mutable reference to the inner type
-    pub fn inner_mut(&mut self) -> &mut A {
-        self.inner.downcast_error_mut()
     }
 
     pub fn map<U, F>(self, f: F) -> ErrorUnion<(U,)>
@@ -1021,7 +1040,7 @@ mod tests {
     #[should_panic]
     fn downcast_error_panics_on_wrong_type() {
         let inner = ErrorUnionInner::new(FooError("oops".into()));
-        inner.downcast_error::<BarError>(); // safe wrapper should panic
+        inner.downcast_error::<BarError>().unwrap(); // should panic
     }
 
     #[test]
@@ -1070,7 +1089,7 @@ mod tests {
         let recovered: ErrorUnion<(FooError,)> =
             ErrorUnion::from_dyn_error(dyn_err).expect("round-trip should succeed");
 
-        assert_eq!(recovered.inner(), &FooError("roundtrip".into()));
+        assert_eq!(recovered.as_ref(), &FooError("roundtrip".into()));
     }
 
     #[test]
@@ -1109,7 +1128,7 @@ mod tests {
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
 
-        assert_eq!(recovered.inner(), &FooError("ctx".into()));
+        assert_eq!(recovered.as_ref(), &FooError("ctx".into()));
     }
 
     #[test]
@@ -1127,7 +1146,7 @@ mod tests {
     #[test]
     fn into_inner_dyn_error_returns_concrete_type_not_wrapper() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("concrete".into()));
-        let dyn_err = union.into_inner_dyn_error();
+        let dyn_err = union.into_inner();
 
         assert!(
             (&*dyn_err as &dyn Any).is::<FooError>(),
@@ -1138,7 +1157,7 @@ mod tests {
     #[test]
     fn into_inner_dyn_error_value_is_preserved() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("preserved".into()));
-        let dyn_err = union.into_inner_dyn_error();
+        let dyn_err = union.into_inner();
 
         let foo = (&*dyn_err as &dyn Any).downcast_ref::<FooError>().unwrap();
         assert_eq!(foo, &FooError("preserved".into()));
@@ -1147,7 +1166,7 @@ mod tests {
     #[test]
     fn into_inner_dyn_error_display_is_concrete_type() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("display".into()));
-        let dyn_err = union.into_inner_dyn_error();
+        let dyn_err = union.into_inner();
 
         assert_eq!(dyn_err.to_string(), "FooError(display)");
     }
@@ -1156,7 +1175,7 @@ mod tests {
     fn into_inner_dyn_error_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>(_: T) {}
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("traits".into()));
-        assert_send_sync(union.into_inner_dyn_error());
+        assert_send_sync(union.into_inner());
     }
 
     #[test]
@@ -1164,7 +1183,7 @@ mod tests {
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("a".into()));
         let union_b: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("b".into()));
 
-        let inner_dyn = union_a.into_inner_dyn_error();
+        let inner_dyn = union_a.into_inner();
         let wrapper_dyn = union_b.into_dyn_error();
 
         assert!((&*inner_dyn as &dyn Any).is::<FooError>());
@@ -1175,7 +1194,7 @@ mod tests {
     #[test]
     fn into_inner_dyn_error_multi_variant_foo() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("multi".into()));
-        let dyn_err = union.into_inner_dyn_error();
+        let dyn_err = union.into_inner();
 
         assert!((&*dyn_err as &dyn Any).is::<FooError>());
         assert!(!(&*dyn_err as &dyn Any).is::<BarError>());
@@ -1186,7 +1205,7 @@ mod tests {
     #[test]
     fn into_inner_dyn_error_multi_variant_bar() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(77));
-        let dyn_err = union.into_inner_dyn_error();
+        let dyn_err = union.into_inner();
 
         assert!((&*dyn_err as &dyn Any).is::<BarError>());
         assert!(!(&*dyn_err as &dyn Any).is::<FooError>());
@@ -1208,7 +1227,7 @@ mod tests {
 
         let payload = vec![1u8, 2, 3, 4, 5];
         let union: ErrorUnion<(VecError,)> = ErrorUnion::new(VecError(payload.clone()));
-        let dyn_err = union.into_inner_dyn_error();
+        let dyn_err = union.into_inner();
 
         let recovered = (&*dyn_err as &dyn Any).downcast_ref::<VecError>().unwrap();
         assert_eq!(recovered.0, payload);
@@ -1220,7 +1239,7 @@ mod tests {
         // Confirm that from_dyn_error correctly rejects a bare inner error
         // (since it's not wrapped in ErrorUnionErrorWrapper).
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
-        let bare_dyn = union_a.into_inner_dyn_error();
+        let bare_dyn = union_a.into_inner();
 
         let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::from_dyn_error(bare_dyn);
         assert!(
@@ -1338,5 +1357,157 @@ mod latest_error_tests {
         let union = union.context(box_err(ContextError("ctx-1".into())));
 
         assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
+    }
+}
+
+#[cfg(test)]
+mod downcast_inner_tests {
+    use super::*;
+    use std::fmt;
+
+    #[derive(Debug, PartialEq)]
+    struct FooError(String);
+    impl fmt::Display for FooError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "FooError({})", self.0)
+        }
+    }
+    impl std::error::Error for FooError {}
+
+    #[derive(Debug, PartialEq)]
+    struct BarError(u32);
+    impl fmt::Display for BarError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "BarError({})", self.0)
+        }
+    }
+    impl std::error::Error for BarError {}
+
+    #[test]
+    fn downcast_inner_correct_type_returns_some() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("hello".into()));
+        let result = union.downcast_inner::<FooError>();
+        assert_eq!(result, Some(FooError("hello".into())));
+    }
+
+    #[test]
+    fn downcast_inner_wrong_type_returns_none() {
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("hello".into()));
+        let result = union.downcast_inner::<BarError>();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn downcast_inner_multi_variant_correct_type() {
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(7));
+        let result = union.downcast_inner::<BarError>();
+        assert_eq!(result, Some(BarError(7)));
+    }
+
+    #[test]
+    fn downcast_inner_does_not_leak_or_double_drop() {
+        // Vec payload lets Miri/ASan catch leaks or double-frees.
+        #[derive(Debug, PartialEq)]
+        struct VecError(Vec<u8>);
+        impl fmt::Display for VecError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:?}", self.0)
+            }
+        }
+        impl std::error::Error for VecError {}
+
+        let payload = vec![1u8, 2, 3, 4, 5];
+        let union: ErrorUnion<(VecError,)> = ErrorUnion::new(VecError(payload.clone()));
+        let result = union.downcast_inner::<VecError>();
+        assert_eq!(result, Some(VecError(payload)));
+    }
+
+    #[test]
+    fn downcast_inner_wrong_type_drops_value_without_leaking() {
+        // The Some(T) branch isn't taken; ensure the wrong-type path still
+        // doesn't leak the original error (it lives on inside `self`/`union`
+        // until `union` is dropped at the end of the test).
+        #[derive(Debug, PartialEq)]
+        struct VecError(Vec<u8>);
+        impl fmt::Display for VecError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:?}", self.0)
+            }
+        }
+        impl std::error::Error for VecError {}
+
+        let union: ErrorUnion<(VecError, FooError)> = ErrorUnion::new(VecError(vec![9, 9, 9]));
+        let result = union.downcast_inner::<FooError>();
+        assert_eq!(result, None);
+        // `union`'s inner VecError is dropped normally here.
+    }
+
+    #[test]
+    fn downcast_inner_ref_correct_type_returns_some() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("ref".into()));
+        let result = union.downcast_inner_ref::<FooError>();
+        assert_eq!(result, Some(&FooError("ref".into())));
+    }
+
+    #[test]
+    fn downcast_inner_ref_wrong_type_returns_none() {
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("ref".into()));
+        let result = union.downcast_inner_ref::<BarError>();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn downcast_inner_ref_does_not_consume_union() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("still here".into()));
+        let first = union.downcast_inner_ref::<FooError>();
+        assert_eq!(first, Some(&FooError("still here".into())));
+        // Union is still usable afterwards since this took `&self`.
+        let second = union.downcast_inner_ref::<FooError>();
+        assert_eq!(second, Some(&FooError("still here".into())));
+    }
+
+    #[test]
+    fn downcast_inner_ref_multi_variant_bar() {
+        let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(123));
+        assert_eq!(union.downcast_inner_ref::<BarError>(), Some(&BarError(123)));
+        assert_eq!(union.downcast_inner_ref::<FooError>(), None);
+    }
+
+    #[test]
+    fn downcast_inner_mut_correct_type_returns_some() {
+        let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("mut".into()));
+        let result = union.downcast_inner_mut::<FooError>();
+        assert_eq!(result, Some(&mut FooError("mut".into())));
+    }
+
+    #[test]
+    fn downcast_inner_mut_wrong_type_returns_none() {
+        let mut union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("mut".into()));
+        let result = union.downcast_inner_mut::<BarError>();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn downcast_inner_mut_allows_mutation() {
+        let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("before".into()));
+        {
+            let inner = union.downcast_inner_mut::<FooError>().unwrap();
+            inner.0 = "after".into();
+        }
+        assert_eq!(
+            union.downcast_inner_ref::<FooError>(),
+            Some(&FooError("after".into()))
+        );
+    }
+
+    #[test]
+    fn downcast_inner_mut_multi_variant_bar() {
+        let mut union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(1));
+        {
+            let bar = union.downcast_inner_mut::<BarError>().unwrap();
+            bar.0 = 99;
+        }
+        assert_eq!(union.downcast_inner_ref::<BarError>(), Some(&BarError(99)));
+        assert_eq!(union.downcast_inner_mut::<FooError>(), None);
     }
 }

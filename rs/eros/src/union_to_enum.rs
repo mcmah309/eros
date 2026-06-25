@@ -21,7 +21,7 @@ where
     A: 'static,
 {
     fn from(union_of: &'a ErrorUnion<(A,)>) -> Self {
-        E1::A(union_of.inner.downcast_error_ref())
+        E1::A(union_of.inner.downcast_error_ref().unwrap())
     }
 }
 
@@ -31,7 +31,7 @@ where
     A: 'static,
 {
     fn from(union_of: &'a mut ErrorUnion<(A,)>) -> Self {
-        E1::A(union_of.inner.downcast_error_mut())
+        E1::A(union_of.inner.downcast_error_mut().unwrap())
     }
 }
 
@@ -60,9 +60,9 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E2::A(union_of.inner.downcast_error_ref())
+            E2::A(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E2::B(union_of.inner.downcast_error_ref())
+            E2::B(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -79,9 +79,9 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E2::A(union_of.inner.downcast_error_mut())
+            E2::A(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E2::B(union_of.inner.downcast_error_mut())
+            E2::B(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -115,11 +115,11 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E3::A(union_of.inner.downcast_error_ref())
+            E3::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E3::B(union_of.inner.downcast_error_ref())
+            E3::B(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E3::C(union_of.inner.downcast_error_ref())
+            E3::C(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -138,11 +138,11 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E3::A(union_of.inner.downcast_error_mut())
+            E3::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E3::B(union_of.inner.downcast_error_mut())
+            E3::B(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E3::C(union_of.inner.downcast_error_mut())
+            E3::C(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -180,13 +180,13 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E4::A(union_of.inner.downcast_error_ref())
+            E4::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E4::B(union_of.inner.downcast_error_ref())
+            E4::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E4::C(union_of.inner.downcast_error_ref())
+            E4::C(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E4::D(union_of.inner.downcast_error_ref())
+            E4::D(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -207,13 +207,13 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E4::A(union_of.inner.downcast_error_mut())
+            E4::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E4::B(union_of.inner.downcast_error_mut())
+            E4::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E4::C(union_of.inner.downcast_error_mut())
+            E4::C(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E4::D(union_of.inner.downcast_error_mut())
+            E4::D(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -255,15 +255,15 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E5::A(union_of.inner.downcast_error_ref())
+            E5::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E5::B(union_of.inner.downcast_error_ref())
+            E5::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E5::C(union_of.inner.downcast_error_ref())
+            E5::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E5::D(union_of.inner.downcast_error_ref())
+            E5::D(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E5::E(union_of.inner.downcast_error_ref())
+            E5::E(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -286,15 +286,15 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E5::A(union_of.inner.downcast_error_mut())
+            E5::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E5::B(union_of.inner.downcast_error_mut())
+            E5::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E5::C(union_of.inner.downcast_error_mut())
+            E5::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E5::D(union_of.inner.downcast_error_mut())
+            E5::D(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E5::E(union_of.inner.downcast_error_mut())
+            E5::E(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -340,17 +340,17 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E6::A(union_of.inner.downcast_error_ref())
+            E6::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E6::B(union_of.inner.downcast_error_ref())
+            E6::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E6::C(union_of.inner.downcast_error_ref())
+            E6::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E6::D(union_of.inner.downcast_error_ref())
+            E6::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E6::E(union_of.inner.downcast_error_ref())
+            E6::E(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E6::F(union_of.inner.downcast_error_ref())
+            E6::F(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -375,17 +375,17 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E6::A(union_of.inner.downcast_error_mut())
+            E6::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E6::B(union_of.inner.downcast_error_mut())
+            E6::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E6::C(union_of.inner.downcast_error_mut())
+            E6::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E6::D(union_of.inner.downcast_error_mut())
+            E6::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E6::E(union_of.inner.downcast_error_mut())
+            E6::E(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E6::F(union_of.inner.downcast_error_mut())
+            E6::F(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -435,19 +435,19 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E7::A(union_of.inner.downcast_error_ref())
+            E7::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E7::B(union_of.inner.downcast_error_ref())
+            E7::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E7::C(union_of.inner.downcast_error_ref())
+            E7::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E7::D(union_of.inner.downcast_error_ref())
+            E7::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E7::E(union_of.inner.downcast_error_ref())
+            E7::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E7::F(union_of.inner.downcast_error_ref())
+            E7::F(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E7::G(union_of.inner.downcast_error_ref())
+            E7::G(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -474,19 +474,19 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E7::A(union_of.inner.downcast_error_mut())
+            E7::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E7::B(union_of.inner.downcast_error_mut())
+            E7::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E7::C(union_of.inner.downcast_error_mut())
+            E7::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E7::D(union_of.inner.downcast_error_mut())
+            E7::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E7::E(union_of.inner.downcast_error_mut())
+            E7::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E7::F(union_of.inner.downcast_error_mut())
+            E7::F(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E7::G(union_of.inner.downcast_error_mut())
+            E7::G(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -540,21 +540,21 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E8::A(union_of.inner.downcast_error_ref())
+            E8::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E8::B(union_of.inner.downcast_error_ref())
+            E8::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E8::C(union_of.inner.downcast_error_ref())
+            E8::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E8::D(union_of.inner.downcast_error_ref())
+            E8::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E8::E(union_of.inner.downcast_error_ref())
+            E8::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E8::F(union_of.inner.downcast_error_ref())
+            E8::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E8::G(union_of.inner.downcast_error_ref())
+            E8::G(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E8::H(union_of.inner.downcast_error_ref())
+            E8::H(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -583,21 +583,21 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E8::A(union_of.inner.downcast_error_mut())
+            E8::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E8::B(union_of.inner.downcast_error_mut())
+            E8::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E8::C(union_of.inner.downcast_error_mut())
+            E8::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E8::D(union_of.inner.downcast_error_mut())
+            E8::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E8::E(union_of.inner.downcast_error_mut())
+            E8::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E8::F(union_of.inner.downcast_error_mut())
+            E8::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E8::G(union_of.inner.downcast_error_mut())
+            E8::G(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E8::H(union_of.inner.downcast_error_mut())
+            E8::H(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -655,23 +655,23 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E9::A(union_of.inner.downcast_error_ref())
+            E9::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E9::B(union_of.inner.downcast_error_ref())
+            E9::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E9::C(union_of.inner.downcast_error_ref())
+            E9::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E9::D(union_of.inner.downcast_error_ref())
+            E9::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E9::E(union_of.inner.downcast_error_ref())
+            E9::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E9::F(union_of.inner.downcast_error_ref())
+            E9::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E9::G(union_of.inner.downcast_error_ref())
+            E9::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E9::H(union_of.inner.downcast_error_ref())
+            E9::H(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E9::I(union_of.inner.downcast_error_ref())
+            E9::I(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -702,23 +702,23 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E9::A(union_of.inner.downcast_error_mut())
+            E9::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E9::B(union_of.inner.downcast_error_mut())
+            E9::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E9::C(union_of.inner.downcast_error_mut())
+            E9::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E9::D(union_of.inner.downcast_error_mut())
+            E9::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E9::E(union_of.inner.downcast_error_mut())
+            E9::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E9::F(union_of.inner.downcast_error_mut())
+            E9::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E9::G(union_of.inner.downcast_error_mut())
+            E9::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E9::H(union_of.inner.downcast_error_mut())
+            E9::H(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E9::I(union_of.inner.downcast_error_mut())
+            E9::I(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -780,25 +780,25 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E10::A(union_of.inner.downcast_error_ref())
+            E10::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E10::B(union_of.inner.downcast_error_ref())
+            E10::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E10::C(union_of.inner.downcast_error_ref())
+            E10::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E10::D(union_of.inner.downcast_error_ref())
+            E10::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E10::E(union_of.inner.downcast_error_ref())
+            E10::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E10::F(union_of.inner.downcast_error_ref())
+            E10::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E10::G(union_of.inner.downcast_error_ref())
+            E10::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E10::H(union_of.inner.downcast_error_ref())
+            E10::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E10::I(union_of.inner.downcast_error_ref())
+            E10::I(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E10::J(union_of.inner.downcast_error_ref())
+            E10::J(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -831,25 +831,25 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E10::A(union_of.inner.downcast_error_mut())
+            E10::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E10::B(union_of.inner.downcast_error_mut())
+            E10::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E10::C(union_of.inner.downcast_error_mut())
+            E10::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E10::D(union_of.inner.downcast_error_mut())
+            E10::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E10::E(union_of.inner.downcast_error_mut())
+            E10::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E10::F(union_of.inner.downcast_error_mut())
+            E10::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E10::G(union_of.inner.downcast_error_mut())
+            E10::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E10::H(union_of.inner.downcast_error_mut())
+            E10::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E10::I(union_of.inner.downcast_error_mut())
+            E10::I(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E10::J(union_of.inner.downcast_error_mut())
+            E10::J(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -915,27 +915,27 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E11::A(union_of.inner.downcast_error_ref())
+            E11::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E11::B(union_of.inner.downcast_error_ref())
+            E11::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E11::C(union_of.inner.downcast_error_ref())
+            E11::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E11::D(union_of.inner.downcast_error_ref())
+            E11::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E11::E(union_of.inner.downcast_error_ref())
+            E11::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E11::F(union_of.inner.downcast_error_ref())
+            E11::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E11::G(union_of.inner.downcast_error_ref())
+            E11::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E11::H(union_of.inner.downcast_error_ref())
+            E11::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E11::I(union_of.inner.downcast_error_ref())
+            E11::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E11::J(union_of.inner.downcast_error_ref())
+            E11::J(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E11::K(union_of.inner.downcast_error_ref())
+            E11::K(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -970,27 +970,27 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E11::A(union_of.inner.downcast_error_mut())
+            E11::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E11::B(union_of.inner.downcast_error_mut())
+            E11::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E11::C(union_of.inner.downcast_error_mut())
+            E11::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E11::D(union_of.inner.downcast_error_mut())
+            E11::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E11::E(union_of.inner.downcast_error_mut())
+            E11::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E11::F(union_of.inner.downcast_error_mut())
+            E11::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E11::G(union_of.inner.downcast_error_mut())
+            E11::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E11::H(union_of.inner.downcast_error_mut())
+            E11::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E11::I(union_of.inner.downcast_error_mut())
+            E11::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E11::J(union_of.inner.downcast_error_mut())
+            E11::J(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E11::K(union_of.inner.downcast_error_mut())
+            E11::K(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -1060,29 +1060,29 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E12::A(union_of.inner.downcast_error_ref())
+            E12::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E12::B(union_of.inner.downcast_error_ref())
+            E12::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E12::C(union_of.inner.downcast_error_ref())
+            E12::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E12::D(union_of.inner.downcast_error_ref())
+            E12::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E12::E(union_of.inner.downcast_error_ref())
+            E12::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E12::F(union_of.inner.downcast_error_ref())
+            E12::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E12::G(union_of.inner.downcast_error_ref())
+            E12::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E12::H(union_of.inner.downcast_error_ref())
+            E12::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E12::I(union_of.inner.downcast_error_ref())
+            E12::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E12::J(union_of.inner.downcast_error_ref())
+            E12::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E12::K(union_of.inner.downcast_error_ref())
+            E12::K(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E12::L(union_of.inner.downcast_error_ref())
+            E12::L(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -1119,29 +1119,29 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E12::A(union_of.inner.downcast_error_mut())
+            E12::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E12::B(union_of.inner.downcast_error_mut())
+            E12::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E12::C(union_of.inner.downcast_error_mut())
+            E12::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E12::D(union_of.inner.downcast_error_mut())
+            E12::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E12::E(union_of.inner.downcast_error_mut())
+            E12::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E12::F(union_of.inner.downcast_error_mut())
+            E12::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E12::G(union_of.inner.downcast_error_mut())
+            E12::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E12::H(union_of.inner.downcast_error_mut())
+            E12::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E12::I(union_of.inner.downcast_error_mut())
+            E12::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E12::J(union_of.inner.downcast_error_mut())
+            E12::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E12::K(union_of.inner.downcast_error_mut())
+            E12::K(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E12::L(union_of.inner.downcast_error_mut())
+            E12::L(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -1215,31 +1215,31 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E13::A(union_of.inner.downcast_error_ref())
+            E13::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E13::B(union_of.inner.downcast_error_ref())
+            E13::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E13::C(union_of.inner.downcast_error_ref())
+            E13::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E13::D(union_of.inner.downcast_error_ref())
+            E13::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E13::E(union_of.inner.downcast_error_ref())
+            E13::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E13::F(union_of.inner.downcast_error_ref())
+            E13::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E13::G(union_of.inner.downcast_error_ref())
+            E13::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E13::H(union_of.inner.downcast_error_ref())
+            E13::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E13::I(union_of.inner.downcast_error_ref())
+            E13::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E13::J(union_of.inner.downcast_error_ref())
+            E13::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E13::K(union_of.inner.downcast_error_ref())
+            E13::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E13::L(union_of.inner.downcast_error_ref())
+            E13::L(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E13::M(union_of.inner.downcast_error_ref())
+            E13::M(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -1278,31 +1278,31 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E13::A(union_of.inner.downcast_error_mut())
+            E13::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E13::B(union_of.inner.downcast_error_mut())
+            E13::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E13::C(union_of.inner.downcast_error_mut())
+            E13::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E13::D(union_of.inner.downcast_error_mut())
+            E13::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E13::E(union_of.inner.downcast_error_mut())
+            E13::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E13::F(union_of.inner.downcast_error_mut())
+            E13::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E13::G(union_of.inner.downcast_error_mut())
+            E13::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E13::H(union_of.inner.downcast_error_mut())
+            E13::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E13::I(union_of.inner.downcast_error_mut())
+            E13::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E13::J(union_of.inner.downcast_error_mut())
+            E13::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E13::K(union_of.inner.downcast_error_mut())
+            E13::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E13::L(union_of.inner.downcast_error_mut())
+            E13::L(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E13::M(union_of.inner.downcast_error_mut())
+            E13::M(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -1380,33 +1380,33 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E14::A(union_of.inner.downcast_error_ref())
+            E14::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E14::B(union_of.inner.downcast_error_ref())
+            E14::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E14::C(union_of.inner.downcast_error_ref())
+            E14::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E14::D(union_of.inner.downcast_error_ref())
+            E14::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E14::E(union_of.inner.downcast_error_ref())
+            E14::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E14::F(union_of.inner.downcast_error_ref())
+            E14::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E14::G(union_of.inner.downcast_error_ref())
+            E14::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E14::H(union_of.inner.downcast_error_ref())
+            E14::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E14::I(union_of.inner.downcast_error_ref())
+            E14::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E14::J(union_of.inner.downcast_error_ref())
+            E14::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E14::K(union_of.inner.downcast_error_ref())
+            E14::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E14::L(union_of.inner.downcast_error_ref())
+            E14::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E14::M(union_of.inner.downcast_error_ref())
+            E14::M(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E14::N(union_of.inner.downcast_error_ref())
+            E14::N(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -1447,33 +1447,33 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E14::A(union_of.inner.downcast_error_mut())
+            E14::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E14::B(union_of.inner.downcast_error_mut())
+            E14::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E14::C(union_of.inner.downcast_error_mut())
+            E14::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E14::D(union_of.inner.downcast_error_mut())
+            E14::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E14::E(union_of.inner.downcast_error_mut())
+            E14::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E14::F(union_of.inner.downcast_error_mut())
+            E14::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E14::G(union_of.inner.downcast_error_mut())
+            E14::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E14::H(union_of.inner.downcast_error_mut())
+            E14::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E14::I(union_of.inner.downcast_error_mut())
+            E14::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E14::J(union_of.inner.downcast_error_mut())
+            E14::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E14::K(union_of.inner.downcast_error_mut())
+            E14::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E14::L(union_of.inner.downcast_error_mut())
+            E14::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E14::M(union_of.inner.downcast_error_mut())
+            E14::M(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E14::N(union_of.inner.downcast_error_mut())
+            E14::N(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -1555,35 +1555,35 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E15::A(union_of.inner.downcast_error_ref())
+            E15::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E15::B(union_of.inner.downcast_error_ref())
+            E15::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E15::C(union_of.inner.downcast_error_ref())
+            E15::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E15::D(union_of.inner.downcast_error_ref())
+            E15::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E15::E(union_of.inner.downcast_error_ref())
+            E15::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E15::F(union_of.inner.downcast_error_ref())
+            E15::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E15::G(union_of.inner.downcast_error_ref())
+            E15::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E15::H(union_of.inner.downcast_error_ref())
+            E15::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E15::I(union_of.inner.downcast_error_ref())
+            E15::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E15::J(union_of.inner.downcast_error_ref())
+            E15::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E15::K(union_of.inner.downcast_error_ref())
+            E15::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E15::L(union_of.inner.downcast_error_ref())
+            E15::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E15::M(union_of.inner.downcast_error_ref())
+            E15::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E15::N(union_of.inner.downcast_error_ref())
+            E15::N(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E15::O(union_of.inner.downcast_error_ref())
+            E15::O(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -1626,35 +1626,35 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E15::A(union_of.inner.downcast_error_mut())
+            E15::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E15::B(union_of.inner.downcast_error_mut())
+            E15::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E15::C(union_of.inner.downcast_error_mut())
+            E15::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E15::D(union_of.inner.downcast_error_mut())
+            E15::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E15::E(union_of.inner.downcast_error_mut())
+            E15::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E15::F(union_of.inner.downcast_error_mut())
+            E15::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E15::G(union_of.inner.downcast_error_mut())
+            E15::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E15::H(union_of.inner.downcast_error_mut())
+            E15::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E15::I(union_of.inner.downcast_error_mut())
+            E15::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E15::J(union_of.inner.downcast_error_mut())
+            E15::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E15::K(union_of.inner.downcast_error_mut())
+            E15::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E15::L(union_of.inner.downcast_error_mut())
+            E15::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E15::M(union_of.inner.downcast_error_mut())
+            E15::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E15::N(union_of.inner.downcast_error_mut())
+            E15::N(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E15::O(union_of.inner.downcast_error_mut())
+            E15::O(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -1740,37 +1740,37 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E16::A(union_of.inner.downcast_error_ref())
+            E16::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E16::B(union_of.inner.downcast_error_ref())
+            E16::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E16::C(union_of.inner.downcast_error_ref())
+            E16::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E16::D(union_of.inner.downcast_error_ref())
+            E16::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E16::E(union_of.inner.downcast_error_ref())
+            E16::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E16::F(union_of.inner.downcast_error_ref())
+            E16::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E16::G(union_of.inner.downcast_error_ref())
+            E16::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E16::H(union_of.inner.downcast_error_ref())
+            E16::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E16::I(union_of.inner.downcast_error_ref())
+            E16::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E16::J(union_of.inner.downcast_error_ref())
+            E16::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E16::K(union_of.inner.downcast_error_ref())
+            E16::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E16::L(union_of.inner.downcast_error_ref())
+            E16::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E16::M(union_of.inner.downcast_error_ref())
+            E16::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E16::N(union_of.inner.downcast_error_ref())
+            E16::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E16::O(union_of.inner.downcast_error_ref())
+            E16::O(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E16::P(union_of.inner.downcast_error_ref())
+            E16::P(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -1815,37 +1815,37 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E16::A(union_of.inner.downcast_error_mut())
+            E16::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E16::B(union_of.inner.downcast_error_mut())
+            E16::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E16::C(union_of.inner.downcast_error_mut())
+            E16::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E16::D(union_of.inner.downcast_error_mut())
+            E16::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E16::E(union_of.inner.downcast_error_mut())
+            E16::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E16::F(union_of.inner.downcast_error_mut())
+            E16::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E16::G(union_of.inner.downcast_error_mut())
+            E16::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E16::H(union_of.inner.downcast_error_mut())
+            E16::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E16::I(union_of.inner.downcast_error_mut())
+            E16::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E16::J(union_of.inner.downcast_error_mut())
+            E16::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E16::K(union_of.inner.downcast_error_mut())
+            E16::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E16::L(union_of.inner.downcast_error_mut())
+            E16::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E16::M(union_of.inner.downcast_error_mut())
+            E16::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E16::N(union_of.inner.downcast_error_mut())
+            E16::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E16::O(union_of.inner.downcast_error_mut())
+            E16::O(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E16::P(union_of.inner.downcast_error_mut())
+            E16::P(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -1935,39 +1935,39 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E17::A(union_of.inner.downcast_error_ref())
+            E17::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E17::B(union_of.inner.downcast_error_ref())
+            E17::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E17::C(union_of.inner.downcast_error_ref())
+            E17::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E17::D(union_of.inner.downcast_error_ref())
+            E17::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E17::E(union_of.inner.downcast_error_ref())
+            E17::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E17::F(union_of.inner.downcast_error_ref())
+            E17::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E17::G(union_of.inner.downcast_error_ref())
+            E17::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E17::H(union_of.inner.downcast_error_ref())
+            E17::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E17::I(union_of.inner.downcast_error_ref())
+            E17::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E17::J(union_of.inner.downcast_error_ref())
+            E17::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E17::K(union_of.inner.downcast_error_ref())
+            E17::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E17::L(union_of.inner.downcast_error_ref())
+            E17::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E17::M(union_of.inner.downcast_error_ref())
+            E17::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E17::N(union_of.inner.downcast_error_ref())
+            E17::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E17::O(union_of.inner.downcast_error_ref())
+            E17::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E17::P(union_of.inner.downcast_error_ref())
+            E17::P(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E17::Q(union_of.inner.downcast_error_ref())
+            E17::Q(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -2014,39 +2014,39 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E17::A(union_of.inner.downcast_error_mut())
+            E17::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E17::B(union_of.inner.downcast_error_mut())
+            E17::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E17::C(union_of.inner.downcast_error_mut())
+            E17::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E17::D(union_of.inner.downcast_error_mut())
+            E17::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E17::E(union_of.inner.downcast_error_mut())
+            E17::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E17::F(union_of.inner.downcast_error_mut())
+            E17::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E17::G(union_of.inner.downcast_error_mut())
+            E17::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E17::H(union_of.inner.downcast_error_mut())
+            E17::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E17::I(union_of.inner.downcast_error_mut())
+            E17::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E17::J(union_of.inner.downcast_error_mut())
+            E17::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E17::K(union_of.inner.downcast_error_mut())
+            E17::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E17::L(union_of.inner.downcast_error_mut())
+            E17::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E17::M(union_of.inner.downcast_error_mut())
+            E17::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E17::N(union_of.inner.downcast_error_mut())
+            E17::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E17::O(union_of.inner.downcast_error_mut())
+            E17::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E17::P(union_of.inner.downcast_error_mut())
+            E17::P(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E17::Q(union_of.inner.downcast_error_mut())
+            E17::Q(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -2140,41 +2140,41 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E18::A(union_of.inner.downcast_error_ref())
+            E18::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E18::B(union_of.inner.downcast_error_ref())
+            E18::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E18::C(union_of.inner.downcast_error_ref())
+            E18::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E18::D(union_of.inner.downcast_error_ref())
+            E18::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E18::E(union_of.inner.downcast_error_ref())
+            E18::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E18::F(union_of.inner.downcast_error_ref())
+            E18::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E18::G(union_of.inner.downcast_error_ref())
+            E18::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E18::H(union_of.inner.downcast_error_ref())
+            E18::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E18::I(union_of.inner.downcast_error_ref())
+            E18::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E18::J(union_of.inner.downcast_error_ref())
+            E18::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E18::K(union_of.inner.downcast_error_ref())
+            E18::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E18::L(union_of.inner.downcast_error_ref())
+            E18::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E18::M(union_of.inner.downcast_error_ref())
+            E18::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E18::N(union_of.inner.downcast_error_ref())
+            E18::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E18::O(union_of.inner.downcast_error_ref())
+            E18::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E18::P(union_of.inner.downcast_error_ref())
+            E18::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E18::Q(union_of.inner.downcast_error_ref())
+            E18::Q(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E18::R(union_of.inner.downcast_error_ref())
+            E18::R(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -2223,41 +2223,41 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E18::A(union_of.inner.downcast_error_mut())
+            E18::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E18::B(union_of.inner.downcast_error_mut())
+            E18::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E18::C(union_of.inner.downcast_error_mut())
+            E18::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E18::D(union_of.inner.downcast_error_mut())
+            E18::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E18::E(union_of.inner.downcast_error_mut())
+            E18::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E18::F(union_of.inner.downcast_error_mut())
+            E18::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E18::G(union_of.inner.downcast_error_mut())
+            E18::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E18::H(union_of.inner.downcast_error_mut())
+            E18::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E18::I(union_of.inner.downcast_error_mut())
+            E18::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E18::J(union_of.inner.downcast_error_mut())
+            E18::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E18::K(union_of.inner.downcast_error_mut())
+            E18::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E18::L(union_of.inner.downcast_error_mut())
+            E18::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E18::M(union_of.inner.downcast_error_mut())
+            E18::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E18::N(union_of.inner.downcast_error_mut())
+            E18::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E18::O(union_of.inner.downcast_error_mut())
+            E18::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E18::P(union_of.inner.downcast_error_mut())
+            E18::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E18::Q(union_of.inner.downcast_error_mut())
+            E18::Q(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E18::R(union_of.inner.downcast_error_mut())
+            E18::R(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -2355,43 +2355,43 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E19::A(union_of.inner.downcast_error_ref())
+            E19::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E19::B(union_of.inner.downcast_error_ref())
+            E19::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E19::C(union_of.inner.downcast_error_ref())
+            E19::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E19::D(union_of.inner.downcast_error_ref())
+            E19::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E19::E(union_of.inner.downcast_error_ref())
+            E19::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E19::F(union_of.inner.downcast_error_ref())
+            E19::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E19::G(union_of.inner.downcast_error_ref())
+            E19::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E19::H(union_of.inner.downcast_error_ref())
+            E19::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E19::I(union_of.inner.downcast_error_ref())
+            E19::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E19::J(union_of.inner.downcast_error_ref())
+            E19::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E19::K(union_of.inner.downcast_error_ref())
+            E19::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E19::L(union_of.inner.downcast_error_ref())
+            E19::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E19::M(union_of.inner.downcast_error_ref())
+            E19::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E19::N(union_of.inner.downcast_error_ref())
+            E19::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E19::O(union_of.inner.downcast_error_ref())
+            E19::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E19::P(union_of.inner.downcast_error_ref())
+            E19::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E19::Q(union_of.inner.downcast_error_ref())
+            E19::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E19::R(union_of.inner.downcast_error_ref())
+            E19::R(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E19::S(union_of.inner.downcast_error_ref())
+            E19::S(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -2442,43 +2442,43 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E19::A(union_of.inner.downcast_error_mut())
+            E19::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E19::B(union_of.inner.downcast_error_mut())
+            E19::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E19::C(union_of.inner.downcast_error_mut())
+            E19::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E19::D(union_of.inner.downcast_error_mut())
+            E19::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E19::E(union_of.inner.downcast_error_mut())
+            E19::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E19::F(union_of.inner.downcast_error_mut())
+            E19::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E19::G(union_of.inner.downcast_error_mut())
+            E19::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E19::H(union_of.inner.downcast_error_mut())
+            E19::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E19::I(union_of.inner.downcast_error_mut())
+            E19::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E19::J(union_of.inner.downcast_error_mut())
+            E19::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E19::K(union_of.inner.downcast_error_mut())
+            E19::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E19::L(union_of.inner.downcast_error_mut())
+            E19::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E19::M(union_of.inner.downcast_error_mut())
+            E19::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E19::N(union_of.inner.downcast_error_mut())
+            E19::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E19::O(union_of.inner.downcast_error_mut())
+            E19::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E19::P(union_of.inner.downcast_error_mut())
+            E19::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E19::Q(union_of.inner.downcast_error_mut())
+            E19::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E19::R(union_of.inner.downcast_error_mut())
+            E19::R(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E19::S(union_of.inner.downcast_error_mut())
+            E19::S(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -2580,45 +2580,45 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E20::A(union_of.inner.downcast_error_ref())
+            E20::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E20::B(union_of.inner.downcast_error_ref())
+            E20::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E20::C(union_of.inner.downcast_error_ref())
+            E20::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E20::D(union_of.inner.downcast_error_ref())
+            E20::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E20::E(union_of.inner.downcast_error_ref())
+            E20::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E20::F(union_of.inner.downcast_error_ref())
+            E20::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E20::G(union_of.inner.downcast_error_ref())
+            E20::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E20::H(union_of.inner.downcast_error_ref())
+            E20::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E20::I(union_of.inner.downcast_error_ref())
+            E20::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E20::J(union_of.inner.downcast_error_ref())
+            E20::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E20::K(union_of.inner.downcast_error_ref())
+            E20::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E20::L(union_of.inner.downcast_error_ref())
+            E20::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E20::M(union_of.inner.downcast_error_ref())
+            E20::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E20::N(union_of.inner.downcast_error_ref())
+            E20::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E20::O(union_of.inner.downcast_error_ref())
+            E20::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E20::P(union_of.inner.downcast_error_ref())
+            E20::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E20::Q(union_of.inner.downcast_error_ref())
+            E20::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E20::R(union_of.inner.downcast_error_ref())
+            E20::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E20::S(union_of.inner.downcast_error_ref())
+            E20::S(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E20::T(union_of.inner.downcast_error_ref())
+            E20::T(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -2671,45 +2671,45 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E20::A(union_of.inner.downcast_error_mut())
+            E20::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E20::B(union_of.inner.downcast_error_mut())
+            E20::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E20::C(union_of.inner.downcast_error_mut())
+            E20::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E20::D(union_of.inner.downcast_error_mut())
+            E20::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E20::E(union_of.inner.downcast_error_mut())
+            E20::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E20::F(union_of.inner.downcast_error_mut())
+            E20::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E20::G(union_of.inner.downcast_error_mut())
+            E20::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E20::H(union_of.inner.downcast_error_mut())
+            E20::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E20::I(union_of.inner.downcast_error_mut())
+            E20::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E20::J(union_of.inner.downcast_error_mut())
+            E20::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E20::K(union_of.inner.downcast_error_mut())
+            E20::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E20::L(union_of.inner.downcast_error_mut())
+            E20::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E20::M(union_of.inner.downcast_error_mut())
+            E20::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E20::N(union_of.inner.downcast_error_mut())
+            E20::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E20::O(union_of.inner.downcast_error_mut())
+            E20::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E20::P(union_of.inner.downcast_error_mut())
+            E20::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E20::Q(union_of.inner.downcast_error_mut())
+            E20::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E20::R(union_of.inner.downcast_error_mut())
+            E20::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E20::S(union_of.inner.downcast_error_mut())
+            E20::S(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E20::T(union_of.inner.downcast_error_mut())
+            E20::T(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -2815,47 +2815,47 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E21::A(union_of.inner.downcast_error_ref())
+            E21::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E21::B(union_of.inner.downcast_error_ref())
+            E21::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E21::C(union_of.inner.downcast_error_ref())
+            E21::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E21::D(union_of.inner.downcast_error_ref())
+            E21::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E21::E(union_of.inner.downcast_error_ref())
+            E21::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E21::F(union_of.inner.downcast_error_ref())
+            E21::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E21::G(union_of.inner.downcast_error_ref())
+            E21::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E21::H(union_of.inner.downcast_error_ref())
+            E21::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E21::I(union_of.inner.downcast_error_ref())
+            E21::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E21::J(union_of.inner.downcast_error_ref())
+            E21::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E21::K(union_of.inner.downcast_error_ref())
+            E21::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E21::L(union_of.inner.downcast_error_ref())
+            E21::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E21::M(union_of.inner.downcast_error_ref())
+            E21::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E21::N(union_of.inner.downcast_error_ref())
+            E21::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E21::O(union_of.inner.downcast_error_ref())
+            E21::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E21::P(union_of.inner.downcast_error_ref())
+            E21::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E21::Q(union_of.inner.downcast_error_ref())
+            E21::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E21::R(union_of.inner.downcast_error_ref())
+            E21::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E21::S(union_of.inner.downcast_error_ref())
+            E21::S(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E21::T(union_of.inner.downcast_error_ref())
+            E21::T(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E21::U(union_of.inner.downcast_error_ref())
+            E21::U(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -2910,47 +2910,47 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E21::A(union_of.inner.downcast_error_mut())
+            E21::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E21::B(union_of.inner.downcast_error_mut())
+            E21::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E21::C(union_of.inner.downcast_error_mut())
+            E21::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E21::D(union_of.inner.downcast_error_mut())
+            E21::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E21::E(union_of.inner.downcast_error_mut())
+            E21::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E21::F(union_of.inner.downcast_error_mut())
+            E21::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E21::G(union_of.inner.downcast_error_mut())
+            E21::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E21::H(union_of.inner.downcast_error_mut())
+            E21::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E21::I(union_of.inner.downcast_error_mut())
+            E21::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E21::J(union_of.inner.downcast_error_mut())
+            E21::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E21::K(union_of.inner.downcast_error_mut())
+            E21::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E21::L(union_of.inner.downcast_error_mut())
+            E21::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E21::M(union_of.inner.downcast_error_mut())
+            E21::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E21::N(union_of.inner.downcast_error_mut())
+            E21::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E21::O(union_of.inner.downcast_error_mut())
+            E21::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E21::P(union_of.inner.downcast_error_mut())
+            E21::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E21::Q(union_of.inner.downcast_error_mut())
+            E21::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E21::R(union_of.inner.downcast_error_mut())
+            E21::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E21::S(union_of.inner.downcast_error_mut())
+            E21::S(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E21::T(union_of.inner.downcast_error_mut())
+            E21::T(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E21::U(union_of.inner.downcast_error_mut())
+            E21::U(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -3060,49 +3060,49 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E22::A(union_of.inner.downcast_error_ref())
+            E22::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E22::B(union_of.inner.downcast_error_ref())
+            E22::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E22::C(union_of.inner.downcast_error_ref())
+            E22::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E22::D(union_of.inner.downcast_error_ref())
+            E22::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E22::E(union_of.inner.downcast_error_ref())
+            E22::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E22::F(union_of.inner.downcast_error_ref())
+            E22::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E22::G(union_of.inner.downcast_error_ref())
+            E22::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E22::H(union_of.inner.downcast_error_ref())
+            E22::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E22::I(union_of.inner.downcast_error_ref())
+            E22::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E22::J(union_of.inner.downcast_error_ref())
+            E22::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E22::K(union_of.inner.downcast_error_ref())
+            E22::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E22::L(union_of.inner.downcast_error_ref())
+            E22::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E22::M(union_of.inner.downcast_error_ref())
+            E22::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E22::N(union_of.inner.downcast_error_ref())
+            E22::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E22::O(union_of.inner.downcast_error_ref())
+            E22::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E22::P(union_of.inner.downcast_error_ref())
+            E22::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E22::Q(union_of.inner.downcast_error_ref())
+            E22::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E22::R(union_of.inner.downcast_error_ref())
+            E22::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E22::S(union_of.inner.downcast_error_ref())
+            E22::S(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E22::T(union_of.inner.downcast_error_ref())
+            E22::T(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E22::U(union_of.inner.downcast_error_ref())
+            E22::U(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E22::V(union_of.inner.downcast_error_ref())
+            E22::V(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -3159,49 +3159,49 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E22::A(union_of.inner.downcast_error_mut())
+            E22::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E22::B(union_of.inner.downcast_error_mut())
+            E22::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E22::C(union_of.inner.downcast_error_mut())
+            E22::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E22::D(union_of.inner.downcast_error_mut())
+            E22::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E22::E(union_of.inner.downcast_error_mut())
+            E22::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E22::F(union_of.inner.downcast_error_mut())
+            E22::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E22::G(union_of.inner.downcast_error_mut())
+            E22::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E22::H(union_of.inner.downcast_error_mut())
+            E22::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E22::I(union_of.inner.downcast_error_mut())
+            E22::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E22::J(union_of.inner.downcast_error_mut())
+            E22::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E22::K(union_of.inner.downcast_error_mut())
+            E22::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E22::L(union_of.inner.downcast_error_mut())
+            E22::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E22::M(union_of.inner.downcast_error_mut())
+            E22::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E22::N(union_of.inner.downcast_error_mut())
+            E22::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E22::O(union_of.inner.downcast_error_mut())
+            E22::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E22::P(union_of.inner.downcast_error_mut())
+            E22::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E22::Q(union_of.inner.downcast_error_mut())
+            E22::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E22::R(union_of.inner.downcast_error_mut())
+            E22::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E22::S(union_of.inner.downcast_error_mut())
+            E22::S(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E22::T(union_of.inner.downcast_error_mut())
+            E22::T(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E22::U(union_of.inner.downcast_error_mut())
+            E22::U(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E22::V(union_of.inner.downcast_error_mut())
+            E22::V(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -3315,51 +3315,51 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E23::A(union_of.inner.downcast_error_ref())
+            E23::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E23::B(union_of.inner.downcast_error_ref())
+            E23::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E23::C(union_of.inner.downcast_error_ref())
+            E23::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E23::D(union_of.inner.downcast_error_ref())
+            E23::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E23::E(union_of.inner.downcast_error_ref())
+            E23::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E23::F(union_of.inner.downcast_error_ref())
+            E23::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E23::G(union_of.inner.downcast_error_ref())
+            E23::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E23::H(union_of.inner.downcast_error_ref())
+            E23::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E23::I(union_of.inner.downcast_error_ref())
+            E23::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E23::J(union_of.inner.downcast_error_ref())
+            E23::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E23::K(union_of.inner.downcast_error_ref())
+            E23::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E23::L(union_of.inner.downcast_error_ref())
+            E23::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E23::M(union_of.inner.downcast_error_ref())
+            E23::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E23::N(union_of.inner.downcast_error_ref())
+            E23::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E23::O(union_of.inner.downcast_error_ref())
+            E23::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E23::P(union_of.inner.downcast_error_ref())
+            E23::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E23::Q(union_of.inner.downcast_error_ref())
+            E23::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E23::R(union_of.inner.downcast_error_ref())
+            E23::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E23::S(union_of.inner.downcast_error_ref())
+            E23::S(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E23::T(union_of.inner.downcast_error_ref())
+            E23::T(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E23::U(union_of.inner.downcast_error_ref())
+            E23::U(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E23::V(union_of.inner.downcast_error_ref())
+            E23::V(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E23::W(union_of.inner.downcast_error_ref())
+            E23::W(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -3418,51 +3418,51 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E23::A(union_of.inner.downcast_error_mut())
+            E23::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E23::B(union_of.inner.downcast_error_mut())
+            E23::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E23::C(union_of.inner.downcast_error_mut())
+            E23::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E23::D(union_of.inner.downcast_error_mut())
+            E23::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E23::E(union_of.inner.downcast_error_mut())
+            E23::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E23::F(union_of.inner.downcast_error_mut())
+            E23::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E23::G(union_of.inner.downcast_error_mut())
+            E23::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E23::H(union_of.inner.downcast_error_mut())
+            E23::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E23::I(union_of.inner.downcast_error_mut())
+            E23::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E23::J(union_of.inner.downcast_error_mut())
+            E23::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E23::K(union_of.inner.downcast_error_mut())
+            E23::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E23::L(union_of.inner.downcast_error_mut())
+            E23::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E23::M(union_of.inner.downcast_error_mut())
+            E23::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E23::N(union_of.inner.downcast_error_mut())
+            E23::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E23::O(union_of.inner.downcast_error_mut())
+            E23::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E23::P(union_of.inner.downcast_error_mut())
+            E23::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E23::Q(union_of.inner.downcast_error_mut())
+            E23::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E23::R(union_of.inner.downcast_error_mut())
+            E23::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E23::S(union_of.inner.downcast_error_mut())
+            E23::S(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E23::T(union_of.inner.downcast_error_mut())
+            E23::T(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E23::U(union_of.inner.downcast_error_mut())
+            E23::U(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E23::V(union_of.inner.downcast_error_mut())
+            E23::V(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E23::W(union_of.inner.downcast_error_mut())
+            E23::W(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -3580,53 +3580,53 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E24::A(union_of.inner.downcast_error_ref())
+            E24::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E24::B(union_of.inner.downcast_error_ref())
+            E24::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E24::C(union_of.inner.downcast_error_ref())
+            E24::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E24::D(union_of.inner.downcast_error_ref())
+            E24::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E24::E(union_of.inner.downcast_error_ref())
+            E24::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E24::F(union_of.inner.downcast_error_ref())
+            E24::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E24::G(union_of.inner.downcast_error_ref())
+            E24::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E24::H(union_of.inner.downcast_error_ref())
+            E24::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E24::I(union_of.inner.downcast_error_ref())
+            E24::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E24::J(union_of.inner.downcast_error_ref())
+            E24::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E24::K(union_of.inner.downcast_error_ref())
+            E24::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E24::L(union_of.inner.downcast_error_ref())
+            E24::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E24::M(union_of.inner.downcast_error_ref())
+            E24::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E24::N(union_of.inner.downcast_error_ref())
+            E24::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E24::O(union_of.inner.downcast_error_ref())
+            E24::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E24::P(union_of.inner.downcast_error_ref())
+            E24::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E24::Q(union_of.inner.downcast_error_ref())
+            E24::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E24::R(union_of.inner.downcast_error_ref())
+            E24::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E24::S(union_of.inner.downcast_error_ref())
+            E24::S(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E24::T(union_of.inner.downcast_error_ref())
+            E24::T(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E24::U(union_of.inner.downcast_error_ref())
+            E24::U(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E24::V(union_of.inner.downcast_error_ref())
+            E24::V(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<W>() {
-            E24::W(union_of.inner.downcast_error_ref())
+            E24::W(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E24::X(union_of.inner.downcast_error_ref())
+            E24::X(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -3687,53 +3687,53 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E24::A(union_of.inner.downcast_error_mut())
+            E24::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E24::B(union_of.inner.downcast_error_mut())
+            E24::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E24::C(union_of.inner.downcast_error_mut())
+            E24::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E24::D(union_of.inner.downcast_error_mut())
+            E24::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E24::E(union_of.inner.downcast_error_mut())
+            E24::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E24::F(union_of.inner.downcast_error_mut())
+            E24::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E24::G(union_of.inner.downcast_error_mut())
+            E24::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E24::H(union_of.inner.downcast_error_mut())
+            E24::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E24::I(union_of.inner.downcast_error_mut())
+            E24::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E24::J(union_of.inner.downcast_error_mut())
+            E24::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E24::K(union_of.inner.downcast_error_mut())
+            E24::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E24::L(union_of.inner.downcast_error_mut())
+            E24::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E24::M(union_of.inner.downcast_error_mut())
+            E24::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E24::N(union_of.inner.downcast_error_mut())
+            E24::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E24::O(union_of.inner.downcast_error_mut())
+            E24::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E24::P(union_of.inner.downcast_error_mut())
+            E24::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E24::Q(union_of.inner.downcast_error_mut())
+            E24::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E24::R(union_of.inner.downcast_error_mut())
+            E24::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E24::S(union_of.inner.downcast_error_mut())
+            E24::S(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E24::T(union_of.inner.downcast_error_mut())
+            E24::T(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E24::U(union_of.inner.downcast_error_mut())
+            E24::U(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E24::V(union_of.inner.downcast_error_mut())
+            E24::V(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<W>() {
-            E24::W(union_of.inner.downcast_error_mut())
+            E24::W(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E24::X(union_of.inner.downcast_error_mut())
+            E24::X(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -3855,55 +3855,55 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E25::A(union_of.inner.downcast_error_ref())
+            E25::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E25::B(union_of.inner.downcast_error_ref())
+            E25::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E25::C(union_of.inner.downcast_error_ref())
+            E25::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E25::D(union_of.inner.downcast_error_ref())
+            E25::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E25::E(union_of.inner.downcast_error_ref())
+            E25::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E25::F(union_of.inner.downcast_error_ref())
+            E25::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E25::G(union_of.inner.downcast_error_ref())
+            E25::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E25::H(union_of.inner.downcast_error_ref())
+            E25::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E25::I(union_of.inner.downcast_error_ref())
+            E25::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E25::J(union_of.inner.downcast_error_ref())
+            E25::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E25::K(union_of.inner.downcast_error_ref())
+            E25::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E25::L(union_of.inner.downcast_error_ref())
+            E25::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E25::M(union_of.inner.downcast_error_ref())
+            E25::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E25::N(union_of.inner.downcast_error_ref())
+            E25::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E25::O(union_of.inner.downcast_error_ref())
+            E25::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E25::P(union_of.inner.downcast_error_ref())
+            E25::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E25::Q(union_of.inner.downcast_error_ref())
+            E25::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E25::R(union_of.inner.downcast_error_ref())
+            E25::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E25::S(union_of.inner.downcast_error_ref())
+            E25::S(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E25::T(union_of.inner.downcast_error_ref())
+            E25::T(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E25::U(union_of.inner.downcast_error_ref())
+            E25::U(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E25::V(union_of.inner.downcast_error_ref())
+            E25::V(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<W>() {
-            E25::W(union_of.inner.downcast_error_ref())
+            E25::W(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<X>() {
-            E25::X(union_of.inner.downcast_error_ref())
+            E25::X(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E25::Y(union_of.inner.downcast_error_ref())
+            E25::Y(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -3966,55 +3966,55 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E25::A(union_of.inner.downcast_error_mut())
+            E25::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E25::B(union_of.inner.downcast_error_mut())
+            E25::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E25::C(union_of.inner.downcast_error_mut())
+            E25::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E25::D(union_of.inner.downcast_error_mut())
+            E25::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E25::E(union_of.inner.downcast_error_mut())
+            E25::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E25::F(union_of.inner.downcast_error_mut())
+            E25::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E25::G(union_of.inner.downcast_error_mut())
+            E25::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E25::H(union_of.inner.downcast_error_mut())
+            E25::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E25::I(union_of.inner.downcast_error_mut())
+            E25::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E25::J(union_of.inner.downcast_error_mut())
+            E25::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E25::K(union_of.inner.downcast_error_mut())
+            E25::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E25::L(union_of.inner.downcast_error_mut())
+            E25::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E25::M(union_of.inner.downcast_error_mut())
+            E25::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E25::N(union_of.inner.downcast_error_mut())
+            E25::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E25::O(union_of.inner.downcast_error_mut())
+            E25::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E25::P(union_of.inner.downcast_error_mut())
+            E25::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E25::Q(union_of.inner.downcast_error_mut())
+            E25::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E25::R(union_of.inner.downcast_error_mut())
+            E25::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E25::S(union_of.inner.downcast_error_mut())
+            E25::S(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E25::T(union_of.inner.downcast_error_mut())
+            E25::T(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E25::U(union_of.inner.downcast_error_mut())
+            E25::U(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E25::V(union_of.inner.downcast_error_mut())
+            E25::V(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<W>() {
-            E25::W(union_of.inner.downcast_error_mut())
+            E25::W(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<X>() {
-            E25::X(union_of.inner.downcast_error_mut())
+            E25::X(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E25::Y(union_of.inner.downcast_error_mut())
+            E25::Y(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
@@ -4140,57 +4140,57 @@ where
 {
     fn from(union_of: &'a ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E26::A(union_of.inner.downcast_error_ref())
+            E26::A(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E26::B(union_of.inner.downcast_error_ref())
+            E26::B(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E26::C(union_of.inner.downcast_error_ref())
+            E26::C(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E26::D(union_of.inner.downcast_error_ref())
+            E26::D(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E26::E(union_of.inner.downcast_error_ref())
+            E26::E(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E26::F(union_of.inner.downcast_error_ref())
+            E26::F(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E26::G(union_of.inner.downcast_error_ref())
+            E26::G(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E26::H(union_of.inner.downcast_error_ref())
+            E26::H(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E26::I(union_of.inner.downcast_error_ref())
+            E26::I(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E26::J(union_of.inner.downcast_error_ref())
+            E26::J(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E26::K(union_of.inner.downcast_error_ref())
+            E26::K(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E26::L(union_of.inner.downcast_error_ref())
+            E26::L(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E26::M(union_of.inner.downcast_error_ref())
+            E26::M(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E26::N(union_of.inner.downcast_error_ref())
+            E26::N(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E26::O(union_of.inner.downcast_error_ref())
+            E26::O(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E26::P(union_of.inner.downcast_error_ref())
+            E26::P(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E26::Q(union_of.inner.downcast_error_ref())
+            E26::Q(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E26::R(union_of.inner.downcast_error_ref())
+            E26::R(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E26::S(union_of.inner.downcast_error_ref())
+            E26::S(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E26::T(union_of.inner.downcast_error_ref())
+            E26::T(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E26::U(union_of.inner.downcast_error_ref())
+            E26::U(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E26::V(union_of.inner.downcast_error_ref())
+            E26::V(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<W>() {
-            E26::W(union_of.inner.downcast_error_ref())
+            E26::W(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<X>() {
-            E26::X(union_of.inner.downcast_error_ref())
+            E26::X(union_of.inner.downcast_error_ref().unwrap())
         } else if union_of.inner.is_error::<Y>() {
-            E26::Y(union_of.inner.downcast_error_ref())
+            E26::Y(union_of.inner.downcast_error_ref().unwrap())
         } else {
-            E26::Z(union_of.inner.downcast_error_ref())
+            E26::Z(union_of.inner.downcast_error_ref().unwrap())
         }
     }
 }
@@ -4255,57 +4255,57 @@ where
 {
     fn from(union_of: &'a mut ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z)>) -> Self {
         if union_of.inner.is_error::<A>() {
-            E26::A(union_of.inner.downcast_error_mut())
+            E26::A(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<B>() {
-            E26::B(union_of.inner.downcast_error_mut())
+            E26::B(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<C>() {
-            E26::C(union_of.inner.downcast_error_mut())
+            E26::C(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<D>() {
-            E26::D(union_of.inner.downcast_error_mut())
+            E26::D(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<E>() {
-            E26::E(union_of.inner.downcast_error_mut())
+            E26::E(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<F>() {
-            E26::F(union_of.inner.downcast_error_mut())
+            E26::F(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<G>() {
-            E26::G(union_of.inner.downcast_error_mut())
+            E26::G(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<H>() {
-            E26::H(union_of.inner.downcast_error_mut())
+            E26::H(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<I>() {
-            E26::I(union_of.inner.downcast_error_mut())
+            E26::I(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<J>() {
-            E26::J(union_of.inner.downcast_error_mut())
+            E26::J(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<K>() {
-            E26::K(union_of.inner.downcast_error_mut())
+            E26::K(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<L>() {
-            E26::L(union_of.inner.downcast_error_mut())
+            E26::L(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<M>() {
-            E26::M(union_of.inner.downcast_error_mut())
+            E26::M(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<N>() {
-            E26::N(union_of.inner.downcast_error_mut())
+            E26::N(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<O>() {
-            E26::O(union_of.inner.downcast_error_mut())
+            E26::O(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<P>() {
-            E26::P(union_of.inner.downcast_error_mut())
+            E26::P(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Q>() {
-            E26::Q(union_of.inner.downcast_error_mut())
+            E26::Q(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<R>() {
-            E26::R(union_of.inner.downcast_error_mut())
+            E26::R(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<S>() {
-            E26::S(union_of.inner.downcast_error_mut())
+            E26::S(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<T>() {
-            E26::T(union_of.inner.downcast_error_mut())
+            E26::T(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<U>() {
-            E26::U(union_of.inner.downcast_error_mut())
+            E26::U(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<V>() {
-            E26::V(union_of.inner.downcast_error_mut())
+            E26::V(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<W>() {
-            E26::W(union_of.inner.downcast_error_mut())
+            E26::W(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<X>() {
-            E26::X(union_of.inner.downcast_error_mut())
+            E26::X(union_of.inner.downcast_error_mut().unwrap())
         } else if union_of.inner.is_error::<Y>() {
-            E26::Y(union_of.inner.downcast_error_mut())
+            E26::Y(union_of.inner.downcast_error_mut().unwrap())
         } else {
-            E26::Z(union_of.inner.downcast_error_mut())
+            E26::Z(union_of.inner.downcast_error_mut().unwrap())
         }
     }
 }
