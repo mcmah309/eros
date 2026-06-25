@@ -503,7 +503,9 @@ If one wants to add a custom error type for all public APIs without exposing con
 <summary>Example Implementation</summary>
 
 ```rust
-use eros::{SendSyncError, ErrorUnion};
+use std::io;
+
+use eros::{SendSyncError, ErrorUnion, bail};
 
 #[derive(Debug)]
 struct CrateError(Box<dyn SendSyncError>);
@@ -520,12 +522,18 @@ impl std::error::Error for CrateError {
     }
 }
 
+impl From<eros::ErrorUnion> for CrateError {
+    fn from(e: eros::ErrorUnion) -> Self {
+        CrateError(e.into_inner_dyn_error())
+    }
+}
+
 fn internal_api() -> eros::Result<()> {
-    Err(ErrorUnion::new(std::io::Error::new(std::io::ErrorKind::Other, "io error")))
+    bail!(io::Error::new(io::ErrorKind::Other, "io error"))
 }
 
 pub fn public_api() -> Result<(), CrateError> {
-    internal_api().map_err(|e| CrateError(e.into_inner_dyn_error()))
+    internal_api().into()
 }
 ```
 
