@@ -490,11 +490,13 @@ eros = { version = "*", features = ["tracing", "log_debug"] }
 
 *Libraries should consider disabling default features* and allowing downstream crates to enable this. This can then be enabled for tests only in the library.
 
-#### Suggested Route
+#### Public APIs
+
+##### Approach A: Exposing `ErrorUnion` in Public APIs
 
 Exposing `ErrorUnion` in a public API is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
 
-#### Alternative
+##### Approach B: Hiding `ErrorUnion` behind Concrete Crate Errors
 
 If one wants to add a custom error type for all public APIs without exposing constructs like `ErrorUnion`, use the `into_inner` method at these boundaries. This is a common pattern, since most crates already define their own error type for public-facing APIs.
 
