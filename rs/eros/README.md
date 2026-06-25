@@ -522,8 +522,8 @@ impl std::error::Error for CrateError {
     }
 }
 
-impl From<eros::ErrorUnion> for CrateError {
-    fn from(e: eros::ErrorUnion) -> Self {
+impl From<ErrorUnion> for CrateError {
+    fn from(e: ErrorUnion) -> Self {
         CrateError(e.into_inner_dyn_error())
     }
 }
@@ -533,7 +533,7 @@ fn internal_api() -> eros::Result<()> {
 }
 
 pub fn public_api() -> Result<(), CrateError> {
-    internal_api().into()
+    internal_api().map_err(Into::into)
 }
 ```
 
@@ -548,7 +548,7 @@ This pattern works for `AnyError` as shown above, but it isn't limited to it. Wh
 <summary>Example Implementation</summary>
 
 ```rust
-use eros::{IntoUnion, E2};
+use eros::{E2, ErrorUnion, IntoUnion};
 use std::{fmt, io};
 
 #[derive(Debug)]
@@ -575,9 +575,10 @@ impl std::error::Error for CrateError {
     }
 }
 
-impl From<E2<io::Error, fmt::Error>> for CrateError {
-    fn from(error: E2<io::Error, fmt::Error>) -> Self {
-        match error {
+impl From<ErrorUnion<(io::Error, fmt::Error)>> for CrateError {
+    fn from(error: ErrorUnion<(io::Error, fmt::Error)>) -> Self {
+        // `to_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
+        match error.to_enum() {
             E2::A(e) => CrateError::Io(e),
             E2::B(e) => CrateError::Format(e),
         }
@@ -598,10 +599,8 @@ fn internal_api() -> eros::Result<(), (io::Error, fmt::Error)> {
     Ok(())
 }
 
-// `to_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
-// which then converts into the crate's own `CrateError` via `From`.
 pub fn public_api() -> Result<(), CrateError> {
-    internal_api().map_err(|e| e.to_enum().into())
+    internal_api().map_err(Into::into)
 }
 
 fn main() {
