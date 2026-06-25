@@ -208,3 +208,491 @@ where
         ErrorUnion::erase(value)
     }
 }
+
+impl<A, B, C, D, E, F, G, H, I, J> From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K> From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L> From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M)>> for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N)>> for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)>> for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)>> for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q)>> for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+{
+    fn from(value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S)>) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T)>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+    U: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U)>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+    U: SendSyncError,
+    V: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V)>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+    U: SendSyncError,
+    V: SendSyncError,
+    W: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W)>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+    U: SendSyncError,
+    V: SendSyncError,
+    W: SendSyncError,
+    X: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(
+            A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X,
+        )>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+    U: SendSyncError,
+    V: SendSyncError,
+    W: SendSyncError,
+    X: SendSyncError,
+    Y: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(
+            A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y,
+        )>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z>
+    From<ErrorUnion<(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z)>>
+    for ErrorUnion<AnyError>
+where
+    A: SendSyncError,
+    B: SendSyncError,
+    C: SendSyncError,
+    D: SendSyncError,
+    E: SendSyncError,
+    F: SendSyncError,
+    G: SendSyncError,
+    H: SendSyncError,
+    I: SendSyncError,
+    J: SendSyncError,
+    K: SendSyncError,
+    L: SendSyncError,
+    M: SendSyncError,
+    N: SendSyncError,
+    O: SendSyncError,
+    P: SendSyncError,
+    Q: SendSyncError,
+    R: SendSyncError,
+    S: SendSyncError,
+    T: SendSyncError,
+    U: SendSyncError,
+    V: SendSyncError,
+    W: SendSyncError,
+    X: SendSyncError,
+    Y: SendSyncError,
+    Z: SendSyncError,
+{
+    fn from(
+        value: ErrorUnion<(
+            A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+        )>,
+    ) -> Self {
+        ErrorUnion::erase(value)
+    }
+}

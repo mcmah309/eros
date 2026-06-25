@@ -356,175 +356,240 @@ where
 
 /* ------------------------- TypeSet implemented for tuples ----------------------- */
 
+#[rustfmt::skip]
 pub trait TypeSet {
     type Variants: TupleForm;
     type Enum;
-    type RefEnum<'a>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-    where
-        Self: 'a;
+    type RefEnum<'a> where Self: 'a;
+    type MutEnum<'a> where Self: 'a;
 }
 
 impl TupleForm for AnyError {
     type Tuple = AnyError;
 }
 
+#[rustfmt::skip]
 impl TypeSet for AnyError {
     type Variants = AnyError;
     type Enum = AnyError;
-
-    type RefEnum<'a>
-        = &'a AnyError
-    where
-        Self: 'a;
-
-    type MutEnum<'a>
-        = &'a mut AnyError
-    where
-        Self: 'a;
+    type RefEnum<'a> = &'a AnyError where Self: 'a;
+    type MutEnum<'a> = &'a mut AnyError where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl TypeSet for () {
     type Variants = End;
     type Enum = E0;
-    type RefEnum<'a>
-        = E0
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E0
-    where
-        Self: 'a;
+    type RefEnum<'a> = E0 where Self: 'a;
+    type MutEnum<'a> = E0 where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A> TypeSet for (A,) {
     type Variants = Cons<A, End>;
     type Enum = E1<A>;
-    type RefEnum<'a>
-        = E1<&'a A>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E1<&'a mut A>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E1<&'a A> where Self: 'a;
+    type MutEnum<'a> = E1<&'a mut A> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
     type Enum = E2<A, B>;
-    type RefEnum<'a>
-        = E2<&'a A, &'a B>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E2<&'a mut A, &'a mut B>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E2<&'a A, &'a B> where Self: 'a;
+    type MutEnum<'a> = E2<&'a mut A, &'a mut B> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C> TypeSet for (A, B, C) {
     type Variants = Cons<A, Cons<B, Cons<C, End>>>;
     type Enum = E3<A, B, C>;
-    type RefEnum<'a>
-        = E3<&'a A, &'a B, &'a C>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E3<&'a mut A, &'a mut B, &'a mut C>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E3<&'a A, &'a B, &'a C> where Self: 'a;
+    type MutEnum<'a> = E3<&'a mut A, &'a mut B, &'a mut C> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
     type Enum = E4<A, B, C, D>;
-    type RefEnum<'a>
-        = E4<&'a A, &'a B, &'a C, &'a D>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E4<&'a mut A, &'a mut B, &'a mut C, &'a mut D>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E4<&'a A, &'a B, &'a C, &'a D> where Self: 'a;
+    type MutEnum<'a> = E4<&'a mut A, &'a mut B, &'a mut C, &'a mut D> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>;
     type Enum = E5<A, B, C, D, E>;
-    type RefEnum<'a>
-        = E5<&'a A, &'a B, &'a C, &'a D, &'a E>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E5<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E5<&'a A, &'a B, &'a C, &'a D, &'a E> where Self: 'a;
+    type MutEnum<'a> = E5<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
     type Enum = E6<A, B, C, D, E, F>;
-    type RefEnum<'a>
-        = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E6<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F> where Self: 'a;
+    type MutEnum<'a> = E6<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>;
     type Enum = E7<A, B, C, D, E, F, G>;
-    type RefEnum<'a>
-        = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E7<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G> where Self: 'a;
+    type MutEnum<'a> = E7<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
     type Enum = E8<A, B, C, D, E, F, G, H>;
-    type RefEnum<'a>
-        = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E8<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H>
-    where
-        Self: 'a;
+    type RefEnum<'a> = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H> where Self: 'a;
+    type MutEnum<'a> = E8<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H> where Self: 'a;
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
-    type Variants =
-        Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
     type Enum = E9<A, B, C, D, E, F, G, H, I>;
-    type RefEnum<'a>
-        = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I>
-    where
-        Self: 'a;
-    type MutEnum<'a>
-        = E9<
-        &'a mut A,
-        &'a mut B,
-        &'a mut C,
-        &'a mut D,
-        &'a mut E,
-        &'a mut F,
-        &'a mut G,
-        &'a mut H,
-        &'a mut I,
-    >
-    where
-        Self: 'a;
+    type RefEnum<'a> = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I> where Self: 'a;
+    type MutEnum<'a> = E9<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J> TypeSet for (A, B, C, D, E, F, G, H, I, J) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, End>>>>>>>>>>;
+    type Enum = E10<A, B, C, D, E, F, G, H, I, J>;
+    type RefEnum<'a> = E10<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J> where Self: 'a;
+    type MutEnum<'a> = E10<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K> TypeSet for (A, B, C, D, E, F, G, H, I, J, K) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, End>>>>>>>>>>>;
+    type Enum = E11<A, B, C, D, E, F, G, H, I, J, K>;
+    type RefEnum<'a> = E11<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K> where Self: 'a;
+    type MutEnum<'a> = E11<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, End>>>>>>>>>>>>;
+    type Enum = E12<A, B, C, D, E, F, G, H, I, J, K, L>;
+    type RefEnum<'a> = E12<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L> where Self: 'a;
+    type MutEnum<'a> = E12<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, End>>>>>>>>>>>>>;
+    type Enum = E13<A, B, C, D, E, F, G, H, I, J, K, L, M>;
+    type RefEnum<'a> = E13<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M> where Self: 'a;
+    type MutEnum<'a> = E13<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, End>>>>>>>>>>>>>>;
+    type Enum = E14<A, B, C, D, E, F, G, H, I, J, K, L, M, N>;
+    type RefEnum<'a> = E14<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N> where Self: 'a;
+    type MutEnum<'a> = E14<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, End>>>>>>>>>>>>>>>;
+    type Enum = E15<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>;
+    type RefEnum<'a> = E15<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O> where Self: 'a;
+    type MutEnum<'a> = E15<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, End>>>>>>>>>>>>>>>>;
+    type Enum = E16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>;
+    type RefEnum<'a> = E16<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P> where Self: 'a;
+    type MutEnum<'a> = E16<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, End>>>>>>>>>>>>>>>>>;
+    type Enum = E17<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>;
+    type RefEnum<'a> = E17<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q> where Self: 'a;
+    type MutEnum<'a> = E17<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, End>>>>>>>>>>>>>>>>>>;
+    type Enum = E18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>;
+    type RefEnum<'a> = E18<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R> where Self: 'a;
+    type MutEnum<'a> = E18<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, End>>>>>>>>>>>>>>>>>>>;
+    type Enum = E19<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S>;
+    type RefEnum<'a> = E19<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S> where Self: 'a;
+    type MutEnum<'a> = E19<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, End>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>;
+    type RefEnum<'a> = E20<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T> where Self: 'a;
+    type MutEnum<'a> = E20<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, End>>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E21<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>;
+    type RefEnum<'a> = E21<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U> where Self: 'a;
+    type MutEnum<'a> = E21<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, End>>>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>;
+    type RefEnum<'a> = E22<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V> where Self: 'a;
+    type MutEnum<'a> = E22<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, End>>>>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E23<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W>;
+    type RefEnum<'a> = E23<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W> where Self: 'a;
+    type MutEnum<'a> = E23<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V, &'a mut W> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, End>>>>>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E24<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>;
+    type RefEnum<'a> = E24<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X> where Self: 'a;
+    type MutEnum<'a> = E24<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V, &'a mut W, &'a mut X> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, End>>>>>>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E25<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y>;
+    type RefEnum<'a> = E25<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X, &'a Y> where Self: 'a;
+    type MutEnum<'a> = E25<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V, &'a mut W, &'a mut X, &'a mut Y> where Self: 'a;
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z) {
+    type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, Cons<Z, End>>>>>>>>>>>>>>>>>>>>>>>>>>;
+    type Enum = E26<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z>;
+    type RefEnum<'a> = E26<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X, &'a Y, &'a Z> where Self: 'a;
+    type MutEnum<'a> = E26<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V, &'a mut W, &'a mut X, &'a mut Y, &'a mut Z> where Self: 'a;
 }
 
 /* ------------------------- TupleForm implemented for TypeSet ----------------------- */
@@ -537,119 +602,292 @@ impl TupleForm for End {
     type Tuple = ();
 }
 
-impl<A> TupleForm for Cons<A, End> {
+#[rustfmt::skip]
+impl<A> TupleForm
+    for Cons<A, End>
+{
     type Tuple = (A,);
 }
 
-impl<A, B> TupleForm for Cons<A, Cons<B, End>> {
+#[rustfmt::skip]
+impl<A, B> TupleForm
+    for Cons<A, Cons<B, End>>
+{
     type Tuple = (A, B);
 }
 
-impl<A, B, C> TupleForm for Cons<A, Cons<B, Cons<C, End>>> {
+#[rustfmt::skip]
+impl<A, B, C> TupleForm
+    for Cons<A, Cons<B, Cons<C, End>>>
+{
     type Tuple = (A, B, C);
 }
 
-impl<A, B, C, D> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, End>>>> {
+#[rustfmt::skip]
+impl<A, B, C, D> TupleForm
+    for Cons<A, Cons<B, Cons<C, Cons<D, End>>>>
+{
     type Tuple = (A, B, C, D);
 }
 
-impl<A, B, C, D, E> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>> {
+#[rustfmt::skip]
+impl<A, B, C, D, E> TupleForm
+    for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>
+{
     type Tuple = (A, B, C, D, E);
 }
 
-impl<A, B, C, D, E, F> TupleForm for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>> {
+#[rustfmt::skip]
+impl<A, B, C, D, E, F> TupleForm
+    for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>
+{
     type Tuple = (A, B, C, D, E, F);
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F, G> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G);
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F, G, H> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G, H);
 }
 
+#[rustfmt::skip]
 impl<A, B, C, D, E, F, G, H, I> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G, H, I);
 }
 
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, End>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, End>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, End>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, End>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, End>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, End>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, End>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, End>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, End>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, End>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, End>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, End>>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, End>>>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, End>>>>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, End>>>>>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, End>>>>>>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
+}
+
+#[rustfmt::skip]
+impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> TupleForm
+    for
+    Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, Cons<Z, End>>>>>>>>>>>>>>>>>>>>>>>>>>
+{
+    type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
+}
+
 /* ------------------------- Lifted ----------------------- */
 
-pub enum E0 {}
-pub enum E1<A> {
-    A(A),
-}
 impl<A> From<A> for E1<A> {
     fn from(a: A) -> E1<A> {
         E1::A(a)
     }
 }
-pub enum E2<A, B> {
-    A(A),
-    B(B),
-}
-pub enum E3<A, B, C> {
-    A(A),
-    B(B),
-    C(C),
-}
-pub enum E4<A, B, C, D> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-}
-pub enum E5<A, B, C, D, E> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-}
-pub enum E6<A, B, C, D, E, F> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-}
-pub enum E7<A, B, C, D, E, F, G> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-    G(G),
-}
-pub enum E8<A, B, C, D, E, F, G, H> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-    G(G),
-    H(H),
-}
-pub enum E9<A, B, C, D, E, F, G, H, I> {
-    A(A),
-    B(B),
-    C(C),
-    D(D),
-    E(E),
-    F(F),
-    G(G),
-    H(H),
-    I(I),
-}
+
+pub enum E0 {}
+
+#[rustfmt::skip]
+pub enum E1<A> { A(A) }
+
+#[rustfmt::skip]
+pub enum E2<A, B> { A(A), B(B) }
+
+#[rustfmt::skip]
+pub enum E3<A, B, C> { A(A), B(B), C(C) }
+
+#[rustfmt::skip]
+pub enum E4<A, B, C, D> { A(A), B(B), C(C), D(D) }
+
+#[rustfmt::skip]
+pub enum E5<A, B, C, D, E> { A(A), B(B), C(C), D(D), E(E) }
+
+#[rustfmt::skip]
+pub enum E6<A, B, C, D, E, F> { A(A), B(B), C(C), D(D), E(E), F(F) }
+
+#[rustfmt::skip]
+pub enum E7<A, B, C, D, E, F, G> { A(A), B(B), C(C), D(D), E(E), F(F), G(G) }
+
+#[rustfmt::skip]
+pub enum E8<A, B, C, D, E, F, G, H> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H) }
+
+#[rustfmt::skip]
+pub enum E9<A, B, C, D, E, F, G, H, I> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I) }
+
+#[rustfmt::skip]
+pub enum E10<A, B, C, D, E, F, G, H, I, J> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J) }
+
+#[rustfmt::skip]
+pub enum E11<A, B, C, D, E, F, G, H, I, J, K> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K) }
+
+#[rustfmt::skip]
+pub enum E12<A, B, C, D, E, F, G, H, I, J, K, L> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L) }
+
+#[rustfmt::skip]
+pub enum E13<A, B, C, D, E, F, G, H, I, J, K, L, M> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M) }
+
+#[rustfmt::skip]
+pub enum E14<A, B, C, D, E, F, G, H, I, J, K, L, M, N> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N) }
+
+#[rustfmt::skip]
+pub enum E15<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O) }
+
+#[rustfmt::skip]
+pub enum E16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P) }
+
+#[rustfmt::skip]
+pub enum E17<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q) }
+
+#[rustfmt::skip]
+pub enum E18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R) }
+
+#[rustfmt::skip]
+pub enum E19<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S) }
+
+#[rustfmt::skip]
+pub enum E20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T) }
+
+#[rustfmt::skip]
+pub enum E21<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U) }
+
+#[rustfmt::skip]
+pub enum E22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V) }
+
+#[rustfmt::skip]
+pub enum E23<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W) }
+
+#[rustfmt::skip]
+pub enum E24<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X) }
+
+#[rustfmt::skip]
+pub enum E25<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X), Y(Y) }
+
+#[rustfmt::skip]
+pub enum E26<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X), Y(Y), Z(Z) }
 
 /* ------------------------- Contains ----------------------- */
 
