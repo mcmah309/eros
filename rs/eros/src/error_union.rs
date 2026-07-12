@@ -20,7 +20,7 @@ use crate::type_set::{
     write_debug, write_display,
 };
 
-use crate::{AnyError, Cons, End};
+use crate::AnyError;
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: core::any::Any + core::error::Error + Send + Sync + 'static {
@@ -967,6 +967,8 @@ impl ErrorUnion {
 //         ErrorUnion::anyhow(value)
 //     }
 // }
+
+//************************************************************************//
 
 #[cfg(test)]
 mod tests {
