@@ -44,6 +44,8 @@ better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
 location = []
 # Add integration with anyhow
 anyhow = ["std", "dep:anyhow"]
+# Enables `Clone` for `ErrorUnion` via shared inner ownership.
+clone = []
 # Enables `ErrorUnion::log_*` statements and `LogExt` for `Result`. But does not enable a logging backend.
 # Libraries can enable this and let a downstream enable a backend.
 logging = []

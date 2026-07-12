@@ -9,6 +9,8 @@ use core::marker::PhantomData;
 use core::mem;
 use core::ops::Deref;
 use core::ptr;
+#[cfg(feature = "clone")]
+use core::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "std")]
 use std::any::TypeId;
 
@@ -59,6 +61,14 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     pub(crate) context: Vec<ErosContext>,
     #[cfg(feature = "location")]
     pub(crate) location: &'static core::panic::Location<'static>,
+    /// Number of live `ErrorUnion` handles that currently share this allocation.
+    /// Only present when the `clone` feature is enabled, in which case
+    /// `ErrorUnion` behaves like a reference-counted (`Arc`-like) pointer instead
+    /// of a uniquely-owned `Box`. Any operation that needs to move the `error`
+    /// field out (and free this allocation) must first confirm the count is `1`,
+    /// since doing so while other handles exist would leave them dangling.
+    #[cfg(feature = "clone")]
+    pub(crate) count: AtomicUsize,
     /// Re-boxes the error field into a fresh allocation.
     /// Stored at construction so the concrete type is still known.
     pub(crate) into_box_fn: fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
@@ -72,21 +82,26 @@ fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncEr
 }
 
 impl ErrorUnionInner<dyn SendSyncError> {
+    /// Allocates a new `ErrorUnionInner` and returns a raw, non-null pointer to it.
     #[cfg_attr(feature = "location", track_caller)]
-    pub(crate) fn new<T>(t: T) -> Box<ErrorUnionInner<dyn SendSyncError>>
+    pub(crate) fn new<T>(t: T) -> ptr::NonNull<ErrorUnionInner<dyn SendSyncError>>
     where
         T: SendSyncError,
     {
-        Box::new(ErrorUnionInner {
+        let boxed: Box<ErrorUnionInner<dyn SendSyncError>> = Box::new(ErrorUnionInner {
             #[cfg(feature = "backtrace")]
             backtrace: std::backtrace::Backtrace::capture(),
             #[cfg(feature = "context")]
             context: Vec::new(),
             #[cfg(feature = "location")]
             location: core::panic::Location::caller(),
+            #[cfg(feature = "clone")]
+            count: AtomicUsize::new(1),
             into_box_fn: make_box::<T>,
             error: t,
-        })
+        });
+        // SAFETY: Box::into_raw never returns a null pointer.
+        unsafe { ptr::NonNull::new_unchecked(Box::into_raw(boxed)) }
     }
 
     pub(crate) fn new_from_parts<T>(
@@ -94,20 +109,24 @@ impl ErrorUnionInner<dyn SendSyncError> {
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
         #[cfg(feature = "context")] context: Vec<ErosContext>,
         #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
-    ) -> Box<ErrorUnionInner<dyn SendSyncError>>
+    ) -> ptr::NonNull<ErrorUnionInner<dyn SendSyncError>>
     where
         T: SendSyncError,
     {
-        Box::new(ErrorUnionInner {
+        let boxed: Box<ErrorUnionInner<dyn SendSyncError>> = Box::new(ErrorUnionInner {
             #[cfg(feature = "backtrace")]
             backtrace,
             #[cfg(feature = "context")]
             context,
             #[cfg(feature = "location")]
             location,
+            #[cfg(feature = "clone")]
+            count: AtomicUsize::new(1),
             into_box_fn: make_box::<T>,
             error: t,
-        })
+        });
+        // SAFETY: Box::into_raw never returns a null pointer.
+        unsafe { ptr::NonNull::new_unchecked(Box::into_raw(boxed)) }
     }
 
     #[allow(unstable_name_collisions)]
@@ -115,8 +134,28 @@ impl ErrorUnionInner<dyn SendSyncError> {
         self.error.type_id() == TypeId::of::<T>()
     }
 
+    /// Panics unless this allocation is uniquely owned (ref count of `1`).
+    /// A no-op when the `clone` feature is disabled, since in that case
+    /// `ErrorUnion` is always uniquely owned by construction.
+    #[allow(dead_code)]
+    #[inline]
+    fn assert_unique(&self) {
+        #[cfg(feature = "clone")]
+        {
+            let count = self.count.load(Ordering::Acquire);
+            assert_eq!(
+                count, 1,
+                "cannot downcast an ErrorUnion's inner error while {count} clone(s) of it exist"
+            );
+        }
+    }
+
     pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self: Box<Self>) -> T {
         debug_assert!(self.is_error::<T>());
+        // Taking the error out of this allocation destroys the allocation itself,
+        // which would leave any other clones dangling, so refuse unless we're the
+        // sole owner.
+        self.assert_unique();
 
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
@@ -151,6 +190,10 @@ impl ErrorUnionInner<dyn SendSyncError> {
         self: Box<Self>,
     ) -> ErrorUnionInner<T> {
         debug_assert!(self.is_error::<T>());
+        // Taking the error out of this allocation destroys the allocation itself,
+        // which would leave any other clones dangling, so refuse unless we're the
+        // sole owner.
+        self.assert_unique();
 
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
@@ -186,6 +229,11 @@ impl ErrorUnionInner<dyn SendSyncError> {
                 context,
                 #[cfg(feature = "location")]
                 location,
+                // This is a brand new, uniquely-owned allocation once it gets
+                // re-boxed by the caller (see `ErrorUnion::map`), so it starts
+                // fresh at a count of one.
+                #[cfg(feature = "clone")]
+                count: AtomicUsize::new(1),
                 into_box_fn,
                 error: downcasted_value,
             }
@@ -246,8 +294,16 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// `ErrorUnion` also holds information surrounding the error depending on feature
 /// flags enabled. This may include `Backtrace` and/or `Location`. Context can be added throughout
 /// the call stack.
+///
+/// When the `clone` feature is enabled, `ErrorUnion` is reference-counted internally
+/// (similar to `Arc`) and implements [`Clone`]. Cloning is cheap: it bumps an atomic
+/// counter rather than duplicating the underlying error. Because of this, operations
+/// that need to take ownership of the underlying error (such as [`ErrorUnion::narrow`]
+/// succeeding, [`ErrorUnion::take`], [`ErrorUnion::into_single`], [`ErrorUnion::into_inner`],
+/// or [`ErrorUnion::map`]) will panic if any other clone of the same `ErrorUnion` is still
+/// alive. Use [`ErrorUnion::ref_count`] or [`ErrorUnion::is_unique`] to check beforehand.
 pub struct ErrorUnion<E: TypeSet = AnyError> {
-    pub(crate) inner: Box<ErrorUnionInner<dyn SendSyncError>>,
+    pub(crate) inner: ptr::NonNull<ErrorUnionInner<dyn SendSyncError>>,
     pub(crate) _pd: PhantomData<E>,
 }
 
@@ -258,21 +314,24 @@ where
     type Target = T;
 
     fn deref(&self) -> &T {
-        (&self.inner.error as &dyn Any).downcast_ref::<T>().unwrap()
+        (unsafe { &self.inner.as_ref().error } as &dyn Any)
+            .downcast_ref::<T>()
+            .unwrap()
     }
 }
 
 impl fmt::Debug for ErrorUnion<AnyError> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let inner = unsafe { self.inner.as_ref() };
         write_debug(
-            &self.inner.error,
+            &inner.error,
             formatter,
             #[cfg(feature = "context")]
-            &self.inner.context,
+            &inner.context,
             #[cfg(feature = "backtrace")]
-            &self.inner.backtrace,
+            &inner.backtrace,
             #[cfg(feature = "location")]
-            self.inner.location,
+            inner.location,
         )
     }
 }
@@ -283,15 +342,16 @@ where
     E::Variants: fmt::Debug + DebugFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let inner = unsafe { self.inner.as_ref() };
         E::Variants::debug_fold(
-            &self.inner.error,
+            &inner.error,
             formatter,
             #[cfg(feature = "context")]
-            &self.inner.context,
+            &inner.context,
             #[cfg(feature = "backtrace")]
-            &self.inner.backtrace,
+            &inner.backtrace,
             #[cfg(feature = "location")]
-            self.inner.location,
+            inner.location,
         )?;
         Ok(())
     }
@@ -299,7 +359,7 @@ where
 
 impl fmt::Display for ErrorUnion<AnyError> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_display(&self.inner.error, formatter)
+        write_display(&unsafe { self.inner.as_ref() }.error, formatter)
     }
 }
 
@@ -309,7 +369,7 @@ where
     E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::display_fold(&self.inner.error as &dyn Any, formatter)?;
+        E::Variants::display_fold(&unsafe { self.inner.as_ref() }.error as &dyn Any, formatter)?;
         Ok(())
     }
 }
@@ -333,6 +393,94 @@ fn _send_sync_error_assert() {
 
 unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
 unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
+
+//************************************************************************//
+
+/// Drops the underlying allocation.
+///
+/// Without the `clone` feature, `ErrorUnion` is always the unique owner of its
+/// allocation (mirroring the old `Box`-based representation), so this always frees it.
+///
+/// With the `clone` feature, `ErrorUnion` is reference-counted: dropping decrements
+/// the shared counter, and the allocation is only actually freed once the last
+/// handle is dropped.
+impl<E> Drop for ErrorUnion<E>
+where
+    E: TypeSet,
+{
+    fn drop(&mut self) {
+        #[cfg(feature = "clone")]
+        {
+            // SAFETY: `self.inner` is always a valid, live allocation for as long
+            // as any `ErrorUnion` referencing it exists.
+            let previous_count = unsafe { self.inner.as_ref() }
+                .count
+                .fetch_sub(1, Ordering::AcqRel);
+            if previous_count != 1 {
+                // Other clones are still alive; they remain responsible for the
+                // allocation.
+                return;
+            }
+        }
+
+        // SAFETY: We are either the unique owner (no `clone` feature), or we just
+        // observed the count drop to zero (with the `clone` feature), so it is
+        // safe to reclaim the allocation.
+        unsafe {
+            drop(Box::from_raw(self.inner.as_ptr()));
+        }
+    }
+}
+
+/// Cloning an `ErrorUnion` is cheap: it simply bumps the shared reference count
+/// rather than duplicating the underlying error. Operations that need to take
+/// ownership of the underlying error will panic while more than one clone is alive
+/// — see the type-level docs on [`ErrorUnion`] for details.
+#[cfg(feature = "clone")]
+impl<E> Clone for ErrorUnion<E>
+where
+    E: TypeSet,
+{
+    fn clone(&self) -> Self {
+        // SAFETY: `self.inner` is always a valid, live allocation for as long
+        // as this `ErrorUnion` exists.
+        unsafe { self.inner.as_ref() }
+            .count
+            .fetch_add(1, Ordering::AcqRel);
+
+        ErrorUnion {
+            inner: self.inner,
+            _pd: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "clone")]
+impl<E> ErrorUnion<E>
+where
+    E: TypeSet,
+{
+    /// Returns the number of `ErrorUnion` handles (including this one) that
+    /// currently share the same underlying error allocation.
+    ///
+    /// Only available when the `clone` feature is enabled.
+    pub fn ref_count(&self) -> usize {
+        unsafe { self.inner.as_ref() }.count.load(Ordering::Acquire)
+    }
+
+    /// Returns `true` if this `ErrorUnion` is the sole owner of its underlying
+    /// error, i.e. [`ErrorUnion::ref_count`] is `1`.
+    ///
+    /// Operations that take ownership of the underlying error (like
+    /// [`ErrorUnion::take`], [`ErrorUnion::into_single`], [`ErrorUnion::into_inner`],
+    /// [`ErrorUnion::map`], or a successful [`ErrorUnion::narrow`]) will panic
+    /// unless this returns `true`. Check this first if you'd rather avoid the panic.
+    ///
+    /// Only available when the `clone` feature is enabled.
+    pub fn is_unique(&self) -> bool {
+        self.ref_count() == 1
+    }
+}
 
 //************************************************************************//
 
@@ -382,7 +530,7 @@ impl ErrorUnion {
         E: TypeSet,
     {
         ErrorUnion {
-            inner: t.inner,
+            inner: t.into_raw_inner(),
             _pd: PhantomData,
         }
     }
@@ -400,7 +548,7 @@ where
     E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        E::Variants::source_fold(&self.0.inner.error as &dyn Any)
+        E::Variants::source_fold(&unsafe { self.0.inner.as_ref() }.error as &dyn Any)
     }
 }
 
@@ -455,9 +603,26 @@ impl<E> ErrorUnion<E>
 where
     E: TypeSet,
 {
+    /// Consumes this `ErrorUnion`, returning the raw pointer to its (possibly
+    /// shared) allocation without running `Drop` — i.e. without touching the
+    /// reference count.
+    ///
+    /// This is the building block for every operation that either re-labels the
+    /// same allocation with a different `TypeSet` (e.g. [`ErrorUnion::widen`]) or
+    /// takes ownership of it to downcast (e.g. [`ErrorUnion::take`]). In both
+    /// cases the logical "handle" is simply being moved, not duplicated or
+    /// dropped, so the reference count must be left untouched.
+    fn into_raw_inner(self) -> ptr::NonNull<ErrorUnionInner<dyn SendSyncError>> {
+        let this = mem::ManuallyDrop::new(self);
+        this.inner
+    }
+
     /// Attempt to downcast the `ErrorUnion` into a specific type, and
     /// if that fails, return a `ErrorUnion` which does not contain that
     /// type as one of its possible variants.
+    ///
+    /// If the `clone` feature is enabled, this panics on a successful downcast
+    /// unless this `ErrorUnion` is uniquely owned — see [`ErrorUnion::is_unique`].
     #[allow(clippy::type_complexity)]
     pub fn narrow<Target, Index>(
         self,
@@ -469,11 +634,12 @@ where
         Target: 'static,
         E::Variants: Narrow<Target, Index>,
     {
-        if self.inner.is_error::<Target>() {
-            Ok(unsafe { self.inner.downcast_error_unchecked::<Target>() })
+        if unsafe { self.inner.as_ref() }.is_error::<Target>() {
+            let ptr = self.into_raw_inner();
+            Ok(unsafe { Box::from_raw(ptr.as_ptr()).downcast_error_unchecked::<Target>() })
         } else {
             Err(ErrorUnion {
-                inner: self.inner,
+                inner: self.into_raw_inner(),
                 _pd: PhantomData,
             })
         }
@@ -488,7 +654,7 @@ where
         Other::Variants: SupersetOf<E::Variants, Index>,
     {
         ErrorUnion {
-            inner: self.inner,
+            inner: self.into_raw_inner(),
             _pd: PhantomData,
         }
     }
@@ -507,14 +673,16 @@ where
         TargetList: TypeSet,
         E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
     {
-        if E::Variants::is_fold(&self.inner.error as &dyn Any) {
+        let is_match = E::Variants::is_fold(&unsafe { self.inner.as_ref() }.error as &dyn Any);
+        let ptr = self.into_raw_inner();
+        if is_match {
             Ok(ErrorUnion {
-                inner: self.inner,
+                inner: ptr,
                 _pd: PhantomData,
             })
         } else {
             Err(ErrorUnion {
-                inner: self.inner,
+                inner: ptr,
                 _pd: PhantomData,
             })
         }
@@ -522,53 +690,84 @@ where
 
     /// For a `ErrorUnion` with a single variant, return
     /// the contained value.
+    ///
+    /// If the `clone` feature is enabled, this panics unless this `ErrorUnion`
+    /// is uniquely owned — see [`ErrorUnion::is_unique`].
     pub fn take<Target>(self) -> Target
     where
         Target: 'static,
         E: TypeSet<Variants = Cons<Target, End>>,
     {
-        unsafe { self.inner.downcast_error_unchecked::<Target>() }
+        let ptr = self.into_raw_inner();
+        unsafe { Box::from_raw(ptr.as_ptr()).downcast_error_unchecked::<Target>() }
     }
 
+    /// If the `clone` feature is enabled and the downcast succeeds, this panics
+    /// unless this `ErrorUnion` is uniquely owned — see [`ErrorUnion::is_unique`].
     pub fn downcast_inner<T: 'static>(self) -> Option<T> {
-        self.inner.downcast_error()
+        if unsafe { self.inner.as_ref() }.is_error::<T>() {
+            let ptr = self.into_raw_inner();
+            Some(unsafe { Box::from_raw(ptr.as_ptr()).downcast_error_unchecked::<T>() })
+        } else {
+            // Wrong type: just let `self` drop normally, which correctly
+            // decrements the ref count (or frees the allocation) without
+            // requiring unique ownership.
+            None
+        }
     }
 
     pub fn downcast_inner_ref<T: 'static>(&self) -> Option<&T> {
-        self.inner.downcast_error_ref()
+        unsafe { self.inner.as_ref() }.downcast_error_ref()
     }
 
     pub fn downcast_inner_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.inner.downcast_error_mut()
+        unsafe { self.inner.as_mut() }.downcast_error_mut()
     }
 
     /// Returns true if the inner error is of type `T`
     pub fn is_inner<T: 'static>(&self) -> bool {
-        self.inner.is_error::<T>()
+        unsafe { self.inner.as_ref() }.is_error::<T>()
     }
 
     #[cfg(feature = "backtrace")]
     pub fn backtrace(&self) -> &std::backtrace::Backtrace {
-        &self.inner.backtrace
+        unsafe { &self.inner.as_ref().backtrace }
     }
 
     pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        self.inner.error.source()
+        unsafe { self.inner.as_ref() }.error.source()
     }
 
     /// Gets a reference to the inner underlying error
     pub fn inner_ref(&self) -> &dyn SendSyncError {
-        &self.inner.error
+        unsafe { &self.inner.as_ref().error }
     }
 
     /// Gets a mutable reference to the inner underlying error
     pub fn inner_mut(&mut self) -> &mut dyn SendSyncError {
-        &mut self.inner.error
+        unsafe { &mut self.inner.as_mut().error }
     }
 
     /// Into the inner underlying error
+    ///
+    /// If the `clone` feature is enabled, this panics unless this `ErrorUnion`
+    /// is uniquely owned — see [`ErrorUnion::is_unique`].
     pub fn into_inner(self) -> Box<dyn SendSyncError> {
-        let raw = Box::into_raw(self.inner);
+        // Re-boxing via `into_box_fn` below destroys this allocation, which
+        // would leave any other clones dangling, so this can't proceed unless
+        // we're the sole owner. `downcast_error_unchecked{,_with_parts}` enforce
+        // this same rule internally, but this method doesn't go through either
+        // of them, so it needs its own check.
+        #[cfg(feature = "clone")]
+        assert_eq!(
+            self.ref_count(),
+            1,
+            "cannot take ownership of an ErrorUnion's inner error while {} clone(s) of it exist",
+            self.ref_count()
+        );
+
+        let ptr = self.into_raw_inner();
+        let raw = ptr.as_ptr();
         unsafe {
             let into_box_fn = (*raw).into_box_fn;
             let error_ptr = ptr::addr_of_mut!((*raw).error);
@@ -594,7 +793,7 @@ where
     /// This takes into consideration errors added as context
     pub fn latest_error(&self) -> &dyn SendSyncError {
         #[cfg(feature = "context")]
-        for context in self.inner.context.iter().rev() {
+        for context in unsafe { self.inner.as_ref() }.context.iter().rev() {
             if let crate::context::ContextSource::Error(err) = &context.context {
                 return err.as_ref();
             }
@@ -633,7 +832,7 @@ where
     #[cfg_attr(feature = "location", track_caller)]
     pub fn context<C: Into<ContextSource>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
-        self.inner
+        unsafe { self.inner.as_mut() }
             .context
             .push(crate::context::ErosContext::new(context.into()));
         self
@@ -646,7 +845,7 @@ where
     #[cfg_attr(feature = "location", track_caller)]
     pub fn user_context<C: Into<ContextSource>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
-        self.inner
+        unsafe { self.inner.as_mut() }
             .context
             .push(crate::context::ErosContext::new_user_facing(context.into()));
         self
@@ -661,7 +860,7 @@ where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        self.inner
+        unsafe { self.inner.as_mut() }
             .context
             .push(crate::context::ErosContext::new(f().into()));
         self
@@ -677,7 +876,7 @@ where
         F: FnOnce() -> C,
     {
         #[cfg(feature = "context")]
-        self.inner
+        unsafe { self.inner.as_mut() }
             .context
             .push(crate::context::ErosContext::new_user_facing(f().into()));
         self
@@ -686,13 +885,13 @@ where
 
 impl<A: 'static> AsRef<A> for ErrorUnion<(A,)> {
     fn as_ref(&self) -> &A {
-        self.inner.downcast_error_ref().unwrap()
+        unsafe { self.inner.as_ref() }.downcast_error_ref().unwrap()
     }
 }
 
 impl<A: 'static> AsMut<A> for ErrorUnion<(A,)> {
     fn as_mut(&mut self) -> &mut A {
-        self.inner.downcast_error_mut().unwrap()
+        unsafe { self.inner.as_mut() }.downcast_error_mut().unwrap()
     }
 }
 
@@ -700,17 +899,25 @@ impl<A: 'static> ErrorUnion<(A,)> {
     /// Convert the inner type of an `ErrorUnion` with a single possible type to that type.
     ///
     /// Use `as_ref` or `as_mut` if you want to borrow the inner type instead of consuming the `ErrorUnion`.
+    ///
+    /// If the `clone` feature is enabled, this panics unless this `ErrorUnion`
+    /// is uniquely owned — see [`ErrorUnion::is_unique`].
     pub fn into_single(self) -> A {
-        unsafe { self.inner.downcast_error_unchecked() }
+        let ptr = self.into_raw_inner();
+        unsafe { Box::from_raw(ptr.as_ptr()).downcast_error_unchecked() }
     }
 
+    /// If the `clone` feature is enabled, this panics unless this `ErrorUnion`
+    /// is uniquely owned — see [`ErrorUnion::is_unique`].
     pub fn map<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
         F: FnOnce(A) -> U,
     {
+        let ptr = self.into_raw_inner();
         // SAFETY: We know that the inner error is only of type A, so we can safely downcast it
-        let inner = unsafe { self.inner.downcast_error_unchecked_with_parts::<A>() };
+        let inner =
+            unsafe { Box::from_raw(ptr.as_ptr()).downcast_error_unchecked_with_parts::<A>() };
         ErrorUnion {
             inner: ErrorUnionInner::new_from_parts(
                 f(inner.error),
@@ -1008,8 +1215,9 @@ mod tests {
     #[test]
     fn downcast_error_unchecked_correct_type_recovers_value() {
         let inner = ErrorUnionInner::new(FooError("hello".into()));
-        assert!(inner.is_error::<FooError>());
-        let recovered: FooError = unsafe { inner.downcast_error_unchecked() };
+        assert!(unsafe { inner.as_ref() }.is_error::<FooError>());
+        let recovered: FooError =
+            unsafe { Box::from_raw(inner.as_ptr()).downcast_error_unchecked() };
         assert_eq!(recovered, FooError("hello".into()));
     }
 
@@ -1027,7 +1235,8 @@ mod tests {
         impl std::error::Error for VecError {}
 
         let inner = ErrorUnionInner::new(VecError(payload.clone()));
-        let recovered: VecError = unsafe { inner.downcast_error_unchecked() };
+        let recovered: VecError =
+            unsafe { Box::from_raw(inner.as_ptr()).downcast_error_unchecked() };
         assert_eq!(recovered.0, payload);
     }
 
@@ -1035,7 +1244,9 @@ mod tests {
     #[should_panic]
     fn downcast_error_panics_on_wrong_type() {
         let inner = ErrorUnionInner::new(FooError("oops".into()));
-        inner.downcast_error::<BarError>().unwrap(); // should panic
+        unsafe { Box::from_raw(inner.as_ptr()) }
+            .downcast_error::<BarError>()
+            .unwrap(); // should panic
     }
 
     #[test]
@@ -1049,18 +1260,17 @@ mod tests {
 
         #[cfg(feature = "context")]
         {
-            union
-                .inner
+            unsafe { union.inner.as_mut() }
                 .context
                 .push(ErosContext::new("step one".into()));
-            union
-                .inner
+            unsafe { union.inner.as_mut() }
                 .context
                 .push(ErosContext::new("step two".into()));
         }
 
+        let ptr = union.into_raw_inner();
         let parts: ErrorUnionInner<FooError> =
-            unsafe { union.inner.downcast_error_unchecked_with_parts() };
+            unsafe { Box::from_raw(ptr.as_ptr()).downcast_error_unchecked_with_parts() };
 
         assert_eq!(parts.error, FooError("ctx".into()));
 
@@ -1072,7 +1282,7 @@ mod tests {
     fn downcast_error_unchecked_with_parts_correct_error_value() {
         let inner = ErrorUnionInner::new(BarError(42));
         let parts: ErrorUnionInner<BarError> =
-            unsafe { inner.downcast_error_unchecked_with_parts() };
+            unsafe { Box::from_raw(inner.as_ptr()).downcast_error_unchecked_with_parts() };
         assert_eq!(parts.error, BarError(42));
     }
 
@@ -1121,7 +1331,7 @@ mod tests {
         let recovered: ErrorUnion<(FooError,)> = ErrorUnion::from_dyn_error(dyn_err).unwrap();
 
         #[cfg(feature = "context")]
-        assert_eq!(recovered.inner.context.len(), 1);
+        assert_eq!(unsafe { recovered.inner.as_ref() }.context.len(), 1);
 
         assert_eq!(recovered.as_ref(), &FooError("ctx".into()));
     }
@@ -1241,6 +1451,43 @@ mod tests {
             result.is_err(),
             "from_dyn_error should reject a bare inner error, not an ErrorUnionErrorWrapper"
         );
+    }
+
+    #[cfg(feature = "clone")]
+    #[test]
+    fn clone_bumps_ref_count_and_downcast_panics_while_shared() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("shared".into()));
+        assert_eq!(union.ref_count(), 1);
+        assert!(union.is_unique());
+
+        let clone = union.clone();
+        assert_eq!(union.ref_count(), 2);
+        assert_eq!(clone.ref_count(), 2);
+        assert!(!union.is_unique());
+
+        drop(clone);
+        assert_eq!(union.ref_count(), 1);
+        assert!(union.is_unique());
+
+        // Now that we're unique again, taking ownership succeeds.
+        assert_eq!(union.into_single(), FooError("shared".into()));
+    }
+
+    #[cfg(feature = "clone")]
+    #[test]
+    #[should_panic]
+    fn into_single_panics_while_shared() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("shared".into()));
+        let _clone = union.clone();
+        let _ = union.into_single(); // should panic: not uniquely owned
+    }
+
+    #[cfg(feature = "clone")]
+    #[test]
+    fn clones_see_same_error_value() {
+        let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("same".into()));
+        let clone = union.clone();
+        assert_eq!(union.as_ref(), clone.as_ref());
     }
 }
 
