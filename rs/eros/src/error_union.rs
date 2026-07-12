@@ -968,6 +968,19 @@ impl ErrorUnion {
 //     }
 // }
 
+#[cfg(feature = "anyhow")]
+impl From<ErrorUnion> for anyhow::Error {
+    fn from(mut value: ErrorUnion) -> Self {
+        let context = core::mem::take(&mut value.inner.context);
+        let inner_error = value.into_inner();
+        let mut error = anyhow::Error::new(inner_error);
+        for c in context {
+            error = error.context(c.context);
+        }
+        error
+    }
+}
+
 //************************************************************************//
 
 #[cfg(test)]
