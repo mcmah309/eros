@@ -27,6 +27,9 @@ mod user_context;
 #[cfg(feature = "logging")]
 mod logging;
 
+#[cfg(feature = "std")]
+pub mod sync;
+
 #[cfg(feature = "logging")]
 pub use logging::LogExt;
 
