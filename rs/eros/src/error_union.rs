@@ -520,16 +520,6 @@ where
         }
     }
 
-    /// For a `ErrorUnion` with a single variant, return
-    /// the contained value.
-    pub fn take<Target>(self) -> Target
-    where
-        Target: 'static,
-        E: TypeSet<Variants = Cons<Target, End>>,
-    {
-        unsafe { self.inner.downcast_error_unchecked::<Target>() }
-    }
-
     pub fn downcast_inner<T: 'static>(self) -> Option<T> {
         self.inner.downcast_error()
     }
