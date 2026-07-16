@@ -1,6 +1,6 @@
 [package]
 name = "eros"
-version = "0.7.0-rc.0"
+version = "0.7.0"
 edition = "2024"
 description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
 license = "Apache-2.0"
@@ -13,7 +13,7 @@ readme = "README.md"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test_in_ci)'] }
 
 [dependencies]
-eros-macros = { version = "0.7.0-rc.0", path = "../eros-macros" }
+eros-macros = { version = "0.7.0", path = "../eros-macros" }
 # Adds `ErrorUnion::anyhow` for converting `anyhow::Error`s into a `ErrorUnion`
 anyhow = { version = "1", optional = true }
 color-backtrace = { version = "0.7", default-features = false, features = [
