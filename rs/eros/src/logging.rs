@@ -66,7 +66,7 @@ where
         ))]
         tracing::error!("{}", self);
         #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::error!("{:#?}", self);
+        tracing::error!("{:?}", self);
     }
 
     /// Logs this error as "warn". The logging backend is configured by feature flag, as well as
@@ -80,7 +80,7 @@ where
         ))]
         tracing::warn!("{}", self);
         #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::warn!("{:#?}", self);
+        tracing::warn!("{:?}", self);
     }
 }
 
@@ -96,7 +96,7 @@ impl ErrorUnion {
         ))]
         tracing::error!("{}", self);
         #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::error!("{:#?}", self);
+        tracing::error!("{:?}", self);
     }
 
     /// Logs this error as "warn". The logging backend is configured by feature flag, as well as
@@ -110,7 +110,7 @@ impl ErrorUnion {
         ))]
         tracing::warn!("{}", self);
         #[cfg(all(feature = "log_debug", feature = "tracing"))]
-        tracing::warn!("{:#?}", self);
+        tracing::warn!("{:?}", self);
     }
 }
 

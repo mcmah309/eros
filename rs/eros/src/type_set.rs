@@ -79,20 +79,28 @@ impl fmt::Display for End {
 }
 
 pub trait DisplayFold {
-    fn display_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
+    fn display_fold(any: &dyn SendSyncError, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
 impl DisplayFold for End {
-    fn display_fold(_: &dyn Any, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn display_fold(_: &dyn SendSyncError, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         unreachable!("display_fold called on End");
     }
 }
 
-pub(crate) fn write_display<T: fmt::Display + ?Sized>(
+pub(crate) fn write_display<T: SendSyncError + ?Sized>(
     t: &T,
     formatter: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
-    t.fmt(formatter)
+    write!(formatter, "{t}")?;
+    if !formatter.alternate() {
+        let mut source = t.source();
+        while let Some(error) = source {
+            write!(formatter, " <- {error}")?;
+            source = error.source();
+        }
+    }
+    Ok(())
 }
 
 impl<Head, Tail> DisplayFold for Cons<Head, Tail>
@@ -101,9 +109,9 @@ where
     Head: 'static + fmt::Display,
     Tail: DisplayFold,
 {
-    fn display_fold(any: &dyn Any, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
-            write_display(head_ref, formatter)
+    fn display_fold(any: &dyn SendSyncError, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if any.as_any().is::<Head>() {
+            write_display(any, formatter)
         } else {
             Tail::display_fold(any, formatter)
         }
@@ -141,152 +149,15 @@ pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
     #[cfg(feature = "backtrace")] backtrace: &Backtrace,
     #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
 ) -> fmt::Result {
-    #[cfg(feature = "context")]
-    fn write_eros_context(
-        context: &ErosContext,
-        formatter: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
+    crate::formatting::Report::from_parts(
+        t,
+        #[cfg(feature = "context")]
+        context,
         #[cfg(feature = "location")]
-        {
-            writeln!(
-                formatter,
-                "{}:{}:{}\n\t- {}",
-                context.location.file(),
-                context.location.line(),
-                context.location.column(),
-                context.context
-            )
-        }
-        #[cfg(not(feature = "location"))]
-        {
-            writeln!(formatter, "\t- {}", context.context)
-        }
-    }
-    #[cfg(feature = "location")]
-    {
-        writeln!(
-            formatter,
-            "{}:{}:{}",
-            location.file(),
-            location.line(),
-            location.column()
-        )?;
-    }
-    #[cfg(feature = "anyhow")]
-    {
-        use crate::error_union::{AnyhowError, AnyhowErrorArc};
-        let anyhow_error: Option<&anyhow::Error> =
-            if let Some(err) = t.as_any().downcast_ref::<AnyhowError>() {
-                Some(&err.0)
-            } else if let Some(err) = t.as_any().downcast_ref::<AnyhowErrorArc>() {
-                Some(&*err.0)
-            } else {
-                None
-            };
-        if let Some(anyhow_error) = anyhow_error {
-            let mut chain = anyhow_error.chain().rev().peekable();
-            let root = chain.next().unwrap();
-            writeln!(formatter, "{root}")?;
-            #[cfg(feature = "context")]
-            {
-                let has_context = chain.peek().is_some() || !context.is_empty();
-                if has_context {
-                    writeln!(formatter, "\nContext:")?;
-                }
-                for context_item in chain {
-                    writeln!(formatter, "\t- {}", context_item)?;
-                }
-                for context_item in context {
-                    write_eros_context(context_item, formatter)?;
-                }
-                if has_context {
-                    writeln!(formatter, "\n---")?;
-                }
-            }
-            #[cfg(feature = "backtrace")]
-            {
-                use std::backtrace::BacktraceStatus;
-
-                let anyhow_backtrace = anyhow_error.backtrace();
-                if matches!(anyhow_backtrace.status(), BacktraceStatus::Captured) {
-                    #[cfg(feature = "better_backtrace")]
-                    write_better_backtrace(anyhow_backtrace, formatter)?;
-                    #[cfg(not(feature = "better_backtrace"))]
-                    write_backtrace(anyhow_backtrace, formatter)?;
-                } else if matches!(backtrace.status(), BacktraceStatus::Captured) {
-                    #[cfg(feature = "better_backtrace")]
-                    write_better_backtrace(backtrace, formatter)?;
-                    #[cfg(not(feature = "better_backtrace"))]
-                    write_backtrace(backtrace, formatter)?;
-                }
-            }
-            return Ok(());
-        }
-    }
-    fmt::Debug::fmt(&t, formatter)?;
-    writeln!(formatter, "\n---")?;
-    #[cfg(feature = "context")]
-    {
-        if !context.is_empty() {
-            writeln!(formatter, "\nContext:")?;
-            for context_item in context.iter() {
-                write_eros_context(context_item, formatter)?;
-            }
-            writeln!(formatter, "\n---")?;
-        }
-    }
-    #[cfg(feature = "backtrace")]
-    {
-        use std::backtrace::BacktraceStatus;
-
-        if matches!(backtrace.status(), BacktraceStatus::Captured) {
-            #[cfg(feature = "better_backtrace")]
-            write_better_backtrace(backtrace, formatter)?;
-            #[cfg(not(feature = "better_backtrace"))]
-            write_backtrace(backtrace, formatter)?;
-        }
-    }
-    Ok(())
-}
-
-#[cfg(feature = "backtrace")]
-fn write_backtrace(
-    backtrace: &std::backtrace::Backtrace,
-    formatter: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    use std::backtrace::BacktraceStatus;
-
-    if matches!(backtrace.status(), BacktraceStatus::Captured) {
-        writeln!(formatter, "\nBacktrace:")?;
-        fmt::Display::fmt(&backtrace, formatter)?;
-    }
-    Ok(())
-}
-
-#[cfg(feature = "better_backtrace")]
-fn write_better_backtrace(
-    backtrace: &std::backtrace::Backtrace,
-    formatter: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    let printer = color_backtrace::BacktracePrinter::new().add_frame_filter(Box::new(
-        |frames: &mut Vec<&color_backtrace::Frame>| {
-            frames.retain(|frame| {
-                !(frame.is_dependency_code()
-                    || frame.is_post_panic_code()
-                    || frame.is_runtime_init_code())
-            });
-        },
-    ));
-    let Ok(btparse_backtrace) = btparse::deserialize(backtrace) else {
-        write_backtrace(backtrace, formatter)?;
-        return Ok(());
-    };
-    let Ok(backtrace_string) = printer.format_trace_to_string(&btparse_backtrace) else {
-        write_backtrace(backtrace, formatter)?;
-        return Ok(());
-    };
-    fmt::Display::fmt(&backtrace_string, formatter)?;
-    Ok(())
+        location,
+        #[cfg(feature = "backtrace")]
+        backtrace,
+    ).debug(formatter)
 }
 
 impl<Head, Tail> DebugFold for Cons<Head, Tail>

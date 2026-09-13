@@ -20,6 +20,10 @@ mod context;
 mod macros;
 mod str_error;
 mod error_union;
+mod formatting;
+mod root_error;
+#[cfg(feature = "diagnostic")]
+mod diagnostic;
 mod type_set;
 mod union_to_enum;
 #[cfg(feature = "user_context")]

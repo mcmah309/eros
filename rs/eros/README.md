@@ -424,26 +424,65 @@ Only annotated parameters are included in the generated context. Parameters with
 
 ## Logging
 
-Eros provides built-in logging integration via the `logging` feature flag. This enables `log_*` methods on `ErrorUnion` directly, as well as the `LogExt` trait for chaining log calls on `Result`.
+`Display` prints the root error followed by its `Error::source()` chain. `Debug` produces a human-readable report with context, locations, and backtrace information.
+
+| Format | Output | Tracing field |
+| --- | --- | --- |
+| `{}` | Root and sources separated by ` <- ` | `error = %error` |
+| `{:#}` | Root only | `error = %format_args!("{error:#}")` |
+| `{:?}` | Root, sources, contexts, locations, and backtrace | `error = ?error` |
+| `{:#?}` | Same report without locations and backtrace | `error = %format_args!("{error:#?}")` |
+
+The optional `diagnostic` feature adds `.diagnostic_display()` and `.diagnostic_debug()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
 
 ```rust,ignore
-use eros::{LogExt, bail};
+// ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
+// Both expose their boxed `source` through Error::source().
 
-fn eros_result() -> eros::Result<()> {
-    bail!("Something went wrong")
-}
+let error = eros::error!("permission denied")
+    .map_root(|source| ConfigError { source })
+    .context("read /etc/app.toml")
+    .context("start service");
 
-fn main() {
-    // Log directly on ErrorUnion
-    if let Err(e) = eros_result() {
-        e.log_error();
-    }
+tracing::error!(error = %error, "startup failed");
+tracing::error!(error = ?error, "startup failed");
+println!("diagnostic_display: {}", error.diagnostic_display());
+println!("diagnostic_debug: {}", error.diagnostic_debug());
 
-    // Or chain logging on a Result without consuming it
-    let _result = eros_result().log_warn();
-}
+// Wrap again, preserving the full source chain.
+let error = error.map_root(|source| StartupError { source });
+println!("replacement: {error}");
 ```
-The recommended pattern in practice is to use when consuming an error:
+
+With default Eros features, `diagnostic`, `RUST_LIB_BACKTRACE=0`, and a text subscriber configured without timestamps, targets, or ANSI colors, the output is:
+
+```text
+ERROR startup failed error=cannot open configuration <- permission denied
+```
+```text
+ERROR startup failed error=cannot open configuration
+  caused by: permission denied
+
+  Context (innermost first):
+    1. read /etc/app.toml
+    2. start service
+
+Backtrace (disabled):
+```
+```text
+diagnostic_display: {"root":"cannot open configuration","sources":["permission denied"]}
+```
+```text
+diagnostic_debug: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
+```
+```text
+replacement: startup failed <- cannot open configuration <- permission denied
+```
+
+### Logging Helpers
+
+The `logging` feature enables `log_error()` and `log_warn()` on `ErrorUnion`, and the `LogExt` trait for chaining logging on a result:
+
 ```rust,ignore
 use eros::{LogExt, bail};
 
@@ -451,37 +490,28 @@ fn eros_result() -> eros::Result<()> {
     bail!("Something went wrong")
 }
 
-fn old_way() {
-    if let Err(error) = eros_result().context("Context around function") {
-        tracing::error!("{:#?}", error);
-    }
-}
-
-fn recommended_way() {
-    eros_result()
-        .context("Context around function")
-        .log_error()
-        .ok();
-}
-
 fn main() {
-    old_way();
-    recommended_way();
+    tracing_subscriber::fmt().init();
+
+    if let Err(error) = eros_result() {
+        error.log_error();
+    }
+
+    // Log an Err and return the Result unchanged.
+    let _result = eros_result().log_warn();
 }
 ```
 
 ### Feature Flags
 
-The `logging` feature enables the `log*` methods and `LogExt` trait, but does not wire up a backend. Libraries can enable `logging` and let downstream crates decide on a backend.
-
-To use `tracing` as the backend, enable the `tracing` feature. Additionally, control the format of logged messages with `log_display` (uses `Display`) or `log_debug` (uses `Debug`) feature flags. These are backend-facing flags that libraries should not set.
+The `logging` feature enables the helpers without selecting a backend. Enable `tracing` to select the backend and `log_display` for ordinary Display or `log_debug` for ordinary Debug, including locations and backtrace information. Debug takes precedence if both format flags are enabled. Helpers emit events only when a backend and a format flag are enabled.
 
 ```toml
 [dependencies]
 eros = { version = "*", features = ["tracing", "log_debug"] }
 ```
 
-> Libraries should enable only `logging` and leave `tracing`, `log_debug`, and `log_display` for downstream crates to decide.
+Libraries should enable only `logging` and leave `tracing`, `log_debug`, and `log_display` for downstream applications to select. Direct `tracing::error!` calls do not depend on these helper flags.
 
 ## Misc
 
@@ -631,6 +661,79 @@ With this, internal composing of errors can remain precise and ergonomic vs trad
 - `anyhow!` with `error!`
 - `anyhow::Error` with `eros::ErrorUnion`
 - `anyhow::` with `eros::`
+
+`anyhow` and `eros` give context different roles. In `anyhow`, each `.context(...)` call adds an outer layer to the error chain. The latest context becomes the main message, while earlier contexts and the original error remain as causes. As an error travels through its callers, this presents the outermost operation first.
+
+```rust,ignore
+let error = anyhow::anyhow!("TLS certificate has expired")
+    .context("fetch https://updates.example.com/manifest.json")
+    .context("prepare application update to v2.4.0");
+
+println!("{error:?}"); // Debug shows the main message and its causes.
+```
+
+```text
+prepare application update to v2.4.0
+
+Caused by:
+    0: fetch https://updates.example.com/manifest.json
+    1: TLS certificate has expired
+```
+
+`eros` keeps the original error as the main message and presents context separately, in the order it was added. As the error travels up the call stack, context follows stack trace order: nearest the failure first, then outward through its callers:
+
+```rust,ignore
+let error = eros::error!("TLS certificate has expired")
+    .context("fetch https://updates.example.com/manifest.json")
+    .context("prepare application update to v2.4.0");
+
+println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
+```
+
+With the `context` feature enabled (the default):
+
+```text
+TLS certificate has expired
+
+  Context (innermost first):
+    1. fetch https://updates.example.com/manifest.json
+    2. prepare application update to v2.4.0
+```
+
+The headline identifies the problem immediately: an expired certificate. The context then identifies the request and the application operation that encountered it.
+
+Use `map_root` to change the main error while keeping the original failure as its source. The closure receives the old root; return an error that stores it and exposes it through `Error::source()`:
+
+```rust
+use eros::SendSyncError;
+use std::{error::Error, fmt};
+
+#[derive(Debug)]
+struct UpdateError {
+    source: Box<dyn SendSyncError>,
+}
+
+impl fmt::Display for UpdateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Update preparation failed")
+    }
+}
+
+impl Error for UpdateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+
+let error = eros::error!("TLS certificate has expired")
+    .map_root(|source| UpdateError { source });
+
+println!("{error}");
+```
+
+```text
+Update preparation failed <- TLS certificate has expired
+```
 
 ### Exposing Errors To Application Users
 

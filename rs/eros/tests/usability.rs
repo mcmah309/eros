@@ -247,14 +247,14 @@ fn map_inner() {
     let error: ErrorUnion<(IoErrorWrapper,)> = error.map(IoErrorWrapper);
     let message = format!("{:?}", error);
     assert!(
-        !message.contains("Context:"),
+        !message.contains("Context (innermost first):"),
         "Expected no context in message:\n{}",
         message
     );
     let error: ErrorUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e.0)));
     let message = format!("{:?}", error);
     assert!(
-        !message.contains("Context:"),
+        !message.contains("Context (innermost first):"),
         "Expected no context in message:\n{}",
         message
     );
@@ -262,7 +262,7 @@ fn map_inner() {
     let error: ErrorUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e)));
     let message = format!("{:?}", error);
     assert!(
-        !message.contains("Context:"),
+        !message.contains("Context (innermost first):"),
         "Expected no context in message:\n{}",
         message
     );

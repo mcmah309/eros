@@ -12,7 +12,7 @@ fn test() {
     let error = test_function("test", "arg2".to_owned(), 42).unwrap_err();
     let inner_error = error.inner_ref();
     assert_eq!(inner_error.to_string(), "This is the error");
-    assert!(format!("{:?}", error).contains("\t- arg1 is test\n"));
+    assert!(format!("{:?}", error).contains("    1. arg1 is test\n"));
 }
 
 // ── Async free functions ─────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ async fn async_function(value: u32) -> eros::Result<u32> {
 async fn test_async_function_context_is_attached() {
     let error = async_function(99).await.unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "async error");
-    assert!(format!("{:?}", error).contains("\t- async arg is 99\n"));
+    assert!(format!("{:?}", error).contains("    1. async arg is 99\n"));
 }
 
 #[eros_macros::context("fetching {}", url)]
@@ -70,7 +70,7 @@ fn test_shared_ref_context_is_attached() {
     };
     let error = f.fetch("/api").unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "connection refused");
-    assert!(format!("{:?}", error).contains("\t- fetching from http://localhost\n"));
+    assert!(format!("{:?}", error).contains("    1. fetching from http://localhost\n"));
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn test_mut_ref_context_is_attached() {
     let mut c = Counter { count: 95 };
     let error = c.increment(10).unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "overflow");
-    assert!(format!("{:?}", error).contains("\t- increment failed at count 95\n"));
+    assert!(format!("{:?}", error).contains("    1. increment failed at count 95\n"));
 }
 
 #[test]
@@ -158,7 +158,7 @@ fn test_value_receiver_context_is_attached() {
     let w = Wrapper("hello".to_owned());
     let error = w.consume().unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "consumed and failed");
-    assert!(format!("{:?}", error).contains("\t- consuming wrapper\n"));
+    assert!(format!("{:?}", error).contains("    1. consuming wrapper\n"));
 }
 
 #[test]
@@ -192,7 +192,7 @@ async fn test_async_shared_ref_context_is_attached() {
     };
     let error = client.fetch("/v1/items").await.unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "timeout");
-    assert!(format!("{:?}", error).contains("\t- async fetch from api.example.com\n"));
+    assert!(format!("{:?}", error).contains("    1. async fetch from api.example.com\n"));
 }
 
 #[tokio::test]
@@ -227,7 +227,7 @@ async fn test_async_mut_ref_context_is_attached() {
     };
     let error = q.push("c".into()).await.unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "queue full");
-    assert!(format!("{:?}", error).contains("\t- push failed, queue len 2\n"));
+    assert!(format!("{:?}", error).contains("    1. push failed, queue len 2\n"));
 }
 
 #[tokio::test]
@@ -247,7 +247,7 @@ fn no_args_function() -> eros::Result<()> {
 #[test]
 fn test_static_context_string_no_args() {
     let error = no_args_function().unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- no format args at all\n"));
+    assert!(format!("{:?}", error).contains("    1. no format args at all\n"));
 }
 
 #[eros_macros::context("a={} b={} c={}", a, b, c)]
@@ -258,7 +258,7 @@ fn three_arg_function(a: u8, b: u8, c: u8) -> eros::Result<()> {
 #[test]
 fn test_context_with_three_format_args() {
     let error = three_arg_function(1, 2, 3).unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- a=1 b=2 c=3\n"));
+    assert!(format!("{:?}", error).contains("    1. a=1 b=2 c=3\n"));
 }
 
 #[eros_macros::context("debug value is {:?}", value)]
@@ -284,7 +284,7 @@ fn auto_display(#[fmt("{}")] name: &str, ignored: u32) -> eros::Result<()> {
 fn test_auto_display_single_param() {
     let error = auto_display("alice", 0).unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "inner error");
-    assert!(format!("{:?}", error).contains("\t- name: alice\n"));
+    assert!(format!("{:?}", error).contains("    1. name: alice\n"));
 }
 
 // Single #[fmt("{:?}")] param
@@ -411,7 +411,7 @@ fn owned_string_function(string: String) -> eros::Result<()> {
 fn test_owned_string_clone_context_is_attached() {
     let error = owned_string_function("hello".to_owned()).unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "owned error");
-    assert!(format!("{:?}", error).contains("\t- processing hello\n"));
+    assert!(format!("{:?}", error).contains("    1. processing hello\n"));
 }
 
 #[test]
@@ -433,7 +433,7 @@ fn two_owned_params(a: String, b: String) -> eros::Result<()> {
 fn test_two_owned_params_both_cloned() {
     let error = two_owned_params("foo".to_owned(), "bar".to_owned()).unwrap_err();
     let debug = format!("{:?}", error);
-    assert!(debug.contains("\t- a=foo b=bar\n"));
+    assert!(debug.contains("    1. a=foo b=bar\n"));
 }
 
 // Mix of cloned owned and non-clone borrowed — the borrow needs no clone.
@@ -445,7 +445,7 @@ fn mixed_owned_and_borrowed(name: String, id: u32) -> eros::Result<()> {
 #[test]
 fn test_mixed_clone_and_plain_ref() {
     let error = mixed_owned_and_borrowed("alice".to_owned(), 42).unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- name=alice id=42\n"));
+    assert!(format!("{:?}", error).contains("    1. name=alice id=42\n"));
 }
 
 // Same param cloned twice in the format string — only one `let` binding
@@ -458,7 +458,7 @@ fn duplicate_clone_same_param(val: String) -> eros::Result<()> {
 #[test]
 fn test_duplicate_clone_same_param_compiles_and_works() {
     let error = duplicate_clone_same_param("dup".to_owned()).unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- first=dup again=dup\n"));
+    assert!(format!("{:?}", error).contains("    1. first=dup again=dup\n"));
 }
 
 // Async free function with a cloned owned param.
@@ -471,7 +471,7 @@ async fn async_owned_function(payload: String) -> eros::Result<()> {
 async fn test_async_owned_clone_context_is_attached() {
     let error = async_owned_function("data".to_owned()).await.unwrap_err();
     assert_eq!(error.inner_ref().to_string(), "async owned error");
-    assert!(format!("{:?}", error).contains("\t- async processing data\n"));
+    assert!(format!("{:?}", error).contains("    1. async processing data\n"));
 }
 
 #[tokio::test]
@@ -543,7 +543,7 @@ fn test_mut_self_method_clone_context_is_attached() {
         entries: vec!["a".into(), "b".into(), "c".into()],
     };
     let error = j.write("d".to_owned()).unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- writing entry d\n"));
+    assert!(format!("{:?}", error).contains("    1. writing entry d\n"));
 }
 
 #[test]
@@ -571,7 +571,7 @@ async fn test_async_self_method_clone_context_is_attached() {
         name: "w1".to_owned(),
     };
     let error = w.process("task-X".to_owned()).await.unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- worker w1 processing task-X\n"));
+    assert!(format!("{:?}", error).contains("    1. worker w1 processing task-X\n"));
 }
 
 // Custom Clone type — verifies the macro works for any Clone, not just String.
@@ -592,7 +592,7 @@ fn custom_clone_type(id: JobId) -> eros::Result<()> {
 #[test]
 fn test_custom_clone_type_display_in_context() {
     let error = custom_clone_type(JobId(7)).unwrap_err();
-    assert!(format!("{:?}", error).contains("\t- running job#7\n"));
+    assert!(format!("{:?}", error).contains("    1. running job#7\n"));
 }
 
 // Debug format specifier with .clone().

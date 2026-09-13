@@ -309,7 +309,7 @@ where
     E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::display_fold(&self.inner.error as &dyn Any, formatter)?;
+        E::Variants::display_fold(&self.inner.error, formatter)?;
         Ok(())
     }
 }
@@ -410,7 +410,8 @@ where
     E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, formatter)
+        // Native Error reporters traverse source() separately.
+        write!(formatter, "{}", self.0.inner_ref())
     }
 }
 
