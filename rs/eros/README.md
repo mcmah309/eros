@@ -525,7 +525,9 @@ Libraries should enable only `logging` and leave `tracing`, `log_debug`, and `lo
 
 ##### Approach A: Exposing `ErrorUnion` in Public APIs
 
-Exposing `ErrorUnion` in a public API is perfectly fine and usually preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Just make sure to re-export these constructs if exposed.
+Exposing `ErrorUnion` in a public API is perfectly fine and sometimes preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Make sure to re-export these constructs if exposed.
+
+Before choosing this approach ask "Will a downstream care about differentiating between these types?" e.g. exposing a `io::Error` may or may not be useful. In fact, it may be more useful for a downstream to expose a type specific to the crate e.g. `CrateError`. One could then expose an e.g.`ErrorUnion<(CrateError,)>`. But if it is desired to hide `ErrorUnion` altogether, approach B dives deeper into this.
 
 ##### Approach B: Hiding `ErrorUnion` behind Concrete Crate Errors
 
