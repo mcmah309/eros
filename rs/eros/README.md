@@ -479,7 +479,7 @@ diagnostic_debug: {"backtrace":{"status":"disabled","text":null},"contexts":[{"m
 replacement: startup failed <- cannot open configuration <- permission denied
 ```
 
-## Misc
+## Best Practices
 
 ### Use In Libraries
 
@@ -617,9 +617,73 @@ fn main() {
 
 With this, internal composing of errors can remain precise and ergonomic vs traditional enums, as outlined in [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly) section. And downstream users are not exposed to the `ErrorUnion` type and instead see a traditional error enum. Note even if typed tuples are used internally, it is still completely valid to choose to type erase at the boundary with `into_inner`.
 
-### Backtrace vs Location
+### Context Placement: Two Approaches
 
-`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+There are two reasonable philosophies for *where* in the call stack context should be attached. Eros is flexible enough to support either, but it's worth picking one and being consistent within a codebase.
+
+#### Approach 1: Attach Context at the Function
+
+Under this approach, a function attaches context describing itself and its own parameters via `#[context]`. The function "owns" its own description, so every caller gets the same context for free, with no risk of forgetting it or duplicating it slightly differently at each call-site.
+
+```rust
+use eros::{Context, context};
+
+#[context("Failed to do some action. param was {}", param)]
+fn do_some_action(param: &str) -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn func1() -> eros::Result<()> {
+    let param = "xyz";
+    do_some_action(param)
+}
+
+fn func2() -> eros::Result<()> {
+    let param = "abc";
+    do_some_action(param)
+}
+
+fn main() {
+    func1();
+    func2();
+}
+```
+
+**Why:** it removes ambiguity about whose job it is to attach context. If every function attaches context describing its own operation and inputs, nothing needs to be re-derived or duplicated by callers, and nothing is silently dropped because every caller assumed some other layer would handle it.
+
+**Tradeoff:** if a function's parameter is itself just forwarded from its caller (and that caller already attaches it too), the same value can appear in context more than once as the error bubbles up. Note if the `context` feature is disabled `with_context` becomes a no-op, so the cost is avoidable.
+
+#### Approach 2: Attach Context Only at the Boundary Where Information Would Otherwise Be Lost
+
+A function should only attach context that the caller doesn't already have. If a caller already knows the value of `param`, then a callee re-stating `param` in its own context adds no new information, just noise.
+
+Responsibility for attaching a given piece of context passes transitively up the stack to whichever function is the last one that still has access to the information, even if that's several layers above where the error actually originated. In the example below, `func2` attaches nothing — it leaves that to its callers — and the context only gets attached at `func1` and `func1b`, the two places where `param` would otherwise be lost:
+
+```rust
+use eros::Context;
+
+fn do_some_action(param: &str) -> eros::Result<()> {
+    eros::bail!("This is an error")
+}
+
+fn func2(param: &str) -> eros::Result<()> {
+    do_some_action(param)
+}
+
+fn func1() -> eros::Result<()> {
+    let param = "xyz";
+    func2(param).with_context(|| format!("Failed to do some action. param was {}", param))
+}
+
+fn func1b() -> eros::Result<()> {
+    let param = "abc";
+    func2(param).with_context(|| format!("Some action failed with param {}", param))
+}
+```
+
+**Why:** it keeps individual error messages lean, avoids restating the same value at every layer, and sidesteps the classic `connection failed: connection failed: connection failed: no route to host` style of redundant, nested context.
+
+**Tradeoff:** because no single function is locally responsible for attaching a given piece of context, it takes discipline and more time has to be spent at each call-site — you have to ask "would this information otherwise be lost going up the stack from here?" If a function is called from many places, that question has to be answered (and the same context written) at each call-site rather than once at the function's own definition. It's also easy to accidentally end up restating context slightly differently at two call-sites — in the example above, `func1` and `func1b` phrase the same underlying fact as `"Failed to do some action. param was {}"` and `"Some action failed with param {}"` — since nothing enforces a single canonical phrasing the way `#[context]` on the function itself does. It is also easy to get lazy and skip attaching context altogether at a given call-site, silently losing information that would have been captured automatically under Approach 1.
 
 ### Logging
 
@@ -662,54 +726,11 @@ The `.warn(())` call emits:
 WARN Something went wrong
 ```
 
-### Anyhow
+### Backtrace vs Location
 
-`eros` comes with an `anyhow` feature flag. This adds a `ErrorUnion::anyhow` function for converting an `anyhow::Error` to an `ErrorUnion`. This can help integrate with legacy code.
+`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
 
-`eros` can also quickly replace `anyhow` in any crate as simple as replacing all occurrences of:
-- `anyhow!` with `error!`
-- `anyhow::Error` with `eros::ErrorUnion`
-- `anyhow::` with `eros::`
-
-`anyhow` and `eros` give context different roles. In `anyhow`, each `.context(...)` call adds an outer layer to the error chain. The latest context becomes the main message, while earlier contexts and the original error remain as causes. As an error travels through its callers, this presents the outermost operation first.
-
-```rust,ignore
-let error = anyhow::anyhow!("TLS certificate has expired")
-    .context("fetch https://updates.example.com/manifest.json")
-    .context("prepare application update to v2.4.0");
-
-println!("{error:?}"); // Debug shows the main message and its causes.
-```
-
-```text
-prepare application update to v2.4.0
-
-Caused by:
-    0: fetch https://updates.example.com/manifest.json
-    1: TLS certificate has expired
-```
-
-`eros` keeps the original error as the main message and presents context separately, in the order it was added. As the error travels up the call stack, context follows stack trace order: nearest the failure first, then outward through its callers:
-
-```rust,ignore
-let error = eros::error!("TLS certificate has expired")
-    .context("fetch https://updates.example.com/manifest.json")
-    .context("prepare application update to v2.4.0");
-
-println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
-```
-
-With the `context` feature enabled (the default):
-
-```text
-TLS certificate has expired
-
-  Context (innermost first):
-    1. fetch https://updates.example.com/manifest.json
-    2. prepare application update to v2.4.0
-```
-
-The headline identifies the problem immediately: an expired certificate. The context then identifies the request and the application operation that encountered it.
+## Additional Features
 
 ### Adding Source Chains
 
@@ -849,79 +870,62 @@ An internal error occurred.
 
 This approach keeps internal diagnostics while making the user-facing experience explicit. Applications remain free to decide which information is safe to expose, while `ErrorUnion` continues to focus on error composition, tracing, and context propagation.
 
-### Context Placement: Two Approaches
+## Misc
 
-There are two reasonable philosophies for *where* in the call stack context should be attached. Eros is flexible enough to support either, but it's worth picking one and being consistent within a codebase.
+### Anyhow
 
-#### Approach 1: Attach Context at the Function
+`eros` comes with an `anyhow` feature flag. This adds a `ErrorUnion::anyhow` function for converting an `anyhow::Error` to an `ErrorUnion`. This can help integrate with legacy code.
 
-Under this approach, a function attaches context describing itself and its own parameters via `#[context]`. The function "owns" its own description, so every caller gets the same context for free, with no risk of forgetting it or duplicating it slightly differently at each call-site.
+`eros` can also quickly replace `anyhow` in any crate as simple as replacing all occurrences of:
+- `anyhow!` with `error!`
+- `anyhow::Error` with `eros::ErrorUnion`
+- `anyhow::` with `eros::`
 
-```rust
-use eros::{Context, context};
+`anyhow` and `eros` give context different roles. In `anyhow`, each `.context(...)` call adds an outer layer to the error chain. The latest context becomes the main message, while earlier contexts and the original error remain as causes. As an error travels through its callers, this presents the outermost operation first.
 
-#[context("Failed to do some action. param was {}", param)]
-fn do_some_action(param: &str) -> eros::Result<()> {
-    eros::bail!("This is an error")
-}
+```rust,ignore
+let error = anyhow::anyhow!("TLS certificate has expired")
+    .context("fetch https://updates.example.com/manifest.json")
+    .context("prepare application update to v2.4.0");
 
-fn func1() -> eros::Result<()> {
-    let param = "xyz";
-    do_some_action(param)
-}
-
-fn func2() -> eros::Result<()> {
-    let param = "abc";
-    do_some_action(param)
-}
-
-fn main() {
-    func1();
-    func2();
-}
+println!("{error:?}"); // Debug shows the main message and its causes.
 ```
 
-**Why:** it removes ambiguity about whose job it is to attach context. If every function attaches context describing its own operation and inputs, nothing needs to be re-derived or duplicated by callers, and nothing is silently dropped because every caller assumed some other layer would handle it.
+```text
+prepare application update to v2.4.0
 
-**Tradeoff:** if a function's parameter is itself just forwarded from its caller (and that caller already attaches it too), the same value can appear in context more than once as the error bubbles up. Note if the `context` feature is disabled `with_context` becomes a no-op, so the cost is avoidable.
-
-#### Approach 2: Attach Context Only at the Boundary Where Information Would Otherwise Be Lost
-
-A function should only attach context that the caller doesn't already have. If a caller already knows the value of `param`, then a callee re-stating `param` in its own context adds no new information, just noise.
-
-Responsibility for attaching a given piece of context passes transitively up the stack to whichever function is the last one that still has access to the information, even if that's several layers above where the error actually originated. In the example below, `func2` attaches nothing — it leaves that to its callers — and the context only gets attached at `func1` and `func1b`, the two places where `param` would otherwise be lost:
-
-```rust
-use eros::Context;
-
-fn do_some_action(param: &str) -> eros::Result<()> {
-    eros::bail!("This is an error")
-}
-
-fn func2(param: &str) -> eros::Result<()> {
-    do_some_action(param)
-}
-
-fn func1() -> eros::Result<()> {
-    let param = "xyz";
-    func2(param).with_context(|| format!("Failed to do some action. param was {}", param))
-}
-
-fn func1b() -> eros::Result<()> {
-    let param = "abc";
-    func2(param).with_context(|| format!("Some action failed with param {}", param))
-}
+Caused by:
+    0: fetch https://updates.example.com/manifest.json
+    1: TLS certificate has expired
 ```
 
-**Why:** it keeps individual error messages lean, avoids restating the same value at every layer, and sidesteps the classic `connection failed: connection failed: connection failed: no route to host` style of redundant, nested context.
+`eros` keeps the original error as the main message and presents context separately, in the order it was added. As the error travels up the call stack, context follows stack trace order: nearest the failure first, then outward through its callers:
 
-**Tradeoff:** because no single function is locally responsible for attaching a given piece of context, it takes discipline and more time has to be spent at each call-site — you have to ask "would this information otherwise be lost going up the stack from here?" If a function is called from many places, that question has to be answered (and the same context written) at each call-site rather than once at the function's own definition. It's also easy to accidentally end up restating context slightly differently at two call-sites — in the example above, `func1` and `func1b` phrase the same underlying fact as `"Failed to do some action. param was {}"` and `"Some action failed with param {}"` — since nothing enforces a single canonical phrasing the way `#[context]` on the function itself does. It is also easy to get lazy and skip attaching context altogether at a given call-site, silently losing information that would have been captured automatically under Approach 1.
+```rust,ignore
+let error = eros::error!("TLS certificate has expired")
+    .context("fetch https://updates.example.com/manifest.json")
+    .context("prepare application update to v2.4.0");
 
-### Why Traditional Enum Errors Scale Poorly
+println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
+```
+
+With the `context` feature enabled (the default):
+
+```text
+TLS certificate has expired
+
+  Context (innermost first):
+    1. fetch https://updates.example.com/manifest.json
+    2. prepare application update to v2.4.0
+```
+
+The headline identifies the problem immediately: an expired certificate. The context then identifies the request and the application operation that encountered it.
+
+## Why Traditional Enum Errors Scale Poorly
 
 Traditional enum-based error handling breaks down as soon as you compose functions, because each new layer of composition demands its own enum.
 
-#### The Problem
+### The Problem
 
 Suppose three low-level functions each return a precise error enum:
 
@@ -993,7 +997,7 @@ match initialize_system() {
 
 Add a fourth step that returns a `DatabaseError` and the cycle repeats: a new enum, new `From` impls, and every downstream `match` needs updating.
 
-#### Why Crates Give Up
+### Why Crates Give Up
 
 Faced with this growth, most crates abandon precision entirely and adopt one monolithic, crate-wide error enum:
 
@@ -1013,7 +1017,7 @@ pub enum CrateError {
 
 This kills the boilerplate, but it also kills accuracy: every function now claims it can return *any* crate error, even when most are impossible for that particular call path. `parse_config`'s caller has to account for a `NetworkError` that can never actually occur.
 
-#### How `ErrorUnion` Avoids This
+### How `ErrorUnion` Avoids This
 
 `ErrorUnion` sidesteps the dilemma entirely. No new enum is needed to combine errors, so precision and ergonomics stop being a trade-off.
 
