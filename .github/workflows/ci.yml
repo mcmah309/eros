@@ -35,6 +35,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          # trybuild snapshots include standard-library source excerpts.
+          components: rust-src
           override: true
 
       - name: Run tests
