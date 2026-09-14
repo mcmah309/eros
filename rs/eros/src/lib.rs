@@ -13,6 +13,7 @@ extern crate std;
 pub mod __private {
     pub use alloc::{borrow::Cow, boxed::Box, string::String, sync::Arc, vec::Vec};
     pub use alloc::format;
+    pub use eros_macros::format_error;
 }
 
 mod any_error;

@@ -1,0 +1,23 @@
+error: invalid format string: unmatched `}` found
+ --> tests/trybuild/error_macro_rejects_invalid_format.rs:2:29
+  |
+2 |     let _ = eros::error!("{{}");
+  |                             ^ unmatched `}` in format string
+  |
+  = note: if you intended to print `}`, you can escape it using `}}`
+
+error: invalid format string: expected `}` but string was terminated
+ --> tests/trybuild/error_macro_rejects_invalid_format.rs:3:30
+  |
+3 |     let _ = eros::error!("}}{");
+  |                             -^ expected `}` in format string
+  |                             |
+  |                             because of this opening brace
+  |
+  = note: if you intended to print `{`, you can escape it using `{{`
+
+error[E0425]: cannot find value `missing` in this scope
+ --> tests/trybuild/error_macro_rejects_invalid_format.rs:4:28
+  |
+4 |     let _ = eros::error!("{missing}");
+  |                            ^^^^^^^ not found in this scope

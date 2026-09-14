@@ -5,9 +5,81 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
-    Expr, ItemFn, LitStr, Token, parse::ParseStream, parse_macro_input, punctuated::Punctuated,
-    token::Comma,
+    Expr, ItemFn, LitStr, Token, ext::IdentExt, parse::ParseStream, parse_macro_input,
+    punctuated::Punctuated, token::Comma,
 };
+
+struct FormatErrorInput {
+    crate_path: syn::Path,
+    message: Expr,
+}
+
+impl syn::parse::Parse for FormatErrorInput {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let crate_path = input.parse()?;
+        input.parse::<Comma>()?;
+        let message = input.parse()?;
+        Ok(Self {
+            crate_path,
+            message,
+        })
+    }
+}
+
+/// Selects storage for the single-argument arm of `eros::error!` during macro expansion.
+#[doc(hidden)]
+#[proc_macro]
+pub fn format_error(input: TokenStream) -> TokenStream {
+    let FormatErrorInput {
+        crate_path,
+        message,
+    } = parse_macro_input!(input as FormatErrorInput);
+    // Expressions forwarded through macro_rules! can have invisible groups.
+    let mut expr = &message;
+    while let Expr::Group(group) = expr {
+        expr = &group.expr;
+    }
+
+    if let Expr::Path(path) = expr
+        && let Some(segment) = path.path.segments.last()
+    {
+        let name = segment.ident.unraw().to_string();
+        if name.chars().any(char::is_uppercase)
+            && name
+                .chars()
+                .all(|ch| ch.is_uppercase() || ch.is_ascii_digit() || ch == '_')
+        {
+            return quote! { #crate_path::StrError::Static(#message) }.into();
+        }
+    }
+
+    let Expr::Lit(syn::ExprLit {
+        lit: syn::Lit::Str(message),
+        ..
+    }) = expr
+    else {
+        return quote! { #message }.into();
+    };
+    let value = message.value();
+    let mut chars = value.chars();
+    let mut literal = String::with_capacity(value.len());
+
+    while let Some(ch) = chars.next() {
+        if matches!(ch, '{' | '}') && chars.next() != Some(ch) {
+            // Preserve the original literal's span for implicit captures. Let
+            // Rust's formatter parse placeholders and report invalid formats.
+            return quote! {
+                #crate_path::StrError::Owned(#crate_path::__private::format!(#message))
+            }
+            .into();
+        }
+        literal.push(ch);
+    }
+
+    // All braces were escaped pairs; unescape them in the static message.
+    let literal = LitStr::new(&literal, message.span());
+    quote! { #crate_path::StrError::Static(#literal) }.into()
+}
 
 /// Arguments parsed from `#[context("format string", arg1, arg2, ...)]`
 /// or `#[context]` / `#[context()]` (auto-build from `#[fmt("...")]`

@@ -1,0 +1,11 @@
+error[E0597]: `message` does not live long enough
+ --> tests/trybuild/error_macro_requires_static_message.rs:4:17
+  |
+3 |     let message = String::from("borrowed message");
+  |         ------- binding `message` declared here
+4 |     let ERROR = message.as_str();
+  |                 ^^^^^^^ borrowed value does not live long enough
+5 |     let _ = eros::error!(ERROR);
+  |                          ----- this usage requires that `message` is borrowed for `'static`
+6 | }
+  | - `message` dropped here while still borrowed

@@ -50,6 +50,14 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_display(formatted.inner_ref(), "val = 7")?;
     assert_type::<StrError>(formatted.inner_ref(), "owned StrError")?;
 
+    let value = 7u32;
+    let captured = eros::error!("val = {value}");
+    assert_display(captured.inner_ref(), "val = 7")?;
+
+    static ERROR: &str = "static message";
+    let named = eros::error!(ERROR);
+    assert_display(named.inner_ref(), ERROR)?;
+
     let r: eros::Result<()> = bailing_function();
     let union = r.expect_err("bail should error");
     assert_display(union.inner_ref(), "boom from bail")?;
@@ -155,7 +163,8 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 }
 
 fn bailing_function() -> eros::Result<()> {
-    eros::bail!("boom from bail")
+    const BAIL_ERROR: &str = "boom from bail";
+    eros::bail!(BAIL_ERROR)
 }
 
 fn chain_with_question() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> {

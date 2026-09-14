@@ -1,19 +1,33 @@
 #![no_implicit_prelude]
+#![deny(unused_braces)]
 
 extern crate eros as renamed;
 
 fn bailing() -> renamed::Result<()> {
-    renamed::bail!("bail {}", 7)
+    let value = 7;
+    renamed::bail!("bail {value}")
 }
 
 fn ensuring() -> renamed::Result<()> {
-    renamed::ensure!(false, "ensure",);
+    let value = 7;
+    renamed::ensure!(false, "ensure {value}",);
     renamed::Result::Ok(())
 }
 
 fn main() {
+    static ERROR: &str = "static message";
+    let _: renamed::ErrorUnion = renamed::error!(ERROR);
+    const ROOT_ERROR: renamed::StrError = renamed::StrError::Static("error");
+    let _: renamed::ErrorUnion = renamed::error!({ ROOT_ERROR });
+    let _: renamed::Result<()> = (|| renamed::bail!(ERROR))();
+    let _: renamed::Result<()> = (|| {
+        renamed::ensure!(false, ERROR);
+        renamed::Result::Ok(())
+    })();
     let _: renamed::ErrorUnion = renamed::error!("literal");
     let _: renamed::ErrorUnion = renamed::error!("formatted {}", 7);
+    let value = 7;
+    let _: renamed::ErrorUnion = renamed::error!("captured {value}");
     let _: renamed::ErrorUnion = renamed::error!(renamed::StrError::Static("expression"));
     let _ = bailing();
     let _ = ensuring();

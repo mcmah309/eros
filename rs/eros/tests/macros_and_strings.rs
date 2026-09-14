@@ -56,10 +56,20 @@ fn string_errors_support_equality_ordering_and_hashing() {
 
 #[test]
 fn error_macro_supports_literals_formatted_messages_and_error_expressions() {
-    for error in [eros::error!("literal"), eros::error!("literal",)] {
+    for (error, expected) in [
+        (eros::error!("literal"), "literal"),
+        (eros::error!("literal",), "literal"),
+        (eros::error!(""), ""),
+        (eros::error!("{{id}}"), "{id}"),
+        (
+            eros::error!(r#"{{{{"id": "日本語"}}}}"#),
+            "{{\"id\": \"日本語\"}}",
+        ),
+        (eros::error!("\u{7b}\u{7b}id\u{7d}\u{7d}"), "{id}"),
+    ] {
         assert!(matches!(
             error.downcast_inner::<StrError>(),
-            Some(StrError::Static("literal"))
+            Some(StrError::Static(message)) if message == expected
         ));
     }
     let calls = Cell::new(0);
@@ -87,6 +97,106 @@ fn error_macro_supports_literals_formatted_messages_and_error_expressions() {
 }
 
 #[test]
+fn error_macro_uses_static_storage_for_all_caps_names() {
+    static ERROR: &str = "User {id} {{not found}}";
+    const _ERROR_404: &str = "User not found";
+    mod messages {
+        pub static NOT_FOUND: &str = "User not found";
+    }
+    macro_rules! forwarded {
+        ($message:expr) => {
+            eros::error!($message)
+        };
+    }
+
+    for (error, expected) in [
+        (eros::error!(ERROR), ERROR),
+        (eros::error!(ERROR,), ERROR),
+        (eros::error!(r#ERROR), ERROR),
+        (eros::error!(_ERROR_404), _ERROR_404),
+        (eros::error!(messages::NOT_FOUND), messages::NOT_FOUND),
+        (forwarded!(ERROR), ERROR),
+    ] {
+        let message = error.downcast_inner::<StrError>().unwrap();
+        assert!(matches!(message, StrError::Static(_)));
+        assert_eq!(message.as_str(), expected);
+        assert!(std::ptr::eq(message.as_str(), expected));
+    }
+}
+
+#[test]
+fn error_macro_preserves_other_error_expressions() {
+    use std::fmt::Error as FormatError;
+    let error = FormatError;
+    let _123 = FormatError;
+    const ERROR: std::fmt::Error = std::fmt::Error;
+
+    for error in [
+        eros::error!(error),
+        eros::error!(_123),
+        eros::error!(FormatError),
+        eros::error!({ ERROR }),
+    ] {
+        assert!(error.is_inner::<std::fmt::Error>());
+    }
+}
+
+#[test]
+fn bail_and_ensure_support_all_caps_messages() {
+    static ERROR: &str = "User not found";
+    fn bail() -> eros::Result<()> {
+        eros::bail!(ERROR)
+    }
+    fn bail_with_trailing_comma() -> eros::Result<()> {
+        eros::bail!(ERROR,)
+    }
+    fn ensure(ok: bool) -> eros::Result<()> {
+        eros::ensure!(ok, ERROR);
+        Ok(())
+    }
+    fn ensure_with_trailing_comma(ok: bool) -> eros::Result<()> {
+        eros::ensure!(ok, ERROR,);
+        Ok(())
+    }
+
+    ensure(true).unwrap();
+    ensure_with_trailing_comma(true).unwrap();
+    for error in [
+        bail().unwrap_err(),
+        bail_with_trailing_comma().unwrap_err(),
+        ensure(false).unwrap_err(),
+        ensure_with_trailing_comma(false).unwrap_err(),
+    ] {
+        assert!(matches!(
+            error.downcast_inner::<StrError>(),
+            Some(StrError::Static(message)) if message == ERROR
+        ));
+    }
+}
+
+#[test]
+fn error_macro_formats_captured_arguments_and_escaped_braces() {
+    let id = 7;
+    for error in [
+        eros::error!("User with id {id} not found"),
+        eros::error!("User with id {id} not found",),
+    ] {
+        assert_eq!(error.to_string(), "User with id 7 not found");
+        assert!(matches!(
+            error.downcast_inner::<StrError>(),
+            Some(StrError::Owned(_))
+        ));
+    }
+
+    let width = 4;
+    let name = "item";
+    assert_eq!(
+        eros::error!(r#"{name:?}: {id:0width$} {{missing}}"#).to_string(),
+        "\"item\": 0007 {missing}"
+    );
+}
+
+#[test]
 fn bail_macro_returns_early_for_each_message_form() {
     fn literal() -> eros::Result<()> {
         eros::bail!("literal",)
@@ -94,12 +204,53 @@ fn bail_macro_returns_early_for_each_message_form() {
     fn formatted(value: u8) -> eros::Result<()> {
         eros::bail!("value {}", value,)
     }
+    fn captured(value: u8) -> eros::Result<()> {
+        eros::bail!("value {value}")
+    }
+    fn captured_with_trailing_comma(value: u8) -> eros::Result<()> {
+        eros::bail!("value {value}",)
+    }
     fn expression() -> eros::Result<()> {
         eros::bail!(std::fmt::Error,)
     }
     assert_eq!(literal().unwrap_err().to_string(), "literal");
     assert_eq!(formatted(7).unwrap_err().to_string(), "value 7");
+    assert_eq!(captured(7).unwrap_err().to_string(), "value 7");
+    assert_eq!(
+        captured_with_trailing_comma(7).unwrap_err().to_string(),
+        "value 7"
+    );
     assert!(expression().unwrap_err().is_inner::<std::fmt::Error>());
+}
+
+#[test]
+fn ensure_formats_captured_arguments_only_on_failure() {
+    struct Value<'a>(&'a Cell<u8>);
+
+    impl std::fmt::Display for Value<'_> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            self.0.set(self.0.get() + 1);
+            f.write_str("7")
+        }
+    }
+
+    fn check(ok: bool, value: &Value<'_>) -> eros::Result<()> {
+        eros::ensure!(ok, "value {value}");
+        Ok(())
+    }
+    fn check_with_trailing_comma(ok: bool, value: &Value<'_>) -> eros::Result<()> {
+        eros::ensure!(ok, "value {value}",);
+        Ok(())
+    }
+
+    for check in [check, check_with_trailing_comma] {
+        let formats = Cell::new(0);
+        let value = Value(&formats);
+        check(true, &value).unwrap();
+        assert_eq!(formats.get(), 0);
+        assert_eq!(check(false, &value).unwrap_err().to_string(), "value 7");
+        assert_eq!(formats.get(), 1);
+    }
 }
 
 #[test]
