@@ -332,19 +332,18 @@ For some functions, one may want to attach the same context to every error that 
 ```rust
 use eros::Context;
 
-fn result1() -> eros::Result<()> {
-    eros::bail!("This is an error")
-}
-
-fn context_on_each_call(param: &str) -> eros::Result<()> {
-    result1().with_context(|| format!("param was {}", param))?;
-    result1().with_context(|| format!("param was {}", param))?;
-    result1().with_context(|| format!("param was {}", param))?;
-    Ok(())
+fn load_port(path: &str) -> eros::Result<u16> {
+    let contents = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to load server port from {}", path))?;
+    let port = contents.trim().parse::<u16>()
+        .with_context(|| format!("Failed to load server port from {}", path))?;
+    Ok(port)
 }
 
 fn main() {
-    context_on_each_call("value");
+    if let Err(error) = load_port("config/port.txt") {
+        println!("{error:#?}");
+    }
 }
 ```
 
@@ -353,24 +352,21 @@ To help with this, `eros` provides the `context` attribute macro. The macro wrap
 ```rust
 use eros::{Context, context};
 
-fn result() -> eros::Result<()> {
-    eros::bail!("This is an error")
-}
-
-#[context("param was {}", param)]
-fn context_added_once(param: &str) -> eros::Result<()> {
-    result()?;
-    result()?;
-    result()?;
-    Ok(())
+#[context("Failed to load server port from {}", path)]
+fn load_port(path: &str) -> eros::Result<u16> {
+    let contents = std::fs::read_to_string(path)?;
+    let port = contents.trim().parse::<u16>()?;
+    Ok(port)
 }
 
 fn main() {
-    context_added_once("value");
+    if let Err(error) = load_port("config/port.txt") {
+        println!("{error:#?}");
+    }
 }
 ```
 
-This behaves as though each `?` in the function had been followed by the same `.with_context(...)` call, while keeping the function body focused on the actual logic.
+Whether reading the file or parsing its contents fails, the error includes `Failed to load server port from config/port.txt` alongside the original I/O or parse error. The macro attaches this context once, while keeping the function body focused on the actual logic.
 
 ### Automatic Context from Parameters
 
