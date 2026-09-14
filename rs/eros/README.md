@@ -97,7 +97,7 @@ fn port_or_default(path: &str) -> Result<u16, ParseIntError> {
         Err(result) => {
             // let _: eros::Result<(), (ParseIntError,)> = result;
             // Only ParseIntError remains, so we *can* unwrap the single-type union.
-            result.map_err(|error| error.into_single()),
+            result.map_err(|error| error.into_single())
         }
     }
 }
