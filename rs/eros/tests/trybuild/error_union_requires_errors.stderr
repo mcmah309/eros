@@ -1,0 +1,125 @@
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+ --> tests/trybuild/error_union_requires_errors.rs:3:21
+  |
+3 | fn single(_: Option<ErrorUnion<(u16,)>>) {}
+  |                     ^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(u16,)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+ --> src/error_union.rs
+  |
+  | pub struct ErrorUnion<E: TypeSet = AnyError> {
+  |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+ --> tests/trybuild/error_union_requires_errors.rs:5:30
+  |
+5 | fn non_error_first(_: Option<ErrorUnion<(u16, std::io::Error)>>) {}
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(u16, std::io::Error)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+ --> src/error_union.rs
+  |
+  | pub struct ErrorUnion<E: TypeSet = AnyError> {
+  |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+ --> tests/trybuild/error_union_requires_errors.rs:7:29
+  |
+7 | fn non_error_last(_: Option<ErrorUnion<(std::io::Error, u16)>>) {}
+  |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(std::io::Error, u16)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+ --> src/error_union.rs
+  |
+  | pub struct ErrorUnion<E: TypeSet = AnyError> {
+  |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+ --> tests/trybuild/error_union_requires_errors.rs:9:27
+  |
+9 | fn result_alias(_: Option<eros::Result<(), (std::io::Error, u16)>>) {}
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(std::io::Error, u16)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+ --> src/error_union.rs
+  |
+  | pub struct ErrorUnion<E: TypeSet = AnyError> {
+  |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+  --> tests/trybuild/error_union_requires_errors.rs:15:9
+   |
+15 | /         ErrorUnion<(
+16 | |             E,
+17 | |             E,
+18 | |             E,
+...  |
+41 | |             u16,
+42 | |         )>,
+   | |__________^ the trait `std::error::Error` is not implemented for `u16`
+   |
+   = help: the following other types implement trait `TypeSet`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `u16` to implement `SendSyncError`
+   = note: required for `(std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, std::fmt::Error, u16)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^ required by this bound in `ErrorUnion`

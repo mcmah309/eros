@@ -229,6 +229,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// one value out of several specific possibilities,
 /// defined by using a tuple of those possible variants
 /// as the generic parameter for the `ErrorUnion`.
+/// Every tuple member must implement [`SendSyncError`].
 ///
 /// For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either
 /// a `io::Error` or a `fmt::Error`. The benefit of this over creating
@@ -253,7 +254,7 @@ pub struct ErrorUnion<E: TypeSet = AnyError> {
 
 impl<T> Deref for ErrorUnion<(T,)>
 where
-    T: 'static,
+    T: SendSyncError,
 {
     type Target = T;
 
@@ -675,19 +676,19 @@ where
     }
 }
 
-impl<A: 'static> AsRef<A> for ErrorUnion<(A,)> {
+impl<A: SendSyncError> AsRef<A> for ErrorUnion<(A,)> {
     fn as_ref(&self) -> &A {
         self.inner.downcast_error_ref().unwrap()
     }
 }
 
-impl<A: 'static> AsMut<A> for ErrorUnion<(A,)> {
+impl<A: SendSyncError> AsMut<A> for ErrorUnion<(A,)> {
     fn as_mut(&mut self) -> &mut A {
         self.inner.downcast_error_mut().unwrap()
     }
 }
 
-impl<A: 'static> ErrorUnion<(A,)> {
+impl<A: SendSyncError> ErrorUnion<(A,)> {
     /// Convert the inner type of an `ErrorUnion` with a single possible type to that type.
     ///
     /// Use `as_ref` or `as_mut` if you want to borrow the inner type instead of consuming the `ErrorUnion`.

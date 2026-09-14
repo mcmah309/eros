@@ -1,0 +1,11 @@
+error[E0477]: the type `BorrowedError<'a>` does not fulfill the required lifetime
+  --> tests/trybuild/error_union_requires_static.rs:16:12
+   |
+16 |     error: Option<ErrorUnion<(std::io::Error, BorrowedError<'a>)>>,
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: type must satisfy the static lifetime as required by this binding
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^

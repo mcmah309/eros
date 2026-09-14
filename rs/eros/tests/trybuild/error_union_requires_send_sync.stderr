@@ -1,0 +1,90 @@
+error[E0277]: `Rc<()>` cannot be sent between threads safely
+  --> tests/trybuild/error_union_requires_send_sync.rs:26:28
+   |
+26 | fn not_send_sync(_: Option<ErrorUnion<(std::io::Error, NotSendSync)>>) {}
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Rc<()>` cannot be sent between threads safely
+   |
+   = help: within `NotSendSync`, the trait `Send` is not implemented for `Rc<()>`
+   = help: the following other types implement trait `TypeSet`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required because it appears within the type `NotSendSync`
+  --> tests/trybuild/error_union_requires_send_sync.rs:5:8
+   |
+ 5 | struct NotSendSync(Rc<()>);
+   |        ^^^^^^^^^^^
+   = note: required for `NotSendSync` to implement `SendSyncError`
+   = note: required for `(std::io::Error, NotSendSync)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: `Rc<()>` cannot be shared between threads safely
+  --> tests/trybuild/error_union_requires_send_sync.rs:26:28
+   |
+26 | fn not_send_sync(_: Option<ErrorUnion<(std::io::Error, NotSendSync)>>) {}
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Rc<()>` cannot be shared between threads safely
+   |
+   = help: within `NotSendSync`, the trait `Sync` is not implemented for `Rc<()>`
+   = help: the following other types implement trait `TypeSet`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required because it appears within the type `NotSendSync`
+  --> tests/trybuild/error_union_requires_send_sync.rs:5:8
+   |
+ 5 | struct NotSendSync(Rc<()>);
+   |        ^^^^^^^^^^^
+   = note: required for `NotSendSync` to implement `SendSyncError`
+   = note: required for `(std::io::Error, NotSendSync)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: `Cell<()>` cannot be shared between threads safely
+  --> tests/trybuild/error_union_requires_send_sync.rs:28:23
+   |
+28 | fn not_sync(_: Option<ErrorUnion<(std::io::Error, NotSync)>>) {}
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Cell<()>` cannot be shared between threads safely
+   |
+   = help: within `NotSync`, the trait `Sync` is not implemented for `Cell<()>`
+   = note: if you want to do aliasing and mutation between multiple threads, use `std::sync::RwLock`
+   = help: the following other types implement trait `TypeSet`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required because it appears within the type `NotSync`
+  --> tests/trybuild/error_union_requires_send_sync.rs:16:8
+   |
+16 | struct NotSync(Cell<()>);
+   |        ^^^^^^^
+   = note: required for `NotSync` to implement `SendSyncError`
+   = note: required for `(std::io::Error, NotSync)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^ required by this bound in `ErrorUnion`

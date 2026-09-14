@@ -1,0 +1,133 @@
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+ --> tests/trybuild/error_union_cannot_add_non_error.rs:4:12
+  |
+4 |     let _: ErrorUnion<(u16, std::io::Error)> = ErrorUnion::new(std::io::Error::other("error"));
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(u16, std::io::Error)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+ --> src/error_union.rs
+  |
+  | pub struct ErrorUnion<E: TypeSet = AnyError> {
+  |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: the trait bound `u16: std::error::Error` is not satisfied
+ --> tests/trybuild/error_union_cannot_add_non_error.rs:4:48
+  |
+4 |     let _: ErrorUnion<(u16, std::io::Error)> = ErrorUnion::new(std::io::Error::other("error"));
+  |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(u16, std::io::Error)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion::new`
+ --> src/error_union.rs
+  |
+  |     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
+  |            --- required by a bound in this associated function
+...
+  |         OutSet: TypeSet,
+  |                 ^^^^^^^ required by this bound in `ErrorUnion::new`
+
+error[E0277]: the trait bound `u16: SendSyncError` is not satisfied
+ --> tests/trybuild/error_union_cannot_add_non_error.rs:7:13
+  |
+7 |     let _ = error.widen::<(std::io::Error, u16), _>();
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `TypeSet`:
+            ()
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+          and $N others
+  = note: required for `u16` to implement `SendSyncError`
+  = note: required for `(std::io::Error, u16)` to implement `TypeSet`
+
+error[E0277]: the trait bound `eros::Cons<std::io::Error, eros::Cons<u16, eros::End>>: eros::type_set::SupersetOf<eros::Cons<std::io::Error, eros::End>, eros::Cons<_, _>>` is not satisfied
+ --> tests/trybuild/error_union_cannot_add_non_error.rs:7:19
+  |
+7 |     let _ = error.widen::<(std::io::Error, u16), _>();
+  |                   ^^^^^ the trait `eros::type_set::Narrow<std::io::Error, _>` is not implemented for `eros::Cons<std::io::Error, eros::Cons<u16, eros::End>>`
+  |
+help: the following other types implement trait `eros::type_set::Narrow<Target, Index>`
+ --> src/type_set.rs
+  |
+  | / impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
+  | | where
+  | |     Tail: TupleForm,
+  | |     Cons<Target, Tail>: TupleForm,
+  | |__________________________________^ `eros::Cons<Target, Tail>` implements `eros::type_set::Narrow<Target, eros::End>`
+...
+  | / impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
+  | | where
+  | |     Tail: Narrow<Target, Index>,
+  | |     Tail: TupleForm,
+  | |     Cons<Head, Tail>: TupleForm,
+  | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
+  | |______________________________________________________________________^ `eros::Cons<Head, Tail>` implements `eros::type_set::Narrow<Target, eros::Recurse<Index>>`
+  = note: required for `eros::Cons<std::io::Error, eros::Cons<u16, eros::End>>` to implement `eros::type_set::SupersetOf<eros::Cons<std::io::Error, eros::End>, eros::Cons<_, _>>`
+note: required by a bound in `ErrorUnion::<E>::widen`
+ --> src/error_union.rs
+  |
+  |     pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
+  |            ----- required by a bound in this associated function
+...
+  |         Other::Variants: SupersetOf<E::Variants, Index>,
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::widen`
+
+error[E0277]: the trait bound `eros::Cons<std::io::Error, eros::Cons<u16, eros::End>>: eros::type_set::SupersetOf<eros::Cons<std::io::Error, eros::End>, eros::Cons<_, _>>` is not satisfied
+  --> tests/trybuild/error_union_cannot_add_non_error.rs:13:28
+   |
+13 |     let _ = result.widen::<(std::io::Error, u16), _>();
+   |                            ^^^^^^^^^^^^^^^^^^^^^ the trait `eros::type_set::Narrow<std::io::Error, _>` is not implemented for `eros::Cons<std::io::Error, eros::Cons<u16, eros::End>>`
+   |
+help: the following other types implement trait `eros::type_set::Narrow<Target, Index>`
+  --> src/type_set.rs
+   |
+   | / impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
+   | | where
+   | |     Tail: TupleForm,
+   | |     Cons<Target, Tail>: TupleForm,
+   | |__________________________________^ `eros::Cons<Target, Tail>` implements `eros::type_set::Narrow<Target, eros::End>`
+...
+   | / impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
+   | | where
+   | |     Tail: Narrow<Target, Index>,
+   | |     Tail: TupleForm,
+   | |     Cons<Head, Tail>: TupleForm,
+   | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
+   | |______________________________________________________________________^ `eros::Cons<Head, Tail>` implements `eros::type_set::Narrow<Target, eros::Recurse<Index>>`
+   = note: required for `eros::Cons<std::io::Error, eros::Cons<u16, eros::End>>` to implement `eros::type_set::SupersetOf<eros::Cons<std::io::Error, eros::End>, eros::Cons<_, _>>`
+note: required by a bound in `widen`
+  --> src/error_union.rs
+   |
+   |     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+   |        ----- required by a bound in this associated function
+...
+   |         Other::Variants: SupersetOf<E::Variants, Index>;
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::widen`

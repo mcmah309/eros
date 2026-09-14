@@ -227,6 +227,10 @@ where
 
 /* ------------------------- TypeSet implemented for tuples ----------------------- */
 
+/// A set of possible errors for an [`crate::ErrorUnion`].
+///
+/// Implemented for tuples whose members all implement [`SendSyncError`],
+/// the empty tuple `()`, and [`AnyError`].
 #[rustfmt::skip]
 pub trait TypeSet {
     type Variants: TupleForm;
@@ -256,7 +260,7 @@ impl TypeSet for () {
 }
 
 #[rustfmt::skip]
-impl<A> TypeSet for (A,) {
+impl<A: SendSyncError> TypeSet for (A,) {
     type Variants = Cons<A, End>;
     type Enum = E1<A>;
     type RefEnum<'a> = E1<&'a A> where Self: 'a;
@@ -264,7 +268,7 @@ impl<A> TypeSet for (A,) {
 }
 
 #[rustfmt::skip]
-impl<A, B> TypeSet for (A, B) {
+impl<A: SendSyncError, B: SendSyncError> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
     type Enum = E2<A, B>;
     type RefEnum<'a> = E2<&'a A, &'a B> where Self: 'a;
@@ -272,7 +276,7 @@ impl<A, B> TypeSet for (A, B) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C> TypeSet for (A, B, C) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError> TypeSet for (A, B, C) {
     type Variants = Cons<A, Cons<B, Cons<C, End>>>;
     type Enum = E3<A, B, C>;
     type RefEnum<'a> = E3<&'a A, &'a B, &'a C> where Self: 'a;
@@ -280,7 +284,7 @@ impl<A, B, C> TypeSet for (A, B, C) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D> TypeSet for (A, B, C, D) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
     type Enum = E4<A, B, C, D>;
     type RefEnum<'a> = E4<&'a A, &'a B, &'a C, &'a D> where Self: 'a;
@@ -288,7 +292,7 @@ impl<A, B, C, D> TypeSet for (A, B, C, D) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError> TypeSet for (A, B, C, D, E) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>;
     type Enum = E5<A, B, C, D, E>;
     type RefEnum<'a> = E5<&'a A, &'a B, &'a C, &'a D, &'a E> where Self: 'a;
@@ -296,7 +300,7 @@ impl<A, B, C, D, E> TypeSet for (A, B, C, D, E) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
     type Enum = E6<A, B, C, D, E, F>;
     type RefEnum<'a> = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F> where Self: 'a;
@@ -304,7 +308,7 @@ impl<A, B, C, D, E, F> TypeSet for (A, B, C, D, E, F) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError> TypeSet for (A, B, C, D, E, F, G) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>;
     type Enum = E7<A, B, C, D, E, F, G>;
     type RefEnum<'a> = E7<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G> where Self: 'a;
@@ -312,7 +316,7 @@ impl<A, B, C, D, E, F, G> TypeSet for (A, B, C, D, E, F, G) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
     type Enum = E8<A, B, C, D, E, F, G, H>;
     type RefEnum<'a> = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H> where Self: 'a;
@@ -320,7 +324,7 @@ impl<A, B, C, D, E, F, G, H> TypeSet for (A, B, C, D, E, F, G, H) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>;
     type Enum = E9<A, B, C, D, E, F, G, H, I>;
     type RefEnum<'a> = E9<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I> where Self: 'a;
@@ -328,7 +332,7 @@ impl<A, B, C, D, E, F, G, H, I> TypeSet for (A, B, C, D, E, F, G, H, I) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J> TypeSet for (A, B, C, D, E, F, G, H, I, J) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, End>>>>>>>>>>;
     type Enum = E10<A, B, C, D, E, F, G, H, I, J>;
     type RefEnum<'a> = E10<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J> where Self: 'a;
@@ -336,7 +340,7 @@ impl<A, B, C, D, E, F, G, H, I, J> TypeSet for (A, B, C, D, E, F, G, H, I, J) {
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K> TypeSet for (A, B, C, D, E, F, G, H, I, J, K) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, End>>>>>>>>>>>;
     type Enum = E11<A, B, C, D, E, F, G, H, I, J, K>;
     type RefEnum<'a> = E11<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K> where Self: 'a;
@@ -344,7 +348,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K> TypeSet for (A, B, C, D, E, F, G, H, I, J,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, End>>>>>>>>>>>>;
     type Enum = E12<A, B, C, D, E, F, G, H, I, J, K, L>;
     type RefEnum<'a> = E12<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L> where Self: 'a;
@@ -352,7 +356,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L> TypeSet for (A, B, C, D, E, F, G, H, I,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, End>>>>>>>>>>>>>;
     type Enum = E13<A, B, C, D, E, F, G, H, I, J, K, L, M>;
     type RefEnum<'a> = E13<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M> where Self: 'a;
@@ -360,7 +364,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M> TypeSet for (A, B, C, D, E, F, G, H,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, End>>>>>>>>>>>>>>;
     type Enum = E14<A, B, C, D, E, F, G, H, I, J, K, L, M, N>;
     type RefEnum<'a> = E14<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N> where Self: 'a;
@@ -368,7 +372,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N> TypeSet for (A, B, C, D, E, F, G,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, End>>>>>>>>>>>>>>>;
     type Enum = E15<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>;
     type RefEnum<'a> = E15<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O> where Self: 'a;
@@ -376,7 +380,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> TypeSet for (A, B, C, D, E, F,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, End>>>>>>>>>>>>>>>>;
     type Enum = E16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>;
     type RefEnum<'a> = E16<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P> where Self: 'a;
@@ -384,7 +388,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> TypeSet for (A, B, C, D, E,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, End>>>>>>>>>>>>>>>>>;
     type Enum = E17<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>;
     type RefEnum<'a> = E17<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q> where Self: 'a;
@@ -392,7 +396,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> TypeSet for (A, B, C, D,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, End>>>>>>>>>>>>>>>>>>;
     type Enum = E18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>;
     type RefEnum<'a> = E18<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R> where Self: 'a;
@@ -400,7 +404,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> TypeSet for (A, B, C,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, End>>>>>>>>>>>>>>>>>>>;
     type Enum = E19<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S>;
     type RefEnum<'a> = E19<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S> where Self: 'a;
@@ -408,7 +412,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> TypeSet for (A, B,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, End>>>>>>>>>>>>>>>>>>>>;
     type Enum = E20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>;
     type RefEnum<'a> = E20<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T> where Self: 'a;
@@ -416,7 +420,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> TypeSet for (A,
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, End>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E21<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>;
     type RefEnum<'a> = E21<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U> where Self: 'a;
@@ -424,7 +428,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> TypeSet for 
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, End>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>;
     type RefEnum<'a> = E22<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V> where Self: 'a;
@@ -432,7 +436,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> TypeSet f
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, End>>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E23<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W>;
     type RefEnum<'a> = E23<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W> where Self: 'a;
@@ -440,7 +444,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> TypeSe
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, End>>>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E24<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>;
     type RefEnum<'a> = E24<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X> where Self: 'a;
@@ -448,7 +452,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> Typ
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, End>>>>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E25<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y>;
     type RefEnum<'a> = E25<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X, &'a Y> where Self: 'a;
@@ -456,7 +460,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> 
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z) {
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError, Z: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, Cons<Z, End>>>>>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E26<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z>;
     type RefEnum<'a> = E26<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X, &'a Y, &'a Z> where Self: 'a;
@@ -474,70 +478,70 @@ impl TupleForm for End {
 }
 
 #[rustfmt::skip]
-impl<A> TupleForm
+impl<A: SendSyncError> TupleForm
     for Cons<A, End>
 {
     type Tuple = (A,);
 }
 
 #[rustfmt::skip]
-impl<A, B> TupleForm
+impl<A: SendSyncError, B: SendSyncError> TupleForm
     for Cons<A, Cons<B, End>>
 {
     type Tuple = (A, B);
 }
 
 #[rustfmt::skip]
-impl<A, B, C> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, End>>>
 {
     type Tuple = (A, B, C);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, End>>>>
 {
     type Tuple = (A, B, C, D);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, End>>>>>
 {
     type Tuple = (A, B, C, D, E);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>
 {
     type Tuple = (A, B, C, D, E, F);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, End>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G, H);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError> TupleForm
     for Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, End>>>>>>>>>
 {
     type Tuple = (A, B, C, D, E, F, G, H, I);
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, End>>>>>>>>>>
 {
@@ -545,7 +549,7 @@ impl<A, B, C, D, E, F, G, H, I, J> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, End>>>>>>>>>>>
 {
@@ -553,7 +557,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, End>>>>>>>>>>>>
 {
@@ -561,7 +565,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, End>>>>>>>>>>>>>
 {
@@ -569,7 +573,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, End>>>>>>>>>>>>>>
 {
@@ -577,7 +581,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, End>>>>>>>>>>>>>>>
 {
@@ -585,7 +589,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, End>>>>>>>>>>>>>>>>
 {
@@ -593,7 +597,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, End>>>>>>>>>>>>>>>>>
 {
@@ -601,7 +605,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, End>>>>>>>>>>>>>>>>>>
 {
@@ -609,7 +613,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, End>>>>>>>>>>>>>>>>>>>
 {
@@ -617,7 +621,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, End>>>>>>>>>>>>>>>>>>>>
 {
@@ -625,7 +629,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, End>>>>>>>>>>>>>>>>>>>>>
 {
@@ -633,7 +637,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, End>>>>>>>>>>>>>>>>>>>>>>
 {
@@ -641,7 +645,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> TupleForm
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, End>>>>>>>>>>>>>>>>>>>>>>>
 {
@@ -649,7 +653,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> TupleF
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, End>>>>>>>>>>>>>>>>>>>>>>>>
 {
@@ -657,7 +661,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> Tup
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, End>>>>>>>>>>>>>>>>>>>>>>>>>
 {
@@ -665,7 +669,7 @@ impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> 
 }
 
 #[rustfmt::skip]
-impl<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> TupleForm
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError, Z: SendSyncError> TupleForm
     for
     Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, Cons<Z, End>>>>>>>>>>>>>>>>>>>>>>>>>>
 {
@@ -808,17 +812,17 @@ where
 }
 
 fn _narrow_test() {
-    use alloc::string::String;
+    use core::{fmt::Error, num::ParseIntError};
     fn can_narrow<Types, Target, Remainder, Index>()
     where
         Types: Narrow<Target, Index, Remainder = Remainder>,
     {
     }
 
-    type T0 = <(u32, String) as TypeSet>::Variants;
+    type T0 = <(Error, ParseIntError) as TypeSet>::Variants;
 
-    can_narrow::<T0, u32, _, _>();
-    can_narrow::<T0, String, Cons<u32, End>, _>();
+    can_narrow::<T0, Error, _, _>();
+    can_narrow::<T0, ParseIntError, Cons<Error, End>, _>();
 }
 
 /* ------------------------- SupersetOf ----------------------- */
@@ -854,18 +858,31 @@ impl SupersetOf<AnyError, End> for AnyError {
 }
 
 fn _superset_test() {
-    use alloc::{string::String, vec::Vec};
+    use core::{
+        cell::{BorrowError, BorrowMutError},
+        fmt::Error,
+        num::{ParseFloatError, ParseIntError, TryFromIntError},
+        str::Utf8Error,
+    };
     fn is_superset<S1, S2, Remainder, Index>()
     where
         S1: SupersetOf<S2, Index, Remainder = Remainder>,
     {
     }
 
-    type T0 = <(u32,) as TypeSet>::Variants;
-    type T1A = <(u32, String) as TypeSet>::Variants;
-    type T1B = <(String, u32) as TypeSet>::Variants;
-    type T2 = <(String, i32, u32) as TypeSet>::Variants;
-    type T3 = <(Vec<u8>, Vec<i8>, u32, f32, String, f64, i32) as TypeSet>::Variants;
+    type T0 = <(Error,) as TypeSet>::Variants;
+    type T1A = <(Error, ParseIntError) as TypeSet>::Variants;
+    type T1B = <(ParseIntError, Error) as TypeSet>::Variants;
+    type T2 = <(ParseIntError, ParseFloatError, Error) as TypeSet>::Variants;
+    type T3 = <(
+        BorrowError,
+        BorrowMutError,
+        Error,
+        TryFromIntError,
+        ParseIntError,
+        Utf8Error,
+        ParseFloatError,
+    ) as TypeSet>::Variants;
 
     is_superset::<T0, T0, _, _>();
     is_superset::<T1A, T1A, _, _>();
@@ -874,17 +891,29 @@ fn _superset_test() {
     is_superset::<T2, T2, _, _>();
     is_superset::<T1A, T0, _, _>();
     is_superset::<T1B, T0, _, _>();
-    is_superset::<T2, T0, <(String, i32) as TypeSet>::Variants, _>();
-    is_superset::<T2, T1A, <(i32,) as TypeSet>::Variants, _>();
-    is_superset::<T2, T1B, <(i32,) as TypeSet>::Variants, _>();
-    is_superset::<T3, T1A, <(Vec<u8>, Vec<i8>, f32, f64, i32) as TypeSet>::Variants, _>();
+    is_superset::<T2, T0, <(ParseIntError, ParseFloatError) as TypeSet>::Variants, _>();
+    is_superset::<T2, T1A, <(ParseFloatError,) as TypeSet>::Variants, _>();
+    is_superset::<T2, T1B, <(ParseFloatError,) as TypeSet>::Variants, _>();
+    is_superset::<
+        T3,
+        T1A,
+        <(
+            BorrowError,
+            BorrowMutError,
+            TryFromIntError,
+            Utf8Error,
+            ParseFloatError,
+        ) as TypeSet>::Variants,
+        _,
+    >();
     is_superset::<T3, T1B, _, _>();
     is_superset::<T3, T0, _, _>();
     is_superset::<T3, T2, _, _>();
 
-    type T5sup = <(u8, u16, u32, u64, u128) as TypeSet>::Variants;
-    type T5sub = <(u8, u128) as TypeSet>::Variants;
-    type T5rem = <(u16, u32, u64) as TypeSet>::Variants;
+    type T5sup =
+        <(BorrowError, BorrowMutError, Error, Utf8Error, ParseIntError) as TypeSet>::Variants;
+    type T5sub = <(BorrowError, ParseIntError) as TypeSet>::Variants;
+    type T5rem = <(BorrowMutError, Error, Utf8Error) as TypeSet>::Variants;
 
     is_superset::<T5sup, T5sub, T5rem, _>();
 }
