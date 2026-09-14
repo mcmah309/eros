@@ -182,7 +182,7 @@ Backtrace (captured):
 ```
 #### Better Backtrace
 
-Enable `better_backtrace` for a more readable backtrace (shortened here):
+Enable `better_backtrace` for a more concise and readable backtrace (shortened here):
 ```console
 invalid digit found in string
 
