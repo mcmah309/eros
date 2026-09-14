@@ -25,29 +25,25 @@ Error types only matter when the caller cares about the type, otherwise this jus
 use eros::bail;
 
 // Error type is untracked
-fn eros_result() -> eros::Result<()> {
-    // `bail!` creates an ad hoc untyped error. Later one can get the underlying error if wanted.
-    bail!("Something went wrong")
+fn validate_port(port: u16) -> eros::Result<()> {
+    if port == 0 {
+        bail!("Server port must be nonzero");
+    }
+    Ok(())
 }
 
-fn normal_result() -> Result<(), std::io::Error> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::AddrInUse,
-        "message here",
-    ))
-}
-
-// Easily convert normal `Result` to an `eros::Result`
-fn using_normal_and_eros_results() -> eros::Result<()> {
-    let val = normal_result()?;
-    let val = eros_result()?;
-    Ok(val)
+// Combine standard I/O and parse errors with an ad hoc validation error.
+fn load_port(path: &str) -> eros::Result<u16> {
+    let contents = std::fs::read_to_string(path)?;
+    let port = contents.trim().parse()?;
+    validate_port(port)?;
+    Ok(port)
 }
 
 fn main() {
-    eros_result();
-    normal_result();
-    using_normal_and_eros_results();
+    if let Err(error) = load_port("config/port.txt") {
+        println!("{error:#?}");
+    }
 }
 ```
 
@@ -57,28 +53,21 @@ There should be no boilerplate needed when handling any number of errors (typed 
 
 
 ```rust
-use eros::{IntoUnion, bail};
-use std::{io, sync};
-
-fn regular_typed_result1() -> Result<(), io::Error> {
-    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"));
-}
-
-fn regular_typed_result2() -> Result<(), sync::mpsc::RecvError> {
-    return Err(sync::mpsc::RecvError);
-}
+use eros::IntoUnion;
+use std::{io, num::ParseIntError};
 
 // `ErrorUnion` is used to track each possible error type,
 // instead of creating an enum for each possible error variant.
 // `eros::Result<_,(..)>` is shorthand for  `Result<_,ErrorUnion<(..)>>`.
-fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> {
-    let val = regular_typed_result1().into_union()?;
-    let val = regular_typed_result2().into_union()?;
-    Ok(val)
+fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
+    let contents = std::fs::read_to_string(path).into_union()?;
+    contents.trim().parse().into_union()
 }
 
 fn main() {
-    error_union_result();
+    if let Err(error) = load_port("config/port.txt") {
+        println!("{error:#?}");
+    }
 }
 ```
 The above code is precisely typed for what we care about and there was no need to create an error enum for each case. See the [ErrorUnion](#errorunion) section for more details how it works.
@@ -89,41 +78,34 @@ Users should be able to seamlessly transition to and from fully typed errors and
 
 ```rust
 use eros::{IntoUnion, ReshapeUnion};
-use std::{io, sync};
+use std::{io, num::ParseIntError};
 
-fn regular_typed_result1() -> Result<(), sync::mpsc::RecvError> {
-    return Err(sync::mpsc::RecvError);
+fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
+    let contents = std::fs::read_to_string(path).into_union()?;
+    contents.trim().parse().into_union()
 }
 
-fn regular_typed_result2() -> Result<(), io::Error> {
-    return Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"));
-}
-
-fn error_union_result() -> eros::Result<(), (io::Error, sync::mpsc::RecvError)> {
-    let val = regular_typed_result1().into_union()?;
-    let val = regular_typed_result2().into_union()?;
-    Ok(val)
-}
-
-// Error type is no longer tracked, we handled internally.
-fn regular_result() -> Result<(), sync::mpsc::RecvError> {
+// I/O Error is no longer tracked, we handled internally.
+fn port_or_default(path: &str) -> Result<u16, ParseIntError> {
     // Narrow the `ErrorUnion` and handle the `io::Error` case!
-    match error_union_result().narrow::<io::Error, _>() {
+    match load_port(path).narrow::<io::Error, _>() {
         Ok(io_error) => {
             // let _: io::Error = io_error;
-            todo!()
+            eprintln!("Could not read {path}: {io_error}; using port 8080");
+            Ok(8080)
         }
-        // The error type of the Result has been narrowed.
-        // It is now a union with a single type, thus we can convert into that single type.
         Err(result) => {
-            // let _: eros::Result<(), (sync::mpsc::RecvError,)> = result;
-            result.map_err(|e| e.into_single())
+            // let _: eros::Result<(), (ParseIntError,)> = result;
+            // Only ParseIntError remains, so we *can* unwrap the single-type union.
+            result.map_err(|error| error.into_single()),
         }
     }
 }
 
 fn main() {
-    regular_result();
+    if let Err(error) = port_or_default("config/port.txt") {
+        eprintln!("Invalid server port: {error}");
+    }
 }
 ```
 
@@ -131,29 +113,28 @@ And to expand an `ErrorUnion` just call `widen`
 
 ```rust
 use eros::{IntoUnion, ReshapeUnion};
-use std::{fmt, io, sync};
+use std::{io, net::{AddrParseError, IpAddr, TcpListener}, num::ParseIntError};
 
-fn result_union1() -> eros::Result<(), (io::Error, fmt::Error)> {
-    Ok(())
+fn load_host(path: &str) -> eros::Result<IpAddr, (io::Error, AddrParseError)> {
+    let contents = std::fs::read_to_string(path).into_union()?;
+    contents.trim().parse().into_union()
 }
 
-fn result_union2() -> eros::Result<(), (fmt::Error, sync::mpsc::RecvError)> {
-    Ok(())
+fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
+    let contents = std::fs::read_to_string(path).into_union()?;
+    contents.trim().parse().into_union()
 }
 
-fn result_union3() -> Result<(), sync::mpsc::RecvError> {
-    Ok(())
-}
-
-fn result_union4() -> eros::Result<(), (io::Error, fmt::Error, sync::mpsc::RecvError)> {
-    result_union1().widen()?;
-    result_union2().widen()?;
-    result_union3().into_union()?;
-    Ok(())
+fn bind_server() -> eros::Result<TcpListener, (io::Error, AddrParseError, ParseIntError)> {
+    let host = load_host("config/host.txt").widen()?;
+    let port = load_port("config/port.txt").widen()?;
+    TcpListener::bind((host, port)).into_union()
 }
 
 fn main() {
-    result_union4().unwrap();
+    if let Err(error) = bind_server() {
+        eprintln!("Could not start server: {error}");
+    }
 }
 ```
 
@@ -162,82 +143,64 @@ fn main() {
 Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
 ```rust
-use eros::{Context, bail};
-use std::io;
+use eros::Context;
 
-fn eros_result1() -> eros::Result<()> {
-    bail!("Something went wrong")
+fn parse_port(value: &str) -> eros::Result<u16> {
+    Ok(value.parse::<u16>().context("Parse server port")?)
 }
 
-fn eros_result2() -> eros::Result<()> {
-    Err(io::Error::new(io::ErrorKind::AddrInUse, "message here")).context("This is some context")?
-}
-
-fn adding_more_context() -> eros::Result<()> {
-    let val = eros_result1().with_context(|| format!("This is some lazy context"))?;
-    let val = eros_result2().context("This is some more context")?;
-    Ok(val)
+fn configure_server(name: &str, port: &str) -> eros::Result<u16> {
+    parse_port(port).with_context(|| format!("Configure server {name}"))
 }
 
 fn main() {
-    let out = adding_more_context().context("final context");
-    println!("{out:#?}");
+    if let Err(error) = configure_server("api", "not-a-port").context("Start application") {
+        println!("{error:?}");
+    }
 }
 ```
 
+With `RUST_BACKTRACE=1` (backtrace shortened):
+
 ```console
-Something went wrong
----
+invalid digit found in string
 
-Context:
-        - This is some lazy context
-        - final context
+  Context (innermost first):
+    1. Parse server port
+    2. Configure server api
+    3. Start application
 
----
-
-Backtrace:
-... 4 lines removed for the example
-   4:     0x5639a19ef19d - eros::error_union::ErrorUnionInner<dyn eros::error_union::SendSyncError>::new::h2b7d357ac3fa4dc2
-                               at /workspaces/eros/rs/eros/src/error_union.rs:74:24
-   5:     0x5639a19eeccc - eros::error_union::ErrorUnion::new::h7248c6cf6e9aac05
-                               at /workspaces/eros/rs/eros/src/error_union.rs:322:20
-   6:     0x5639a19f0cbf - example::eros_result1::h38d1b0e1c5450c1f
-                               at /workspaces/eros/rs/eros/tests/example.rs:5:5
-   7:     0x5639a19f0d99 - example::adding_more_context::hddf805cbc7e3056c
-                               at /workspaces/eros/rs/eros/tests/example.rs:13:15
-   8:     0x5639a19f0ec9 - example::main::hf13f943154472682
-                               at /workspaces/eros/rs/eros/tests/example.rs:20:15
-   9:     0x5639a19efb37 - example::main::{{closure}}::h4cab7eede14f8495
-                               at /workspaces/eros/rs/eros/tests/example.rs:19:10
-... 21 lines removed for example
+Backtrace (captured):
+...
+   3: example::parse_port
+             at ./src/main.rs:4:29
+   4: example::configure_server
+             at ./src/main.rs:8:5
+   5: example::main
+             at ./src/main.rs:12:25
 ...
 ```
 #### Better Backtrace
 
-The previous backtrace in the example was shortened for brevity, thus the "...". For a better backtrace experience while developing, enable the `better_backtrace` feature flag. Resulting in
+Enable `better_backtrace` for a more readable backtrace (shortened here):
 ```console
-Something went wrong
----
+invalid digit found in string
 
-Context:
-        - This is some lazy context
-        - final context
+  Context (innermost first):
+    1. Parse server port
+    2. Configure server api
+    3. Start application
 
----
+Backtrace (captured):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BACKTRACE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 1: eros::error_union::ErrorUnionInner<dyn eros::error_union::SendSyncError>::new
-    at ./src/error_union.rs:74
- 2: eros::error_union::ErrorUnion::new
-    at ./src/error_union.rs:322
- 3: example::eros_result1
-    at ./tests/example.rs:5
- 4: example::adding_more_context
-    at ./tests/example.rs:13
- 5: example::main
-    at ./tests/example.rs:20
- 6: example::main::{{closure}}
-    at ./tests/example.rs:19
-                              ⋮ 21 frames hidden ⋮   
+...
+ 4: example::parse_port
+    at ./src/main.rs:4
+ 5: example::configure_server
+    at ./src/main.rs:8
+ 6: example::main
+    at ./src/main.rs:12
+...
 ```
 #### Location
 
