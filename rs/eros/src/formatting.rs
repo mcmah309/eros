@@ -22,7 +22,7 @@ pub(crate) struct Report<'a, T: SendSyncError + ?Sized = dyn SendSyncError> {
 impl<'a> Report<'a> {
     pub(crate) fn new<E: TypeSet>(error: &'a ErrorUnion<E>) -> Self {
         Self::from_parts(
-            error.inner_ref(),
+            error.inner(),
             #[cfg(feature = "context")]
             &error.inner.context,
             #[cfg(feature = "location")]

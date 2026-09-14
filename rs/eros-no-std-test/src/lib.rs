@@ -43,30 +43,30 @@ pub enum CheckOutcome {
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let untitled: ErrorUnion<AnyError> = error!("something went wrong");
-    assert_type::<StrError>(untitled.inner_ref(), "StrError present")?;
-    assert_display(untitled.inner_ref(), "something went wrong")?;
+    assert_type::<StrError>(untitled.inner(), "StrError present")?;
+    assert_display(untitled.inner(), "something went wrong")?;
 
     let formatted: ErrorUnion<AnyError> = eros::error!("val = {}", 7u32);
-    assert_display(formatted.inner_ref(), "val = 7")?;
-    assert_type::<StrError>(formatted.inner_ref(), "owned StrError")?;
+    assert_display(formatted.inner(), "val = 7")?;
+    assert_type::<StrError>(formatted.inner(), "owned StrError")?;
 
     let value = 7u32;
     let captured = eros::error!("val = {value}");
-    assert_display(captured.inner_ref(), "val = 7")?;
+    assert_display(captured.inner(), "val = 7")?;
 
     static ERROR: &str = "static message";
     let named = eros::error!(ERROR);
-    assert_display(named.inner_ref(), ERROR)?;
+    assert_display(named.inner(), ERROR)?;
 
     let r: eros::Result<()> = bailing_function();
     let union = r.expect_err("bail should error");
-    assert_display(union.inner_ref(), "boom from bail")?;
-    assert_type::<StrError>(union.inner_ref(), "bail StrError")?;
+    assert_display(union.inner(), "boom from bail")?;
+    assert_type::<StrError>(union.inner(), "bail StrError")?;
 
     let r: Result<(), ErrorUnion<(NotEnoughMemory,)>> =
-        Err(NotEnoughMemory).into_union::<_, (NotEnoughMemory,)>();
+        Err(NotEnoughMemory).union::<_, (NotEnoughMemory,)>();
     let union = r.unwrap_err();
-    assert_type::<NotEnoughMemory>(union.inner_ref(), "NotEnoughMemory")?;
+    assert_type::<NotEnoughMemory>(union.inner(), "NotEnoughMemory")?;
     assert_eq(union.into_single(), NotEnoughMemory)?;
 
     let u: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
@@ -99,10 +99,16 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
     let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
     let u = u.context("allocating memory failed");
-    assert_type::<NotEnoughMemory>(u.inner_ref(), "context preserves type")?;
+    assert_type::<NotEnoughMemory>(u.inner(), "context preserves type")?;
     let u = u.with_context(|| "while booting");
-    assert_type::<NotEnoughMemory>(u.inner_ref(), "with_context preserves type")?;
-    assert_type::<NotEnoughMemory>(u.latest_error(), "latest_error is original")?;
+    assert_type::<NotEnoughMemory>(u.inner(), "with_context preserves type")?;
+    if u.latest_context_error().is_some() {
+        return Err(CheckOutcome::Fail("string contexts have no context error"));
+    }
+    assert_type::<NotEnoughMemory>(
+        u.latest_context_error().unwrap_or_else(|| u.inner()),
+        "context error fallback preserves inner error",
+    )?;
 
     let u: ErrorUnion<(InvalidPassword,)> = ErrorUnion::new(InvalidPassword);
     let u = u.user_context("Please choose a stronger password.");
@@ -111,12 +117,12 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_eq(user_ctxs.len(), 1)?;
     assert_eq_str(&user_ctxs[0], "Please choose a stronger password.")?;
 
-    let r: Result<(), ErrorUnion<AnyError>> = Err(NotEnoughMemory).into_dyn_union();
+    let r: Result<(), ErrorUnion<AnyError>> = Err(NotEnoughMemory).any_union();
     let union = r.unwrap_err();
-    assert_type::<NotEnoughMemory>(union.inner_ref(), "into_dyn_union preserves type")?;
+    assert_type::<NotEnoughMemory>(union.inner(), "any_union preserves type")?;
 
     let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
-    let mapped: ErrorUnion<(Timeout,)> = u.map(|NotEnoughMemory| Timeout);
+    let mapped: ErrorUnion<(Timeout,)> = u.map_single(|NotEnoughMemory| Timeout);
     assert_eq(mapped.into_single(), Timeout)?;
 
     let outcome: Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> =
@@ -130,7 +136,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let outcome: Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> =
         chain_with_failure();
     let union = outcome.unwrap_err();
-    assert_type::<NotEnoughMemory>(union.inner_ref(), "chain failure type")?;
+    assert_type::<NotEnoughMemory>(union.inner(), "chain failure type")?;
 
     let u: ErrorUnion<(InvalidPassword,)> = ErrorUnion::new(InvalidPassword);
     let dyn_err = u.into_inner();
@@ -153,7 +159,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
     let u: ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)> = ErrorUnion::new(NotEnoughMemory);
     let remainder = u.subset::<(Timeout,), _>().expect_err("non-member must be rejected");
-    assert_type::<NotEnoughMemory>(remainder.inner_ref(), "subset remainder")?;
+    assert_type::<NotEnoughMemory>(remainder.inner(), "subset remainder")?;
 
     let diagnostic = eros::error!("diagnostic root").context("diagnostic context").diagnostic_debug();
     assert_eq_str(diagnostic["root"].as_str().unwrap(), "diagnostic root")?;
@@ -170,14 +176,14 @@ fn bailing_function() -> eros::Result<()> {
 fn chain_with_question() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> {
     let _: () =
         Err::<(), NotEnoughMemory>(NotEnoughMemory)
-            .into_union::<_, (NotEnoughMemory, Timeout, InvalidPassword)>()?;
+            .union::<_, (NotEnoughMemory, Timeout, InvalidPassword)>()?;
     Ok(())
 }
 
 fn chain_with_failure() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> {
     let _: () =
         Err::<(), NotEnoughMemory>(NotEnoughMemory)
-            .into_union::<_, (NotEnoughMemory, Timeout, InvalidPassword)>()?;
+            .union::<_, (NotEnoughMemory, Timeout, InvalidPassword)>()?;
     Ok(())
 }
 
@@ -262,12 +268,12 @@ mod tests {
     }
 
     #[test]
-    fn to_enum_works() {
+    fn into_enum_works() {
         let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(Timeout);
-        assert!(matches!(u.to_enum(), eros::E2::B(Timeout)));
+        assert!(matches!(u.into_enum(), eros::E2::B(Timeout)));
 
         let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(NotEnoughMemory);
-        assert!(matches!(u.to_enum(), eros::E2::A(NotEnoughMemory)));
+        assert!(matches!(u.into_enum(), eros::E2::A(NotEnoughMemory)));
     }
 
     #[test]
@@ -284,7 +290,7 @@ mod tests {
         let r: Result<u8, ErrorUnion<(eros::AbsentValueError,)>> = none.context("expected a value");
         assert!(r.is_err());
         let u = r.unwrap_err();
-        assert!(u.inner_ref().as_any().is::<eros::AbsentValueError>());
+        assert!(u.inner().as_any().is::<eros::AbsentValueError>());
     }
 
     #[test]

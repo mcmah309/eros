@@ -32,10 +32,10 @@ fn converting_to_anyhow_preserves_root_and_context_order() {
 #[test]
 fn owned_and_shared_anyhow_adapters_retain_chains_and_shared_ownership() {
     let shared = Arc::new(anyhow::Error::new(StrError::from("root")).context("anyhow context"));
-    let shared_union = ErrorUnion::anyhow_arc(shared.clone());
+    let shared_union = ErrorUnion::from_anyhow_arc(shared.clone());
     assert_eq!(Arc::strong_count(&shared), 2);
     let owned_union =
-        ErrorUnion::anyhow(anyhow::Error::new(StrError::from("root")).context("anyhow context"));
+        ErrorUnion::from_anyhow(anyhow::Error::new(StrError::from("root")).context("anyhow context"));
     for error in [owned_union, shared_union] {
         assert_eq!(error.to_string(), "anyhow context <- root");
         assert_eq!(

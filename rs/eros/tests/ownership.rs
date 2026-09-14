@@ -46,7 +46,7 @@ fn owned_extraction_moves_the_root_and_drops_metadata_exactly_once() {
         |error: ErrorUnion<(Tracked,)>| error.narrow::<Tracked, _>().unwrap(),
         |error: ErrorUnion<(Tracked,)>| error.downcast_inner::<Tracked>().unwrap(),
         |error: ErrorUnion<(Tracked,)>| {
-            let eros::E1::A(value) = error.to_enum();
+            let eros::E1::A(value) = error.into_enum();
             value
         },
     ] {
@@ -65,7 +65,7 @@ fn owned_extraction_moves_the_root_and_drops_metadata_exactly_once() {
 fn mapping_preserves_metadata_until_the_new_union_is_dropped() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
-    let error = union(&root, &context).map(|mut error| {
+    let error = union(&root, &context).map_single(|mut error| {
         error.payload.push(4);
         error
     });
@@ -88,7 +88,7 @@ fn panicking_map_drops_both_root_and_context() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        union(&root, &context).map(|_| -> Tracked { panic!("mapping failed") })
+        union(&root, &context).map_single(|_| -> Tracked { panic!("mapping failed") })
     }));
     assert!(outcome.is_err());
     assert_eq!(root.load(Ordering::SeqCst), 1);

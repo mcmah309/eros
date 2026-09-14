@@ -10,7 +10,7 @@ fn test_function(arg1: &str, arg2: String, arg3: i32) -> eros::Result<String> {
 #[test]
 fn test() {
     let error = test_function("test", "arg2".to_owned(), 42).unwrap_err();
-    let inner_error = error.inner_ref();
+    let inner_error = error.inner();
     assert_eq!(inner_error.to_string(), "This is the error");
     assert!(format!("{:?}", error).contains("    1. arg1 is test\n"));
 }
@@ -25,7 +25,7 @@ async fn async_function(value: u32) -> eros::Result<u32> {
 #[tokio::test]
 async fn test_async_function_context_is_attached() {
     let error = async_function(99).await.unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "async error");
+    assert_eq!(error.inner().to_string(), "async error");
     assert!(format!("{:?}", error).contains("    1. async arg is 99\n"));
 }
 
@@ -69,7 +69,7 @@ fn test_shared_ref_context_is_attached() {
         base_url: "http://localhost".to_owned(),
     };
     let error = f.fetch("/api").unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "connection refused");
+    assert_eq!(error.inner().to_string(), "connection refused");
     assert!(format!("{:?}", error).contains("    1. fetching from http://localhost\n"));
 }
 
@@ -119,7 +119,7 @@ impl Counter {
 fn test_mut_ref_context_is_attached() {
     let mut c = Counter { count: 95 };
     let error = c.increment(10).unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "overflow");
+    assert_eq!(error.inner().to_string(), "overflow");
     assert!(format!("{:?}", error).contains("    1. increment failed at count 95\n"));
 }
 
@@ -157,7 +157,7 @@ impl Wrapper {
 fn test_value_receiver_context_is_attached() {
     let w = Wrapper("hello".to_owned());
     let error = w.consume().unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "consumed and failed");
+    assert_eq!(error.inner().to_string(), "consumed and failed");
     assert!(format!("{:?}", error).contains("    1. consuming wrapper\n"));
 }
 
@@ -191,7 +191,7 @@ async fn test_async_shared_ref_context_is_attached() {
         host: "api.example.com".to_owned(),
     };
     let error = client.fetch("/v1/items").await.unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "timeout");
+    assert_eq!(error.inner().to_string(), "timeout");
     assert!(format!("{:?}", error).contains("    1. async fetch from api.example.com\n"));
 }
 
@@ -226,7 +226,7 @@ async fn test_async_mut_ref_context_is_attached() {
         items: vec!["a".into(), "b".into()],
     };
     let error = q.push("c".into()).await.unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "queue full");
+    assert_eq!(error.inner().to_string(), "queue full");
     assert!(format!("{:?}", error).contains("    1. push failed, queue len 2\n"));
 }
 
@@ -283,7 +283,7 @@ fn auto_display(#[fmt("{}")] name: &str, ignored: u32) -> eros::Result<()> {
 #[test]
 fn test_auto_display_single_param() {
     let error = auto_display("alice", 0).unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "inner error");
+    assert_eq!(error.inner().to_string(), "inner error");
     assert!(format!("{:?}", error).contains("    1. name: alice\n"));
 }
 
@@ -410,7 +410,7 @@ fn owned_string_function(string: String) -> eros::Result<()> {
 #[test]
 fn test_owned_string_clone_context_is_attached() {
     let error = owned_string_function("hello".to_owned()).unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "owned error");
+    assert_eq!(error.inner().to_string(), "owned error");
     assert!(format!("{:?}", error).contains("    1. processing hello\n"));
 }
 
@@ -470,7 +470,7 @@ async fn async_owned_function(payload: String) -> eros::Result<()> {
 #[tokio::test]
 async fn test_async_owned_clone_context_is_attached() {
     let error = async_owned_function("data".to_owned()).await.unwrap_err();
-    assert_eq!(error.inner_ref().to_string(), "async owned error");
+    assert_eq!(error.inner().to_string(), "async owned error");
     assert!(format!("{:?}", error).contains("    1. async processing data\n"));
 }
 

@@ -345,12 +345,17 @@ fn auto_context_attribute_uses_only_annotated_parameters() {
 }
 
 #[test]
-fn disabled_context_does_not_change_the_latest_error() {
+fn latest_context_error_respects_the_context_feature() {
     let context = ContextSource::Error(Box::new(std::fmt::Error));
     let error = eros::error!("root").context(context).context("last string");
+    let latest = error.latest_context_error();
     if cfg!(feature = "context") {
-        assert!(error.latest_error().as_any().is::<std::fmt::Error>());
+        assert!(latest.unwrap().as_any().is::<std::fmt::Error>());
     } else {
-        assert!(error.latest_error().as_any().is::<StrError>());
+        assert!(latest.is_none());
+        assert!(latest
+            .unwrap_or_else(|| error.inner())
+            .as_any()
+            .is::<StrError>());
     }
 }

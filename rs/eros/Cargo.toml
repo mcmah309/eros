@@ -14,7 +14,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test_in_ci)'] }
 
 [dependencies]
 eros-macros = { version = "0.7.0", path = "../eros-macros" }
-# Adds `ErrorUnion::anyhow` for converting `anyhow::Error`s into a `ErrorUnion`
+# Adds `ErrorUnion::from_anyhow` for converting `anyhow::Error`s into a `ErrorUnion`
 anyhow = { version = "1", optional = true }
 color-backtrace = { version = "0.7", default-features = false, features = [
     "use-btparse-crate",

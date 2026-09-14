@@ -60,7 +60,7 @@ mod tests {
         assert_eq!(user_context.len(), 1);
         assert_eq!(user_context[0].to_string(), "User context");
 
-        let user_error_message = create_user_error_message(union_a.inner_ref());
+        let user_error_message = create_user_error_message(union_a.inner());
         assert_eq!(user_error_message, None);
 
         let user_err = InvalidPasswordError;
@@ -73,7 +73,7 @@ mod tests {
         assert_eq!(user_context.len(), 1);
         assert_eq!(user_context[0].to_string(), "User context");
 
-        let user_error_message = create_user_error_message(union_b.inner_ref());
+        let user_error_message = create_user_error_message(union_b.inner());
         assert_eq!(
             user_error_message.as_deref(),
             Some("Your password must be at least 8 characters long.")

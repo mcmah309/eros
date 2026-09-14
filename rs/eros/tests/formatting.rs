@@ -185,7 +185,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert_eq!(format!("{native:?}"), expected_debug);
     assert_eq!(format!("{native:#?}"), expected_alternate_debug);
 
-    let recovered = ErrorUnion::<(NativeError,)>::from_dyn_error(native).unwrap();
+    let recovered = ErrorUnion::<(NativeError,)>::try_from_dyn_error(native).unwrap();
     assert!(recovered.is_inner::<NativeError>());
     assert_eq!(recovered.to_string(), expected_display);
     assert_eq!(format!("{recovered:?}"), expected_debug);
@@ -227,7 +227,7 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     #[cfg(feature = "diagnostic")]
     let mut expected_diagnostic = error.diagnostic_debug();
 
-    let error: ErrorUnion<(StartupError,)> = error.map_root(|old| {
+    let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<NativeError>());
         StartupError(old)
     });
@@ -302,8 +302,8 @@ fn anyhow_failure_origin() -> anyhow::Error {
 #[test]
 fn anyhow_owned_and_shared_adapters_preserve_source_order_after_new_root() {
     for error in [
-        ErrorUnion::anyhow(anyhow_failure_origin()),
-        ErrorUnion::anyhow_arc(Arc::new(anyhow_failure_origin())),
+        ErrorUnion::from_anyhow(anyhow_failure_origin()),
+        ErrorUnion::from_anyhow_arc(Arc::new(anyhow_failure_origin())),
     ] {
         let error = error.context("start service");
         let expected_sources = [
@@ -314,14 +314,14 @@ fn anyhow_owned_and_shared_adapters_preserve_source_order_after_new_root() {
         ];
         assert_eq!(error.to_string(), expected_sources.join(" <- "));
         assert_eq!(format!("{error:#}"), "initialize application");
-        assert_eq!(native_chain_messages(error.inner_ref()), expected_sources);
+        assert_eq!(native_chain_messages(error.inner()), expected_sources);
         let mut expected_report = "initialize application\n  caused by: load configuration\n  caused by: cannot open configuration\n  caused by: permission denied".to_owned();
         if cfg!(feature = "context") {
             expected_report.push_str("\n\n  Context (innermost first):\n    1. start service");
         }
         assert_eq!(format!("{error:#?}"), expected_report);
 
-        let error = error.map_root(StartupError);
+        let error = error.map_inner(StartupError);
         assert_eq!(
             error.to_string(),
             "startup failed <- initialize application <- load configuration <- cannot open configuration <- permission denied"
@@ -346,9 +346,9 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
         let original_status = original.backtrace().status();
         let original_frames = original.backtrace().to_string();
         let error = if shared {
-            ErrorUnion::anyhow_arc(Arc::new(original))
+            ErrorUnion::from_anyhow_arc(Arc::new(original))
         } else {
-            ErrorUnion::anyhow(original)
+            ErrorUnion::from_anyhow(original)
         };
         let report = format!("{error:?}");
         let (_, original_section) = report.split_once("\n\nBacktrace (").unwrap();

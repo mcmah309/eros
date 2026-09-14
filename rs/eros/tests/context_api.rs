@@ -225,10 +225,13 @@ mod user_context {
             .user_context(boxed)
             .context("internal after");
         assert_eq!(calls.get(), 1);
-        assert_eq!(error.latest_error().to_string(), "public error");
+        assert_eq!(
+            error.latest_context_error().unwrap().to_string(),
+            "public error"
+        );
         let error = error
-            .map(|error| error)
-            .map_root(|_| StrError::from("replacement"));
+            .map_single(|error| error)
+            .map_inner(|_| StrError::from("replacement"));
         let error: ErrorUnion = error.into();
         assert_eq!(
             error

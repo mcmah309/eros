@@ -24,18 +24,18 @@ macro_rules! check_arity {
                 let mut error: ErrorUnion<Set> = ErrorUnion::new(Payload::<$n>(original.clone()));
                 assert_eq!(error.to_string(), format!("error {}: {original}", $n));
                 assert_eq!(format!("{error:#?}"), format!("error {}: {original}", $n));
-                match error.ref_enum() {
+                match error.as_enum() {
                     eros::$enum::$variant(payload) => assert_eq!(payload.0, original),
                     #[allow(unreachable_patterns)]
                     _ => panic!("wrong borrowed variant for {}", $n),
                 }
-                match error.mut_enum() {
+                match error.as_mut_enum() {
                     eros::$enum::$variant(payload) => payload.0.push_str(" updated"),
                     #[allow(unreachable_patterns)]
                     _ => panic!("wrong mutable variant for {}", $n),
                 }
                 assert_eq!(error.downcast_inner_ref::<Payload<$n>>().unwrap().0, format!("{original} updated"));
-                match error.to_enum() {
+                match error.into_enum() {
                     eros::$enum::$variant(payload) => assert_eq!(payload.0, format!("{original} updated")),
                     #[allow(unreachable_patterns)]
                     _ => panic!("wrong owned variant for {}", $n),
@@ -47,7 +47,7 @@ macro_rules! check_arity {
                 let report = format!("{error:?}");
                 let adapter = error.into_dyn_error();
                 assert!(std::error::Error::source(adapter.as_ref()).is_none());
-                let error = ErrorUnion::<Set>::from_dyn_error(adapter).unwrap();
+                let error = ErrorUnion::<Set>::try_from_dyn_error(adapter).unwrap();
                 let erased: ErrorUnion = error.into();
                 assert_eq!(format!("{erased:?}"), report);
                 assert_eq!(erased.downcast_inner::<Payload<$n>>().unwrap().0, original);

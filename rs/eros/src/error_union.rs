@@ -412,7 +412,7 @@ where
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Native Error reporters traverse source() separately.
-        write!(formatter, "{}", self.0.inner_ref())
+        write!(formatter, "{}", self.0.inner())
     }
 }
 
@@ -434,13 +434,16 @@ where
     /// Creates a `Box<dyn SendSyncError>` error from this [`crate::ErrorUnion`]. This is used since
     /// [`crate::ErrorUnion`] cannot implement [`core::error::Error`] directly, otherwise trait implementations
     /// that require this bounds would conflict. To convert back into a [`crate::ErrorUnion`],
-    /// [`crate::ErrorUnion::from_dyn_error`] must be used.
+    /// [`crate::ErrorUnion::try_from_dyn_error`] must be used.
     pub fn into_dyn_error(self) -> Box<dyn SendSyncError> {
         Box::new(ErrorUnionErrorWrapper(self)) as Box<dyn SendSyncError>
     }
 
-    /// See [`crate::ErrorUnion::into_dyn_error`].
-    pub fn from_dyn_error(error: Box<dyn SendSyncError>) -> Result<Self, Box<dyn SendSyncError>> {
+    /// Recovers a union from an adapter created by [`Self::into_dyn_error`].
+    ///
+    /// Returns the original boxed error unchanged if it is not an Eros adapter
+    /// for the same error set `E`.
+    pub fn try_from_dyn_error(error: Box<dyn SendSyncError>) -> Result<Self, Box<dyn SendSyncError>> {
         let error_ref = &*error as &dyn Any;
         if !error_ref.is::<ErrorUnionErrorWrapper<E>>() {
             return Err(error);
@@ -549,17 +552,17 @@ where
         self.inner.error.source()
     }
 
-    /// Gets a reference to the inner underlying error
-    pub fn inner_ref(&self) -> &dyn SendSyncError {
+    /// Returns a reference to the stored inner error.
+    pub fn inner(&self) -> &dyn SendSyncError {
         &self.inner.error
     }
 
-    /// Gets a mutable reference to the inner underlying error
+    /// Returns a mutable reference to the stored inner error.
     pub fn inner_mut(&mut self) -> &mut dyn SendSyncError {
         &mut self.inner.error
     }
 
-    /// Into the inner underlying error
+    /// Extracts the boxed inner error, discarding context, location, and backtrace.
     pub fn into_inner(self) -> Box<dyn SendSyncError> {
         let raw = Box::into_raw(self.inner);
         unsafe {
@@ -583,37 +586,49 @@ where
         }
     }
 
-    /// Returns the latest error.
-    /// This takes into consideration errors added as context
-    pub fn latest_error(&self) -> &dyn SendSyncError {
+    /// Returns the most recently attached error-valued context.
+    ///
+    /// String contexts are ignored. Returns `None` if no error-valued context
+    /// has been attached, or if the `context` feature is disabled. This does not
+    /// search the inner error's source chain.
+    ///
+    /// To fall back to the inner error when no context error exists:
+    ///
+    /// ```
+    /// let error = eros::error!("permission denied").context("read configuration");
+    /// let latest = error.latest_context_error().unwrap_or_else(|| error.inner());
+    /// assert_eq!(latest.to_string(), "permission denied");
+    /// ```
+    pub fn latest_context_error(&self) -> Option<&dyn SendSyncError> {
         #[cfg(feature = "context")]
         for context in self.inner.context.iter().rev() {
             if let crate::context::ContextSource::Error(err) = &context.context {
-                return err.as_ref();
+                return Some(err.as_ref());
             }
         }
-        self.inner_ref()
+        None
     }
 
-    /// Convert the `ErrorUnion` to an owned enum for
-    /// use in pattern matching etc...
-    pub fn to_enum(self) -> E::Enum
+    /// Converts the union into an owned enum for pattern matching.
+    ///
+    /// Context, location, and backtrace are discarded.
+    pub fn into_enum(self) -> E::Enum
     where
         E::Enum: From<Self>,
     {
         E::Enum::from(self)
     }
 
-    /// Borrow the enum as an enum for use in
-    /// pattern matching etc...
-    pub fn ref_enum<'a>(&'a self) -> E::RefEnum<'a>
+    /// Borrows the inner error as an enum of references for pattern matching.
+    pub fn as_enum<'a>(&'a self) -> E::RefEnum<'a>
     where
         E::RefEnum<'a>: From<&'a Self>,
     {
         E::RefEnum::from(self)
     }
 
-    pub fn mut_enum<'a>(&'a mut self) -> E::MutEnum<'a>
+    /// Borrows the inner error as an enum of mutable references for pattern matching.
+    pub fn as_mut_enum<'a>(&'a mut self) -> E::MutEnum<'a>
     where
         E::MutEnum<'a>: From<&'a mut Self>,
     {
@@ -697,7 +712,11 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
         unsafe { self.inner.downcast_error_unchecked() }
     }
 
-    pub fn map<U, F>(self, f: F) -> ErrorUnion<(U,)>
+    /// Maps the single concrete inner error, preserving context, location, and backtrace.
+    ///
+    /// For unions with any number of variants, use [`Self::map_inner`] to map
+    /// the boxed inner error instead.
+    pub fn map_single<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
         F: FnOnce(A) -> U,
@@ -790,8 +809,8 @@ where
 //************************************************************************//
 
 pub trait IntoUnion<S, F> {
-    /// Creates an `ErrorUnion` for this type.
-    fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    /// Wraps the result's error in a union whose error set is inferred from the destination.
+    fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: Contains<F, Index>;
@@ -799,7 +818,7 @@ pub trait IntoUnion<S, F> {
 
 impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
     #[cfg_attr(feature = "location", track_caller)]
-    fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+    fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
         Other::Variants: Contains<F, Index>,
@@ -813,13 +832,15 @@ impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
 }
 
 pub trait IntoDynUnion<S> {
-    /// Creates an `ErrorUnion` for this type.
-    fn into_dyn_union(self) -> Result<S, ErrorUnion>;
+    /// Converts the result's error into an [`ErrorUnion<AnyError>`].
+    ///
+    /// Existing unions retain their context, location, and backtrace.
+    fn any_union(self) -> Result<S, ErrorUnion>;
 }
 
 impl<S, F: SendSyncError> IntoDynUnion<S> for Result<S, F> {
     #[cfg_attr(feature = "location", track_caller)]
-    fn into_dyn_union(self) -> Result<S, ErrorUnion> {
+    fn any_union(self) -> Result<S, ErrorUnion> {
         match self {
             Ok(value) => Ok(value),
             Err(err) => Err(ErrorUnion::new(err)),
@@ -828,14 +849,14 @@ impl<S, F: SendSyncError> IntoDynUnion<S> for Result<S, F> {
 }
 
 impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
-    fn into_dyn_union(self) -> Result<S, ErrorUnion> {
+    fn any_union(self) -> Result<S, ErrorUnion> {
         self.map_err(|e| ErrorUnion::erase(e))
     }
 }
 
 // pub trait IntoUnion<S, F> {
 //     /// Con `Err` to i
-//     fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+//     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
 //     where
 //         Other: TypeSet,
 //         Other::Variants: Contains<F, Index>;
@@ -846,7 +867,7 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
 //     F1: Into<F2> + SendSyncError, // `SendSyncError` is used to ensure it does not overlap with below
 //     F2: SendSyncError,
 // {
-//     fn into_union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+//     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
 //     where
 //         Other: TypeSet,
 //         Other::Variants: Contains<F2, Index>,
@@ -866,7 +887,7 @@ impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
 //     F2: SendSyncError,
 // {
 //     fn inner_into(self) -> Result<S, ErrorUnion<(F2,)>> {
-//         self.map_err(|e| e.map(|e| e.into()))
+//         self.map_err(|e| e.map_single(|e| e.into()))
 //     }
 // }
 
@@ -938,7 +959,7 @@ impl core::error::Error for AnyhowErrorArc {
 #[cfg(feature = "anyhow")]
 impl ErrorUnion {
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn anyhow(error: anyhow::Error) -> ErrorUnion {
+    pub fn from_anyhow(error: anyhow::Error) -> ErrorUnion {
         ErrorUnion::new_from_parts(
             AnyhowError(error),
             #[cfg(feature = "backtrace")]
@@ -951,7 +972,7 @@ impl ErrorUnion {
     }
 
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn anyhow_arc(error: alloc::sync::Arc<anyhow::Error>) -> ErrorUnion {
+    pub fn from_anyhow_arc(error: alloc::sync::Arc<anyhow::Error>) -> ErrorUnion {
         ErrorUnion::new_from_parts(
             AnyhowErrorArc(error),
             #[cfg(feature = "backtrace")]
@@ -967,7 +988,7 @@ impl ErrorUnion {
 // Needs specialization
 // impl From<anyhow::Error> for ErrorUnion {
 //     fn from(value: anyhow::Error) -> Self {
-//         ErrorUnion::anyhow(value)
+//         ErrorUnion::from_anyhow(value)
 //     }
 // }
 
@@ -1095,17 +1116,17 @@ mod tests {
         let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
         assert!((&*dyn_err as &dyn Any).is::<ErrorUnionErrorWrapper<(FooError,)>>());
         let recovered: ErrorUnion<(FooError,)> =
-            ErrorUnion::from_dyn_error(dyn_err).expect("round-trip should succeed");
+            ErrorUnion::try_from_dyn_error(dyn_err).expect("round-trip should succeed");
 
         assert_eq!(recovered.as_ref(), &FooError("roundtrip".into()));
     }
 
     #[test]
-    fn from_dyn_error_wrong_type_returns_err() {
+    fn try_from_dyn_error_wrong_type_returns_err() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("mismatch".into()));
         let dyn_err: Box<dyn SendSyncError> = union.into_dyn_error();
 
-        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::from_dyn_error(dyn_err);
+        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::try_from_dyn_error(dyn_err);
         assert!(result.is_err(), "mismatched type should be returned as Err");
     }
 
@@ -1124,14 +1145,14 @@ mod tests {
     }
 
     #[test]
-    fn from_dyn_error_preserves_context() {
+    fn try_from_dyn_error_preserves_context() {
         let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("ctx".into()));
         #[cfg(feature = "context")]
         {
             union = union.context("some context");
         }
         let dyn_err = union.into_dyn_error();
-        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::from_dyn_error(dyn_err).unwrap();
+        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -1145,7 +1166,7 @@ mod tests {
         let dyn_err = union.into_dyn_error();
 
         let recovered: ErrorUnion<(FooError, BarError)> =
-            ErrorUnion::from_dyn_error(dyn_err).unwrap();
+            ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
 
         let bar: BarError = recovered.narrow().unwrap();
         assert_eq!(bar, BarError(99));
@@ -1243,22 +1264,22 @@ mod tests {
     }
 
     #[test]
-    fn into_inner_dyn_error_not_roundtrippable_via_from_dyn_error() {
-        // Confirm that from_dyn_error correctly rejects a bare inner error
+    fn into_inner_dyn_error_not_roundtrippable_via_try_from_dyn_error() {
+        // Confirm that try_from_dyn_error correctly rejects a bare inner error
         // (since it's not wrapped in ErrorUnionErrorWrapper).
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
         let bare_dyn = union_a.into_inner();
 
-        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::from_dyn_error(bare_dyn);
+        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_dyn_error(bare_dyn);
         assert!(
             result.is_err(),
-            "from_dyn_error should reject a bare inner error, not an ErrorUnionErrorWrapper"
+            "try_from_dyn_error should reject a bare inner error, not an ErrorUnionErrorWrapper"
         );
     }
 }
 
 #[cfg(test)]
-mod latest_error_tests {
+mod latest_context_error_tests {
     use super::*;
     #[cfg(not(feature = "std"))]
     use std::prelude::v1::*;
@@ -1287,86 +1308,102 @@ mod latest_error_tests {
     }
 
     #[test]
-    fn latest_error_with_no_context_returns_inner() {
+    fn latest_context_error_with_no_context_returns_none() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
 
-        assert_eq!(union.latest_error().to_string(), "PrimaryError(base)");
+        assert!(union.latest_context_error().is_none());
     }
 
     #[test]
-    fn latest_error_with_no_context_returns_correct_type() {
+    fn latest_context_error_fallback_returns_inner() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
 
-        assert!(union.latest_error().as_any().is::<PrimaryError>());
+        let error = union.latest_context_error().unwrap_or_else(|| union.inner());
+        assert_eq!(error.to_string(), "PrimaryError(base)");
+        assert!(error.as_any().is::<PrimaryError>());
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_with_string_context_only_returns_inner() {
+    fn latest_context_error_with_string_context_only_returns_none() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union.context("just a string message");
 
-        assert_eq!(union.latest_error().to_string(), "PrimaryError(base)");
+        assert!(union.latest_context_error().is_none());
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_with_error_context_returns_context_error() {
+    fn latest_context_error_with_error_context_returns_context_error() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union.context(box_err(ContextError("ctx-1".into())));
 
-        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
+        assert_eq!(
+            union.latest_context_error().unwrap().to_string(),
+            "ContextError(ctx-1)"
+        );
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_returns_most_recently_added_error_context() {
+    fn latest_context_error_returns_most_recently_added_error_context() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union
             .context(box_err(ContextError("ctx-1".into())))
             .context(box_err(ContextError("ctx-2".into())))
             .context(box_err(ContextError("ctx-3".into())));
 
-        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-3)");
+        assert_eq!(
+            union.latest_context_error().unwrap().to_string(),
+            "ContextError(ctx-3)"
+        );
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_skips_trailing_string_contexts_to_find_error_context() {
+    fn latest_context_error_skips_trailing_string_contexts_to_find_error_context() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union
             .context(box_err(ContextError("ctx-1".into())))
             .context("a string note added after");
 
-        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
+        assert_eq!(
+            union.latest_context_error().unwrap().to_string(),
+            "ContextError(ctx-1)"
+        );
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_with_only_string_contexts_falls_back_to_inner() {
+    fn latest_context_error_with_only_string_contexts_can_fall_back_to_inner() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union.context("note one").context("note two");
 
-        assert_eq!(union.latest_error().to_string(), "PrimaryError(base)");
+        assert!(union.latest_context_error().is_none());
+        let error = union.latest_context_error().unwrap_or_else(|| union.inner());
+        assert_eq!(error.to_string(), "PrimaryError(base)");
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_error_context_correct_concrete_type() {
+    fn latest_context_error_error_context_correct_concrete_type() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union.context(box_err(ContextError("typed".into())));
 
-        assert!(union.latest_error().as_any().is::<ContextError>());
+        assert!(union.latest_context_error().unwrap().as_any().is::<ContextError>());
     }
 
     #[cfg(feature = "context")]
     #[test]
-    fn latest_error_multi_variant_union_with_error_context() {
+    fn latest_context_error_multi_variant_union_with_error_context() {
         let union: ErrorUnion<(PrimaryError, ContextError)> =
             ErrorUnion::new(PrimaryError("base".into()));
         let union = union.context(box_err(ContextError("ctx-1".into())));
 
-        assert_eq!(union.latest_error().to_string(), "ContextError(ctx-1)");
+        assert_eq!(
+            union.latest_context_error().unwrap().to_string(),
+            "ContextError(ctx-1)"
+        );
     }
 }
 

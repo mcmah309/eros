@@ -32,7 +32,7 @@ fn subset_accepts_each_member_in_requested_order() {
         let report = format!("{error:?}");
         let subset = error.subset::<(fmt::Error, StrError), _>().unwrap();
         assert_eq!(format!("{subset:?}"), report);
-        match (index, subset.to_enum()) {
+        match (index, subset.into_enum()) {
             (0, E2::B(error)) => assert_eq!(error.as_str(), "message"),
             (1, E2::A(fmt::Error)) => {}
             _ => panic!("subset changed the active variant"),
@@ -53,7 +53,7 @@ fn empty_subset_always_returns_the_original_union() {
 fn full_subset_can_be_reordered_and_has_an_empty_remainder() {
     let error: ErrorUnion<Pair> = ErrorUnion::new(fmt::Error);
     let subset: Result<ErrorUnion<(fmt::Error, StrError)>, ErrorUnion<()>> = error.subset();
-    assert!(matches!(subset.unwrap().to_enum(), E2::A(fmt::Error)));
+    assert!(matches!(subset.unwrap().into_enum(), E2::A(fmt::Error)));
 }
 
 #[test]
@@ -80,28 +80,28 @@ fn result_narrow_covers_success_matching_error_and_remainder() {
 #[test]
 fn result_conversions_preserve_success_values_and_error_metadata() {
     let success: Result<String, StrError> = Ok("typed".into());
-    let success: eros::Result<_, Pair> = success.into_union();
+    let success: eros::Result<_, Pair> = success.union();
     let success: eros::Result<_, Triple> = success.widen();
-    assert_eq!(success.into_dyn_union().unwrap(), "typed");
+    assert_eq!(success.any_union().unwrap(), "typed");
 
     let success: Result<String, StrError> = Ok("erased".into());
-    assert_eq!(success.into_dyn_union().unwrap(), "erased");
+    assert_eq!(success.any_union().unwrap(), "erased");
 
-    let error: eros::Result<(), Pair> = Err(StrError::from("typed")).into_union();
+    let error: eros::Result<(), Pair> = Err(StrError::from("typed")).union();
     assert!(error.as_ref().unwrap_err().is_inner::<StrError>());
     let error = error.unwrap_err().context("metadata");
     let report = format!("{error:?}");
     let result: eros::Result<(), Pair> = Err(error);
     let widened: eros::Result<(), Triple> = result.widen();
-    let erased = widened.into_dyn_union().unwrap_err();
+    let erased = widened.any_union().unwrap_err();
     assert_eq!(format!("{erased:?}"), report);
     let result: eros::Result<()> = Err(erased);
     assert_eq!(
-        format!("{:?}", result.into_dyn_union().unwrap_err()),
+        format!("{:?}", result.any_union().unwrap_err()),
         report
     );
 
-    let erased: eros::Result<()> = Err(StrError::from("erased")).into_dyn_union();
+    let erased: eros::Result<()> = Err(StrError::from("erased")).any_union();
     assert_eq!(
         erased
             .unwrap_err()
@@ -121,7 +121,7 @@ fn singleton_borrowing_and_mapping_preserve_owned_values_and_metadata() {
     let error = error.context("mapping");
     let report = format!("{error:?}");
     let mut calls = 0;
-    let mapped = error.map(|error| {
+    let mapped = error.map_single(|error| {
         calls += 1;
         assert_eq!(error.as_str(), "after");
         error
@@ -154,7 +154,7 @@ fn mutable_erased_root_and_boxed_error_trait_refer_to_the_actual_error() {
     *root.downcast_mut::<StrError>().unwrap() = StrError::from("after");
     assert_eq!(
         error
-            .inner_ref()
+            .inner()
             .as_any()
             .downcast_ref::<StrError>()
             .unwrap()
@@ -177,12 +177,12 @@ fn failed_native_adapter_downcast_retains_the_original_adapter() {
     let report = format!("{error:?}");
     let adapter = error.into_dyn_error();
     let original = &*adapter as *const dyn eros::SendSyncError as *const ();
-    let adapter = ErrorUnion::<(StrError,)>::from_dyn_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<(StrError,)>::try_from_dyn_error(adapter).unwrap_err();
     assert_eq!(
         &*adapter as *const dyn eros::SendSyncError as *const (),
         original
     );
-    let recovered = ErrorUnion::<Pair>::from_dyn_error(adapter).unwrap();
+    let recovered = ErrorUnion::<Pair>::try_from_dyn_error(adapter).unwrap();
     assert_eq!(format!("{recovered:?}"), report);
 }
 

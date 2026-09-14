@@ -53,7 +53,7 @@ fn closure_owns_the_typed_root_and_can_explicitly_retain_it_as_source() {
     let error: ErrorUnion<(ConfigError, fmt::Error)> = ErrorUnion::new(config_error());
     let message = String::from("startup failed");
     let mut calls = 0;
-    let error: ErrorUnion<(StartupError,)> = error.map_root(|old| {
+    let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
         calls += 1;
         assert!(old.as_ref().as_any().is::<ConfigError>());
         StartupError {
@@ -83,7 +83,7 @@ fn closure_owns_the_typed_root_and_can_explicitly_retain_it_as_source() {
 
 #[test]
 fn closure_can_replace_the_old_root_with_an_unrelated_error_and_chain() {
-    let error = eros::error!("original failure").map_root(|_old| config_error());
+    let error = eros::error!("original failure").map_inner(|_old| config_error());
 
     assert!(error.is_inner::<ConfigError>());
     assert_eq!(
@@ -105,7 +105,7 @@ fn closure_can_replace_the_old_root_with_an_unrelated_error_and_chain() {
 #[test]
 fn closure_can_drop_the_source_chain_completely() {
     let error: ErrorUnion = ErrorUnion::new(config_error());
-    let error = error.map_root(|_| StrError::from("configuration unavailable"));
+    let error = error.map_inner(|_| StrError::from("configuration unavailable"));
 
     assert_eq!(error.to_string(), "configuration unavailable");
     assert!(error.source().is_none());
@@ -116,21 +116,21 @@ fn closure_can_drop_the_source_chain_completely() {
 fn identity_and_repeated_replacements_receive_the_actual_root() {
     let error: ErrorUnion = ErrorUnion::new(config_error());
     let report = format!("{error:?}");
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<ConfigError>().unwrap()
     });
     assert!(error.is_inner::<ConfigError>());
     assert_eq!(format!("{error:?}"), report);
 
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<ConfigError>());
         StartupError {
             message: "startup failed".into(),
             source: old,
         }
     });
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<StartupError>());
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<StartupError>().unwrap()
@@ -141,7 +141,7 @@ fn identity_and_repeated_replacements_receive_the_actual_root() {
         "startup failed <- cannot open configuration <- permission denied"
     );
 
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<StartupError>());
         StrError::from("replacement leaf")
     });
@@ -155,7 +155,7 @@ fn identity_and_repeated_replacements_receive_the_actual_root() {
 #[test]
 fn closure_can_downcast_and_consume_the_old_error() {
     let error: ErrorUnion = ErrorUnion::new(config_error());
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         let old: Box<dyn core::any::Any> = old;
         let old = old.downcast::<ConfigError>().unwrap();
         old.cause
@@ -168,7 +168,7 @@ fn closure_can_downcast_and_consume_the_old_error() {
 
 #[test]
 fn extracted_box_has_the_actual_returned_root_type() {
-    let error = eros::error!("original failure").map_root(|_| config_error());
+    let error = eros::error!("original failure").map_inner(|_| config_error());
     let boxed = error.into_inner();
     assert!(boxed.as_ref().as_any().is::<ConfigError>());
     let boxed: Box<dyn core::any::Any> = boxed;
@@ -180,11 +180,11 @@ fn extracted_box_has_the_actual_returned_root_type() {
 fn intentionally_boxed_root_keeps_its_type_and_owned_allocation() {
     let root = Box::new(config_error());
     let original_pointer = &*root as *const ConfigError;
-    let error = eros::error!("original failure").map_root(|_| root);
+    let error = eros::error!("original failure").map_inner(|_| root);
     assert!(error.is_inner::<Box<ConfigError>>());
     assert!(!error.is_inner::<ConfigError>());
 
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<Box<ConfigError>>());
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<Box<ConfigError>>().unwrap()
@@ -221,7 +221,7 @@ fn aligned_owned_root_supports_reference_mutable_and_owned_downcasts() {
     let drops = Arc::new(AtomicUsize::new(0));
     let payload = vec![37; 4097];
     let original_pointer = payload.as_ptr();
-    let mut error = eros::error!("original failure").map_root(|_| AlignedError {
+    let mut error = eros::error!("original failure").map_inner(|_| AlignedError {
         payload,
         drops: drops.clone(),
     });
@@ -259,7 +259,7 @@ fn aligned_anyerror_root_can_be_retained_as_source_then_replaced() {
     #[cfg(feature = "context")]
     let error = error.context(Box::new(DropError(context_drops.clone())) as Box<dyn SendSyncError>);
 
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         let root = old
             .as_ref()
             .as_any()
@@ -284,7 +284,7 @@ fn aligned_anyerror_root_can_be_retained_as_source_then_replaced() {
     assert_eq!(context_drops.load(Ordering::SeqCst), 0);
 
     let error: ErrorUnion<eros::AnyError> = error.into();
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         drop(old);
         StrError::from("replacement leaf")
     });
@@ -300,7 +300,7 @@ fn aligned_anyerror_root_can_be_retained_as_source_then_replaced() {
 #[test]
 fn wrong_type_owned_downcast_drops_root_and_context() {
     let drops = Arc::new(AtomicUsize::new(0));
-    let error = eros::error!("original failure").map_root(|_| AlignedError {
+    let error = eros::error!("original failure").map_inner(|_| AlignedError {
         payload: vec![73; 8193],
         drops: drops.clone(),
     });
@@ -340,13 +340,13 @@ fn zero_sized_root_moves_through_identity_extraction_and_drop_once() {
     assert_eq!(core::mem::size_of::<ZeroSizedError>(), 0);
     assert_eq!(core::mem::align_of::<ZeroSizedError>(), 64);
     let before = ZERO_SIZED_DROPS.load(Ordering::SeqCst);
-    let error = eros::error!("original failure").map_root(|_| ZeroSizedError);
+    let error = eros::error!("original failure").map_inner(|_| ZeroSizedError);
     assert!(error.is_inner::<ZeroSizedError>());
     let root = error.downcast_inner_ref::<ZeroSizedError>().unwrap();
     assert_eq!((root as *const ZeroSizedError).addr() % 64, 0);
     assert_eq!(ZERO_SIZED_DROPS.load(Ordering::SeqCst), before);
 
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<ZeroSizedError>());
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<ZeroSizedError>().unwrap()
@@ -357,7 +357,7 @@ fn zero_sized_root_moves_through_identity_extraction_and_drop_once() {
     drop(root);
     assert_eq!(ZERO_SIZED_DROPS.load(Ordering::SeqCst), before + 1);
 
-    let error = eros::error!("original failure").map_root(|_| ZeroSizedError);
+    let error = eros::error!("original failure").map_inner(|_| ZeroSizedError);
     drop(error);
     assert_eq!(ZERO_SIZED_DROPS.load(Ordering::SeqCst), before + 2);
 }
@@ -382,7 +382,7 @@ fn replacement_drops_old_and_new_roots_exactly_once() {
     let old_drops = Arc::new(AtomicUsize::new(0));
     let new_drops = Arc::new(AtomicUsize::new(0));
     let error: ErrorUnion = ErrorUnion::new(DropError(old_drops.clone()));
-    let error = error.map_root(|old| {
+    let error = error.map_inner(|old| {
         drop(old);
         DropError(new_drops.clone())
     });
@@ -404,7 +404,7 @@ fn panicking_closure_drops_root_and_context_without_leaking() {
     let error = error.context(Box::new(DropError(context_drops.clone())) as Box<dyn SendSyncError>);
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _: ErrorUnion<(StrError,)> = error.map_root(|_old| panic!("replacement failed"));
+        let _: ErrorUnion<(StrError,)> = error.map_inner(|_old| panic!("replacement failed"));
     }));
 
     assert!(result.is_err());

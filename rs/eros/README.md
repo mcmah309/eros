@@ -60,8 +60,8 @@ use std::{io, num::ParseIntError};
 // instead of creating an enum for each possible error variant.
 // `eros::Result<_,(..)>` is shorthand for  `Result<_,ErrorUnion<(..)>>`.
 fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
-    let contents = std::fs::read_to_string(path).into_union()?;
-    contents.trim().parse().into_union()
+    let contents = std::fs::read_to_string(path).union()?;
+    contents.trim().parse().union()
 }
 
 fn main() {
@@ -81,8 +81,8 @@ use eros::{IntoUnion, ReshapeUnion};
 use std::{io, num::ParseIntError};
 
 fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
-    let contents = std::fs::read_to_string(path).into_union()?;
-    contents.trim().parse().into_union()
+    let contents = std::fs::read_to_string(path).union()?;
+    contents.trim().parse().union()
 }
 
 // I/O Error is no longer tracked, we handled internally.
@@ -116,19 +116,19 @@ use eros::{IntoUnion, ReshapeUnion};
 use std::{io, net::{AddrParseError, IpAddr, TcpListener}, num::ParseIntError};
 
 fn load_host(path: &str) -> eros::Result<IpAddr, (io::Error, AddrParseError)> {
-    let contents = std::fs::read_to_string(path).into_union()?;
-    contents.trim().parse().into_union()
+    let contents = std::fs::read_to_string(path).union()?;
+    contents.trim().parse().union()
 }
 
 fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
-    let contents = std::fs::read_to_string(path).into_union()?;
-    contents.trim().parse().into_union()
+    let contents = std::fs::read_to_string(path).union()?;
+    contents.trim().parse().union()
 }
 
 fn bind_server() -> eros::Result<TcpListener, (io::Error, AddrParseError, ParseIntError)> {
     let host = load_host("config/host.txt").widen()?;
     let port = load_port("config/port.txt").widen()?;
-    TcpListener::bind((host, port)).into_union()
+    TcpListener::bind((host, port)).union()
 }
 
 fn main() {
@@ -444,7 +444,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a thin wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally.
 
-This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `to_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
+This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `into_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
 
 <details>
 
@@ -480,8 +480,8 @@ impl std::error::Error for CrateError {
 
 impl From<ErrorUnion<(io::Error, fmt::Error)>> for CrateError {
     fn from(error: ErrorUnion<(io::Error, fmt::Error)>) -> Self {
-        // `to_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
-        match error.to_enum() {
+        // `into_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
+        match error.into_enum() {
             E2::A(e) => CrateError::Io(e),
             E2::B(e) => CrateError::Format(e),
         }
@@ -497,8 +497,8 @@ fn regular_typed_result2() -> Result<(), fmt::Error> {
 }
 
 fn internal_api() -> eros::Result<(), (io::Error, fmt::Error)> {
-    regular_typed_result1().into_union()?;
-    regular_typed_result2().into_union()?;
+    regular_typed_result1().union()?;
+    regular_typed_result2().union()?;
     Ok(())
 }
 
@@ -645,7 +645,7 @@ WARN Something went wrong
 
 ### Adding Source Chains
 
-Use `map_root` to change the main error while keeping the original failure as its source. The closure receives the old root; return an error that stores it and exposes it through `Error::source()`:
+Use `map_inner` to change the main error while keeping the original failure as its source. The closure receives the boxed inner error; return an error that stores it and exposes it through `Error::source()`:
 
 ```rust
 use eros::SendSyncError;
@@ -669,7 +669,7 @@ impl Error for UpdateError {
 }
 
 let error = eros::error!("TLS certificate has expired")
-    .map_root(|source| UpdateError { source });
+    .map_inner(|source| UpdateError { source });
 
 println!("{error}");
 ```
@@ -677,6 +677,8 @@ println!("{error}");
 ```text
 Update preparation failed <- TLS certificate has expired
 ```
+
+For a union with a single possible error type, `map_single` passes the concrete error to the closure and preserves context, location, and backtrace. Or use `into_single` to extract that error and discard the metadata.
 
 ### Diagnostic Logging
 
@@ -687,7 +689,7 @@ The optional `diagnostic` feature adds `.diagnostic_display()` and `.diagnostic_
 // Both expose their boxed `source` through Error::source().
 
 let error = eros::error!("permission denied")
-    .map_root(|source| ConfigError { source })
+    .map_inner(|source| ConfigError { source })
     .context("read /etc/app.toml")
     .context("start service");
 
@@ -697,7 +699,7 @@ println!("diagnostic_display: {}", error.diagnostic_display());
 println!("diagnostic_debug: {}", error.diagnostic_debug());
 
 // Wrap again, preserving the full source chain.
-let error = error.map_root(|source| StartupError { source });
+let error = error.map_inner(|source| StartupError { source });
 println!("replacement: {error}");
 ```
 
@@ -780,7 +782,7 @@ where
     E: TypeSet,
 {
     let mut message = String::new();
-    let error_message = root_error_message(error.inner_ref());
+    let error_message = root_error_message(error.inner());
     message.push_str(&error_message);
 
     for context in error.user_contexts() {
@@ -797,14 +799,14 @@ fn validate_password(password: &str) -> eros::Result<()> {
             .context("Password validation failed")
             // This context is marked as "user facing" meaning it is safe to expose to the user
             .user_context("Please choose a stronger password.")
-            .into_dyn_union();
+            .any_union();
     }
     Ok(())
 }
 fn load_configuration() -> eros::Result<()> {
     Err(SystemDiskError)
         .context("Failed to read configuration from /etc/my-app/config.toml")
-        .into_dyn_union()
+        .any_union()
 }
 #[test]
 fn main() {
@@ -833,7 +835,7 @@ This approach keeps internal diagnostics while making the user-facing experience
 
 ### Anyhow
 
-`eros` comes with an `anyhow` feature flag. This adds a `ErrorUnion::anyhow` function for converting an `anyhow::Error` to an `ErrorUnion`. This can help integrate with legacy code.
+`eros` comes with an `anyhow` feature flag. This adds a `ErrorUnion::from_anyhow` function for converting an `anyhow::Error` to an `ErrorUnion`. This can help integrate with legacy code.
 
 `eros` can also quickly replace `anyhow` in any crate as simple as replacing all occurrences of:
 - `anyhow!` with `error!`
@@ -984,9 +986,9 @@ This kills the boilerplate, but it also kills accuracy: every function now claim
 type MyError = (io::Error, ParseIntError, AddrParseError);
 
 fn initialize_system() -> eros::Result<(), MyError> {
-    let data = read_file().into_union()?;
-    let port = parse_config(&data).into_union()?;
-    open_socket(port).into_union()?;
+    let data = read_file().union()?;
+    let port = parse_config(&data).union()?;
+    open_socket(port).union()?;
     Ok(())
 }
 ```

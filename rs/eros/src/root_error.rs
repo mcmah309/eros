@@ -4,20 +4,22 @@ use core::{mem, ptr};
 use crate::{ErrorUnion, SendSyncError, TypeSet, error_union::ErrorUnionInner};
 
 impl<E: TypeSet> ErrorUnion<E> {
-    /// Replaces the root, passing ownership of the old boxed error to a closure.
+    /// Replaces the inner error, passing ownership of the old boxed error to a closure.
     ///
-    /// The closure runs once, receives the previous root, and returns the new
+    /// The closure runs once, receives the previous inner error, and returns the new
     /// concrete error value. Eros handles boxing the replacement. Preserve the
-    /// original failure by storing the old root in the new error and returning
+    /// original failure by storing the old inner error in the new error and returning
     /// it from `Error::source()`. Eros uses the new error's source chain without
-    /// automatically adding the old root.
+    /// automatically adding the old inner error.
     ///
     /// Context, the original Eros capture location, and the saved Eros backtrace
     /// are preserved. No new backtrace or location is captured.
     ///
     /// The returned union has the replacement type as its single variant.
+    /// For a union with a single variant, [`Self::map_single`] passes the concrete
+    /// inner error to the closure instead of a boxed error.
     ///
-    /// Wrap the old root as the source of a new error:
+    /// Wrap the old inner error as the source of a new error:
     ///
     /// ```
     /// use eros::SendSyncError;
@@ -41,13 +43,13 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// }
     ///
     /// let error = eros::error!("permission denied")
-    ///     .map_root(|old| ConfigError { source: old });
+    ///     .map_inner(|old| ConfigError { source: old });
     ///
     /// assert_eq!(error.to_string(), "cannot open configuration <- permission denied");
     /// assert!(error.is_inner::<ConfigError>());
     /// assert_eq!(error.source().unwrap().to_string(), "permission denied");
     /// ```
-    pub fn map_root<T, F>(self, f: F) -> ErrorUnion<(T,)>
+    pub fn map_inner<T, F>(self, f: F) -> ErrorUnion<(T,)>
     where
         T: SendSyncError,
         F: FnOnce(Box<dyn SendSyncError>) -> T,
@@ -108,8 +110,8 @@ mod tests {
         #[cfg(feature = "context")]
         let original_context = error.inner.context.as_ptr();
 
-        let error = error.map_root(|_| StrError::from("cannot open configuration"));
-        let _error = error.map_root(|_| StrError::from("startup failed"));
+        let error = error.map_inner(|_| StrError::from("cannot open configuration"));
+        let _error = error.map_inner(|_| StrError::from("startup failed"));
 
         #[cfg(feature = "backtrace")]
         {

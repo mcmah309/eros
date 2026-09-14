@@ -103,7 +103,7 @@ fn generic_context_error_to_traced_error_union() {
     -> Result<(), eros::ErrorUnion<(std::sync::mpsc::RecvError, std::io::Error, std::fmt::Error)>>
     {
         // yeet_a_regular()?; // todo ideally this should work
-        yeet_a_regular().into_union()?;
+        yeet_a_regular().union()?;
         Ok(())
     }
 
@@ -167,13 +167,13 @@ fn ensure() {
 fn absent_value_error() {
     fn func1() -> eros::Result<()> {
         // None.context("This value should be some").into() // todo ideally this should work
-        None.context("This value should be some").into_dyn_union()
+        None.context("This value should be some").any_union()
     }
 
     let result = func1().context("Some context");
     println!("{:?}", result);
     let error = result.unwrap_err();
-    let inner_error = error.inner_ref() as &dyn std::any::Any;
+    let inner_error = error.inner() as &dyn std::any::Any;
     assert!(inner_error.is::<AbsentValueError>());
 }
 
@@ -186,9 +186,9 @@ fn nesting_traced_dyn_calls() {
     fn func2() -> eros::Result<()> {
         func1()
             .context("One") // creates union
-            .into_dyn_union() // should not nest it
+            .any_union() // should not nest it
             .context("Two")
-            .into_dyn_union() // should not nest it
+            .any_union() // should not nest it
             .context("Three")
     }
 
@@ -215,7 +215,7 @@ fn integration_with_anyhow() {
     fn eros_result() -> eros::Result<()> {
         use eros::ErrorUnion;
 
-        anyhow_result().map_err(ErrorUnion::anyhow)?;
+        anyhow_result().map_err(ErrorUnion::from_anyhow)?;
         Ok(())
     }
 

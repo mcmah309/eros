@@ -64,9 +64,9 @@ fn error_sets_support_generic_and_empty_unions() {
 fn largest_error_set_supports_enum_conversions_and_reshaping() {
     let error: ErrorUnion<(TestError<25>,)> = ErrorUnion::new(TestError::<25>);
     let mut error: ErrorUnion<AllErrors> = error.widen();
-    assert!(matches!(error.ref_enum(), E26::Z(_)));
-    assert!(matches!(error.mut_enum(), E26::Z(_)));
-    assert!(matches!(error.to_enum(), E26::Z(_)));
+    assert!(matches!(error.as_enum(), E26::Z(_)));
+    assert!(matches!(error.as_mut_enum(), E26::Z(_)));
+    assert!(matches!(error.into_enum(), E26::Z(_)));
 
     let error: ErrorUnion<AllErrors> = ErrorUnion::new(TestError::<25>);
     let remainder = error.narrow::<TestError<0>, _>().unwrap_err();

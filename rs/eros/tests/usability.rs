@@ -158,13 +158,13 @@ fn multi_match() {
     use eros::E2;
 
     let o_1: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(NotEnoughMemory);
-    match o_1.ref_enum() {
+    match o_1.as_enum() {
         E2::A(_u) => {}
         E2::B(_s) => {
             unreachable!()
         }
     }
-    match o_1.to_enum() {
+    match o_1.into_enum() {
         E2::A(_u) => {}
         E2::B(_s) => {
             unreachable!()
@@ -202,7 +202,7 @@ fn multi_narrow() {
     match o_2
         .subset::<(Timeout, NotEnoughMemory), _>()
         .unwrap()
-        .to_enum()
+        .into_enum()
     {
         E2::A(Timeout {}) => {}
         E2::B(NotEnoughMemory {}) => {
@@ -242,16 +242,16 @@ impl std::error::Error for MyErrorType {
 }
 
 #[test]
-fn map_inner() {
+fn map_single() {
     let error: ErrorUnion<(std::io::Error,)> = ErrorUnion::new(std::io::Error::other("wuaaaaahhh"));
-    let error: ErrorUnion<(IoErrorWrapper,)> = error.map(IoErrorWrapper);
+    let error: ErrorUnion<(IoErrorWrapper,)> = error.map_single(IoErrorWrapper);
     let message = format!("{:?}", error);
     assert!(
         !message.contains("Context (innermost first):"),
         "Expected no context in message:\n{}",
         message
     );
-    let error: ErrorUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e.0)));
+    let error: ErrorUnion<(MyErrorType,)> = error.map_single(|e| MyErrorType(Box::new(e.0)));
     let message = format!("{:?}", error);
     assert!(
         !message.contains("Context (innermost first):"),
@@ -259,7 +259,7 @@ fn map_inner() {
         message
     );
     let error: ErrorUnion<(std::io::Error,)> = ErrorUnion::new(std::io::Error::other("io error"));
-    let error: ErrorUnion<(MyErrorType,)> = error.map(|e| MyErrorType(Box::new(e)));
+    let error: ErrorUnion<(MyErrorType,)> = error.map_single(|e| MyErrorType(Box::new(e)));
     let message = format!("{:?}", error);
     assert!(
         !message.contains("Context (innermost first):"),
@@ -316,7 +316,7 @@ fn union() {
     fn result_union() -> Result<(), ErrorUnion<(std::io::Error,)>> {
         let error =
             std::io::Error::new(std::io::ErrorKind::AddrInUse, "Address in use message here");
-        Err(error).into_union()
+        Err(error).union()
     }
 
     fn mapped_result_union() -> Result<(), ErrorUnion<(MyCustomError,)>> {
