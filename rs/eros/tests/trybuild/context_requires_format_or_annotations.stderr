@@ -1,0 +1,5 @@
+error: `#[context]` with no format string requires at least one parameter annotated with `#[fmt("...")]`
+ --> tests/trybuild/context_requires_format_or_annotations.rs:2:4
+  |
+2 | fn missing_annotation(value: u8) -> eros::Result<()> {
+  |    ^^^^^^^^^^^^^^^^^^

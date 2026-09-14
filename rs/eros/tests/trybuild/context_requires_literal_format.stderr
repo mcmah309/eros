@@ -1,0 +1,5 @@
+error: expected string literal
+ --> tests/trybuild/context_requires_literal_format.rs:1:17
+  |
+1 | #[eros::context(42)]
+  |                 ^^

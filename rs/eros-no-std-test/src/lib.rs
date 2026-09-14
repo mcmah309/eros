@@ -143,6 +143,14 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let sub_union = sub.unwrap();
     assert_eq(sub_union.into_single(), Timeout)?;
 
+    let u: ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)> = ErrorUnion::new(NotEnoughMemory);
+    let remainder = u.subset::<(Timeout,), _>().expect_err("non-member must be rejected");
+    assert_type::<NotEnoughMemory>(remainder.inner_ref(), "subset remainder")?;
+
+    let diagnostic = eros::error!("diagnostic root").context("diagnostic context").diagnostic_debug();
+    assert_eq_str(diagnostic["root"].as_str().unwrap(), "diagnostic root")?;
+    assert_eq_str(diagnostic["contexts"][0]["message"].as_str().unwrap(), "diagnostic context")?;
+
     Ok(())
 }
 

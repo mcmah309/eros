@@ -559,10 +559,7 @@ fn tracing_percent_and_question_mark_use_the_public_human_formats() {
     );
 }
 
-#[cfg(all(
-    feature = "tracing",
-    any(feature = "log_display", feature = "log_debug")
-))]
+#[cfg(feature = "logging")]
 #[test]
 fn logging_helpers_emit_the_selected_format_for_typed_and_erased_errors() {
     use eros::LogExt;
@@ -608,7 +605,11 @@ fn logging_helpers_emit_the_selected_format_for_typed_and_erased_errors() {
         .into_iter::<serde_json::Value>()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    assert_eq!(events.len(), 8, "successful results must not emit logs");
+    let logging_enabled = cfg!(all(
+        feature = "tracing",
+        any(feature = "log_display", feature = "log_debug")
+    ));
+    assert_eq!(events.len(), if logging_enabled { 8 } else { 0 });
     for (event, level) in events.iter().zip(["ERROR", "WARN"].repeat(4)) {
         assert_eq!(event["level"], level);
         assert_eq!(event["fields"]["message"], expected);

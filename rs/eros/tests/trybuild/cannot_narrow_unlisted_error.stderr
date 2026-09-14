@@ -1,0 +1,55 @@
+error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<StrError, _>` is not satisfied
+ --> tests/trybuild/cannot_narrow_unlisted_error.rs:5:19
+  |
+5 |     let _ = error.narrow::<StrError, _>();
+  |                   ^^^^^^ the trait `eros::type_set::Narrow<StrError, _>` is not implemented for `eros::End`
+  |
+help: the following other types implement trait `eros::type_set::Narrow<Target, Index>`
+ --> src/type_set.rs
+  |
+  | / impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
+  | | where
+  | |     Tail: TupleForm,
+  | |     Cons<Target, Tail>: TupleForm,
+  | |__________________________________^ `eros::Cons<Target, Tail>` implements `eros::type_set::Narrow<Target, eros::End>`
+...
+  | / impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
+  | | where
+  | |     Tail: Narrow<Target, Index>,
+  | |     Tail: TupleForm,
+  | |     Cons<Head, Tail>: TupleForm,
+  | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
+  | |______________________________________________________________________^ `eros::Cons<Head, Tail>` implements `eros::type_set::Narrow<Target, eros::Recurse<Index>>`
+  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::Narrow<StrError, eros::Recurse<_>>`
+
+error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<StrError, _>` is not satisfied
+ --> tests/trybuild/cannot_narrow_unlisted_error.rs:5:19
+  |
+5 |     let _ = error.narrow::<StrError, _>();
+  |                   ^^^^^^ the trait `eros::type_set::Narrow<StrError, _>` is not implemented for `eros::End`
+  |
+help: the following other types implement trait `eros::type_set::Narrow<Target, Index>`
+ --> src/type_set.rs
+  |
+  | / impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
+  | | where
+  | |     Tail: TupleForm,
+  | |     Cons<Target, Tail>: TupleForm,
+  | |__________________________________^ `eros::Cons<Target, Tail>` implements `eros::type_set::Narrow<Target, eros::End>`
+...
+  | / impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
+  | | where
+  | |     Tail: Narrow<Target, Index>,
+  | |     Tail: TupleForm,
+  | |     Cons<Head, Tail>: TupleForm,
+  | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
+  | |______________________________________________________________________^ `eros::Cons<Head, Tail>` implements `eros::type_set::Narrow<Target, eros::Recurse<Index>>`
+  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::Narrow<StrError, eros::Recurse<_>>`
+note: required by a bound in `ErrorUnion::<E>::narrow`
+ --> src/error_union.rs
+  |
+  |     pub fn narrow<Target, Index>(
+  |            ------ required by a bound in this associated function
+...
+  |         E::Variants: Narrow<Target, Index>,
+  |                      ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::narrow`

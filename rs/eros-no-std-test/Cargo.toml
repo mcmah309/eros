@@ -13,6 +13,7 @@ eros = { path = "../eros", default-features = false, features = [
     "context",
     "location",
     "user_context",
+    "diagnostic",
 ] }
 
 [features]

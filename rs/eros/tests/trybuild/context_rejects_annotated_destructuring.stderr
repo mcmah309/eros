@@ -1,0 +1,5 @@
+error: `#[fmt("...")]` is only supported on simple identifier patterns
+ --> tests/trybuild/context_rejects_annotated_destructuring.rs:2:32
+  |
+2 | fn destructured(#[fmt("{:?}")] (left, right): (u8, u8)) -> eros::Result<()> {
+  |                                ^^^^^^^^^^^^^

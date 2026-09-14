@@ -1,0 +1,5 @@
+error: a parameter may have at most one `#[fmt("...")]` attribute, and it must contain a single string literal
+ --> tests/trybuild/context_rejects_malformed_fmt.rs:2:25
+  |
+2 | fn malformed(#[fmt(42)] value: u8) -> eros::Result<()> {
+  |                         ^^^^^

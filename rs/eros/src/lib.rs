@@ -3,7 +3,7 @@
 
 extern crate alloc;
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", test))]
 extern crate std;
 
 // Re-export alloc items so that the exported macros (e.g. `error!`/`bail!`) work in

@@ -1,0 +1,20 @@
+error[E0277]: the trait bound `eros::End: eros::type_set::Contains<StrError, _>` is not satisfied
+ --> tests/trybuild/cannot_construct_unlisted_error.rs:4:45
+  |
+4 |     let _: ErrorUnion<(std::fmt::Error,)> = ErrorUnion::new(StrError::from("unlisted"));
+  |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `eros::type_set::Contains<StrError, _>` is not implemented for `eros::End`
+  |
+help: the trait `eros::type_set::Contains<T, eros::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl<T> Contains<T, End> for AnyError {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::Contains<StrError, eros::Cons<_, ()>>`
+note: required by a bound in `ErrorUnion::new`
+ --> src/error_union.rs
+  |
+  |     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
+  |            --- required by a bound in this associated function
+...
+  |         OutSet::Variants: Contains<T, Index>,
+  |                           ^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::new`

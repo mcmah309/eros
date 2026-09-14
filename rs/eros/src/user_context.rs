@@ -15,6 +15,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "std"))]
+    use std::prelude::v1::*;
     use crate::SendSyncError;
 
     use super::*;
@@ -66,7 +68,7 @@ mod tests {
         let union_b = union_b.context("Normal context");
         let union_b = union_b.user_context("User context");
 
-        let _user_contexts = union_b.user_contexts().collect::<Vec<_>>();
+        let user_context = union_b.user_contexts().collect::<Vec<_>>();
 
         assert_eq!(user_context.len(), 1);
         assert_eq!(user_context[0].to_string(), "User context");

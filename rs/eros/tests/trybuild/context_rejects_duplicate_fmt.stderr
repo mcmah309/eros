@@ -1,0 +1,5 @@
+error: a parameter may have at most one `#[fmt("...")]` attribute, and it must contain a single string literal
+ --> tests/trybuild/context_rejects_duplicate_fmt.rs:2:42
+  |
+2 | fn duplicate(#[fmt("{}")] #[fmt("{:?}")] value: u8) -> eros::Result<()> {
+  |                                          ^^^^^

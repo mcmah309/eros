@@ -507,9 +507,10 @@ where
     >
     where
         TargetList: TypeSet,
-        E::Variants: IsFold + SupersetOf<TargetList::Variants, Index>,
+        TargetList::Variants: IsFold,
+        E::Variants: SupersetOf<TargetList::Variants, Index>,
     {
-        if E::Variants::is_fold(&self.inner.error as &dyn Any) {
+        if TargetList::Variants::is_fold(&self.inner.error as &dyn Any) {
             Ok(ErrorUnion {
                 inner: self.inner,
                 _pd: PhantomData,
@@ -972,10 +973,13 @@ impl ErrorUnion {
 
 #[cfg(feature = "anyhow")]
 impl From<ErrorUnion> for anyhow::Error {
+    #[allow(unused_mut)]
     fn from(mut value: ErrorUnion) -> Self {
+        #[cfg(feature = "context")]
         let context = core::mem::take(&mut value.inner.context);
         let inner_error = value.into_inner();
         let mut error = anyhow::Error::new(inner_error);
+        #[cfg(feature = "context")]
         for c in context {
             error = error.context(c.context);
         }
@@ -988,6 +992,8 @@ impl From<ErrorUnion> for anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use std::{prelude::v1::*, vec};
     use std::fmt;
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -1254,6 +1260,8 @@ mod tests {
 #[cfg(test)]
 mod latest_error_tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use std::prelude::v1::*;
     use std::fmt;
 
     #[derive(Debug, PartialEq)]
@@ -1365,6 +1373,8 @@ mod latest_error_tests {
 #[cfg(test)]
 mod downcast_inner_tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use std::{prelude::v1::*, vec};
     use std::fmt;
 
     #[derive(Debug, PartialEq)]

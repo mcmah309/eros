@@ -10,8 +10,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        rust: [stable]
+        args:
+          - ""
+          - "--all-features"
+          - "--no-default-features"
+          - "--no-default-features --features std"
+          - "--no-default-features --features context"
+          - "--no-default-features --features location"
+          - "--no-default-features --features diagnostic"
+          - "--no-default-features --features context,location,user_context,diagnostic,logging"
+          - "--no-default-features --features anyhow"
+          - "--no-default-features --features backtrace,diagnostic"
+          - "--no-default-features --features tracing"
+          - "--no-default-features --features context,tracing,log_display"
+          - "--no-default-features --features logging,log_debug"
 
     steps:
       - name: Checkout repository
@@ -20,16 +34,27 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           override: true
 
       - name: Run tests
         env:
-          RUSTFLAGS: "--cfg test_in_ci"
-        run: |
-          cargo test --all-features --workspace --exclude eros-no-std-test
-          cargo test --workspace --exclude eros-no-std-test
-          cargo test --no-default-features --workspace --exclude eros-no-std-test
+          RUST_BACKTRACE: "0"
+          RUST_LIB_BACKTRACE: "0"
+        # Select eros alone: eros-macros' dev dependency enables eros' defaults
+        # during workspace tests, masking failures in disabled feature paths.
+        run: cargo test -p eros ${{ matrix.args }}
+
+      - name: Test procedural macro crate
+        if: matrix.args == ''
+        run: cargo test -p eros-macros
+
+      - name: Test captured backtraces
+        if: matrix.args == '--all-features'
+        env:
+          RUST_BACKTRACE: "1"
+          RUST_LIB_BACKTRACE: "1"
+        run: cargo test -p eros --all-features --test formatting --test reshaping
 
   miri:
     runs-on: ubuntu-latest
@@ -47,8 +72,13 @@ jobs:
       - name: Run Miri tests
         env:
           RUSTFLAGS: "--cfg test_in_ci"
+          # Formatting a captured std backtrace reads the working directory.
+          MIRIFLAGS: "-Zmiri-disable-isolation"
+          RUST_BACKTRACE: "0"
+          RUST_LIB_BACKTRACE: "0"
         run: |
           cargo miri test -p eros
+          cargo miri test -p eros --no-default-features
 
   no-std:
     runs-on: ubuntu-latest
