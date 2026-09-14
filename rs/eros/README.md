@@ -418,63 +418,6 @@ format!(
 
 Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
 
-## Logging
-
-`Display` prints the root error followed by its `Error::source()` chain. `Debug` produces a human-readable report with context, locations, and backtrace information.
-
-| Format | Output | Tracing field |
-| --- | --- | --- |
-| `{}` | Root and sources separated by ` <- ` | `error = %error` |
-| `{:#}` | Root only | `error = %format_args!("{error:#}")` |
-| `{:?}` | Root, sources, contexts, locations, and backtrace | `error = ?error` |
-| `{:#?}` | Same report without locations and backtrace | `error = %format_args!("{error:#?}")` |
-
-The optional `diagnostic` feature adds `.diagnostic_display()` and `.diagnostic_debug()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
-
-```rust,ignore
-// ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
-// Both expose their boxed `source` through Error::source().
-
-let error = eros::error!("permission denied")
-    .map_root(|source| ConfigError { source })
-    .context("read /etc/app.toml")
-    .context("start service");
-
-tracing::error!(error = %error, "startup failed");
-tracing::error!(error = ?error, "startup failed");
-println!("diagnostic_display: {}", error.diagnostic_display());
-println!("diagnostic_debug: {}", error.diagnostic_debug());
-
-// Wrap again, preserving the full source chain.
-let error = error.map_root(|source| StartupError { source });
-println!("replacement: {error}");
-```
-
-With default Eros features, `diagnostic`, `RUST_LIB_BACKTRACE=0`, and a text subscriber configured without timestamps, targets, or ANSI colors, the output is:
-
-```text
-ERROR startup failed error=cannot open configuration <- permission denied
-```
-```text
-ERROR startup failed error=cannot open configuration
-  caused by: permission denied
-
-  Context (innermost first):
-    1. read /etc/app.toml
-    2. start service
-
-Backtrace (disabled):
-```
-```text
-diagnostic_display: {"root":"cannot open configuration","sources":["permission denied"]}
-```
-```text
-diagnostic_debug: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
-```
-```text
-replacement: startup failed <- cannot open configuration <- permission denied
-```
-
 ## Best Practices
 
 ### Use In Libraries
@@ -681,11 +624,24 @@ fn func1b() -> eros::Result<()> {
 
 **Tradeoff:** because no single function is locally responsible for attaching a given piece of context, it takes discipline and more time has to be spent at each call-site — you have to ask "would this information otherwise be lost going up the stack from here?" If a function is called from many places, that question has to be answered (and the same context written) at each call-site rather than once at the function's own definition. It's also easy to accidentally end up restating context slightly differently at two call-sites — in the example above, `func1` and `func1b` phrase the same underlying fact as `"Failed to do some action. param was {}"` and `"Some action failed with param {}"` — since nothing enforces a single canonical phrasing the way `#[context]` on the function itself does. It is also easy to get lazy and skip attaching context altogether at a given call-site, silently losing information that would have been captured automatically under Approach 1.
 
+### Backtrace vs Location
+
+`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+
 ### Logging
+
+For `ErrorUnion`, `Display` prints the root error followed by its `Error::source()` chain. `Debug` produces a human-readable report with context, locations, and backtrace information.
+
+| Format | Output | Tracing field |
+| --- | --- | --- |
+| `{}` | Root and sources separated by ` <- ` | `error = %error` |
+| `{:#}` | Root only | `error = %format_args!("{error:#}")` |
+| `{:?}` | Root, sources, contexts, locations, and backtrace | `error = ?error` |
+| `{:#?}` | Same report without locations and backtrace | `error = %format_args!("{error:#?}")` |
 
 For logging, [`err_trail`](https://github.com/mcmah309/err_trail) is recommended. Libraries can use its constructs like `error!`, `warn!`, `info!`, `debug!`, and `trace!` macros while downstream applications select the `tracing`, `log`, or `defmt` backend. If no backend is selected by a downstream, then the code is optimized away by the compiler.
 
-Use `%` for Eros's `Display` format and `?` for its `Debug` report, choosing the format at each call. The `ErrContext` trait also provides methods like `.warn(())`, which logs an `Err` using `Display` and returns the result unchanged:
+The `ErrContext` trait in `err_trail` also provides methods like `.warn(())`, which logs an `Err` using `Display` and returns the result unchanged:
 
 ```rust,ignore
 use eros::bail;
@@ -722,10 +678,6 @@ The `.warn(())` call emits:
 WARN Something went wrong
 ```
 
-### Backtrace vs Location
-
-`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
-
 ## Additional Features
 
 ### Adding Source Chains
@@ -761,6 +713,54 @@ println!("{error}");
 
 ```text
 Update preparation failed <- TLS certificate has expired
+```
+
+### Diagnostic Logging
+
+The optional `diagnostic` feature adds `.diagnostic_display()` and `.diagnostic_debug()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
+
+```rust,ignore
+// ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
+// Both expose their boxed `source` through Error::source().
+
+let error = eros::error!("permission denied")
+    .map_root(|source| ConfigError { source })
+    .context("read /etc/app.toml")
+    .context("start service");
+
+tracing::error!(error = %error, "startup failed");
+tracing::error!(error = ?error, "startup failed");
+println!("diagnostic_display: {}", error.diagnostic_display());
+println!("diagnostic_debug: {}", error.diagnostic_debug());
+
+// Wrap again, preserving the full source chain.
+let error = error.map_root(|source| StartupError { source });
+println!("replacement: {error}");
+```
+
+With default Eros features, `diagnostic`, `RUST_LIB_BACKTRACE=0`, and a text subscriber configured without timestamps, targets, or ANSI colors, the output is:
+
+```text
+ERROR startup failed error=cannot open configuration <- permission denied
+```
+```text
+ERROR startup failed error=cannot open configuration
+  caused by: permission denied
+
+  Context (innermost first):
+    1. read /etc/app.toml
+    2. start service
+
+Backtrace (disabled):
+```
+```text
+diagnostic_display: {"root":"cannot open configuration","sources":["permission denied"]}
+```
+```text
+diagnostic_debug: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
+```
+```text
+replacement: startup failed <- cannot open configuration <- permission denied
 ```
 
 ### Exposing Errors To Application Users
