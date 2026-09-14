@@ -559,63 +559,6 @@ fn tracing_percent_and_question_mark_use_the_public_human_formats() {
     );
 }
 
-#[cfg(feature = "logging")]
-#[test]
-fn logging_helpers_emit_the_selected_format_for_typed_and_erased_errors() {
-    use eros::LogExt;
-
-    let error = start_service().unwrap_err();
-    let expected = if cfg!(feature = "log_debug") {
-        // Debug takes precedence if both formatting features are enabled.
-        // In particular, the helper must keep the backtrace and locations.
-        format!("{error:?}")
-    } else {
-        error.to_string()
-    };
-    let output = Buffer::default();
-    let writer = output.clone();
-    let subscriber = tracing_subscriber::fmt()
-        .json()
-        .without_time()
-        .with_writer(move || writer.clone())
-        .finish();
-
-    tracing::subscriber::with_default(subscriber, || {
-        error.log_error();
-        error.log_warn();
-        let result: Result<(), _> = Err(error);
-        let error = result.log_error().log_warn().unwrap_err();
-        let error: ErrorUnion<eros::AnyError> = error.into();
-        error.log_error();
-        error.log_warn();
-        let result: Result<(), _> = Err(error);
-        assert_eq!(
-            result.log_error().log_warn().unwrap_err().to_string(),
-            "cannot open configuration <- permission denied"
-        );
-
-        let typed_ok: Result<_, ErrorUnion<(NativeError,)>> = Ok(42);
-        let erased_ok: Result<_, ErrorUnion<eros::AnyError>> = Ok(43);
-        assert_eq!(typed_ok.log_error().log_warn().unwrap(), 42);
-        assert_eq!(erased_ok.log_error().log_warn().unwrap(), 43);
-    });
-
-    let bytes = output.0.lock().unwrap();
-    let events = serde_json::Deserializer::from_slice(&bytes)
-        .into_iter::<serde_json::Value>()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-    let logging_enabled = cfg!(all(
-        feature = "tracing",
-        any(feature = "log_display", feature = "log_debug")
-    ));
-    assert_eq!(events.len(), if logging_enabled { 8 } else { 0 });
-    for (event, level) in events.iter().zip(["ERROR", "WARN"].repeat(4)) {
-        assert_eq!(event["level"], level);
-        assert_eq!(event["fields"]["message"], expected);
-    }
-}
-
 #[cfg(feature = "diagnostic")]
 #[test]
 fn diagnostic_display_is_data_with_the_same_root_and_source_messages() {

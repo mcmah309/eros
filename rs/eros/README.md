@@ -479,40 +479,6 @@ diagnostic_debug: {"backtrace":{"status":"disabled","text":null},"contexts":[{"m
 replacement: startup failed <- cannot open configuration <- permission denied
 ```
 
-### Logging Helpers
-
-The `logging` feature enables `log_error()` and `log_warn()` on `ErrorUnion`, and the `LogExt` trait for chaining logging on a result:
-
-```rust,ignore
-use eros::{LogExt, bail};
-
-fn eros_result() -> eros::Result<()> {
-    bail!("Something went wrong")
-}
-
-fn main() {
-    tracing_subscriber::fmt().init();
-
-    if let Err(error) = eros_result() {
-        error.log_error();
-    }
-
-    // Log an Err and return the Result unchanged.
-    let _result = eros_result().log_warn();
-}
-```
-
-### Feature Flags
-
-The `logging` feature enables the helpers without selecting a backend. Enable `tracing` to select the backend and `log_display` for ordinary Display or `log_debug` for ordinary Debug, including locations and backtrace information. Debug takes precedence if both format flags are enabled. Helpers emit events only when a backend and a format flag are enabled.
-
-```toml
-[dependencies]
-eros = { version = "*", features = ["tracing", "log_debug"] }
-```
-
-Libraries should enable only `logging` and leave `tracing`, `log_debug`, and `log_display` for downstream applications to select. Direct `tracing::error!` calls do not depend on these helper flags.
-
 ## Misc
 
 ### Use In Libraries
@@ -655,6 +621,47 @@ With this, internal composing of errors can remain precise and ergonomic vs trad
 
 `eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
 
+### Logging
+
+For logging, [`err_trail`](https://github.com/mcmah309/err_trail) is recommended. Libraries can use its constructs like `error!`, `warn!`, `info!`, `debug!`, and `trace!` macros while downstream applications select the `tracing`, `log`, or `defmt` backend. If no backend is selected by a downstream, then the code is optimized away by the compiler.
+
+Use `%` for Eros's `Display` format and `?` for its `Debug` report, choosing the format at each call. The `ErrContext` trait also provides methods like `.warn(())`, which logs an `Err` using `Display` and returns the result unchanged:
+
+```rust,ignore
+use eros::bail;
+use err_trail::ErrContext;
+
+fn eros_result() -> eros::Result<()> {
+    bail!("Something went wrong")
+}
+
+fn main() {
+    tracing_subscriber::fmt()
+        .without_time()
+        .with_target(false)
+        .with_ansi(false)
+        .init();
+
+    if let Err(error) = eros_result() {
+        err_trail::error!(error = %error, "Operation failed");
+    }
+
+    let _result = eros_result().warn(());
+}
+```
+
+The `error!` call emits:
+
+```text
+ERROR Operation failed error=Something went wrong
+```
+
+The `.warn(())` call emits:
+
+```text
+WARN Something went wrong
+```
+
 ### Anyhow
 
 `eros` comes with an `anyhow` feature flag. This adds a `ErrorUnion::anyhow` function for converting an `anyhow::Error` to an `ErrorUnion`. This can help integrate with legacy code.
@@ -703,6 +710,8 @@ TLS certificate has expired
 ```
 
 The headline identifies the problem immediately: an expired certificate. The context then identifies the request and the application operation that encountered it.
+
+### Adding Source Chains
 
 Use `map_root` to change the main error while keeping the original failure as its source. The closure receives the old root; return an error that stores it and exposes it through `Error::source()`:
 

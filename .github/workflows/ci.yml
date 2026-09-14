@@ -20,12 +20,9 @@ jobs:
           - "--no-default-features --features context"
           - "--no-default-features --features location"
           - "--no-default-features --features diagnostic"
-          - "--no-default-features --features context,location,user_context,diagnostic,logging"
+          - "--no-default-features --features context,location,user_context,diagnostic"
           - "--no-default-features --features anyhow"
           - "--no-default-features --features backtrace,diagnostic"
-          - "--no-default-features --features tracing"
-          - "--no-default-features --features context,tracing,log_display"
-          - "--no-default-features --features logging,log_debug"
 
     steps:
       - name: Checkout repository

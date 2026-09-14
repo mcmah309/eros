@@ -20,7 +20,6 @@ color-backtrace = { version = "0.7", default-features = false, features = [
     "use-btparse-crate",
 ], optional = true }
 btparse = { version = "0.2", optional = true }
-tracing = { version = "0.1", optional = true }
 serde_json = { version = "1", default-features = false, features = ["alloc"], optional = true }
 
 
@@ -48,15 +47,6 @@ better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
 location = []
 # Add integration with anyhow
 anyhow = ["std", "dep:anyhow"]
-# Enables `ErrorUnion::log_*` statements and `LogExt` for `Result`. But does not enable a logging backend.
-# Libraries can enable this and let a downstream enable a backend.
-logging = []
-# Enables tracing in `ErrorUnion::log_*` statements. Libraries should not set this.
-tracing = ["dep:tracing", "logging"]
-# Each `ErrorUnion::log_*` statement will log as debug. Libraries should not set this.
-log_debug = []
-# Each `ErrorUnion::log_*` statement will log as display. Libraries should not set this.
-log_display = []
 # Adds context methods that are user facing. Useful for applications reporting error messages to users.
 user_context = ["context"]
 # Exposes diagnostic_display()/diagnostic_debug() as structured JSON values.

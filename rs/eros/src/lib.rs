@@ -29,11 +29,6 @@ mod type_set;
 mod union_to_enum;
 #[cfg(feature = "user_context")]
 mod user_context;
-#[cfg(feature = "logging")]
-mod logging;
-
-#[cfg(feature = "logging")]
-pub use logging::LogExt;
 
 // re-export macro
 pub use eros_macros::context;
