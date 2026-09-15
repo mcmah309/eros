@@ -6,7 +6,7 @@
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 [<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std-support)
 
-**Typed errors when you need them, easy propagation everywhere.** Combine error types without defining custom enums. Handle the failures you care about and propagate the rest with context. Choose precise error types or a simple catch-all result for each API, in libraries and applications alike.
+**Typed or untyped errors, with ergonomic propagation and no enum boilerplate.** Eros lets each API specify its possible error types or use a catch-all result. Callers can handle specific error types and attach context as errors move through the call stack. Both approaches work in libraries and applications.
 
 Choose the signature that fits your API:
 
