@@ -175,5 +175,44 @@ fn better_backtrace(backtrace: &std::backtrace::Backtrace) -> Option<String> {
     // Formatting an error must not inject terminal escapes into tracing/JSON.
     let mut output = color_backtrace::termcolor::NoColor::new(Vec::new());
     printer.print_trace(&trace, &mut output).ok()?;
-    String::from_utf8(output.into_inner()).ok()
+    let mut text = String::from_utf8(output.into_inner()).ok()?;
+    // Eros already prints its own backtrace heading.
+    if let Some((banner, _)) = text.split_once('\n') {
+        if banner.trim_matches('━').trim() == "BACKTRACE" {
+            text.drain(..=banner.len());
+        }
+    }
+    Some(text)
+}
+
+#[cfg(all(test, feature = "better_backtrace"))]
+mod tests {
+    use alloc::{format, string::String, vec::Vec};
+    use std::backtrace::Backtrace;
+
+    #[test]
+    fn better_backtrace_removes_color_backtrace_banner() {
+        // Exercise the formatter even when environment-controlled capture is disabled.
+        let backtrace = Backtrace::force_capture();
+        let trace = btparse::deserialize(&backtrace).expect("backtrace must deserialize");
+        let mut output = color_backtrace::termcolor::NoColor::new(Vec::new());
+        color_backtrace::BacktracePrinter::new()
+            .print_trace(&trace, &mut output)
+            .expect("color-backtrace must print the trace");
+        let original = String::from_utf8(output.into_inner()).expect("trace must be UTF-8");
+        let banner = format!("{:━^80}\n", " BACKTRACE ");
+        assert!(
+            original.starts_with(&banner),
+            "color-backtrace's banner changed: {original}"
+        );
+
+        let formatted = super::better_backtrace(&backtrace)
+            .expect("better_backtrace must format without falling back");
+        assert!(!formatted.contains(" BACKTRACE "), "{formatted}");
+        assert!(
+            formatted
+                .contains("formatting::tests::better_backtrace_removes_color_backtrace_banner"),
+            "the application frame must remain: {formatted}"
+        );
+    }
 }

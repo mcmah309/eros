@@ -160,7 +160,7 @@ fn main() {
 }
 ```
 
-With `RUST_BACKTRACE=1` (backtrace shortened):
+With `RUST_BACKTRACE=1`:
 
 ```console
 invalid digit found in string
@@ -171,37 +171,16 @@ invalid digit found in string
     3. Start application
 
 Backtrace (captured):
-...
+[3 frames hidden for brevity]
    3: example::parse_port
              at ./src/main.rs:4:29
    4: example::configure_server
              at ./src/main.rs:8:5
    5: example::main
              at ./src/main.rs:12:25
-...
+[17 frames hidden for brevity]
 ```
-#### Better Backtrace
 
-Enable `better_backtrace` for a more concise and readable backtrace (shortened here):
-```console
-invalid digit found in string
-
-  Context (innermost first):
-    1. Parse server port
-    2. Configure server api
-    3. Start application
-
-Backtrace (captured):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BACKTRACE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-...
- 4: example::parse_port
-    at ./src/main.rs:4
- 5: example::configure_server
-    at ./src/main.rs:8
- 6: example::main
-    at ./src/main.rs:12
-...
-```
 #### Location
 
 The `location` feature flag adds a location at compile time for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments) and no_std environments.
@@ -643,6 +622,10 @@ WARN Something went wrong
 
 ## Additional Features
 
+### Better Backtrace
+
+Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `better_backtrace` to filter recognized dependency and runtime frames automatically.
+
 ### Adding Source Chains
 
 Use `map_inner` to change the main error while keeping the original failure as its source. The closure receives the boxed inner error; return an error that stores it and exposes it through `Error::source()`:
@@ -830,8 +813,6 @@ An internal error occurred.
 </details>
 
 This approach keeps internal diagnostics while making the user-facing experience explicit. Applications remain free to decide which information is safe to expose, while `ErrorUnion` continues to focus on error composition, tracing, and context propagation.
-
-## Misc
 
 ### Anyhow
 
