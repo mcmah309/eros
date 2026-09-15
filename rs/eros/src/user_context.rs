@@ -1,25 +1,8 @@
-use crate::{ContextValue, ErrorUnion, type_set::TypeSet};
-
-impl<E> ErrorUnion<E>
-where
-    E: TypeSet,
-{
-    pub fn user_contexts(&self) -> impl Iterator<Item = &ContextValue> {
-        self.inner
-            .context
-            .iter()
-            .filter(|e| e.is_user_facing)
-            .map(|e| &e.context)
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::{ErrorUnion, SendSyncError};
     #[cfg(not(feature = "std"))]
     use std::prelude::v1::*;
-    use crate::SendSyncError;
-
-    use super::*;
 
     #[derive(Debug)]
     struct SystemDiskError;
@@ -55,7 +38,10 @@ mod tests {
         let union_a = union_a.context("Normal context");
         let union_a = union_a.user_context("User context");
 
-        let user_context = union_a.user_contexts().collect::<Vec<_>>();
+        let user_context = union_a
+            .contexts()
+            .filter(|frame| frame.is_user_facing())
+            .collect::<Vec<_>>();
 
         assert_eq!(user_context.len(), 1);
         assert_eq!(user_context[0].to_string(), "User context");
@@ -68,7 +54,10 @@ mod tests {
         let union_b = union_b.context("Normal context");
         let union_b = union_b.user_context("User context");
 
-        let user_context = union_b.user_contexts().collect::<Vec<_>>();
+        let user_context = union_b
+            .contexts()
+            .filter(|frame| frame.is_user_facing())
+            .collect::<Vec<_>>();
 
         assert_eq!(user_context.len(), 1);
         assert_eq!(user_context[0].to_string(), "User context");

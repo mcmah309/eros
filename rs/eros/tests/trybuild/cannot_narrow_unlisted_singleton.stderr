@@ -1,0 +1,5 @@
+error[E0277]: the trait bound `(MsgError,): NarrowTarget<(std::fmt::Error,), _>` is not satisfied
+ --> tests/trybuild/cannot_narrow_unlisted_singleton.rs:5:19
+  |
+5 |     let _ = error.narrow::<(MsgError,), _>();
+  |                   ^^^^^^ the trait `NarrowTarget<(std::fmt::Error,), _>` is not implemented for `(MsgError,)`

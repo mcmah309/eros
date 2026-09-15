@@ -1,8 +1,8 @@
 error[E0277]: the trait bound `eros::type_set::End: Narrow<std::io::Error, _>` is not satisfied
- --> tests/trybuild/cannot_subset_partially_unlisted_errors.rs:5:19
+ --> tests/trybuild/cannot_try_recover_group_omit_remainder.rs:6:16
   |
-5 |     let _ = error.subset::<(std::fmt::Error, std::io::Error), _>();
-  |                   ^^^^^^ the trait `Narrow<std::io::Error, _>` is not implemented for `eros::type_set::End`
+6 |         result.try_recover(|_: ErrorUnion<(MsgError, std::fmt::Error)>| Ok(()));
+  |                ^^^^^^^^^^^ the trait `Narrow<std::io::Error, _>` is not implemented for `eros::type_set::End`
   |
 help: the trait `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, _>` is not implemented for `eros::type_set::Cons<MsgError, eros::type_set::End>`
       but trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, eros::type_set::Cons<eros::type_set::End, eros::type_set::End>>` is implemented for it
@@ -17,3 +17,11 @@ help: the trait `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set:
   | |_______________________________________^
   = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `Narrow<std::io::Error, eros::type_set::Recurse<_>>`
   = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
+note: required by a bound in `try_recover`
+ --> src/error_union.rs
+  |
+  |     fn try_recover<Target, Other, Index, OtherIndex>(
+  |        ----------- required by a bound in this associated function
+...
+  |         Other::Variants: SupersetOf<Target::Remainder, OtherIndex>;
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`

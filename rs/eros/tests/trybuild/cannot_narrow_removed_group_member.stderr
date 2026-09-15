@@ -1,0 +1,5 @@
+error[E0277]: the trait bound `MsgError: NarrowTarget<(std::fmt::Error,), _>` is not satisfied
+ --> tests/trybuild/cannot_narrow_removed_group_member.rs:6:23
+  |
+6 |     let _ = remainder.narrow::<MsgError, _>();
+  |                       ^^^^^^ the trait `NarrowTarget<(std::fmt::Error,), _>` is not implemented for `MsgError`

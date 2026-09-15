@@ -1,0 +1,17 @@
+error[E0277]: the trait bound `{closure@$DIR/tests/trybuild/cannot_recover_unlisted_group.rs:5:28: 5:71}: RecoveryHandler<_, (MsgError, std::fmt::Error), _, ()>` is not satisfied
+ --> tests/trybuild/cannot_recover_unlisted_group.rs:5:28
+  |
+5 |     let _ = result.recover(|_: ErrorUnion<(MsgError, std::io::Error)>| ());
+  |                    ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+  |                    |
+  |                    required by a bound introduced by this call
+  |
+  = help: the trait `RecoveryHandler<_, (MsgError, std::fmt::Error), _, ()>` is not implemented for closure `{closure@$DIR/tests/trybuild/cannot_recover_unlisted_group.rs:5:28: 5:71}`
+note: required by a bound in `recover`
+ --> src/error_union.rs
+  |
+  |     fn recover<Target, Index>(
+  |        ------- required by a bound in this associated function
+  |         self,
+  |         f: impl RecoveryHandler<Target, E, Index, S>,
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::recover`

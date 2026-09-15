@@ -2,33 +2,31 @@ error[E0277]: the trait bound `eros::type_set::End: Narrow<MsgError, _>` is not 
  --> tests/trybuild/cannot_recover_unlisted_error.rs:5:30
   |
 5 |     let _ = result.recover::<MsgError, _>(|_| ());
-  |                              ^^^^^^^^ the trait `Narrow<MsgError, _>` is not implemented for `eros::type_set::End`
+  |                    -------   ^^^^^^^^ the trait `Narrow<MsgError, _>` is not implemented for `eros::type_set::End`
+  |                    |
+  |                    required by a bound introduced by this call
   |
-help: the following other types implement trait `Narrow<T, Index>`
- --> src/type_set.rs
-  |
-  | / impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
-  | | where
-  | |     Tail: TupleForm,
-  | |     Cons<Target, Tail>: TupleForm,
-  | |__________________________________^ `eros::type_set::Cons<Target, Tail>` implements `Narrow<Target, eros::type_set::End>`
-...
-  | / impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
-  | | where
-  | |     Tail: Narrow<Target, Index>,
-  | |     Tail: TupleForm,
-  | |     Cons<Head, Tail>: TupleForm,
-  | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
-  | |______________________________________________________________________^ `eros::type_set::Cons<Head, Tail>` implements `Narrow<Target, eros::type_set::Recurse<Index>>`
+  = help: the following other types implement trait `RecoveryTarget<E, Index>`:
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+            (A, B, C, D, E, F, G, H, I)
+          and $N others
   = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `Narrow<MsgError, eros::type_set::Recurse<_>>`
+  = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
+  = note: required for `MsgError` to implement `RecoveryTarget<(std::fmt::Error,), SingleRecovery<eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>>`
 note: required by a bound in `recover`
  --> src/error_union.rs
   |
   |     fn recover<Target, Index>(
   |        ------- required by a bound in this associated function
 ...
-  |         E::Variants: Narrow<Target, Index>;
-  |                      ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::recover`
+  |         Target: RecoveryTarget<E, Index>;
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::recover`
 
 error[E0277]: the trait bound `eros::type_set::End: Narrow<MsgError, _>` is not satisfied
  --> tests/trybuild/cannot_recover_unlisted_error.rs:5:20
@@ -36,20 +34,36 @@ error[E0277]: the trait bound `eros::type_set::End: Narrow<MsgError, _>` is not 
 5 |     let _ = result.recover::<MsgError, _>(|_| ());
   |                    ^^^^^^^ the trait `Narrow<MsgError, _>` is not implemented for `eros::type_set::End`
   |
-help: the following other types implement trait `Narrow<T, Index>`
- --> src/type_set.rs
-  |
-  | / impl<Target, Tail> Narrow<Target, End> for Cons<Target, Tail>
-  | | where
-  | |     Tail: TupleForm,
-  | |     Cons<Target, Tail>: TupleForm,
-  | |__________________________________^ `eros::type_set::Cons<Target, Tail>` implements `Narrow<Target, eros::type_set::End>`
-...
-  | / impl<Head, Tail, Target, Index> Narrow<Target, Recurse<Index>> for Cons<Head, Tail>
-  | | where
-  | |     Tail: Narrow<Target, Index>,
-  | |     Tail: TupleForm,
-  | |     Cons<Head, Tail>: TupleForm,
-  | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
-  | |______________________________________________________________________^ `eros::type_set::Cons<Head, Tail>` implements `Narrow<Target, eros::type_set::Recurse<Index>>`
+  = help: the following other types implement trait `RecoveryTarget<E, Index>`:
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+            (A, B, C, D, E, F, G, H, I)
+          and $N others
   = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `Narrow<MsgError, eros::type_set::Recurse<_>>`
+  = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
+  = note: required for `MsgError` to implement `RecoveryTarget<(std::fmt::Error,), SingleRecovery<eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>>`
+
+error[E0277]: the trait bound `eros::type_set::End: Narrow<MsgError, _>` is not satisfied
+ --> tests/trybuild/cannot_recover_unlisted_error.rs:5:43
+  |
+5 |     let _ = result.recover::<MsgError, _>(|_| ());
+  |                    -------                ^^^^^^ the trait `Narrow<MsgError, _>` is not implemented for `eros::type_set::End`
+  |                    |
+  |                    required by a bound introduced by this call
+  |
+  = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `Narrow<MsgError, eros::type_set::Recurse<_>>`
+  = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
+  = note: required for `{closure@$DIR/tests/trybuild/cannot_recover_unlisted_error.rs:5:43: 5:46}` to implement `RecoveryHandler<MsgError, (std::fmt::Error,), SingleRecovery<eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>, ()>`
+note: required by a bound in `recover`
+ --> src/error_union.rs
+  |
+  |     fn recover<Target, Index>(
+  |        ------- required by a bound in this associated function
+  |         self,
+  |         f: impl RecoveryHandler<Target, E, Index, S>,
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::recover`

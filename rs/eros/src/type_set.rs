@@ -2,6 +2,11 @@ use core::any::Any;
 
 use crate::{AnyError, SendSyncError};
 
+#[doc(hidden)]
+pub use crate::narrowing::{GroupNarrow, NarrowTarget, SingleNarrow};
+#[doc(hidden)]
+pub use crate::recovery::{GroupRecovery, RecoveryHandler, RecoveryTarget, SingleRecovery};
+
 mod sealed {
     pub trait Sealed {}
 
@@ -357,8 +362,7 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 ///
 /// For example, `Cons<A, Cons<B, End>>` has `Tuple = (A, B)`.
 /// This association determines the error set of the remainder union after
-/// [`ErrorUnion::narrow`](crate::ErrorUnion::narrow) or
-/// [`ErrorUnion::subset`](crate::ErrorUnion::subset). This trait is sealed.
+/// [`ErrorUnion::narrow`](crate::ErrorUnion::narrow). This trait is sealed.
 pub trait TupleForm: sealed::Sealed {
     /// The corresponding error set.
     type Tuple: TypeSet;
@@ -777,7 +781,7 @@ fn _narrow_test() {
 /// A type list containing every member of `Other`.
 ///
 /// Applied to [`TypeSet::Variants`] by [`ErrorUnion::widen`](crate::ErrorUnion::widen)
-/// and [`ErrorUnion::subset`](crate::ErrorUnion::subset).
+/// and [`ErrorUnion::narrow`](crate::ErrorUnion::narrow).
 /// `Index` is inferred at call sites. This trait is sealed.
 pub trait SupersetOf<Other, Index> {
     /// The type list remaining after removing the members of `Other`.

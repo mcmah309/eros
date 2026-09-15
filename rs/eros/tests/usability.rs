@@ -107,26 +107,28 @@ fn widen_narrow() {
 
     let o_4: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(Timeout);
 
-    let _: Timeout = o_4.narrow().unwrap();
+    let _: Timeout = o_4.narrow::<Timeout, _>().unwrap();
 
     let o_5: ErrorUnion<(Timeout, NotEnoughMemory)> = ErrorUnion::new(Timeout);
     o_5.narrow::<Timeout, _>().unwrap();
 
     let o_6: ErrorUnion<(Timeout, NotEnoughMemory)> = ErrorUnion::new(Timeout);
     let o_7: ErrorUnion<(NotEnoughMemory, Timeout)> = o_6.widen();
-    let o_8: ErrorUnion<(Timeout, NotEnoughMemory)> = o_7.subset().unwrap();
-    let _: ErrorUnion<(NotEnoughMemory, Timeout)> = o_8.subset().unwrap();
+    let o_8: ErrorUnion<(Timeout, NotEnoughMemory)> =
+        o_7.narrow::<(Timeout, NotEnoughMemory), _>().unwrap();
+    let _: ErrorUnion<(NotEnoughMemory, Timeout)> =
+        o_8.narrow::<(NotEnoughMemory, Timeout), _>().unwrap();
 
     let o_9: ErrorUnion<(std::sync::mpsc::RecvError, std::fmt::Error, NotEnoughMemory)> =
         ErrorUnion::new(NotEnoughMemory);
     let _: Result<
         ErrorUnion<(std::fmt::Error,)>,
         ErrorUnion<(std::sync::mpsc::RecvError, NotEnoughMemory)>,
-    > = o_9.subset();
+    > = o_9.narrow::<(std::fmt::Error,), _>();
     let o_10: ErrorUnion<(std::sync::mpsc::RecvError, std::fmt::Error, NotEnoughMemory)> =
         ErrorUnion::new(NotEnoughMemory);
     let _: Result<std::fmt::Error, ErrorUnion<(std::sync::mpsc::RecvError, NotEnoughMemory)>> =
-        o_10.narrow();
+        o_10.narrow::<std::fmt::Error, _>();
 }
 
 #[test]
@@ -188,7 +190,7 @@ fn multi_narrow() {
     let _narrow_res: Result<
         ErrorUnion<(std::sync::mpsc::RecvError, std::cell::BorrowError)>,
         ErrorUnion<(std::fmt::Error, NotEnoughMemory, std::io::Error)>,
-    > = o_1.subset();
+    > = o_1.narrow::<(std::sync::mpsc::RecvError, std::cell::BorrowError), _>();
 
     let o_2: ErrorUnion<(
         std::sync::mpsc::RecvError,
@@ -200,7 +202,7 @@ fn multi_narrow() {
     )> = ErrorUnion::new(Timeout);
 
     match o_2
-        .subset::<(Timeout, NotEnoughMemory), _>()
+        .narrow::<(Timeout, NotEnoughMemory), _>()
         .unwrap()
         .into_enum()
     {

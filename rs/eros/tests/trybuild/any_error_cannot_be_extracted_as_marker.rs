@@ -12,8 +12,8 @@ fn mutable(error: &mut ErrorUnion) -> &mut AnyError {
     error.as_mut_enum()
 }
 
-fn narrow(error: ErrorUnion) {
-    let _ = error.narrow::<AnyError, _>();
+fn narrow(error: ErrorUnion) -> AnyError {
+    error.narrow::<AnyError, _>().unwrap()
 }
 
 fn singleton_marker_is_not_an_error_set() -> Option<ErrorUnion<(AnyError,)>> {

@@ -10,7 +10,7 @@ use crate::{ErrorUnion, TypeSet};
 pub(crate) struct Report<'a, T: SendSyncError + ?Sized = dyn SendSyncError> {
     pub(crate) root: &'a T,
     #[cfg(feature = "context")]
-    pub(crate) contexts: &'a [crate::context::ErosContext],
+    pub(crate) contexts: &'a [crate::context::ContextFrame],
     #[cfg(feature = "location")]
     pub(crate) location: &'static core::panic::Location<'static>,
     #[cfg(feature = "backtrace")]
@@ -34,7 +34,7 @@ impl<'a> Report<'a> {
 impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
     pub(crate) fn from_parts(
         root: &'a T,
-        #[cfg(feature = "context")] contexts: &'a [crate::context::ErosContext],
+        #[cfg(feature = "context")] contexts: &'a [crate::context::ContextFrame],
         #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
         #[cfg(feature = "backtrace")] backtrace: &'a std::backtrace::Backtrace,
     ) -> Self {

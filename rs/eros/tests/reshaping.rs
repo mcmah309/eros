@@ -5,11 +5,11 @@ type Pair = (MsgError, fmt::Error);
 type Triple = (MsgError, fmt::Error, std::io::Error);
 
 #[test]
-fn subset_rejects_errors_outside_the_requested_types() {
+fn group_narrow_rejects_errors_outside_the_requested_types() {
     let error: ErrorUnion<Triple> = ErrorUnion::new(MsgError::from("original"));
     let error = error.context("preserved context");
     let report = format!("{error:?}");
-    let result = error.subset::<(fmt::Error,), _>();
+    let result = error.narrow::<(fmt::Error,), _>();
     // Check the branch before accessing the typed value: an incorrect Ok would
     // violate the invariant used by the enum conversions' unchecked downcasts.
     assert!(result.is_err(), "a MsgError is not a fmt::Error");
@@ -22,7 +22,7 @@ fn subset_rejects_errors_outside_the_requested_types() {
 }
 
 #[test]
-fn subset_accepts_each_member_in_requested_order() {
+fn group_narrow_accepts_each_member_in_requested_order() {
     let errors: [ErrorUnion<Triple>; 2] = [
         ErrorUnion::new(MsgError::from("message")),
         ErrorUnion::new(fmt::Error),
@@ -30,34 +30,35 @@ fn subset_accepts_each_member_in_requested_order() {
     for (index, error) in errors.into_iter().enumerate() {
         let error = error.context("context");
         let report = format!("{error:?}");
-        let subset = error.subset::<(fmt::Error, MsgError), _>().unwrap();
-        assert_eq!(format!("{subset:?}"), report);
-        match (index, subset.into_enum()) {
+        let selected = error.narrow::<(fmt::Error, MsgError), _>().unwrap();
+        assert_eq!(format!("{selected:?}"), report);
+        match (index, selected.into_enum()) {
             (0, E2::B(error)) => assert_eq!(error.as_str(), "message"),
             (1, E2::A(fmt::Error)) => {}
-            _ => panic!("subset changed the active variant"),
+            _ => panic!("selected changed the active variant"),
         }
     }
 }
 
 #[test]
-fn empty_subset_always_returns_the_original_union() {
+fn empty_narrow_target_always_returns_the_original_union() {
     let error: ErrorUnion<Pair> = ErrorUnion::new(MsgError::from("original"));
-    let result = error.subset::<(), _>();
+    let result = error.narrow::<(), _>();
     assert!(result.is_err());
     let remainder: ErrorUnion<Pair> = result.unwrap_err();
     assert_eq!(remainder.to_string(), "original");
 }
 
 #[test]
-fn full_subset_can_be_reordered_and_has_an_empty_remainder() {
+fn full_narrow_target_can_be_reordered_and_has_an_empty_remainder() {
     let error: ErrorUnion<Pair> = ErrorUnion::new(fmt::Error);
-    let subset: Result<ErrorUnion<(fmt::Error, MsgError)>, ErrorUnion<()>> = error.subset();
-    assert!(matches!(subset.unwrap().into_enum(), E2::A(fmt::Error)));
+    let selected: Result<ErrorUnion<(fmt::Error, MsgError)>, ErrorUnion<()>> =
+        error.narrow::<(fmt::Error, MsgError), _>();
+    assert!(matches!(selected.unwrap().into_enum(), E2::A(fmt::Error)));
 }
 
 #[test]
-fn subset_partitions_every_variant_and_preserves_metadata_and_identity() {
+fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
     use std::{io, num::ParseIntError};
 
     type Variants = (MsgError, fmt::Error, io::Error, ParseIntError);
@@ -82,7 +83,7 @@ fn subset_partitions_every_variant_and_preserves_metadata_and_identity() {
         let partition: Result<
             ErrorUnion<(io::Error, fmt::Error)>,
             ErrorUnion<(MsgError, ParseIntError)>,
-        > = error.subset();
+        > = error.narrow::<(io::Error, fmt::Error), _>();
         let error: ErrorUnion<Variants> = match partition {
             Ok(selected) => {
                 assert!(matches!(index, 1 | 2), "selected an unlisted variant");
@@ -122,7 +123,7 @@ fn subset_partitions_every_variant_and_preserves_metadata_and_identity() {
 }
 
 #[test]
-fn subset_checks_the_inner_error_type_without_matching_sources_or_contexts() {
+fn group_narrow_checks_the_inner_error_type_without_matching_sources_or_contexts() {
     #[derive(Debug)]
     struct OuterError(MsgError);
 
@@ -143,7 +144,7 @@ fn subset_checks_the_inner_error_type_without_matching_sources_or_contexts() {
     let context: Box<dyn SendSyncError> = Box::new(MsgError::from("context error"));
     let error = error.context(context);
     let report = format!("{error:?}");
-    let remainder: ErrorUnion<(OuterError,)> = error.subset::<(MsgError,), _>().unwrap_err();
+    let remainder: ErrorUnion<(OuterError,)> = error.narrow::<(MsgError,), _>().unwrap_err();
     assert_eq!(format!("{remainder:?}"), report);
     assert_eq!(remainder.into_single().0.as_str(), "source error");
 }
@@ -171,6 +172,75 @@ fn result_narrow_covers_success_matching_error_and_remainder() {
     let error = remainder.unwrap_err();
     assert_eq!(format!("{error:?}"), report);
     assert_eq!(error.into_single(), fmt::Error);
+}
+
+#[test]
+fn result_group_narrow_preserves_successes_and_both_error_branches() {
+    let value = String::from("success");
+    let original = value.as_ptr();
+    let success: eros::Result<String, Triple> = Ok(value);
+    let value = success
+        .narrow::<(fmt::Error, MsgError), _>()
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(value.as_ptr(), original);
+
+    let errors: [ErrorUnion<Triple>; 3] = [
+        ErrorUnion::new(MsgError::from("message")),
+        ErrorUnion::new(fmt::Error),
+        ErrorUnion::new(std::io::Error::other("unhandled")),
+    ];
+    for (index, error) in errors.into_iter().enumerate() {
+        let error = error.context("retained context");
+        #[cfg(feature = "user_context")]
+        let error = error.user_context("user message");
+        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let report = format!("{error:?}");
+        #[cfg(feature = "diagnostic")]
+        let json = error.to_debug_json();
+        let result: eros::Result<String, Triple> = Err(error);
+        let selected: Result<
+            ErrorUnion<(fmt::Error, MsgError)>,
+            eros::Result<String, (std::io::Error,)>,
+        > = result.narrow::<(fmt::Error, MsgError), _>();
+        let error: ErrorUnion<Triple> = match selected {
+            Ok(error) => {
+                match (index, error.as_enum()) {
+                    (0, E2::B(_)) | (1, E2::A(_)) => {}
+                    _ => panic!("incorrect selected variant"),
+                }
+                error.widen()
+            }
+            Err(Err(error)) => {
+                assert_eq!(index, 2);
+                error.widen()
+            }
+            Err(Ok(_)) => panic!("narrow converted an error into a success"),
+        };
+        assert_eq!(
+            error.inner() as *const dyn SendSyncError as *const (),
+            original
+        );
+        assert_eq!(format!("{error:?}"), report);
+        #[cfg(feature = "diagnostic")]
+        assert_eq!(error.to_debug_json(), json);
+    }
+}
+
+#[test]
+fn result_singleton_and_empty_targets_retain_diagnostics() {
+    let error: ErrorUnion<Pair> = ErrorUnion::new(MsgError::from("root"));
+    let error = error.context("retained context");
+    let report = format!("{error:?}");
+    let result: eros::Result<(), Pair> = Err(error);
+    let result: eros::Result<(), Pair> = result.narrow::<(), _>().unwrap_err();
+    let error: ErrorUnion<(MsgError,)> = result.narrow::<(MsgError,), _>().unwrap();
+    assert_eq!(format!("{error:?}"), report);
+
+    let result: eros::Result<(), (MsgError,)> = Err(error);
+    let selected: Result<ErrorUnion<(MsgError,)>, eros::Result<(), ()>> =
+        result.narrow::<(MsgError,), _>();
+    assert_eq!(format!("{:?}", selected.unwrap()), report);
 }
 
 #[test]
@@ -251,11 +321,25 @@ fn recover_can_handle_each_type_until_the_error_set_is_empty() {
     ] {
         let result: eros::Result<u8, Pair> = Err(error);
         // Start with the last tuple member, then handle the remaining one.
-        let result: eros::Result<u8, ()> = result
+        let value = result
             .recover::<fmt::Error, _>(|_| 1)
-            .recover::<MsgError, _>(|_| 2);
-        assert_eq!(result.unwrap(), expected);
+            .recover::<MsgError, _>(|_| 2)
+            .into_value();
+        assert_eq!(value, expected);
     }
+}
+
+#[test]
+fn into_value_accepts_owned_and_borrowed_successes_without_extra_bounds() {
+    // No Clone, Copy, or Debug implementation is required for the success type.
+    struct Value(String);
+    let result: eros::Result<Value, ()> = Ok(Value(String::from("owned")));
+    let original = result.as_ref().ok().unwrap().0.as_ptr();
+    let value = result.into_value();
+    assert_eq!(value.0.as_ptr(), original);
+
+    let result: eros::Result<&str, ()> = Ok(&value.0);
+    assert_eq!(result.into_value(), "owned");
 }
 
 #[test]

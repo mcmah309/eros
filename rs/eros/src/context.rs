@@ -4,9 +4,10 @@ use core::result::Result;
 
 use crate::{ErrorUnion, SendSyncError, type_set::TypeSet};
 
+/// An attached context value and its captured metadata.
 #[cfg(feature = "context")]
 #[derive(Debug)]
-pub(crate) struct ErosContext {
+pub struct ContextFrame {
     pub(crate) context: ContextValue,
     #[cfg(feature = "location")]
     pub(crate) location: &'static core::panic::Location<'static>,
@@ -15,7 +16,7 @@ pub(crate) struct ErosContext {
 }
 
 #[cfg(feature = "context")]
-impl ErosContext {
+impl ContextFrame {
     #[cfg_attr(feature = "location", track_caller)]
     pub(crate) fn new(context: ContextValue) -> Self {
         Self {
@@ -36,6 +37,34 @@ impl ErosContext {
             location: core::panic::Location::caller(),
             is_user_facing: true,
         }
+    }
+}
+
+#[cfg(feature = "context")]
+impl ContextFrame {
+    /// Returns the attached message or error without formatting or cloning it.
+    pub fn value(&self) -> &ContextValue {
+        &self.context
+    }
+
+    /// Returns where this context was attached. Requires the `location` feature.
+    #[cfg(feature = "location")]
+    pub fn location(&self) -> &'static core::panic::Location<'static> {
+        self.location
+    }
+
+    /// Returns whether this context was attached with `user_context` or
+    /// `with_user_context`. Requires the `user_context` feature.
+    #[cfg(feature = "user_context")]
+    pub fn is_user_facing(&self) -> bool {
+        self.is_user_facing
+    }
+}
+
+#[cfg(feature = "context")]
+impl core::fmt::Display for ContextFrame {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(self.value(), f)
     }
 }
 

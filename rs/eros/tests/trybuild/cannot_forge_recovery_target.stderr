@@ -1,0 +1,7 @@
+error[E0046]: not all trait items implemented, missing: `__seal`
+ --> tests/trybuild/cannot_forge_recovery_target.rs:8:1
+  |
+8 | impl RecoveryTarget<(std::io::Error,), ForgedIndex> for (MsgError, std::fmt::Error) {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `__seal` in implementation
+  |
+  = help: implement the missing item: `fn __seal(_: eros::recovery::sealed::Token) { todo!() }`

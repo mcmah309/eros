@@ -69,7 +69,26 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
             assert_eq!(error.into_single().as_str(), ERROR);
             7
         });
-    assert_eq(recovered.unwrap(), 7)?;
+    assert_eq(recovered.recover::<Timeout, _>(|_| 0).into_value(), 7)?;
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let recovered: eros::Result<u8, (Timeout,)> =
+        result.try_recover(|error: ErrorUnion<(MsgError,)>| {
+            assert_eq!(error.into_single().as_str(), ERROR);
+            Err(ErrorUnion::new(Timeout))
+        });
+    assert_eq(recovered.unwrap_err().into_single(), Timeout)?;
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let value = result
+        .recover(|error: ErrorUnion<(Timeout, MsgError)>| {
+            assert!(matches!(error.as_enum(), eros::E2::B(_)));
+            7
+        })
+        .into_value();
+    assert_eq(value, 7)?;
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let recovered: eros::Result<u8, (NotEnoughMemory,)> = result
+        .try_recover(|_: ErrorUnion<(MsgError, Timeout)>| Err(ErrorUnion::new(NotEnoughMemory)));
+    assert_eq(recovered.unwrap_err().into_single(), NotEnoughMemory)?;
     let result: eros::Result<(), (Timeout, MsgError)> = (|| {
         eros::ensure!(false, "typed {}", 7);
         Ok(())
@@ -116,9 +135,17 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_eq(u.narrow::<NotEnoughMemory, _>().unwrap(), NotEnoughMemory)?;
 
     let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
+    let capture = u.location();
     let u = u.context("allocating memory failed");
     assert_type::<NotEnoughMemory>(u.inner(), "context preserves type")?;
     let u = u.with_context(|| "while booting");
+    assert_eq(u.location(), capture)?;
+    assert_eq(u.contexts().len(), 2)?;
+    for frame in u.contexts() {
+        assert_eq(frame.location().file(), file!())?;
+        assert_eq(frame.is_user_facing(), false)?;
+        assert!(frame.value().as_str().is_some());
+    }
     assert_type::<NotEnoughMemory>(u.inner(), "with_context preserves type")?;
     if u.latest_context_error().is_some() {
         return Err(CheckOutcome::Fail("string contexts have no context error"));
@@ -130,8 +157,11 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
     let u: ErrorUnion<(InvalidPassword,)> = ErrorUnion::new(InvalidPassword);
     let u = u.user_context("Please choose a stronger password.");
-    let user_ctxs: alloc::vec::Vec<alloc::string::String> =
-        u.user_contexts().map(|c| c.to_string()).collect();
+    let user_ctxs: alloc::vec::Vec<alloc::string::String> = u
+        .contexts()
+        .filter(|frame| frame.is_user_facing())
+        .map(|frame| frame.to_string())
+        .collect();
     assert_eq(user_ctxs.len(), 1)?;
     assert_eq_str(&user_ctxs[0], "Please choose a stronger password.")?;
 
@@ -168,16 +198,21 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
     let u: ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)> = ErrorUnion::new(Timeout);
     let sub: Result<ErrorUnion<(Timeout,)>, ErrorUnion<(NotEnoughMemory, InvalidPassword)>> =
-        u.subset::<(Timeout,), _>();
+        u.narrow::<(Timeout,), _>();
     if sub.is_err() {
-        return Err(CheckOutcome::Fail("subset (Timeout,) should succeed"));
+        return Err(CheckOutcome::Fail("narrow (Timeout,) should succeed"));
     }
     let sub_union = sub.unwrap();
     assert_eq(sub_union.into_single(), Timeout)?;
 
+    let result: eros::Result<(), (NotEnoughMemory, Timeout, InvalidPassword)> =
+        Err(ErrorUnion::new(Timeout));
+    let selected = result.narrow::<(InvalidPassword, Timeout), _>().unwrap();
+    assert_type::<Timeout>(selected.inner(), "narrow result group")?;
+
     let u: ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)> = ErrorUnion::new(NotEnoughMemory);
-    let remainder = u.subset::<(Timeout,), _>().expect_err("non-member must be rejected");
-    assert_type::<NotEnoughMemory>(remainder.inner(), "subset remainder")?;
+    let remainder = u.narrow::<(Timeout,), _>().expect_err("non-member must be rejected");
+    assert_type::<NotEnoughMemory>(remainder.inner(), "narrow remainder")?;
 
     let diagnostic = eros::error!("diagnostic root").context("diagnostic context").to_debug_json();
     assert_eq_str(diagnostic["root"].as_str().unwrap(), "diagnostic root")?;

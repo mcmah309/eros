@@ -15,7 +15,7 @@ fn narrow_to_concrete(error: ErrorUnion) {
 }
 
 fn subset_to_concrete(error: ErrorUnion) {
-    let _ = error.subset::<(fmt::Error,), _>();
+    let _ = error.narrow::<(fmt::Error,), _>();
 }
 
 fn into_typed(error: ErrorUnion) -> ErrorUnion<(fmt::Error,)> {

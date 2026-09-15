@@ -23,10 +23,12 @@ mod error_union;
 mod formatting;
 mod macros;
 mod msg_error;
+mod narrowing;
+mod recovery;
 mod root_error;
 pub mod type_set;
 mod union_to_enum;
-#[cfg(feature = "user_context")]
+#[cfg(all(test, feature = "user_context"))]
 mod user_context;
 
 // re-export macro
@@ -38,6 +40,8 @@ pub type Result<T, E = AnyError> = core::result::Result<T, ErrorUnion<E>>;
 // data structures
 pub use any_error::AnyError;
 pub use context::AbsentValueError;
+#[cfg(feature = "context")]
+pub use context::ContextFrame;
 pub use context::ContextValue;
 pub use error_union::ErrorUnion;
 pub use error_union::SendSyncError;

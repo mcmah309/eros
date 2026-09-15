@@ -1,0 +1,5 @@
+error[E0277]: the trait bound `(std::fmt::Error, std::io::Error): NarrowTarget<(std::fmt::Error, MsgError), _>` is not satisfied
+ --> tests/trybuild/cannot_narrow_partially_unlisted_group.rs:5:19
+  |
+5 |     let _ = error.narrow::<(std::fmt::Error, std::io::Error), _>();
+  |                   ^^^^^^ the trait `NarrowTarget<(std::fmt::Error, MsgError), _>` is not implemented for `(std::fmt::Error, std::io::Error)`

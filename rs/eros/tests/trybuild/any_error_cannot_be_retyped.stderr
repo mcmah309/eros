@@ -67,33 +67,17 @@ note: required by a bound in `ErrorUnion::<E>::widen`
    |         Other::Variants: SupersetOf<E::Variants, Index>,
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::widen`
 
-error[E0599]: the method `narrow` exists for struct `ErrorUnion`, but its trait bounds were not satisfied
+error[E0277]: the trait bound `std::fmt::Error: NarrowTarget<AnyError, _>` is not satisfied
   --> tests/trybuild/any_error_cannot_be_retyped.rs:14:19
    |
 14 |     let _ = error.narrow::<fmt::Error, _>();
-   |                   ^^^^^^
-   |
-  ::: src/any_error.rs
-   |
-   | pub enum AnyError {}
-   | ----------------- doesn't satisfy `AnyError: Narrow<_, _>`
-   |
-   = note: the following trait bounds were not satisfied:
-           `AnyError: Narrow<_, _>`
+   |                   ^^^^^^ the trait `NarrowTarget<AnyError, _>` is not implemented for `std::fmt::Error`
 
-error[E0277]: the trait bound `AnyError: SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, _>` is not satisfied
+error[E0277]: the trait bound `(std::fmt::Error,): NarrowTarget<AnyError, _>` is not satisfied
   --> tests/trybuild/any_error_cannot_be_retyped.rs:18:19
    |
-18 |     let _ = error.subset::<(fmt::Error,), _>();
-   |                   ^^^^^^ the trait `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, _>` is not implemented for `AnyError`
-   |
-help: the trait `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, _>` is not implemented for `AnyError`
-      but trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for it
-  --> src/type_set.rs
-   |
-   | impl SupersetOf<AnyError, End> for AnyError {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = help: for that trait implementation, expected `AnyError`, found `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>`
+18 |     let _ = error.narrow::<(fmt::Error,), _>();
+   |                   ^^^^^^ the trait `NarrowTarget<AnyError, _>` is not implemented for `(std::fmt::Error,)`
 
 error[E0277]: the trait bound `ErrorUnion: Into<ErrorUnion<(std::fmt::Error,)>>` is not satisfied
   --> tests/trybuild/any_error_cannot_be_retyped.rs:22:11

@@ -12,11 +12,13 @@ use core::ptr;
 #[cfg(feature = "std")]
 use std::any::TypeId;
 
-use crate::context::ContextValue;
 #[cfg(feature = "context")]
-use crate::context::ErosContext;
+use crate::context::ContextFrame;
+use crate::context::ContextValue;
 use crate::formatting::Report;
-use crate::type_set::{Contains, IsFold, Narrow, SupersetOf, TupleForm, TypeSet};
+use crate::type_set::{
+    Contains, NarrowTarget, RecoveryHandler, RecoveryTarget, SupersetOf, TupleForm, TypeSet,
+};
 
 use crate::AnyError;
 
@@ -59,7 +61,7 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
     #[cfg(feature = "context")]
-    pub(crate) context: Vec<ErosContext>,
+    pub(crate) context: Vec<ContextFrame>,
     #[cfg(feature = "location")]
     pub(crate) location: &'static core::panic::Location<'static>,
     /// Re-boxes the error field into a fresh allocation.
@@ -98,7 +100,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
     pub(crate) fn new_from_parts<T>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "context")] context: Vec<ErosContext>,
+        #[cfg(feature = "context")] context: Vec<ContextFrame>,
         #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> Box<ErrorUnionInner<dyn SendSyncError>>
     where
@@ -318,7 +320,7 @@ impl ErrorUnion {
     pub(crate) fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "context")] context: Vec<ErosContext>,
+        #[cfg(feature = "context")] context: Vec<ContextFrame>,
         #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> ErrorUnion<OutSet>
     where
@@ -420,28 +422,42 @@ impl<E> ErrorUnion<E>
 where
     E: TypeSet,
 {
-    /// Attempt to downcast the `ErrorUnion` into a specific type, and
-    /// if that fails, return a `ErrorUnion` which does not contain that
-    /// type as one of its possible variants.
+    /// Selects one error type or a group, returning the remaining error union
+    /// when the stored error does not match.
+    ///
+    /// A bare target, `narrow::<T, _>()`, extracts `T`, discarding context,
+    /// location, and backtrace on a match. A tuple target, `narrow::<(T,), _>()`
+    /// or `narrow::<(A, B), _>()`, returns an `ErrorUnion` of the selected types
+    /// and preserves all diagnostics. The remainder always retains its
+    /// diagnostics and original type order; the selected union uses the target order.
+    ///
+    /// Specify the target explicitly; the return type alone cannot infer it.
+    /// Tuple targets support 0–26 types. An empty target `()` always returns
+    /// the original union in `Err`. On an erased union, `AnyError` selects the
+    /// original union without extracting the marker as a concrete error.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, MsgError};
+    /// use std::{fmt, io};
+    ///
+    /// let error: ErrorUnion<(MsgError, fmt::Error, io::Error)> =
+    ///     ErrorUnion::new(MsgError::from("permission denied"));
+    /// let error = error.context("read configuration");
+    /// let selected = error.narrow::<(io::Error, MsgError), _>().unwrap();
+    /// // Select a single type while retaining its diagnostics.
+    /// let selected = selected.narrow::<(MsgError,), _>().unwrap();
+    /// // Extract the concrete error when its diagnostics are no longer needed.
+    /// let message = selected.narrow::<MsgError, _>().unwrap();
+    /// assert_eq!(message.as_str(), "permission denied");
+    /// ```
     #[allow(clippy::type_complexity)]
     pub fn narrow<Target, Index>(
         self,
-    ) -> Result<
-        Target,
-        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
-    >
+    ) -> Result<Target::Output, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>
     where
-        Target: 'static,
-        E::Variants: Narrow<Target, Index>,
+        Target: NarrowTarget<E, Index>,
     {
-        if self.inner.is_error::<Target>() {
-            Ok(unsafe { self.inner.downcast_error_unchecked::<Target>() })
-        } else {
-            Err(ErrorUnion {
-                inner: self.inner,
-                _pd: PhantomData,
-            })
-        }
+        Target::split(self)
     }
 
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
@@ -455,30 +471,6 @@ where
         ErrorUnion {
             inner: self.inner,
             _pd: PhantomData,
-        }
-    }
-
-    /// Attempt to split a subset of variants out of the `ErrorUnion`,
-    /// returning the remainder of possible variants if the value
-    /// does not have one of the `TargetList` types.
-    #[allow(clippy::type_complexity)]
-    pub fn subset<TargetList, Index>(
-        self,
-    ) -> Result<ErrorUnion<TargetList>, ErrorUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>>
-    where
-        TargetList: TypeSet,
-        E::Variants: SupersetOf<TargetList::Variants, Index>,
-    {
-        if TargetList::Variants::is_fold(&self.inner.error as &dyn Any) {
-            Ok(ErrorUnion {
-                inner: self.inner,
-                _pd: PhantomData,
-            })
-        } else {
-            Err(ErrorUnion {
-                inner: self.inner,
-                _pd: PhantomData,
-            })
         }
     }
 
@@ -519,6 +511,51 @@ where
     #[cfg(feature = "backtrace")]
     pub fn backtrace(&self) -> &std::backtrace::Backtrace {
         &self.inner.backtrace
+    }
+
+    /// Returns where the error was first wrapped in an Eros union.
+    ///
+    /// Reshaping and mapping retain this original location. 
+    /// With the `context` feature, each context frame also
+    /// exposes its attachment location.
+    #[cfg(feature = "location")]
+    pub fn location(&self) -> &'static core::panic::Location<'static> {
+        self.inner.location
+    }
+
+    /// Borrows all context frames in attachment order (innermost first).
+    ///
+    /// Includes both ordinary and user-facing contexts, with their available
+    /// metadata. Does not allocate or format values. Requires the `context` feature.
+    /// Use [`ContextFrame::value`] to borrow each frame's message or error.
+    ///
+    /// ```
+    /// let error = eros::error!("permission denied").context("read configuration");
+    /// for frame in error.contexts() {
+    ///     println!("{}", frame.value());
+    ///     #[cfg(feature = "location")]
+    ///     println!("  at {}", frame.location());
+    /// }
+    /// ```
+    ///
+    /// With the `user_context` feature, filter for user-facing frames:
+    ///
+    /// ```
+    /// # #[cfg(feature = "user_context")]
+    /// # {
+    /// let error = eros::error!("permission denied")
+    ///     .context("read configuration")
+    ///     .user_context("Could not load your settings.");
+    /// for frame in error.contexts().filter(|frame| frame.is_user_facing()) {
+    ///     println!("{frame}");
+    /// }
+    /// # }
+    /// ```
+    #[cfg(feature = "context")]
+    pub fn contexts(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &crate::ContextFrame> + ExactSizeIterator {
+        self.inner.context.iter()
     }
 
     pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
@@ -627,7 +664,7 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ErosContext::new(context.into()));
+            .push(crate::context::ContextFrame::new(context.into()));
         self
     }
 
@@ -640,7 +677,7 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ErosContext::new_user_facing(context.into()));
+            .push(crate::context::ContextFrame::new_user_facing(context.into()));
         self
     }
 
@@ -655,7 +692,7 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ErosContext::new(f().into()));
+            .push(crate::context::ContextFrame::new(f().into()));
         self
     }
 
@@ -671,7 +708,7 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ErosContext::new_user_facing(f().into()));
+            .push(crate::context::ContextFrame::new_user_facing(f().into()));
         self
     }
 }
@@ -737,28 +774,45 @@ where
         Other: TypeSet,
         Other::Variants: SupersetOf<E::Variants, Index>;
 
-    /// Attempt to downcast the `ErrorUnion` into a specific type, and
-    /// if that fails, return a `Result` with the `ErrorUnion` wither the remainder
-    /// which does not contain that type as one of its possible variants.
+    /// Selects a matching error or group, returning the original success value
+    /// or the remaining error union in the outer `Err` branch otherwise.
+    ///
+    /// As with [`ErrorUnion::narrow`], `narrow::<T, _>()` extracts a concrete
+    /// error and discards its diagnostics. Tuple targets such as `(T,)` or
+    /// `(A, B)` return an `ErrorUnion` with its diagnostics. The remainder
+    /// always retains its diagnostics. Specify the target explicitly.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, MsgError, ReshapeUnion};
+    ///
+    /// let result: eros::Result<u8, (MsgError, std::fmt::Error)> =
+    ///     Err(ErrorUnion::new(MsgError::from("failed")));
+    /// match result.narrow::<(MsgError,), _>() {
+    ///     Ok(error) => assert_eq!(error.as_str(), "failed"),
+    ///     Err(Ok(value)) => println!("success: {value}"),
+    ///     Err(Err(remainder)) => eprintln!("unhandled: {remainder}"),
+    /// }
+    /// ```
     #[allow(clippy::type_complexity)]
     fn narrow<Target, Index>(
         self,
     ) -> Result<
-        Target,
-        Result<
-            S,
-            ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
-        >,
+        Target::Output,
+        Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>,
     >
     where
-        Target: 'static,
-        E::Variants: Narrow<Target, Index>;
+        Target: NarrowTarget<E, Index>;
 
-    /// Handles one error type, removing it from the result's possible errors.
+    /// Handles one error type or a group, removing the handled types from the result.
     ///
     /// Calls `f` once on a matching error and returns its value as `Ok`. The
-    /// handler receives a single-type union with the original context, location,
-    /// and backtrace.
+    /// handler receives a union of the selected types with the original context,
+    /// location, and backtrace. Unhandled types retain their original order.
+    ///
+    /// Use `recover::<ErrorType, _>(...)` for one type or
+    /// `recover::<(FirstError, SecondError), _>(...)` for a group of 2–26 types.
+    /// Alternatively, infer the target from an annotated handler argument such as
+    /// `|error: ErrorUnion<(FirstError, SecondError)>| ...`.
     ///
     /// ```
     /// use eros::{ErrorUnion, ReshapeUnion};
@@ -773,17 +827,86 @@ where
     ///     });
     /// assert_eq!(result.unwrap(), 8080);
     /// ```
+    ///
+    /// Handle all errors in a group with one callback:
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, ReshapeUnion};
+    /// use std::{io, num::ParseIntError};
+    ///
+    /// let result: eros::Result<u16, (io::Error, ParseIntError)> =
+    ///     Err(ErrorUnion::new(io::Error::other("cannot read port")));
+    /// let port = result
+    ///     .recover(|error: ErrorUnion<(io::Error, ParseIntError)>| {
+    ///         eprintln!("{error:?}; using port 8080");
+    ///         8080
+    ///     })
+    ///     .into_value();
+    /// assert_eq!(port, 8080);
+    /// ```
     #[allow(clippy::type_complexity)]
     fn recover<Target, Index>(
         self,
-        f: impl FnOnce(ErrorUnion<(Target,)>) -> S,
-    ) -> Result<
-        S,
-        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
-    >
+        f: impl RecoveryHandler<Target, E, Index, S>,
+    ) -> Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>
     where
-        Target: SendSyncError,
-        E::Variants: Narrow<Target, Index>;
+        Target: RecoveryTarget<E, Index>;
+
+    /// Handles one error type or a group with a fallible fallback.
+    ///
+    /// The handler receives the matching error with its original context,
+    /// location, and backtrace. Its result is returned unchanged, including any
+    /// fallback error's diagnostics. The original error's diagnostics are not
+    /// automatically attached to a new fallback error. Successful input values
+    /// and unhandled errors pass through without calling the handler.
+    ///
+    /// `Other` is inferred from the destination or the handler's return type.
+    /// It must contain every unhandled error type as well as the errors returned
+    /// by the handler. Use `.union()` or `.widen()` inside the handler to convert
+    /// a fallback result into that set. The handler may reintroduce handled types.
+    /// Select a group with `|error: ErrorUnion<(FirstError, SecondError)>| ...`
+    /// or `try_recover::<(FirstError, SecondError), Other, _, _>(...)`.
+    /// As with [`Self::recover`], explicit single-type targets use the concrete
+    /// error type, and groups use tuples of 2–26 types. The index parameters are inferred.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
+    /// use std::{io, num::ParseIntError};
+    ///
+    /// let result: eros::Result<u16, (io::Error, ParseIntError)> =
+    ///     Err(ErrorUnion::new(io::Error::other("cannot read port")));
+    /// let result: eros::Result<u16, (ParseIntError,)> =
+    ///     result.try_recover(|error: ErrorUnion<(io::Error,)>| {
+    ///         eprintln!("{error:?}; parsing fallback port");
+    ///         "8080".parse::<u16>().union()
+    ///     });
+    /// assert_eq!(result.unwrap(), 8080);
+    /// ```
+    fn try_recover<Target, Other, Index, OtherIndex>(
+        self,
+        f: impl RecoveryHandler<Target, E, Index, Result<S, ErrorUnion<Other>>>,
+    ) -> Result<S, ErrorUnion<Other>>
+    where
+        Target: RecoveryTarget<E, Index>,
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Target::Remainder, OtherIndex>;
+
+    /// Extracts the success value once no possible error types remain.
+    ///
+    /// Only available for `eros::Result<S, ()>`. As opposed to `unwrap`,
+    /// calling this method does not compile if an unhandled error type remains in the result's set.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, MsgError, ReshapeUnion};
+    ///
+    /// let result: eros::Result<u16, (MsgError,)> =
+    ///     Err(ErrorUnion::new(MsgError::from("missing port")));
+    /// let port = result.recover::<MsgError, _>(|_| 8080).into_value();
+    /// assert_eq!(port, 8080);
+    /// ```
+    fn into_value(self) -> S
+    where
+        E: TypeSet<Enum = core::convert::Infallible>;
 }
 
 impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
@@ -801,19 +924,15 @@ where
     fn narrow<Target, Index>(
         self,
     ) -> Result<
-        Target,
-        Result<
-            S,
-            ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
-        >,
+        Target::Output,
+        Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>,
     >
     where
-        Target: 'static,
-        E::Variants: Narrow<Target, Index>,
+        Target: NarrowTarget<E, Index>,
     {
         match self {
             Ok(value) => Err(Ok(value)),
-            Err(err) => match err.narrow() {
+            Err(err) => match err.narrow::<Target, Index>() {
                 Ok(value) => Ok(value),
                 Err(err) => Err(Err(err)),
             },
@@ -822,25 +941,52 @@ where
 
     fn recover<Target, Index>(
         self,
-        f: impl FnOnce(ErrorUnion<(Target,)>) -> S,
-    ) -> Result<
-        S,
-        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
-    >
+        f: impl RecoveryHandler<Target, E, Index, S>,
+    ) -> Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>
     where
-        Target: SendSyncError,
-        E::Variants: Narrow<Target, Index>,
+        Target: RecoveryTarget<E, Index>,
     {
         match self {
             Ok(value) => Ok(value),
-            Err(error) if error.inner.is_error::<Target>() => Ok(f(ErrorUnion {
-                inner: error.inner,
-                _pd: PhantomData,
-            })),
-            Err(error) => Err(ErrorUnion {
-                inner: error.inner,
-                _pd: PhantomData,
-            }),
+            Err(error) => match Target::split(error) {
+                Ok(selected) => Ok(f(selected)),
+                Err(remainder) => Err(remainder),
+            },
+        }
+    }
+
+    fn try_recover<Target, Other, Index, OtherIndex>(
+        self,
+        f: impl RecoveryHandler<Target, E, Index, Result<S, ErrorUnion<Other>>>,
+    ) -> Result<S, ErrorUnion<Other>>
+    where
+        Target: RecoveryTarget<E, Index>,
+        Other: TypeSet,
+        Other::Variants: SupersetOf<Target::Remainder, OtherIndex>,
+    {
+        match self {
+            Ok(value) => Ok(value),
+            Err(error) => match Target::split(error) {
+                Ok(selected) => f(selected),
+                // Other contains every unhandled type. Retain the remainder's
+                // allocation and diagnostics, changing only its type marker.
+                Err(remainder) => Err(ErrorUnion {
+                    inner: remainder.inner,
+                    _pd: PhantomData,
+                }),
+            },
+        }
+    }
+
+    fn into_value(self) -> S
+    where
+        E: TypeSet<Enum = core::convert::Infallible>,
+    {
+        match self {
+            Ok(value) => value,
+            // TypeSet is sealed, and only () has an Infallible enum. A union
+            // with that empty set cannot be constructed through the safe API.
+            Err(_) => unreachable!("an empty error set cannot contain an error"),
         }
     }
 }
@@ -1138,11 +1284,11 @@ mod tests {
             union
                 .inner
                 .context
-                .push(ErosContext::new("step one".into()));
+                .push(ContextFrame::new("step one".into()));
             union
                 .inner
                 .context
-                .push(ErosContext::new("step two".into()));
+                .push(ContextFrame::new("step two".into()));
         }
 
         let parts: ErrorUnionInner<FooError> =
@@ -1220,7 +1366,7 @@ mod tests {
         let recovered: ErrorUnion<(FooError, BarError)> =
             ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
 
-        let bar: BarError = recovered.narrow().unwrap();
+        let bar: BarError = recovered.narrow::<BarError, _>().unwrap();
         assert_eq!(bar, BarError(99));
     }
 

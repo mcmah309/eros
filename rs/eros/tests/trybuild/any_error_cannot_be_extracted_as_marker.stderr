@@ -67,19 +67,16 @@ note: required by a bound in `ErrorUnion::<E>::as_mut_enum`
    |         E::MutEnum<'a>: From<&'a mut Self>,
    |                         ^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::as_mut_enum`
 
-error[E0599]: the method `narrow` exists for struct `ErrorUnion`, but its trait bounds were not satisfied
-  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:16:19
+error[E0308]: mismatched types
+  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:16:5
    |
-16 |     let _ = error.narrow::<AnyError, _>();
-   |                   ^^^^^^
+15 | fn narrow(error: ErrorUnion) -> AnyError {
+   |                                 -------- expected `AnyError` because of return type
+16 |     error.narrow::<AnyError, _>().unwrap()
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `AnyError`, found `ErrorUnion`
    |
-  ::: src/any_error.rs
-   |
-   | pub enum AnyError {}
-   | ----------------- doesn't satisfy `AnyError: Narrow<_, _>`
-   |
-   = note: the following trait bounds were not satisfied:
-           `AnyError: Narrow<_, _>`
+   = note: expected enum `AnyError`
+            found struct `ErrorUnion`
 
 error[E0277]: the trait bound `AnyError: std::error::Error` is not satisfied
   --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:20:5

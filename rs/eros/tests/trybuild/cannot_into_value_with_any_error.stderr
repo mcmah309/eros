@@ -1,0 +1,14 @@
+error[E0271]: type mismatch resolving `<AnyError as TypeSet>::Enum == Infallible`
+ --> tests/trybuild/cannot_into_value_with_any_error.rs:5:20
+  |
+5 |     let _ = result.into_value();
+  |                    ^^^^^^^^^^ expected `Infallible`, found `AnyError`
+  |
+note: required by a bound in `into_value`
+ --> src/error_union.rs
+  |
+  |     fn into_value(self) -> S
+  |        ---------- required by a bound in this associated function
+  |     where
+  |         E: TypeSet<Enum = core::convert::Infallible>;
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::into_value`

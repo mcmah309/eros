@@ -65,7 +65,7 @@ fn error_sets_support_generic_and_empty_unions() {
 #[test]
 fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
     use eros::MsgError;
-    use eros::type_set::{Contains, Narrow, SupersetOf, TupleForm};
+    use eros::type_set::{Contains, GroupNarrow, Narrow, SingleNarrow, SupersetOf, TupleForm};
 
     fn wrap<T: SendSyncError, E: TypeSet, I>(error: T) -> ErrorUnion<E>
     where
@@ -87,10 +87,10 @@ fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
     where
         E::Variants: Narrow<T, I>,
     {
-        error.narrow()
+        error.narrow::<T, SingleNarrow<I>>()
     }
 
-    fn subset<Other: TypeSet, E: TypeSet, I>(
+    fn narrow_group<Other: TypeSet, E: TypeSet, I>(
         error: ErrorUnion<E>,
     ) -> Result<
         ErrorUnion<Other>,
@@ -101,13 +101,13 @@ fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
     where
         E::Variants: SupersetOf<Other::Variants, I>,
     {
-        error.subset()
+        error.narrow::<Other, GroupNarrow<I>>()
     }
 
     let error: ErrorUnion<(MsgError,)> = wrap(MsgError::from_static("root"));
     let error: ErrorUnion<(fmt::Error, MsgError)> = widen(error);
     let error = narrow::<fmt::Error, _, _>(error).unwrap_err();
-    let error = subset::<(MsgError,), _, _>(error).unwrap();
+    let error = narrow_group::<(MsgError,), _, _>(error).unwrap();
     assert_eq!(error.into_single().as_str(), "root");
 }
 
@@ -157,4 +157,9 @@ fn largest_error_set_supports_enum_conversions_and_reshaping() {
     let error: ErrorUnion<AllErrors> = ErrorUnion::new(TestError::<25>);
     let remainder = error.narrow::<TestError<0>, _>().unwrap_err();
     assert!(remainder.narrow::<TestError<25>, _>().is_ok());
+
+    let error: ErrorUnion<AllErrors> = ErrorUnion::new(TestError::<25>);
+    let selected: Result<ErrorUnion<AllErrors>, ErrorUnion<()>> =
+        error.narrow::<AllErrors, _>();
+    assert!(matches!(selected.unwrap().as_enum(), E26::Z(_)));
 }

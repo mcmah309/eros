@@ -165,10 +165,10 @@ fn panicking_map_drops_both_root_and_context() {
 }
 
 #[test]
-fn both_subset_branches_keep_the_error_and_context_alive_until_drop() {
+fn both_tuple_narrow_branches_keep_the_error_and_context_alive_until_drop() {
     for partition in [
-        |error: ErrorUnion<(fmt::Error, Tracked)>| error.subset::<(Tracked,), _>().unwrap(),
-        |error: ErrorUnion<(fmt::Error, Tracked)>| error.subset::<(fmt::Error,), _>().unwrap_err(),
+        |error: ErrorUnion<(fmt::Error, Tracked)>| error.narrow::<(Tracked,), _>().unwrap(),
+        |error: ErrorUnion<(fmt::Error, Tracked)>| error.narrow::<(fmt::Error,), _>().unwrap_err(),
     ] {
         let root = Arc::new(AtomicUsize::new(0));
         let context = Arc::new(AtomicUsize::new(0));
@@ -187,11 +187,11 @@ fn both_subset_branches_keep_the_error_and_context_alive_until_drop() {
 }
 
 #[test]
-fn rejected_subset_and_narrow_retain_ownership_until_extraction() {
+fn rejected_tuple_and_bare_narrow_retain_ownership_until_extraction() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
     let error: ErrorUnion<(fmt::Error, Tracked)> = union(&root, &context).widen();
-    let error = error.subset::<(fmt::Error,), _>().unwrap_err();
+    let error = error.narrow::<(fmt::Error,), _>().unwrap_err();
     let error: ErrorUnion<(fmt::Error, Tracked)> = error.widen();
     let error = error.narrow::<fmt::Error, _>().unwrap_err();
     assert_eq!(root.load(Ordering::SeqCst), 0);
@@ -214,10 +214,11 @@ fn erased_reshaping_preserves_ownership_until_checked_extraction() {
 
     let error = error.widen::<AnyError, _>();
     // The universal subset matches, but neither branch promises a concrete type.
-    let partition: Result<ErrorUnion<AnyError>, ErrorUnion<AnyError>> = error.subset();
+    let partition: Result<ErrorUnion<AnyError>, ErrorUnion<AnyError>> =
+        error.narrow::<AnyError, _>();
     let error = partition.unwrap();
     // An empty subset cannot manufacture an inhabited ErrorUnion<()>.
-    let partition: Result<ErrorUnion<()>, ErrorUnion<AnyError>> = error.subset();
+    let partition: Result<ErrorUnion<()>, ErrorUnion<AnyError>> = error.narrow::<(), _>();
     let mut error = partition.unwrap_err();
     assert_eq!(
         error.inner() as *const dyn SendSyncError as *const (),

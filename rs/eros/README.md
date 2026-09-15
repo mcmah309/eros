@@ -114,12 +114,15 @@ fn main() {
 }
 ```
 
-`recover` handles one error type and removes it from the result's error set.
-Successful values and other errors pass through unchanged. For manual branching,
-use `narrow` to extract a concrete error or `subset` to preserve its diagnostics
-in a smaller union.
+`recover` removes handled error types from the result's error set. Handle a group
+with `.recover::<(io::Error, ParseIntError), _>(|_| 8080)`.
+Successful values and unhandled errors pass through unchanged.
 
-And to expand an `ErrorUnion` just call `widen`
+For manual branching, `narrow::<E, _>()` extracts `E` and discards its diagnostics.
+Use `narrow::<(E,), _>()` or `narrow::<(A, B), _>()` to retain diagnostics in a
+smaller union. The unmatched remainder always retains its diagnostics.
+
+Use `widen` to add possible error types:
 
 ```rust
 use eros::{IntoUnion, ReshapeUnion};
@@ -778,9 +781,9 @@ where
     let error_message = root_error_message(error.inner());
     message.push_str(&error_message);
 
-    for context in error.user_contexts() {
+    for frame in error.contexts().filter(|frame| frame.is_user_facing()) {
         message.push('\n');
-        message.push_str(&context.to_string());
+        message.push_str(&frame.to_string());
     }
 
     message
