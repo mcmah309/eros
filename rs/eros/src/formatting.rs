@@ -4,7 +4,6 @@ use alloc::{format, string::String};
 use core::{error::Error, fmt};
 
 use crate::SendSyncError;
-#[cfg(feature = "diagnostic")]
 use crate::{ErrorUnion, TypeSet};
 
 /// One view of the saved data, shared by human formatting and JSON diagnostics.
@@ -18,7 +17,6 @@ pub(crate) struct Report<'a, T: SendSyncError + ?Sized = dyn SendSyncError> {
     backtrace: &'a std::backtrace::Backtrace,
 }
 
-#[cfg(feature = "diagnostic")]
 impl<'a> Report<'a> {
     pub(crate) fn new<E: TypeSet>(error: &'a ErrorUnion<E>) -> Self {
         Self::from_parts(
@@ -68,6 +66,16 @@ impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
 
     pub(crate) fn sources(&self) -> impl Iterator<Item = &'a (dyn Error + 'static)> {
         core::iter::successors(self.root.source(), |error| (*error).source())
+    }
+
+    pub(crate) fn display(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.root)?;
+        if !f.alternate() {
+            for source in self.sources() {
+                write!(f, " <- {source}")?;
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

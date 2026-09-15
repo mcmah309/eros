@@ -1,32 +1,30 @@
-use eros::{Context, ContextValue, ErrorUnion, SendSyncError, MsgError};
+use eros::{Context, ContextValue, ErrorUnion, MsgError, SendSyncError};
 use std::{borrow::Cow, cell::Cell};
 
 #[test]
-fn context_values_preserve_storage_and_error_identity() {
-    for source in [
-        ContextValue::from("static"),
-        Cow::Borrowed("static").into(),
-    ] {
-        assert!(matches!(source, ContextValue::Static("static")));
+fn context_values_expose_messages_and_preserve_error_identity() {
+    for source in [ContextValue::from("static"), Cow::Borrowed("static").into()] {
+        assert_eq!(source.as_str(), Some("static"));
+        assert!(source.as_error().is_none());
         assert_eq!(source.to_string(), "static");
-        assert_eq!(format!("{source:?}"), "Static(\"static\")");
+        assert_eq!(format!("{source:?}"), "Message(\"static\")");
     }
     for source in [
         ContextValue::from(String::from("owned")),
         Cow::<str>::Owned(String::from("owned")).into(),
     ] {
-        assert!(matches!(&source, ContextValue::Owned(value) if value == "owned"));
+        assert_eq!(source.as_str(), Some("owned"));
+        assert!(source.as_error().is_none());
         assert_eq!(source.to_string(), "owned");
     }
     let boxed: Box<dyn SendSyncError> = Box::new(MsgError::from("error"));
     let ptr = boxed.as_ref() as *const dyn SendSyncError as *const ();
     let source = ContextValue::from(boxed);
     assert_eq!(source.to_string(), "error");
-    let ContextValue::Error(error) = source else {
-        panic!("expected an error context")
-    };
-    assert_eq!(error.as_ref() as *const dyn SendSyncError as *const (), ptr);
-    assert!(error.as_ref().as_any().is::<MsgError>());
+    assert!(source.as_str().is_none());
+    let error = source.as_error().unwrap();
+    assert_eq!(error as *const dyn SendSyncError as *const (), ptr);
+    assert!(error.as_any().is::<MsgError>());
 }
 
 // Conversion must be deferred too: even eager context values should only be
@@ -139,7 +137,6 @@ fn option_failure_has_the_absent_value_root_with_or_without_context() {
     ] {
         assert_eq!(error.to_string(), "An `Option` was unexpectedly `None`");
         assert!(error.source().is_none());
-        #[cfg(feature = "context")]
         assert_eq!(error.into_single(), eros::AbsentValueError);
     }
 }
@@ -240,9 +237,6 @@ mod user_context {
                 .collect::<Vec<_>>(),
             ["public first", "public second", "public error"]
         );
-        assert!(matches!(
-            error.user_contexts().last(),
-            Some(ContextValue::Error(_))
-        ));
+        assert!(error.user_contexts().last().unwrap().as_error().is_some());
     }
 }

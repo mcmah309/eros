@@ -1,0 +1,106 @@
+error[E0277]: the trait bound `AnyError: std::error::Error` is not satisfied
+  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:19:53
+   |
+19 | fn singleton_marker_is_not_an_error_set() -> Option<ErrorUnion<(AnyError,)>> {
+   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `AnyError`
+   |
+   = help: the following other types implement trait `TypeSet`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `AnyError` to implement `SendSyncError`
+   = note: required for `(AnyError,)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^ required by this bound in `ErrorUnion`
+
+error[E0277]: the trait bound `AnyError: From<ErrorUnion>` is not satisfied
+ --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:4:11
+  |
+4 |     error.into_enum()
+  |           ^^^^^^^^^ the trait `From<ErrorUnion>` is not implemented for `AnyError`
+  |
+note: required by a bound in `ErrorUnion::<E>::into_enum`
+ --> src/error_union.rs
+  |
+  |     pub fn into_enum(self) -> E::Enum
+  |            --------- required by a bound in this associated function
+  |     where
+  |         E::Enum: From<Self>,
+  |                  ^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::into_enum`
+
+error[E0277]: the trait bound `&AnyError: From<&ErrorUnion>` is not satisfied
+ --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:8:11
+  |
+8 |     error.as_enum()
+  |           ^^^^^^^ the trait `From<&ErrorUnion>` is not implemented for `&AnyError`
+  |
+note: required by a bound in `ErrorUnion::<E>::as_enum`
+ --> src/error_union.rs
+  |
+  |     pub fn as_enum<'a>(&'a self) -> E::RefEnum<'a>
+  |            ------- required by a bound in this associated function
+  |     where
+  |         E::RefEnum<'a>: From<&'a Self>,
+  |                         ^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::as_enum`
+
+error[E0277]: the trait bound `&mut AnyError: From<&mut ErrorUnion>` is not satisfied
+  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:12:11
+   |
+12 |     error.as_mut_enum()
+   |           ^^^^^^^^^^^ the trait `From<&mut ErrorUnion>` is not implemented for `&mut AnyError`
+   |
+note: required by a bound in `ErrorUnion::<E>::as_mut_enum`
+  --> src/error_union.rs
+   |
+   |     pub fn as_mut_enum<'a>(&'a mut self) -> E::MutEnum<'a>
+   |            ----------- required by a bound in this associated function
+   |     where
+   |         E::MutEnum<'a>: From<&'a mut Self>,
+   |                         ^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::as_mut_enum`
+
+error[E0599]: the method `narrow` exists for struct `ErrorUnion`, but its trait bounds were not satisfied
+  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:16:19
+   |
+16 |     let _ = error.narrow::<AnyError, _>();
+   |                   ^^^^^^
+   |
+  ::: src/any_error.rs
+   |
+   | pub enum AnyError {}
+   | ----------------- doesn't satisfy `AnyError: Narrow<_, _>`
+   |
+   = note: the following trait bounds were not satisfied:
+           `AnyError: Narrow<_, _>`
+
+error[E0277]: the trait bound `AnyError: std::error::Error` is not satisfied
+  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:20:5
+   |
+20 |     None
+   |     ^^^^ the trait `std::error::Error` is not implemented for `AnyError`
+   |
+   = help: the following other types implement trait `TypeSet`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `AnyError` to implement `SendSyncError`
+   = note: required for `(AnyError,)` to implement `TypeSet`
+note: required by a bound in `ErrorUnion`
+  --> src/error_union.rs
+   |
+   | pub struct ErrorUnion<E: TypeSet = AnyError> {
+   |                          ^^^^^^^ required by this bound in `ErrorUnion`

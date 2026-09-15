@@ -1,11 +1,11 @@
-error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<std::io::Error, _>` is not satisfied
+error[E0277]: the trait bound `eros::type_set::End: Narrow<std::io::Error, _>` is not satisfied
  --> tests/trybuild/cannot_subset_partially_unlisted_errors.rs:5:19
   |
 5 |     let _ = error.subset::<(std::fmt::Error, std::io::Error), _>();
-  |                   ^^^^^^ the trait `eros::type_set::Narrow<std::io::Error, _>` is not implemented for `eros::End`
+  |                   ^^^^^^ the trait `Narrow<std::io::Error, _>` is not implemented for `eros::type_set::End`
   |
-help: the trait `SupersetOf<eros::Cons<std::io::Error, eros::End>, _>` is not implemented for `eros::Cons<MsgError, eros::End>`
-      but trait `SupersetOf<eros::Cons<MsgError, eros::End>, eros::Cons<eros::End, eros::End>>` is implemented for it
+help: the trait `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, _>` is not implemented for `eros::type_set::Cons<MsgError, eros::type_set::End>`
+      but trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, eros::type_set::Cons<eros::type_set::End, eros::type_set::End>>` is implemented for it
  --> src/type_set.rs
   |
   | / impl<SubHead, SubTail, SuperHead, SuperTail, HeadIndex, TailIndex>
@@ -15,5 +15,5 @@ help: the trait `SupersetOf<eros::Cons<std::io::Error, eros::End>, _>` is not im
   | |     <Cons<SuperHead, SuperTail> as Narrow<SubHead, HeadIndex>>::Remainder:
   | |         SupersetOf<SubTail, TailIndex>,
   | |_______________________________________^
-  = note: required for `eros::Cons<MsgError, eros::End>` to implement `eros::type_set::Narrow<std::io::Error, eros::Recurse<_>>`
-  = note: required for `eros::Cons<MsgError, eros::End>` to implement `eros::type_set::SupersetOf<eros::Cons<std::io::Error, eros::End>, eros::Cons<eros::Recurse<_>, eros::End>>`
+  = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `Narrow<std::io::Error, eros::type_set::Recurse<_>>`
+  = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`

@@ -1,0 +1,25 @@
+error[E0046]: not all trait items implemented, missing: `__seal`
+  --> tests/trybuild/cannot_forge_type_set_relations.rs:11:1
+   |
+11 | impl Contains<MsgError, Index> for Variants {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `__seal` in implementation
+   |
+   = help: implement the missing item: `fn __seal(_: type_set::sealed::Token) { todo!() }`
+
+error[E0119]: conflicting implementations of trait `Narrow<MsgError, Index>` for type `<(std::fmt::Error,) as TypeSet>::Variants`
+  --> tests/trybuild/cannot_forge_type_set_relations.rs:22:1
+   |
+13 | impl Narrow<MsgError, Index> for Variants {
+   | ----------------------------------------- first implementation here
+...
+22 | impl Narrow<MsgError, Index> for AnyError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `<(std::fmt::Error,) as TypeSet>::Variants`
+
+error[E0119]: conflicting implementations of trait `SupersetOf<<(MsgError,) as TypeSet>::Variants, Index>` for type `<(std::fmt::Error,) as TypeSet>::Variants`
+  --> tests/trybuild/cannot_forge_type_set_relations.rs:26:1
+   |
+17 | impl SupersetOf<<(MsgError,) as TypeSet>::Variants, Index> for Variants {
+   | ----------------------------------------------------------------------- first implementation here
+...
+26 | impl SupersetOf<AnyError, Index> for Variants {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `<(std::fmt::Error,) as TypeSet>::Variants`

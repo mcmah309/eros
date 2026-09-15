@@ -1,0 +1,25 @@
+error[E0432]: unresolved imports `eros::Cons`, `eros::End`, `eros::Recurse`
+ --> tests/trybuild/type_set_helpers_are_not_root_exports.rs:2:12
+  |
+2 | use eros::{Cons, End, Recurse};
+  |            ^^^^  ^^^  ^^^^^^^ no `Recurse` in the root
+  |            |     |
+  |            |     no `End` in the root
+  |            no `Cons` in the root
+  |
+  = help: consider importing this variant instead:
+          std::io::SeekFrom::End
+
+error[E0603]: module `sealed` is private
+ --> tests/trybuild/type_set_helpers_are_not_root_exports.rs:1:21
+  |
+1 | use eros::type_set::sealed::Token;
+  |                     ^^^^^^  ----- struct `Token` is not publicly re-exported
+  |                     |
+  |                     private module
+  |
+note: the module `sealed` is defined here
+ --> src/type_set.rs
+  |
+  | mod sealed {
+  | ^^^^^^^^^^

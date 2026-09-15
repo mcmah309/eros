@@ -1,247 +1,50 @@
 use core::any::Any;
-use core::error::Error;
-use core::fmt;
-#[cfg(feature = "backtrace")]
-use std::backtrace::Backtrace;
 
-#[cfg(feature = "context")]
-use crate::context::ErosContext;
 use crate::{AnyError, SendSyncError};
 
-/* ------------------------- Helpers ----------------------- */
+mod sealed {
+    pub trait Sealed {}
 
-/// The final element of a type-level Cons list.
+    // A required method taking this unnameable type seals each relation,
+    // including its generic parameters. Sealing only Self would let downstream
+    // crates supply a local Index and invent membership or remainder proofs.
+    // These methods are never called.
+    pub struct Token;
+}
+
+// Type-list and index helpers that appear in associated types and inferred proofs.
 #[doc(hidden)]
-#[derive(Debug)]
 pub enum End {}
-
-impl core::error::Error for End {}
-
-/// A compile-time list of types, similar to other basic functional list structures.
 #[doc(hidden)]
-#[derive(Debug)]
 pub struct Cons<Head, Tail>(core::marker::PhantomData<Head>, Tail);
-
 #[doc(hidden)]
-#[derive(Debug)]
 pub struct Recurse<Tail>(Tail);
 
-/* ------------------------- std::error::Error support ----------------------- */
+impl sealed::Sealed for End {}
+impl<Head, Tail> sealed::Sealed for Cons<Head, Tail> {}
 
-pub trait ErrorFold {
-    fn source_fold(any: &dyn Any) -> Option<&(dyn Error + 'static)>;
-}
-
-impl ErrorFold for End {
-    fn source_fold(_: &dyn Any) -> Option<&(dyn Error + 'static)> {
-        unreachable!("source_fold called on End");
-    }
-}
-
-impl<Head, Tail> Error for Cons<Head, Tail>
-where
-    Head: Error,
-    Tail: Error,
-{
-}
-
-impl<Head, Tail> ErrorFold for Cons<Head, Tail>
-where
-    Cons<Head, Tail>: Error,
-    Head: 'static + Error,
-    Tail: ErrorFold,
-{
-    fn source_fold(any: &dyn Any) -> Option<&(dyn Error + 'static)> {
-        if let Some(head_ref) = any.downcast_ref::<Head>() {
-            head_ref.source()
-        } else {
-            Tail::source_fold(any)
-        }
-    }
-}
-
-/* ------------------------- Display support ----------------------- */
-
-impl<Head, Tail> fmt::Display for Cons<Head, Tail>
-where
-    Head: fmt::Display,
-    Tail: fmt::Display,
-{
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!("Display called for Cons which is not constructable")
-    }
-}
-
-impl fmt::Display for End {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!("Display::fmt called for an End, which is not constructible.")
-    }
-}
-
-pub trait DisplayFold {
-    fn display_fold(any: &dyn SendSyncError, formatter: &mut fmt::Formatter<'_>) -> fmt::Result;
-}
-
-impl DisplayFold for End {
-    fn display_fold(_: &dyn SendSyncError, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!("display_fold called on End");
-    }
-}
-
-pub(crate) fn write_display<T: SendSyncError + ?Sized>(
-    t: &T,
-    formatter: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    write!(formatter, "{t}")?;
-    if !formatter.alternate() {
-        let mut source = t.source();
-        while let Some(error) = source {
-            write!(formatter, " <- {error}")?;
-            source = error.source();
-        }
-    }
-    Ok(())
-}
-
-impl<Head, Tail> DisplayFold for Cons<Head, Tail>
-where
-    Cons<Head, Tail>: fmt::Display,
-    Head: 'static + fmt::Display,
-    Tail: DisplayFold,
-{
-    fn display_fold(any: &dyn SendSyncError, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if any.as_any().is::<Head>() {
-            write_display(any, formatter)
-        } else {
-            Tail::display_fold(any, formatter)
-        }
-    }
-}
-
-/* ------------------------- Debug support ----------------------- */
-
-pub trait DebugFold {
-    fn debug_fold(
-        any: &dyn SendSyncError,
-        formatter: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &[ErosContext],
-        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
-        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
-    ) -> fmt::Result;
-}
-
-impl DebugFold for End {
-    fn debug_fold(
-        _: &dyn SendSyncError,
-        _: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] _context: &[ErosContext],
-        #[cfg(feature = "backtrace")] _backtrace: &Backtrace,
-        #[cfg(feature = "location")] _location: &'static core::panic::Location<'static>,
-    ) -> fmt::Result {
-        unreachable!("debug_fold called on End");
-    }
-}
-
-pub(crate) fn write_debug<T: SendSyncError + ?Sized>(
-    t: &T,
-    formatter: &mut fmt::Formatter<'_>,
-    #[cfg(feature = "context")] context: &[ErosContext],
-    #[cfg(feature = "backtrace")] backtrace: &Backtrace,
-    #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
-) -> fmt::Result {
-    crate::formatting::Report::from_parts(
-        t,
-        #[cfg(feature = "context")]
-        context,
-        #[cfg(feature = "location")]
-        location,
-        #[cfg(feature = "backtrace")]
-        backtrace,
-    ).debug(formatter)
-}
-
-impl<Head, Tail> DebugFold for Cons<Head, Tail>
-where
-    Cons<Head, Tail>: fmt::Debug,
-    Head: SendSyncError,
-    Tail: DebugFold,
-{
-    fn debug_fold(
-        any: &dyn SendSyncError,
-        formatter: &mut fmt::Formatter<'_>,
-        #[cfg(feature = "context")] context: &[ErosContext],
-        #[cfg(feature = "backtrace")] backtrace: &Backtrace,
-        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
-    ) -> fmt::Result {
-        if let Some(head_ref) = (any as &dyn Any).downcast_ref::<Head>() {
-            write_debug(
-                head_ref,
-                formatter,
-                #[cfg(feature = "context")]
-                context,
-                #[cfg(feature = "backtrace")]
-                backtrace,
-                #[cfg(feature = "location")]
-                location,
-            )
-        } else {
-            Tail::debug_fold(
-                any,
-                formatter,
-                #[cfg(feature = "context")]
-                context,
-                #[cfg(feature = "backtrace")]
-                backtrace,
-                #[cfg(feature = "location")]
-                location,
-            )
-        }
-    }
-}
-
-/* ------------------------- Any::is support ----------------------- */
-
-pub trait IsFold {
-    fn is_fold(any: &dyn Any) -> bool;
-}
-
-impl IsFold for End {
-    fn is_fold(_: &dyn Any) -> bool {
-        false
-    }
-}
-
-impl<Head, Tail> IsFold for Cons<Head, Tail>
-where
-    Head: 'static,
-    Tail: IsFold,
-{
-    fn is_fold(any: &dyn Any) -> bool {
-        if any.is::<Head>() {
-            true
-        } else {
-            Tail::is_fold(any)
-        }
-    }
-}
-
-/* ------------------------- TypeSet implemented for tuples ----------------------- */
-
-/// A set of possible errors for an [`crate::ErrorUnion`].
+/// A set of possible errors for an [`ErrorUnion`](crate::ErrorUnion).
 ///
-/// Implemented for tuples whose members all implement [`SendSyncError`],
-/// the empty tuple `()`, and [`AnyError`].
-#[rustfmt::skip]
-pub trait TypeSet {
-    type Variants: TupleForm;
+/// Implemented for tuples of up to 26 [`SendSyncError`] types, the empty tuple
+/// `()`, and [`AnyError`].
+/// This trait is sealed and cannot be implemented outside Eros.
+pub trait TypeSet: sealed::Sealed + Send + Sync + 'static {
+    /// The type list used by [`Contains`], [`Narrow`], and [`SupersetOf`].
+    type Variants: TupleForm + IsFold;
+    /// The owned enum used by [`ErrorUnion::into_enum`](crate::ErrorUnion::into_enum).
     type Enum;
-    type RefEnum<'a> where Self: 'a;
-    type MutEnum<'a> where Self: 'a;
+    /// The borrowed enum used by [`ErrorUnion::as_enum`](crate::ErrorUnion::as_enum).
+    type RefEnum<'a>
+    where
+        Self: 'a;
+    /// The mutable enum used by [`ErrorUnion::as_mut_enum`](crate::ErrorUnion::as_mut_enum).
+    type MutEnum<'a>
+    where
+        Self: 'a;
 }
 
-impl TupleForm for AnyError {
-    type Tuple = AnyError;
-}
+#[rustfmt::skip]
+impl sealed::Sealed for AnyError {}
 
 #[rustfmt::skip]
 impl TypeSet for AnyError {
@@ -252,12 +55,18 @@ impl TypeSet for AnyError {
 }
 
 #[rustfmt::skip]
+impl sealed::Sealed for () {}
+
+#[rustfmt::skip]
 impl TypeSet for () {
     type Variants = End;
-    type Enum = E0;
-    type RefEnum<'a> = E0 where Self: 'a;
-    type MutEnum<'a> = E0 where Self: 'a;
+    type Enum = core::convert::Infallible;
+    type RefEnum<'a> = core::convert::Infallible where Self: 'a;
+    type MutEnum<'a> = core::convert::Infallible where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError> sealed::Sealed for (A,) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError> TypeSet for (A,) {
@@ -268,12 +77,18 @@ impl<A: SendSyncError> TypeSet for (A,) {
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError> sealed::Sealed for (A, B) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError> TypeSet for (A, B) {
     type Variants = Cons<A, Cons<B, End>>;
     type Enum = E2<A, B>;
     type RefEnum<'a> = E2<&'a A, &'a B> where Self: 'a;
     type MutEnum<'a> = E2<&'a mut A, &'a mut B> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError> sealed::Sealed for (A, B, C) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError> TypeSet for (A, B, C) {
@@ -284,12 +99,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError> TypeSet for (A, B, C)
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError> sealed::Sealed for (A, B, C, D) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError> TypeSet for (A, B, C, D) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, End>>>>;
     type Enum = E4<A, B, C, D>;
     type RefEnum<'a> = E4<&'a A, &'a B, &'a C, &'a D> where Self: 'a;
     type MutEnum<'a> = E4<&'a mut A, &'a mut B, &'a mut C, &'a mut D> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError> sealed::Sealed for (A, B, C, D, E) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError> TypeSet for (A, B, C, D, E) {
@@ -300,12 +121,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError> sealed::Sealed for (A, B, C, D, E, F) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError> TypeSet for (A, B, C, D, E, F) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, End>>>>>>;
     type Enum = E6<A, B, C, D, E, F>;
     type RefEnum<'a> = E6<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F> where Self: 'a;
     type MutEnum<'a> = E6<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError> TypeSet for (A, B, C, D, E, F, G) {
@@ -316,12 +143,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, End>>>>>>>>;
     type Enum = E8<A, B, C, D, E, F, G, H>;
     type RefEnum<'a> = E8<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H> where Self: 'a;
     type MutEnum<'a> = E8<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I) {
@@ -332,12 +165,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, End>>>>>>>>>>;
     type Enum = E10<A, B, C, D, E, F, G, H, I, J>;
     type RefEnum<'a> = E10<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J> where Self: 'a;
     type MutEnum<'a> = E10<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K) {
@@ -348,12 +187,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, End>>>>>>>>>>>>;
     type Enum = E12<A, B, C, D, E, F, G, H, I, J, K, L>;
     type RefEnum<'a> = E12<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L> where Self: 'a;
     type MutEnum<'a> = E12<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M) {
@@ -364,12 +209,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, End>>>>>>>>>>>>>>;
     type Enum = E14<A, B, C, D, E, F, G, H, I, J, K, L, M, N>;
     type RefEnum<'a> = E14<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N> where Self: 'a;
     type MutEnum<'a> = E14<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O) {
@@ -380,12 +231,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, End>>>>>>>>>>>>>>>>;
     type Enum = E16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>;
     type RefEnum<'a> = E16<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P> where Self: 'a;
     type MutEnum<'a> = E16<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q) {
@@ -396,12 +253,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, End>>>>>>>>>>>>>>>>>>;
     type Enum = E18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>;
     type RefEnum<'a> = E18<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R> where Self: 'a;
     type MutEnum<'a> = E18<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S) {
@@ -412,12 +275,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, End>>>>>>>>>>>>>>>>>>>>;
     type Enum = E20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>;
     type RefEnum<'a> = E20<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T> where Self: 'a;
     type MutEnum<'a> = E20<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U) {
@@ -428,12 +297,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, End>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>;
     type RefEnum<'a> = E22<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V> where Self: 'a;
     type MutEnum<'a> = E22<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) {
@@ -444,12 +319,18 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, End>>>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E24<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>;
     type RefEnum<'a> = E24<&'a A, &'a B, &'a C, &'a D, &'a E, &'a F, &'a G, &'a H, &'a I, &'a J, &'a K, &'a L, &'a M, &'a N, &'a O, &'a P, &'a Q, &'a R, &'a S, &'a T, &'a U, &'a V, &'a W, &'a X> where Self: 'a;
     type MutEnum<'a> = E24<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V, &'a mut W, &'a mut X> where Self: 'a;
 }
+
+#[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) {}
 
 #[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) {
@@ -460,6 +341,9 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
 }
 
 #[rustfmt::skip]
+impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError, Z: SendSyncError> sealed::Sealed for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z) {}
+
+#[rustfmt::skip]
 impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: SendSyncError, F: SendSyncError, G: SendSyncError, H: SendSyncError, I: SendSyncError, J: SendSyncError, K: SendSyncError, L: SendSyncError, M: SendSyncError, N: SendSyncError, O: SendSyncError, P: SendSyncError, Q: SendSyncError, R: SendSyncError, S: SendSyncError, T: SendSyncError, U: SendSyncError, V: SendSyncError, W: SendSyncError, X: SendSyncError, Y: SendSyncError, Z: SendSyncError> TypeSet for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z) {
     type Variants = Cons<A, Cons<B, Cons<C, Cons<D, Cons<E, Cons<F, Cons<G, Cons<H, Cons<I, Cons<J, Cons<K, Cons<L, Cons<M, Cons<N, Cons<O, Cons<P, Cons<Q, Cons<R, Cons<S, Cons<T, Cons<U, Cons<V, Cons<W, Cons<X, Cons<Y, Cons<Z, End>>>>>>>>>>>>>>>>>>>>>>>>>>;
     type Enum = E26<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z>;
@@ -467,10 +351,21 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
     type MutEnum<'a> = E26<&'a mut A, &'a mut B, &'a mut C, &'a mut D, &'a mut E, &'a mut F, &'a mut G, &'a mut H, &'a mut I, &'a mut J, &'a mut K, &'a mut L, &'a mut M, &'a mut N, &'a mut O, &'a mut P, &'a mut Q, &'a mut R, &'a mut S, &'a mut T, &'a mut U, &'a mut V, &'a mut W, &'a mut X, &'a mut Y, &'a mut Z> where Self: 'a;
 }
 
-/* ------------------------- TupleForm implemented for TypeSet ----------------------- */
+//************************************************************************//
 
-pub trait TupleForm {
+/// Associates a type list with its corresponding error set type.
+///
+/// For example, `Cons<A, Cons<B, End>>` has `Tuple = (A, B)`.
+/// This association determines the error set of the remainder union after
+/// [`ErrorUnion::narrow`](crate::ErrorUnion::narrow) or
+/// [`ErrorUnion::subset`](crate::ErrorUnion::subset). This trait is sealed.
+pub trait TupleForm: sealed::Sealed {
+    /// The corresponding error set.
     type Tuple: TypeSet;
+}
+
+impl TupleForm for AnyError {
+    type Tuple = AnyError;
 }
 
 impl TupleForm for End {
@@ -676,15 +571,48 @@ impl<A: SendSyncError, B: SendSyncError, C: SendSyncError, D: SendSyncError, E: 
     type Tuple = (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
 }
 
-/* ------------------------- Lifted ----------------------- */
+//************************************************************************//
+
+/// Tests whether a value's concrete type occurs in a type list.
+/// This trait is sealed.
+pub trait IsFold: sealed::Sealed {
+    /// Returns whether the list contains the value's concrete type.
+    fn is_fold(any: &dyn Any) -> bool;
+}
+
+impl IsFold for End {
+    fn is_fold(_: &dyn Any) -> bool {
+        false
+    }
+}
+
+impl<Head, Tail> IsFold for Cons<Head, Tail>
+where
+    Head: 'static,
+    Tail: IsFold,
+{
+    fn is_fold(any: &dyn Any) -> bool {
+        if any.is::<Head>() {
+            true
+        } else {
+            Tail::is_fold(any)
+        }
+    }
+}
+
+impl IsFold for AnyError {
+    fn is_fold(_: &dyn Any) -> bool {
+        true
+    }
+}
+
+//************************************************************************//
 
 impl<A> From<A> for E1<A> {
     fn from(a: A) -> E1<A> {
         E1::A(a)
     }
 }
-
-pub enum E0 {}
 
 #[rustfmt::skip]
 pub enum E1<A> { A(A) }
@@ -764,31 +692,46 @@ pub enum E25<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
 #[rustfmt::skip]
 pub enum E26<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X), Y(Y), Z(Z) }
 
-/* ------------------------- Contains ----------------------- */
+//************************************************************************//
 
-/// A trait that assists with compile-time type set inclusion testing.
-/// The `Index` parameter is either `End` or `Cons<...>` depending on
-/// whether the trait implementation is a base case or the recursive
-/// case.
-pub trait Contains<T, Index> {}
-
-/// Base case implementation for when the Cons Head is T.
-impl<T, Tail> Contains<T, End> for Cons<T, Tail> {}
-
-/// Recursive case for when the Cons Tail contains T.
-impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail> where
-    Tail: Contains<T, Index>
-{
+/// A type list that contains `T`.
+///
+/// Applied to [`TypeSet::Variants`] when constructing an error union.
+/// `Index` is inferred at call sites. This trait is sealed.
+pub trait Contains<T, Index> {
+    #[doc(hidden)]
+    fn __seal(_: sealed::Token);
 }
 
-impl<T> Contains<T, End> for AnyError {}
+/// Base case implementation for when the Cons Head is T.
+impl<T, Tail> Contains<T, End> for Cons<T, Tail> {
+    fn __seal(_: sealed::Token) {}
+}
 
-/* ------------------------- Narrow ----------------------- */
+/// Recursive case for when the Cons Tail contains T.
+impl<T, Index, Head, Tail> Contains<T, Cons<Index, ()>> for Cons<Head, Tail>
+where
+    Tail: Contains<T, Index>,
+{
+    fn __seal(_: sealed::Token) {}
+}
 
-/// A trait for pulling a specific type out of a Variants at compile-time
-/// and having access to the other types as the Remainder.
-pub trait Narrow<Target, Index>: TupleForm {
+impl<T> Contains<T, End> for AnyError {
+    fn __seal(_: sealed::Token) {}
+}
+
+//************************************************************************//
+
+/// A type list from which `T` can be removed.
+///
+/// Applied to [`TypeSet::Variants`] by [`ErrorUnion::narrow`](crate::ErrorUnion::narrow).
+/// `Index` is inferred at call sites. This trait is sealed.
+pub trait Narrow<T, Index>: TupleForm {
+    /// The type list remaining after removing `T`.
     type Remainder: TupleForm;
+
+    #[doc(hidden)]
+    fn __seal(_: sealed::Token);
 }
 
 /// Base case where the search Target is in the Head of the Variants.
@@ -798,6 +741,8 @@ where
     Cons<Target, Tail>: TupleForm,
 {
     type Remainder = Tail;
+
+    fn __seal(_: sealed::Token) {}
 }
 
 /// Recursive case where the search Target is in the Tail of the Variants.
@@ -809,6 +754,8 @@ where
     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
 {
     type Remainder = Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>;
+
+    fn __seal(_: sealed::Token) {}
 }
 
 fn _narrow_test() {
@@ -825,16 +772,26 @@ fn _narrow_test() {
     can_narrow::<T0, ParseIntError, Cons<Error, End>, _>();
 }
 
-/* ------------------------- SupersetOf ----------------------- */
+//************************************************************************//
 
-/// When all types in a Variants are present in a second Variants
+/// A type list containing every member of `Other`.
+///
+/// Applied to [`TypeSet::Variants`] by [`ErrorUnion::widen`](crate::ErrorUnion::widen)
+/// and [`ErrorUnion::subset`](crate::ErrorUnion::subset).
+/// `Index` is inferred at call sites. This trait is sealed.
 pub trait SupersetOf<Other, Index> {
+    /// The type list remaining after removing the members of `Other`.
     type Remainder: TupleForm;
+
+    #[doc(hidden)]
+    fn __seal(_: sealed::Token);
 }
 
 /// Base case
 impl<T: TupleForm> SupersetOf<End, End> for T {
     type Remainder = T;
+
+    fn __seal(_: sealed::Token) {}
 }
 
 /// Recursive case - more complex because we have to reason about the Index itself as a
@@ -851,10 +808,14 @@ where
             SubTail,
             TailIndex,
         >>::Remainder;
+
+    fn __seal(_: sealed::Token) {}
 }
 
 impl SupersetOf<AnyError, End> for AnyError {
     type Remainder = AnyError;
+
+    fn __seal(_: sealed::Token) {}
 }
 
 fn _superset_test() {

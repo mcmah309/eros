@@ -3,7 +3,7 @@ use super::{
     E22, E23, E24, E25, E26, ErrorUnion, SendSyncError,
 };
 
-/* ------------------------- Enum conversions ----------------------- */
+//************************************************************************//
 
 #[rustfmt::skip]
 impl<A> From<ErrorUnion<(A,)>> for E1<A>

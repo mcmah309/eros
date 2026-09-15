@@ -45,6 +45,8 @@ type AllErrors = (
 fn error_sets_support_generic_and_empty_unions() {
     fn assert_union<E: TypeSet>() {
         let _: Option<ErrorUnion<E>> = None;
+        fn assert_traits<T: fmt::Display + fmt::Debug + Send + Sync>() {}
+        assert_traits::<ErrorUnion<E>>();
     }
 
     fn singleton<E: SendSyncError>(error: E) -> ErrorUnion<(E,)> {
@@ -58,6 +60,90 @@ fn error_sets_support_generic_and_empty_unions() {
     let error = singleton(fmt::Error).narrow::<fmt::Error, _>().unwrap();
     let erased: ErrorUnion = singleton(error).into();
     assert!(erased.is_inner::<fmt::Error>());
+}
+
+#[test]
+fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
+    use eros::MsgError;
+    use eros::type_set::{Contains, Narrow, SupersetOf, TupleForm};
+
+    fn wrap<T: SendSyncError, E: TypeSet, I>(error: T) -> ErrorUnion<E>
+    where
+        E::Variants: Contains<T, I>,
+    {
+        ErrorUnion::new(error)
+    }
+
+    fn widen<E: TypeSet, Other: TypeSet, I>(error: ErrorUnion<E>) -> ErrorUnion<Other>
+    where
+        Other::Variants: SupersetOf<E::Variants, I>,
+    {
+        error.widen()
+    }
+
+    fn narrow<T: 'static, E: TypeSet, I>(
+        error: ErrorUnion<E>,
+    ) -> Result<T, ErrorUnion<<<E::Variants as Narrow<T, I>>::Remainder as TupleForm>::Tuple>>
+    where
+        E::Variants: Narrow<T, I>,
+    {
+        error.narrow()
+    }
+
+    fn subset<Other: TypeSet, E: TypeSet, I>(
+        error: ErrorUnion<E>,
+    ) -> Result<
+        ErrorUnion<Other>,
+        ErrorUnion<
+            <<E::Variants as SupersetOf<Other::Variants, I>>::Remainder as TupleForm>::Tuple,
+        >,
+    >
+    where
+        E::Variants: SupersetOf<Other::Variants, I>,
+    {
+        error.subset()
+    }
+
+    let error: ErrorUnion<(MsgError,)> = wrap(MsgError::from_static("root"));
+    let error: ErrorUnion<(fmt::Error, MsgError)> = widen(error);
+    let error = narrow::<fmt::Error, _, _>(error).unwrap_err();
+    let error = subset::<(MsgError,), _, _>(error).unwrap();
+    assert_eq!(error.into_single().as_str(), "root");
+}
+
+#[test]
+fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
+    fn roundtrip<E: TypeSet>(error: ErrorUnion<E>) -> ErrorUnion<E> {
+        let display = format!("{error}");
+        let debug = format!("{error:?}");
+        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let error = ErrorUnion::<E>::try_from_dyn_error(error.into_dyn_error()).unwrap();
+        assert_eq!(
+            error.inner() as *const dyn SendSyncError as *const (),
+            original
+        );
+        assert_eq!(format!("{error}"), display);
+        assert_eq!(format!("{error:?}"), debug);
+        error
+    }
+
+    let typed: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
+    let typed = roundtrip(typed.context("typed context"));
+    assert_eq!(typed.into_single(), fmt::Error);
+
+    let erased = roundtrip(eros::error!("root").context("erased context"));
+    assert_eq!(
+        erased.downcast_inner::<eros::MsgError>().unwrap().as_str(),
+        "root"
+    );
+
+    let unrelated: Box<dyn SendSyncError> = Box::new(eros::MsgError::from_static("unrelated"));
+    let original = unrelated.as_ref() as *const dyn SendSyncError as *const ();
+    let unrelated = ErrorUnion::<AnyError>::try_from_dyn_error(unrelated).unwrap_err();
+    assert_eq!(
+        unrelated.as_ref() as *const dyn SendSyncError as *const (),
+        original
+    );
 }
 
 #[test]

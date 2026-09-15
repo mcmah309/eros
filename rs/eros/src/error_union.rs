@@ -15,10 +15,8 @@ use std::any::TypeId;
 use crate::context::ContextValue;
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
-use crate::type_set::{
-    Contains, DebugFold, DisplayFold, ErrorFold, IsFold, Narrow, SupersetOf, TupleForm, TypeSet,
-    write_debug, write_display,
-};
+use crate::formatting::Report;
+use crate::type_set::{Contains, IsFold, Narrow, SupersetOf, TupleForm, TypeSet};
 
 use crate::AnyError;
 
@@ -263,55 +261,15 @@ where
     }
 }
 
-impl fmt::Debug for ErrorUnion<AnyError> {
+impl<E: TypeSet> fmt::Debug for ErrorUnion<E> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_debug(
-            &self.inner.error,
-            formatter,
-            #[cfg(feature = "context")]
-            &self.inner.context,
-            #[cfg(feature = "backtrace")]
-            &self.inner.backtrace,
-            #[cfg(feature = "location")]
-            self.inner.location,
-        )
+        Report::new(self).debug(formatter)
     }
 }
 
-impl<E> fmt::Debug for ErrorUnion<E>
-where
-    E: TypeSet,
-    E::Variants: fmt::Debug + DebugFold,
-{
+impl<E: TypeSet> fmt::Display for ErrorUnion<E> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::debug_fold(
-            &self.inner.error,
-            formatter,
-            #[cfg(feature = "context")]
-            &self.inner.context,
-            #[cfg(feature = "backtrace")]
-            &self.inner.backtrace,
-            #[cfg(feature = "location")]
-            self.inner.location,
-        )?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for ErrorUnion<AnyError> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_display(&self.inner.error, formatter)
-    }
-}
-
-impl<E> fmt::Display for ErrorUnion<E>
-where
-    E: TypeSet,
-    E::Variants: fmt::Display + DisplayFold,
-{
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        E::Variants::display_fold(&self.inner.error, formatter)?;
-        Ok(())
+        Report::new(self).display(formatter)
     }
 }
 
@@ -398,17 +356,15 @@ where
 impl<E> core::error::Error for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
-    E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
 {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        E::Variants::source_fold(&self.0.inner.error as &dyn Any)
+        self.0.source()
     }
 }
 
 impl<E> fmt::Display for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
-    E::Variants: fmt::Display + DisplayFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Native Error reporters traverse source() separately.
@@ -419,7 +375,6 @@ where
 impl<E> fmt::Debug for ErrorUnionErrorWrapper<E>
 where
     E: TypeSet,
-    E::Variants: fmt::Debug + DebugFold,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, formatter)
@@ -428,8 +383,7 @@ where
 
 impl<E> ErrorUnion<E>
 where
-    E: TypeSet + Send + Sync + 'static,
-    E::Variants: core::error::Error + DebugFold + DisplayFold + ErrorFold,
+    E: TypeSet,
 {
     /// Creates a `Box<dyn SendSyncError>` error from this [`crate::ErrorUnion`]. This is used since
     /// [`crate::ErrorUnion`] cannot implement [`core::error::Error`] directly, otherwise trait implementations
@@ -443,7 +397,9 @@ where
     ///
     /// Returns the original boxed error unchanged if it is not an Eros adapter
     /// for the same error set `E`.
-    pub fn try_from_dyn_error(error: Box<dyn SendSyncError>) -> Result<Self, Box<dyn SendSyncError>> {
+    pub fn try_from_dyn_error(
+        error: Box<dyn SendSyncError>,
+    ) -> Result<Self, Box<dyn SendSyncError>> {
         let error_ref = &*error as &dyn Any;
         if !error_ref.is::<ErrorUnionErrorWrapper<E>>() {
             return Err(error);
@@ -504,13 +460,9 @@ where
     #[allow(clippy::type_complexity)]
     pub fn subset<TargetList, Index>(
         self,
-    ) -> Result<
-        ErrorUnion<TargetList>,
-        ErrorUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>,
-    >
+    ) -> Result<ErrorUnion<TargetList>, ErrorUnion<<<E::Variants as SupersetOf<TargetList::Variants, Index>>::Remainder as TupleForm>::Tuple>>
     where
         TargetList: TypeSet,
-        TargetList::Variants: IsFold,
         E::Variants: SupersetOf<TargetList::Variants, Index>,
     {
         if TargetList::Variants::is_fold(&self.inner.error as &dyn Any) {
@@ -602,8 +554,8 @@ where
     pub fn latest_context_error(&self) -> Option<&dyn SendSyncError> {
         #[cfg(feature = "context")]
         for context in self.inner.context.iter().rev() {
-            if let crate::context::ContextValue::Error(err) = &context.context {
-                return Some(err.as_ref());
+            if let Some(err) = context.context.as_error() {
+                return Some(err);
             }
         }
         None
@@ -1013,11 +965,11 @@ impl From<ErrorUnion> for anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt;
     #[cfg(not(feature = "std"))]
     use std::{prelude::v1::*, vec};
-    use std::fmt;
 
-    // ── helpers ──────────────────────────────────────────────────────────────
+    //************************************************************************//
 
     #[derive(Debug, PartialEq)]
     struct FooError(String);
@@ -1281,9 +1233,9 @@ mod tests {
 #[cfg(test)]
 mod latest_context_error_tests {
     use super::*;
+    use std::fmt;
     #[cfg(not(feature = "std"))]
     use std::prelude::v1::*;
-    use std::fmt;
 
     #[derive(Debug, PartialEq)]
     struct PrimaryError(String);
@@ -1318,7 +1270,9 @@ mod latest_context_error_tests {
     fn latest_context_error_fallback_returns_inner() {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
 
-        let error = union.latest_context_error().unwrap_or_else(|| union.inner());
+        let error = union
+            .latest_context_error()
+            .unwrap_or_else(|| union.inner());
         assert_eq!(error.to_string(), "PrimaryError(base)");
         assert!(error.as_any().is::<PrimaryError>());
     }
@@ -1380,7 +1334,9 @@ mod latest_context_error_tests {
         let union = union.context("note one").context("note two");
 
         assert!(union.latest_context_error().is_none());
-        let error = union.latest_context_error().unwrap_or_else(|| union.inner());
+        let error = union
+            .latest_context_error()
+            .unwrap_or_else(|| union.inner());
         assert_eq!(error.to_string(), "PrimaryError(base)");
     }
 
@@ -1390,7 +1346,13 @@ mod latest_context_error_tests {
         let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
         let union = union.context(box_err(ContextError("typed".into())));
 
-        assert!(union.latest_context_error().unwrap().as_any().is::<ContextError>());
+        assert!(
+            union
+                .latest_context_error()
+                .unwrap()
+                .as_any()
+                .is::<ContextError>()
+        );
     }
 
     #[cfg(feature = "context")]
@@ -1410,9 +1372,9 @@ mod latest_context_error_tests {
 #[cfg(test)]
 mod downcast_inner_tests {
     use super::*;
+    use std::fmt;
     #[cfg(not(feature = "std"))]
     use std::{prelude::v1::*, vec};
-    use std::fmt;
 
     #[derive(Debug, PartialEq)]
     struct FooError(String);

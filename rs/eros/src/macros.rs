@@ -25,12 +25,12 @@ macro_rules! bail {
 /// assert_eq!(error.to_string(), "User 7 not found");
 /// ```
 /// `error!` optimizes allocations unlike `format!`.
-/// Plain literals use [`MsgError::Static`](crate::MsgError::Static); formatted
-/// messages use [`MsgError::Owned`](crate::MsgError::Owned). Storage is selected
+/// Plain literals use [`MsgError::from_static`](crate::MsgError::from_static); formatted
+/// messages use [`MsgError::from_owned`](crate::MsgError::from_owned). Storage is selected
 /// at compile time. Escape literal braces as `{{` and `}}`, just like `format!`.
 ///
 /// All-caps names, such as `NOT_FOUND` or `messages::NOT_FOUND`, must refer to a
-/// `&'static str`. These messages use `MsgError::Static` and keep their text unchanged:
+/// `&'static str`. These messages borrow the text and keep it unchanged:
 /// ```
 /// static NOT_FOUND: &str = "User {id} not found";
 /// let error = eros::error!(NOT_FOUND);
@@ -55,7 +55,7 @@ macro_rules! error {
         $crate::ErrorUnion::new::<_, $crate::AnyError, _>(error)
     }};
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::ErrorUnion::new::<_, $crate::AnyError, _>($crate::MsgError::Owned($crate::__private::format!($fmt, $($arg)*)))
+        $crate::ErrorUnion::new::<_, $crate::AnyError, _>($crate::MsgError::from_owned($crate::__private::format!($fmt, $($arg)*)))
     };
 }
 

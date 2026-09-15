@@ -1,70 +1,62 @@
 use alloc::{borrow::Cow, string::String};
 use core::fmt::{self, Debug, Display};
 
-/// An Error type that is just a message.
-/// It can hold a string in either a static or owned form.
-/// No unnecessary allocation for static strings compared to `String`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MsgError {
-    Static(&'static str),
-    Owned(String),
-}
+/// An error containing a message.
+///
+/// Static messages do not allocate. Equality, ordering, and hashing depend only
+/// on the message text, regardless of how it is stored.
+/// Use [`Self::from_static`] or [`Self::from_owned`] to choose storage explicitly,
+/// or convert from a string with [`From`].
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MsgError(Cow<'static, str>);
 
 impl core::error::Error for MsgError {}
 
 impl MsgError {
+    /// Borrows static text without allocating.
+    #[inline]
+    pub const fn from_static(message: &'static str) -> Self {
+        Self(Cow::Borrowed(message))
+    }
+
+    /// Takes ownership of a string without allocating or copying its contents.
+    #[inline]
+    pub fn from_owned(message: String) -> Self {
+        Self(Cow::Owned(message))
+    }
+
+    /// Returns the message text.
     pub fn as_str(&self) -> &str {
-        match self {
-            MsgError::Static(s) => s,
-            MsgError::Owned(s) => s,
-        }
+        &self.0
     }
 }
 
 impl Debug for MsgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MsgError::Static(s) => f.write_str(s),
-            MsgError::Owned(s) => f.write_str(s),
-        }
+        f.write_str(self.as_str())
     }
 }
 
 impl Display for MsgError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MsgError::Static(s) => write!(formatter, "{}", s),
-            MsgError::Owned(s) => write!(formatter, "{}", s),
-        }
-    }
-}
-
-impl Clone for MsgError {
-    fn clone(&self) -> Self {
-        match self {
-            MsgError::Static(s) => MsgError::Static(s),
-            MsgError::Owned(s) => MsgError::Owned(s.clone()),
-        }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
 impl From<&'static str> for MsgError {
-    fn from(s: &'static str) -> MsgError {
-        MsgError::Static(s)
+    fn from(s: &'static str) -> Self {
+        Self::from_static(s)
     }
 }
 
 impl From<String> for MsgError {
-    fn from(s: String) -> MsgError {
-        MsgError::Owned(s)
+    fn from(s: String) -> Self {
+        Self::from_owned(s)
     }
 }
 
 impl From<Cow<'static, str>> for MsgError {
-    fn from(s: Cow<'static, str>) -> MsgError {
-        match s {
-            Cow::Borrowed(s) => MsgError::Static(s),
-            Cow::Owned(s) => MsgError::Owned(s),
-        }
+    fn from(s: Cow<'static, str>) -> Self {
+        Self(s)
     }
 }

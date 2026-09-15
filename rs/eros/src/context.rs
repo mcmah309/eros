@@ -4,8 +4,9 @@ use core::result::Result;
 
 use crate::{ErrorUnion, SendSyncError, type_set::TypeSet};
 
+#[cfg(feature = "context")]
 #[derive(Debug)]
-pub struct ErosContext {
+pub(crate) struct ErosContext {
     pub(crate) context: ContextValue,
     #[cfg(feature = "location")]
     pub(crate) location: &'static core::panic::Location<'static>,
@@ -13,9 +14,10 @@ pub struct ErosContext {
     pub(crate) is_user_facing: bool,
 }
 
+#[cfg(feature = "context")]
 impl ErosContext {
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn new(context: ContextValue) -> Self {
+    pub(crate) fn new(context: ContextValue) -> Self {
         Self {
             context,
             #[cfg(feature = "location")]
@@ -27,7 +29,7 @@ impl ErosContext {
 
     #[cfg(feature = "user_context")]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn new_user_facing(context: ContextValue) -> Self {
+    pub(crate) fn new_user_facing(context: ContextValue) -> Self {
         Self {
             context,
             #[cfg(feature = "location")]
@@ -37,48 +39,74 @@ impl ErosContext {
     }
 }
 
-/// A context value containing a static message, an owned message, or an error.
-#[derive(Debug)]
-pub enum ContextValue {
-    Static(&'static str),
-    Owned(String),
+/// A context value containing a message or an error.
+///
+/// Convert static text, a `String`, a `Cow<'static, str>`, or a boxed
+/// [`SendSyncError`] into context. Static messages do not allocate.
+pub struct ContextValue(ContextValueInner);
+
+enum ContextValueInner {
+    Message(Cow<'static, str>),
     Error(Box<dyn SendSyncError>),
+}
+
+impl ContextValue {
+    /// Returns the message text, or `None` for error-valued context.
+    pub fn as_str(&self) -> Option<&str> {
+        match &self.0 {
+            ContextValueInner::Message(message) => Some(message),
+            ContextValueInner::Error(_) => None,
+        }
+    }
+
+    /// Returns the original error, or `None` for message-valued context.
+    pub fn as_error(&self) -> Option<&dyn SendSyncError> {
+        match &self.0 {
+            ContextValueInner::Message(_) => None,
+            ContextValueInner::Error(error) => Some(error.as_ref()),
+        }
+    }
+}
+
+impl core::fmt::Debug for ContextValue {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match &self.0 {
+            ContextValueInner::Message(message) => f.debug_tuple("Message").field(message).finish(),
+            ContextValueInner::Error(error) => f.debug_tuple("Error").field(error).finish(),
+        }
+    }
 }
 
 impl core::fmt::Display for ContextValue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            ContextValue::Static(s) => write!(f, "{}", s),
-            ContextValue::Owned(s) => write!(f, "{}", s),
-            ContextValue::Error(e) => write!(f, "{}", e),
+        match &self.0 {
+            ContextValueInner::Message(message) => f.write_str(message),
+            ContextValueInner::Error(error) => write!(f, "{}", error),
         }
     }
 }
 
 impl From<&'static str> for ContextValue {
     fn from(s: &'static str) -> ContextValue {
-        ContextValue::Static(s)
+        Self(ContextValueInner::Message(Cow::Borrowed(s)))
     }
 }
 
 impl From<String> for ContextValue {
     fn from(s: String) -> ContextValue {
-        ContextValue::Owned(s)
+        Self(ContextValueInner::Message(Cow::Owned(s)))
     }
 }
 
 impl From<Cow<'static, str>> for ContextValue {
     fn from(s: Cow<'static, str>) -> ContextValue {
-        match s {
-            Cow::Borrowed(s) => ContextValue::Static(s),
-            Cow::Owned(s) => ContextValue::Owned(s),
-        }
+        Self(ContextValueInner::Message(s))
     }
 }
 
 impl From<Box<dyn SendSyncError>> for ContextValue {
     fn from(e: Box<dyn SendSyncError>) -> Self {
-        ContextValue::Error(e)
+        Self(ContextValueInner::Error(e))
     }
 }
 
