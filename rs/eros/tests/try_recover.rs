@@ -153,3 +153,56 @@ fn only_the_inner_error_is_matched() {
         .try_recover::<MsgError, _, _, _>(|_| panic!("must not handle source or context errors"));
     assert_eq!(format!("{:?}", result.unwrap_err()), report);
 }
+
+#[test]
+fn chained_fallbacks_can_replace_reintroduce_and_finally_recover_an_error() {
+    let result: eros::Result<u8, (MsgError, fmt::Error)> = Err(MsgError::from("original")).union();
+    let mut calls = Vec::new();
+    let result: eros::Result<u8, (fmt::Error, io::Error)> =
+        result.try_recover::<MsgError, _, _, _>(|error| {
+            calls.push("replace");
+            assert_eq!(error.as_str(), "original");
+            Err(io::Error::other("fallback")).union()
+        });
+    let result: eros::Result<u8, (io::Error, fmt::Error)> =
+        result.try_recover::<io::Error, _, _, _>(|error| {
+            calls.push("reintroduce");
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+            Err(error.context("retry failed").widen())
+        });
+    let result: eros::Result<u8, (io::Error,)> =
+        result.recover::<fmt::Error, _>(|_| panic!("unrelated handler"));
+    let value = result
+        .recover::<io::Error, _>(|error| {
+            calls.push("recover");
+            assert_eq!(error.into_single().to_string(), "fallback");
+            7
+        })
+        .into_value();
+    assert_eq!(value, 7);
+    assert_eq!(calls, ["replace", "reintroduce", "recover"]);
+}
+
+#[test]
+fn recovery_accepts_borrowed_values_and_handlers_without_send_or_static_bounds() {
+    for fallible in [false, true] {
+        let mut storage = 0;
+        let token = std::rc::Rc::new(());
+        let borrowed_token = &token;
+        let borrowed_storage = &mut storage;
+        let result: eros::Result<&mut u8, (MsgError,)> =
+            Err(ErrorUnion::new(MsgError::from("original")));
+        let handler = move |error: ErrorUnion<(MsgError,)>| {
+            assert_eq!(error.as_str(), "original");
+            assert_eq!(std::rc::Rc::strong_count(borrowed_token), 1);
+            borrowed_storage
+        };
+        let result: eros::Result<&mut u8, ()> = if fallible {
+            result.try_recover::<MsgError, _, _, _>(|error| Ok(handler(error)))
+        } else {
+            result.recover::<MsgError, _>(handler)
+        };
+        *result.into_value() = 7;
+        assert_eq!(storage, 7);
+    }
+}

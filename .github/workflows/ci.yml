@@ -53,7 +53,10 @@ jobs:
         env:
           RUST_BACKTRACE: "1"
           RUST_LIB_BACKTRACE: "1"
-        run: cargo test -p eros --all-features --test formatting --test reshaping
+        run: >-
+          cargo test -p eros --all-features
+          --test formatting --test reshaping --test union_conversions
+          --test single_reshaping --test group_recovery --test try_recover
 
   miri:
     runs-on: ubuntu-latest

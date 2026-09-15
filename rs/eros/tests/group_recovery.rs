@@ -180,14 +180,37 @@ macro_rules! check_group_arity {
             type Errors = ($(Payload<$n>,)+);
             // Each generated handler implementation must support inference and
             // remove the full group, for both recovery methods.
-            let error: ErrorUnion<Errors> = ErrorUnion::new(Payload::<0>);
-            let result: eros::Result<u8, Errors> = Err(error);
-            let value = result.recover(|_: ErrorUnion<Errors>| 7).into_value();
-            assert_eq!(value, 7);
-            let error: ErrorUnion<Errors> = ErrorUnion::new(Payload::<0>);
-            let result: eros::Result<u8, Errors> = Err(error);
-            let result: eros::Result<u8, ()> = result.try_recover(|_: ErrorUnion<Errors>| Ok(7));
-            assert_eq!(result.into_value(), 7);
+            // Exercise the whole runtime type search, including the last member.
+            let errors: [ErrorUnion<Errors>; [$($n),+].len()] = [
+                $(ErrorUnion::new(Payload::<$n>),)+
+            ];
+            for (index, error) in errors.into_iter().enumerate() {
+                let expected = format!("error {index}");
+                let result: eros::Result<u8, Errors> = Err(error);
+                let mut calls = 0;
+                let value = result.recover(|error: ErrorUnion<Errors>| {
+                    calls += 1;
+                    assert_eq!(error.to_string(), expected);
+                    7
+                }).into_value();
+                assert_eq!(calls, 1);
+                assert_eq!(value, 7);
+            }
+            let errors: [ErrorUnion<Errors>; [$($n),+].len()] = [
+                $(ErrorUnion::new(Payload::<$n>),)+
+            ];
+            for (index, error) in errors.into_iter().enumerate() {
+                let expected = format!("error {index}");
+                let result: eros::Result<u8, Errors> = Err(error);
+                let mut calls = 0;
+                let result: eros::Result<u8, ()> = result.try_recover(|error: ErrorUnion<Errors>| {
+                    calls += 1;
+                    assert_eq!(error.to_string(), expected);
+                    Ok(7)
+                });
+                assert_eq!(calls, 1);
+                assert_eq!(result.into_value(), 7);
+            }
         }
     };
 }

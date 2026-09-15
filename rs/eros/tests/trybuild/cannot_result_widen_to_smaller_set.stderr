@@ -1,0 +1,20 @@
+error[E0277]: the trait bound `eros::type_set::End: SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, _>` is not satisfied
+ --> tests/trybuild/cannot_result_widen_to_smaller_set.rs:5:51
+  |
+5 |     let _: eros::Result<(), (MsgError,)> = result.widen();
+  |                                                   ^^^^^ the trait `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, _>` is not implemented for `eros::type_set::End`
+  |
+help: the trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl SupersetOf<AnyError, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::Cons<std::fmt::Error, eros::type_set::End>>, eros::type_set::Cons<eros::type_set::End, _>>`
+note: required by a bound in `widen`
+ --> src/error_union.rs
+  |
+  |     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
+  |        ----- required by a bound in this associated function
+...
+  |         Other::Variants: SupersetOf<E::Variants, Index>;
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::widen`

@@ -1,0 +1,20 @@
+error[E0277]: the trait bound `eros::type_set::End: Contains<MsgError, _>` is not satisfied
+ --> tests/trybuild/cannot_union_unlisted_error.rs:5:58
+  |
+5 |     let _: eros::Result<(), (std::fmt::Error,)> = result.union();
+  |                                                          ^^^^^ the trait `Contains<MsgError, _>` is not implemented for `eros::type_set::End`
+  |
+help: the trait `Contains<T, eros::type_set::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl<T> Contains<T, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `Contains<MsgError, eros::type_set::Cons<_, ()>>`
+note: required by a bound in `union`
+ --> src/error_union.rs
+  |
+  |     fn union<Index, Other>(self) -> Result<S, ErrorUnion<Other>>
+  |        ----- required by a bound in this associated function
+...
+  |         Other::Variants: Contains<F, Index>;
+  |                          ^^^^^^^^^^^^^^^^^^ required by this bound in `IntoUnion::union`

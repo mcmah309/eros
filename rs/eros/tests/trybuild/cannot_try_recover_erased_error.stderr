@@ -1,0 +1,79 @@
+error[E0277]: the trait bound `AnyError: SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not satisfied
+ --> tests/trybuild/cannot_try_recover_erased_error.rs:5:35
+  |
+5 |     let _: eros::Result<(), ()> = result.try_recover::<MsgError, _, _, _>(|_| Ok(()));
+  |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+  |
+help: the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+      but trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for it
+ --> src/type_set.rs
+  |
+  | impl SupersetOf<AnyError, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: for that trait implementation, expected `AnyError`, found `eros::type_set::Cons<MsgError, eros::type_set::End>`
+  = note: required for `MsgError` to implement `RecoveryTarget<AnyError, SingleRecovery<_>>`
+
+error[E0277]: the trait bound `AnyError: SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not satisfied
+ --> tests/trybuild/cannot_try_recover_erased_error.rs:5:56
+  |
+5 |     let _: eros::Result<(), ()> = result.try_recover::<MsgError, _, _, _>(|_| Ok(()));
+  |                                          -----------   ^^^^^^^^ the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+  |                                          |
+  |                                          required by a bound introduced by this call
+  |
+help: the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+      but trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for it
+ --> src/type_set.rs
+  |
+  | impl SupersetOf<AnyError, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: for that trait implementation, expected `AnyError`, found `eros::type_set::Cons<MsgError, eros::type_set::End>`
+  = note: required for `MsgError` to implement `RecoveryTarget<AnyError, SingleRecovery<_>>`
+note: required by a bound in `try_recover`
+ --> src/error_union.rs
+  |
+  |     fn try_recover<Target, Other, Index, OtherIndex>(
+  |        ----------- required by a bound in this associated function
+...
+  |         Target: RecoveryTarget<E, Index>,
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`
+
+error[E0277]: the trait bound `AnyError: SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not satisfied
+ --> tests/trybuild/cannot_try_recover_erased_error.rs:5:42
+  |
+5 |     let _: eros::Result<(), ()> = result.try_recover::<MsgError, _, _, _>(|_| Ok(()));
+  |                                          ^^^^^^^^^^^ the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+  |
+help: the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+      but trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for it
+ --> src/type_set.rs
+  |
+  | impl SupersetOf<AnyError, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: for that trait implementation, expected `AnyError`, found `eros::type_set::Cons<MsgError, eros::type_set::End>`
+  = note: required for `MsgError` to implement `RecoveryTarget<AnyError, SingleRecovery<_>>`
+
+error[E0277]: the trait bound `AnyError: SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not satisfied
+ --> tests/trybuild/cannot_try_recover_erased_error.rs:5:75
+  |
+5 |     let _: eros::Result<(), ()> = result.try_recover::<MsgError, _, _, _>(|_| Ok(()));
+  |                                          -----------                      ^^^^^^^^^^ the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+  |                                          |
+  |                                          required by a bound introduced by this call
+  |
+help: the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `AnyError`
+      but trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for it
+ --> src/type_set.rs
+  |
+  | impl SupersetOf<AnyError, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: for that trait implementation, expected `AnyError`, found `eros::type_set::Cons<MsgError, eros::type_set::End>`
+  = note: required for `{closure@$DIR/tests/trybuild/cannot_try_recover_erased_error.rs:5:75: 5:78}` to implement `RecoveryHandler<MsgError, AnyError, SingleRecovery<_>, Result<(), ErrorUnion<_>>>`
+note: required by a bound in `try_recover`
+ --> src/error_union.rs
+  |
+  |     fn try_recover<Target, Other, Index, OtherIndex>(
+  |        ----------- required by a bound in this associated function
+  |         self,
+  |         f: impl RecoveryHandler<Target, E, Index, Result<S, ErrorUnion<Other>>>,
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`

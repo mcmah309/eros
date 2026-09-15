@@ -1,4 +1,4 @@
-use eros::{AnyError, ContextValue, ErrorUnion, ReshapeUnion, SendSyncError};
+use eros::{AnyError, ContextValue, ErrorUnion, IntoUnion, ReshapeUnion, SendSyncError};
 use std::{
     fmt,
     sync::{
@@ -125,9 +125,138 @@ fn recover_keeps_the_error_alive_in_the_handler_and_drops_it_once_on_unwind() {
             panic!("recovery failed");
         });
     }));
-    assert!(outcome.is_err());
+    assert_eq!(
+        outcome.unwrap_err().downcast_ref::<&str>(),
+        Some(&"recovery failed")
+    );
     assert_eq!(root.load(Ordering::SeqCst), 1);
     assert_eq!(context.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn union_and_widen_move_the_error_without_dropping_it() {
+    let root = Arc::new(AtomicUsize::new(0));
+    let error = tracked(&root);
+    let original = error.payload.as_ptr();
+    let result: eros::Result<(), (Tracked,)> = Err(error).union();
+    let result: eros::Result<(), (fmt::Error, Tracked)> = result.widen();
+    let error: ErrorUnion<(Tracked, fmt::Error)> = result.unwrap_err().widen();
+    assert_eq!(root.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        error.downcast_inner_ref::<Tracked>().unwrap().payload.as_ptr(),
+        original
+    );
+    drop(error);
+    assert_eq!(root.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn skipped_recovery_handlers_drop_captured_values_and_preserve_the_input() {
+    for fallible in [false, true] {
+        for succeeds in [false, true] {
+            let root = Arc::new(AtomicUsize::new(0));
+            let context = Arc::new(AtomicUsize::new(0));
+            let capture = Arc::new(AtomicUsize::new(0));
+            let captured = tracked(&capture);
+            let result: eros::Result<Tracked, (Tracked, fmt::Error)> = if succeeds {
+                Ok(tracked(&root))
+            } else {
+                Err(union(&root, &context).widen())
+            };
+            let handler = move |_: ErrorUnion<(fmt::Error,)>| {
+                drop(captured);
+                panic!("handler must be skipped");
+            };
+            let result: eros::Result<Tracked, (Tracked,)> = if fallible {
+                result.try_recover::<fmt::Error, _, _, _>(|error| Ok(handler(error)))
+            } else {
+                result.recover::<fmt::Error, _>(handler)
+            };
+            assert_eq!(capture.load(Ordering::SeqCst), 1);
+            assert_eq!(root.load(Ordering::SeqCst), 0);
+            assert_eq!(result.is_ok(), succeeds);
+            assert_eq!(
+                context.load(Ordering::SeqCst),
+                usize::from(!succeeds && !cfg!(feature = "context"))
+            );
+            drop(result);
+            assert_eq!(root.load(Ordering::SeqCst), 1);
+            assert_eq!(context.load(Ordering::SeqCst), usize::from(!succeeds));
+        }
+    }
+}
+
+#[test]
+fn try_recover_drops_original_metadata_and_transfers_fallback_ownership() {
+    for succeeds in [false, true] {
+        let root = Arc::new(AtomicUsize::new(0));
+        let context = Arc::new(AtomicUsize::new(0));
+        let fallback_root = Arc::new(AtomicUsize::new(0));
+        let fallback_context = Arc::new(AtomicUsize::new(0));
+        let fallback = union(&fallback_root, &fallback_context);
+        let result: eros::Result<Tracked, (fmt::Error, Tracked)> =
+            Err(union(&root, &context).widen());
+        let result: eros::Result<Tracked, (Tracked, fmt::Error)> =
+            result.try_recover::<Tracked, _, _, _>(|error| {
+                assert_eq!(error.payload, [1, 2, 3]);
+                assert_eq!(root.load(Ordering::SeqCst), 0);
+                if succeeds {
+                    Ok(fallback.into_single())
+                } else {
+                    Err(fallback.widen())
+                }
+            });
+        assert_eq!(result.is_ok(), succeeds);
+        assert_eq!(root.load(Ordering::SeqCst), 1);
+        assert_eq!(context.load(Ordering::SeqCst), 1);
+        assert_eq!(fallback_root.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            fallback_context.load(Ordering::SeqCst),
+            usize::from(succeeds || !cfg!(feature = "context"))
+        );
+        drop(result);
+        assert_eq!(fallback_root.load(Ordering::SeqCst), 1);
+        assert_eq!(fallback_context.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+fn panicking_single_and_group_try_recover_handlers_drop_errors_and_captures_once() {
+    for group in [false, true] {
+        let root = Arc::new(AtomicUsize::new(0));
+        let context = Arc::new(AtomicUsize::new(0));
+        let capture = Arc::new(AtomicUsize::new(0));
+        let captured = tracked(&capture);
+        let result: eros::Result<(), (fmt::Error, Tracked)> = Err(union(&root, &context).widen());
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _: eros::Result<(), (fmt::Error,)> = if group {
+                result.try_recover::<(Tracked, fmt::Error), _, _, _>(|error| {
+                    let guard = captured;
+                    assert!(error.is_inner::<Tracked>());
+                    assert_eq!(guard.payload, [1, 2, 3]);
+                    panic!("group recovery failed");
+                })
+            } else {
+                result.try_recover::<Tracked, _, _, _>(|error| {
+                    let guard = captured;
+                    assert_eq!(error.payload, [1, 2, 3]);
+                    assert_eq!(guard.payload, [1, 2, 3]);
+                    panic!("single recovery failed");
+                })
+            };
+        }));
+        // An assertion failure inside the handler must not count as the
+        // deliberate panic this test expects.
+        let expected = if group {
+            "group recovery failed"
+        } else {
+            "single recovery failed"
+        };
+        assert_eq!(outcome.unwrap_err().downcast_ref::<&str>(), Some(&expected));
+        assert_eq!(root.load(Ordering::SeqCst), 1);
+        assert_eq!(context.load(Ordering::SeqCst), 1);
+        assert_eq!(capture.load(Ordering::SeqCst), 1);
+    }
 }
 
 #[test]

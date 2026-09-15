@@ -244,6 +244,20 @@ fn result_singleton_and_empty_targets_retain_diagnostics() {
 }
 
 #[test]
+fn result_narrow_empty_and_full_targets_preserve_success_with_empty_remainders() {
+    let result: eros::Result<Box<u8>, ()> = Ok(Box::new(7));
+    let original = result.as_ref().unwrap().as_ref() as *const u8;
+    let result: eros::Result<Box<u8>, ()> = result.narrow::<(), _>().unwrap_err();
+    let result: eros::Result<Box<u8>, Pair> = result.widen();
+    let result: eros::Result<Box<u8>, Pair> = result.narrow::<(), _>().unwrap_err();
+    let result: eros::Result<Box<u8>, ()> =
+        result.narrow::<(fmt::Error, MsgError), _>().unwrap_err();
+    let value = result.into_value();
+    assert_eq!(value.as_ref() as *const u8, original);
+    assert_eq!(*value, 7);
+}
+
+#[test]
 fn recover_preserves_success_and_only_calls_the_matching_handler() {
     let success: eros::Result<String, Pair> = Ok(String::from("original success"));
     let original = success.as_ref().unwrap().as_ptr();
