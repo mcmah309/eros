@@ -80,7 +80,7 @@ fn main() {
     }
 }
 ```
-The above code is precisely typed for what we care about and there was no need to create an error enum for each case. See the [ErrorUnion](#errorunion) section for more details how it works.
+The above code is precisely typed for what we care about and there was no need to create an error enum for each case. One can also use a type alias like `type MyError = (io::Error, ParseIntError);` for reuse. See the [ErrorUnion](#errorunion) section for more details how it works.
 
 ### Seamless Transitions Between Error Types
 
