@@ -431,7 +431,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a thin wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the existing allocation (no-op) so there is no cost to use `eros` in a library for any downstreams.
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the existing allocation (no-op) so there is no cost to use `eros` in a library for any downstreams.
 
 This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `into_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
 
