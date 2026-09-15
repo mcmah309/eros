@@ -19,7 +19,7 @@ pub mod __private {
 mod any_error;
 mod context;
 mod macros;
-mod str_error;
+mod msg_error;
 mod error_union;
 mod formatting;
 mod root_error;
@@ -38,10 +38,10 @@ pub type Result<T, E = AnyError> = core::result::Result<T, ErrorUnion<E>>;
 
 // data structures
 pub use any_error::AnyError;
-pub use context::ContextSource;
+pub use context::ContextValue;
 #[cfg(feature = "context")]
 pub use context::AbsentValueError;
-pub use str_error::StrError;
+pub use msg_error::MsgError;
 pub use error_union::SendSyncError;
 pub use error_union::ErrorUnion;
 pub use type_set::TypeSet;
@@ -58,4 +58,4 @@ pub use type_set::{
 pub use context::Context;
 pub use error_union::ReshapeUnion;
 pub use error_union::IntoUnion;
-pub use error_union::IntoDynUnion;
+pub use error_union::IntoAnyUnion;

@@ -1,6 +1,6 @@
 #![cfg(feature = "anyhow")]
 
-use eros::{ErrorUnion, StrError};
+use eros::{ErrorUnion, MsgError};
 use std::sync::Arc;
 
 #[test]
@@ -25,24 +25,24 @@ fn converting_to_anyhow_preserves_root_and_context_order() {
     assert!(
         error
             .chain()
-            .any(|cause| cause.downcast_ref::<StrError>().is_some())
+            .any(|cause| cause.downcast_ref::<MsgError>().is_some())
     );
 }
 
 #[test]
 fn owned_and_shared_anyhow_adapters_retain_chains_and_shared_ownership() {
-    let shared = Arc::new(anyhow::Error::new(StrError::from("root")).context("anyhow context"));
+    let shared = Arc::new(anyhow::Error::new(MsgError::from("root")).context("anyhow context"));
     let shared_union = ErrorUnion::from_anyhow_arc(shared.clone());
     assert_eq!(Arc::strong_count(&shared), 2);
     let owned_union =
-        ErrorUnion::from_anyhow(anyhow::Error::new(StrError::from("root")).context("anyhow context"));
+        ErrorUnion::from_anyhow(anyhow::Error::new(MsgError::from("root")).context("anyhow context"));
     for error in [owned_union, shared_union] {
         assert_eq!(error.to_string(), "anyhow context <- root");
         assert_eq!(
             error
                 .source()
                 .unwrap()
-                .downcast_ref::<StrError>()
+                .downcast_ref::<MsgError>()
                 .unwrap()
                 .as_str(),
             "root"

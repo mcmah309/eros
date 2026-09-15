@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::string::ToString;
-use eros::{AnyError, ErrorUnion, IntoDynUnion, IntoUnion, SendSyncError, StrError, error};
+use eros::{AnyError, ErrorUnion, IntoAnyUnion, IntoUnion, SendSyncError, MsgError, error};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotEnoughMemory;
@@ -43,12 +43,12 @@ pub enum CheckOutcome {
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let untitled: ErrorUnion<AnyError> = error!("something went wrong");
-    assert_type::<StrError>(untitled.inner(), "StrError present")?;
+    assert_type::<MsgError>(untitled.inner(), "MsgError present")?;
     assert_display(untitled.inner(), "something went wrong")?;
 
     let formatted: ErrorUnion<AnyError> = eros::error!("val = {}", 7u32);
     assert_display(formatted.inner(), "val = 7")?;
-    assert_type::<StrError>(formatted.inner(), "owned StrError")?;
+    assert_type::<MsgError>(formatted.inner(), "owned MsgError")?;
 
     let value = 7u32;
     let captured = eros::error!("val = {value}");
@@ -61,7 +61,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let r: eros::Result<()> = bailing_function();
     let union = r.expect_err("bail should error");
     assert_display(union.inner(), "boom from bail")?;
-    assert_type::<StrError>(union.inner(), "bail StrError")?;
+    assert_type::<MsgError>(union.inner(), "bail MsgError")?;
 
     let r: Result<(), ErrorUnion<(NotEnoughMemory,)>> =
         Err(NotEnoughMemory).union::<_, (NotEnoughMemory,)>();
@@ -161,7 +161,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let remainder = u.subset::<(Timeout,), _>().expect_err("non-member must be rejected");
     assert_type::<NotEnoughMemory>(remainder.inner(), "subset remainder")?;
 
-    let diagnostic = eros::error!("diagnostic root").context("diagnostic context").diagnostic_debug();
+    let diagnostic = eros::error!("diagnostic root").context("diagnostic context").to_debug_json();
     assert_eq_str(diagnostic["root"].as_str().unwrap(), "diagnostic root")?;
     assert_eq_str(diagnostic["contexts"][0]["message"].as_str().unwrap(), "diagnostic context")?;
 
@@ -236,7 +236,7 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
 #[cfg(test)]
 mod tests {
     use super::{NotEnoughMemory, Timeout, run_no_std_checks};
-    use eros::{AnyError, Context, ErrorUnion, SendSyncError, StrError};
+    use eros::{AnyError, Context, ErrorUnion, SendSyncError, MsgError};
 
     #[test]
     fn all_no_std_checks_pass() {
@@ -294,10 +294,10 @@ mod tests {
     }
 
     #[test]
-    fn str_error_alloc_conversions() {
-        let from_string: StrError = String::from("hi").into();
+    fn msg_error_alloc_conversions() {
+        let from_string: MsgError = String::from("hi").into();
         assert_eq!(from_string.as_str(), "hi");
-        let from_static: StrError = "x".into();
+        let from_static: MsgError = "x".into();
         assert_eq!(from_static.as_str(), "x");
     }
 }

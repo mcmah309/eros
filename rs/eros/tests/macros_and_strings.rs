@@ -1,15 +1,15 @@
-use eros::{ContextSource, StrError};
+use eros::{ContextValue, MsgError};
 use std::{borrow::Cow, cell::Cell, error::Error};
 
 #[test]
 fn string_error_conversions_formatting_and_clone_preserve_storage() {
     for error in [
-        StrError::from("static"),
-        StrError::from(Cow::Borrowed("static")),
+        MsgError::from("static"),
+        MsgError::from(Cow::Borrowed("static")),
     ] {
-        assert!(matches!(error, StrError::Static("static")));
+        assert!(matches!(error, MsgError::Static("static")));
         let clone = error.clone();
-        assert!(matches!(clone, StrError::Static("static")));
+        assert!(matches!(clone, MsgError::Static("static")));
         assert!(std::ptr::eq(error.as_str(), clone.as_str()));
         assert_eq!(error, clone);
         assert_eq!(error.to_string(), "static");
@@ -17,29 +17,29 @@ fn string_error_conversions_formatting_and_clone_preserve_storage() {
         assert!(error.source().is_none());
     }
     for mut error in [
-        StrError::from(String::from("owned")),
-        StrError::from(Cow::Owned(String::from("owned"))),
+        MsgError::from(String::from("owned")),
+        MsgError::from(Cow::Owned(String::from("owned"))),
     ] {
         let clone = error.clone();
         assert_eq!(error, clone);
         assert_eq!(error.to_string(), "owned");
         assert_eq!(format!("{error:?}"), "owned");
         assert!(error.source().is_none());
-        let StrError::Owned(value) = &mut error else {
+        let MsgError::Owned(value) = &mut error else {
             panic!("expected owned storage")
         };
         value.push_str(" changed");
         assert_eq!(clone.as_str(), "owned");
-        assert!(matches!(clone, StrError::Owned(_)));
+        assert!(matches!(clone, MsgError::Owned(_)));
     }
 }
 
 #[test]
 fn string_errors_support_equality_ordering_and_hashing() {
     let mut values = std::collections::BTreeSet::new();
-    values.insert(StrError::from("b"));
-    values.insert(StrError::from("a"));
-    values.insert(StrError::from("a"));
+    values.insert(MsgError::from("b"));
+    values.insert(MsgError::from("a"));
+    values.insert(MsgError::from("a"));
     assert_eq!(
         values
             .into_iter()
@@ -48,8 +48,8 @@ fn string_errors_support_equality_ordering_and_hashing() {
         ["a", "b"]
     );
     let values = std::collections::HashSet::from([
-        StrError::from(String::from("a")),
-        StrError::from(String::from("a")),
+        MsgError::from(String::from("a")),
+        MsgError::from(String::from("a")),
     ]);
     assert_eq!(values.len(), 1);
 }
@@ -68,8 +68,8 @@ fn error_macro_supports_literals_formatted_messages_and_error_expressions() {
         (eros::error!("\u{7b}\u{7b}id\u{7d}\u{7d}"), "{id}"),
     ] {
         assert!(matches!(
-            error.downcast_inner::<StrError>(),
-            Some(StrError::Static(message)) if message == expected
+            error.downcast_inner::<MsgError>(),
+            Some(MsgError::Static(message)) if message == expected
         ));
     }
     let calls = Cell::new(0);
@@ -83,7 +83,7 @@ fn error_macro_supports_literals_formatted_messages_and_error_expressions() {
     );
     assert_eq!(calls.get(), 1);
     assert!(
-        matches!(error.downcast_inner::<StrError>(), Some(StrError::Owned(value)) if value == "value item: 7")
+        matches!(error.downcast_inner::<MsgError>(), Some(MsgError::Owned(value)) if value == "value item: 7")
     );
     let error = eros::error!({
         calls.set(calls.get() + 1);
@@ -117,8 +117,8 @@ fn error_macro_uses_static_storage_for_all_caps_names() {
         (eros::error!(messages::NOT_FOUND), messages::NOT_FOUND),
         (forwarded!(ERROR), ERROR),
     ] {
-        let message = error.downcast_inner::<StrError>().unwrap();
-        assert!(matches!(message, StrError::Static(_)));
+        let message = error.downcast_inner::<MsgError>().unwrap();
+        assert!(matches!(message, MsgError::Static(_)));
         assert_eq!(message.as_str(), expected);
         assert!(std::ptr::eq(message.as_str(), expected));
     }
@@ -168,8 +168,8 @@ fn bail_and_ensure_support_all_caps_messages() {
         ensure_with_trailing_comma(false).unwrap_err(),
     ] {
         assert!(matches!(
-            error.downcast_inner::<StrError>(),
-            Some(StrError::Static(message)) if message == ERROR
+            error.downcast_inner::<MsgError>(),
+            Some(MsgError::Static(message)) if message == ERROR
         ));
     }
 }
@@ -183,8 +183,8 @@ fn error_macro_formats_captured_arguments_and_escaped_braces() {
     ] {
         assert_eq!(error.to_string(), "User with id 7 not found");
         assert!(matches!(
-            error.downcast_inner::<StrError>(),
-            Some(StrError::Owned(_))
+            error.downcast_inner::<MsgError>(),
+            Some(MsgError::Owned(_))
         ));
     }
 
@@ -346,7 +346,7 @@ fn auto_context_attribute_uses_only_annotated_parameters() {
 
 #[test]
 fn latest_context_error_respects_the_context_feature() {
-    let context = ContextSource::Error(Box::new(std::fmt::Error));
+    let context = ContextValue::Error(Box::new(std::fmt::Error));
     let error = eros::error!("root").context(context).context("last string");
     let latest = error.latest_context_error();
     if cfg!(feature = "context") {
@@ -356,6 +356,6 @@ fn latest_context_error_respects_the_context_feature() {
         assert!(latest
             .unwrap_or_else(|| error.inner())
             .as_any()
-            .is::<StrError>());
+            .is::<MsgError>());
     }
 }

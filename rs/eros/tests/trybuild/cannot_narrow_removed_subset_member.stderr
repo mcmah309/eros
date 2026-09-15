@@ -1,8 +1,8 @@
 error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<MsgError, _>` is not satisfied
- --> tests/trybuild/cannot_narrow_unlisted_error.rs:5:19
+ --> tests/trybuild/cannot_narrow_removed_subset_member.rs:6:23
   |
-5 |     let _ = error.narrow::<MsgError, _>();
-  |                   ^^^^^^ the trait `eros::type_set::Narrow<MsgError, _>` is not implemented for `eros::End`
+6 |     let _ = remainder.narrow::<MsgError, _>();
+  |                       ^^^^^^ the trait `eros::type_set::Narrow<MsgError, _>` is not implemented for `eros::End`
   |
 help: the following other types implement trait `eros::type_set::Narrow<Target, Index>`
  --> src/type_set.rs
@@ -23,10 +23,10 @@ help: the following other types implement trait `eros::type_set::Narrow<Target, 
   = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::Narrow<MsgError, eros::Recurse<_>>`
 
 error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<MsgError, _>` is not satisfied
- --> tests/trybuild/cannot_narrow_unlisted_error.rs:5:19
+ --> tests/trybuild/cannot_narrow_removed_subset_member.rs:6:23
   |
-5 |     let _ = error.narrow::<MsgError, _>();
-  |                   ^^^^^^ the trait `eros::type_set::Narrow<MsgError, _>` is not implemented for `eros::End`
+6 |     let _ = remainder.narrow::<MsgError, _>();
+  |                       ^^^^^^ the trait `eros::type_set::Narrow<MsgError, _>` is not implemented for `eros::End`
   |
 help: the following other types implement trait `eros::type_set::Narrow<Target, Index>`
  --> src/type_set.rs

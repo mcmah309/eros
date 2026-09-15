@@ -1,10 +1,10 @@
-use crate::{ContextSource, ErrorUnion, type_set::TypeSet};
+use crate::{ContextValue, ErrorUnion, type_set::TypeSet};
 
 impl<E> ErrorUnion<E>
 where
     E: TypeSet,
 {
-    pub fn user_contexts(&self) -> impl Iterator<Item = &ContextSource> {
+    pub fn user_contexts(&self) -> impl Iterator<Item = &ContextValue> {
         self.inner
             .context
             .iter()

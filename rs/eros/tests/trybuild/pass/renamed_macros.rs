@@ -17,7 +17,7 @@ fn ensuring() -> renamed::Result<()> {
 fn main() {
     static ERROR: &str = "static message";
     let _: renamed::ErrorUnion = renamed::error!(ERROR);
-    const ROOT_ERROR: renamed::StrError = renamed::StrError::Static("error");
+    const ROOT_ERROR: renamed::MsgError = renamed::MsgError::Static("error");
     let _: renamed::ErrorUnion = renamed::error!({ ROOT_ERROR });
     let _: renamed::Result<()> = (|| renamed::bail!(ERROR))();
     let _: renamed::Result<()> = (|| {
@@ -28,7 +28,7 @@ fn main() {
     let _: renamed::ErrorUnion = renamed::error!("formatted {}", 7);
     let value = 7;
     let _: renamed::ErrorUnion = renamed::error!("captured {value}");
-    let _: renamed::ErrorUnion = renamed::error!(renamed::StrError::Static("expression"));
+    let _: renamed::ErrorUnion = renamed::error!(renamed::MsgError::Static("expression"));
     let _ = bailing();
     let _ = ensuring();
 }

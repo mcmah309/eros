@@ -1,10 +1,10 @@
-error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<StrError, _>` is not satisfied
+error[E0277]: the trait bound `eros::End: eros::type_set::Narrow<MsgError, _>` is not satisfied
  --> tests/trybuild/cannot_subset_unlisted_error.rs:5:19
   |
-5 |     let _ = error.subset::<(StrError,), _>();
-  |                   ^^^^^^ the trait `eros::type_set::Narrow<StrError, _>` is not implemented for `eros::End`
+5 |     let _ = error.subset::<(MsgError,), _>();
+  |                   ^^^^^^ the trait `eros::type_set::Narrow<MsgError, _>` is not implemented for `eros::End`
   |
-help: the trait `SupersetOf<eros::Cons<StrError, eros::End>, _>` is not implemented for `eros::Cons<std::fmt::Error, eros::End>`
+help: the trait `SupersetOf<eros::Cons<MsgError, eros::End>, _>` is not implemented for `eros::Cons<std::fmt::Error, eros::End>`
       but trait `SupersetOf<eros::Cons<std::fmt::Error, eros::End>, eros::Cons<eros::End, eros::End>>` is implemented for it
  --> src/type_set.rs
   |
@@ -15,5 +15,5 @@ help: the trait `SupersetOf<eros::Cons<StrError, eros::End>, _>` is not implemen
   | |     <Cons<SuperHead, SuperTail> as Narrow<SubHead, HeadIndex>>::Remainder:
   | |         SupersetOf<SubTail, TailIndex>,
   | |_______________________________________^
-  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::Narrow<StrError, eros::Recurse<_>>`
-  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::SupersetOf<eros::Cons<StrError, eros::End>, eros::Cons<eros::Recurse<_>, eros::End>>`
+  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::Narrow<MsgError, eros::Recurse<_>>`
+  = note: required for `eros::Cons<std::fmt::Error, eros::End>` to implement `eros::type_set::SupersetOf<eros::Cons<MsgError, eros::End>, eros::Cons<eros::Recurse<_>, eros::End>>`

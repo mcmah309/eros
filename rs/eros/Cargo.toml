@@ -49,5 +49,5 @@ location = []
 anyhow = ["std", "dep:anyhow"]
 # Adds context methods that are user facing. Useful for applications reporting error messages to users.
 user_context = ["context"]
-# Exposes diagnostic_display()/diagnostic_debug() as structured JSON values.
+# Exposes to_display_json()/to_debug_json() as structured JSON values.
 diagnostic = ["dep:serde_json"]

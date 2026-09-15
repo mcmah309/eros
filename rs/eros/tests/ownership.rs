@@ -1,4 +1,4 @@
-use eros::{ContextSource, ErrorUnion, SendSyncError};
+use eros::{ContextValue, ErrorUnion, SendSyncError};
 use std::{
     fmt,
     sync::{
@@ -36,7 +36,7 @@ fn tracked(drops: &Arc<AtomicUsize>) -> Tracked {
 fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<(Tracked,)> {
     let error: ErrorUnion<(Tracked,)> = ErrorUnion::new(tracked(root));
     let context: Box<dyn SendSyncError> = Box::new(tracked(context));
-    error.context(ContextSource::Error(context))
+    error.context(ContextValue::Error(context))
 }
 
 #[test]
@@ -93,6 +93,28 @@ fn panicking_map_drops_both_root_and_context() {
     assert!(outcome.is_err());
     assert_eq!(root.load(Ordering::SeqCst), 1);
     assert_eq!(context.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn both_subset_branches_keep_the_error_and_context_alive_until_drop() {
+    for partition in [
+        |error: ErrorUnion<(fmt::Error, Tracked)>| error.subset::<(Tracked,), _>().unwrap(),
+        |error: ErrorUnion<(fmt::Error, Tracked)>| error.subset::<(fmt::Error,), _>().unwrap_err(),
+    ] {
+        let root = Arc::new(AtomicUsize::new(0));
+        let context = Arc::new(AtomicUsize::new(0));
+        let error = union(&root, &context).widen();
+        let error = partition(error);
+        assert_eq!(error.payload, [1, 2, 3]);
+        assert_eq!(root.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            context.load(Ordering::SeqCst),
+            usize::from(!cfg!(feature = "context"))
+        );
+        drop(error);
+        assert_eq!(root.load(Ordering::SeqCst), 1);
+        assert_eq!(context.load(Ordering::SeqCst), 1);
+    }
 }
 
 #[test]

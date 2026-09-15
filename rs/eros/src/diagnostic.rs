@@ -9,7 +9,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// The object contains `root` (a string) and `sources` (an array of strings
     /// in source-chain order). This creates data, without logging or serializing
     /// it to text. Requires the `diagnostic` feature; works with `no_std + alloc`.
-    pub fn diagnostic_display(&self) -> Value {
+    pub fn to_display_json(&self) -> Value {
         display_value(&Report::new(self))
     }
 
@@ -21,7 +21,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// backtrace text is null; status is `disabled`, `unsupported`, or
     /// `feature_disabled`. Captured frames use `captured` and a rendered string.
     /// Locations are omitted when the `location` feature is off.
-    pub fn diagnostic_debug(&self) -> Value {
+    pub fn to_debug_json(&self) -> Value {
         let report = Report::new(self);
         let mut value = display_value(&report);
         #[allow(unused_mut)]

@@ -91,12 +91,12 @@ mod tests {
     #[cfg(feature = "backtrace")]
     use alloc::string::ToString;
 
-    use crate::{ErrorUnion, StrError};
+    use crate::{ErrorUnion, MsgError};
 
     #[test]
     fn replacement_preserves_metadata() {
         #[allow(unused_mut)]
-        let mut error: ErrorUnion = ErrorUnion::new(StrError::from("permission denied"));
+        let mut error: ErrorUnion = ErrorUnion::new(MsgError::from("permission denied"));
 
         #[cfg(feature = "backtrace")]
         let original_backtrace = {
@@ -110,8 +110,8 @@ mod tests {
         #[cfg(feature = "context")]
         let original_context = error.inner.context.as_ptr();
 
-        let error = error.map_inner(|_| StrError::from("cannot open configuration"));
-        let _error = error.map_inner(|_| StrError::from("startup failed"));
+        let error = error.map_inner(|_| MsgError::from("cannot open configuration"));
+        let _error = error.map_inner(|_| MsgError::from("startup failed"));
 
         #[cfg(feature = "backtrace")]
         {

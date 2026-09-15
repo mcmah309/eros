@@ -1,7 +1,7 @@
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
 use eros::{
-    AbsentValueError, AnyError, Context, ErrorUnion, IntoDynUnion, IntoUnion, ReshapeUnion, error,
+    AbsentValueError, AnyError, Context, ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion, error,
 };
 
 #[test]

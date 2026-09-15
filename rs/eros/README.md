@@ -682,7 +682,7 @@ For a union with a single possible error type, `map_single` passes the concrete 
 
 ### Diagnostic Logging
 
-The optional `diagnostic` feature adds `.diagnostic_display()` and `.diagnostic_debug()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
+The optional `diagnostic` feature adds `.to_display_json()` and `.to_debug_json()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
 
 ```rust,ignore
 // ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
@@ -695,8 +695,8 @@ let error = eros::error!("permission denied")
 
 tracing::error!(error = %error, "startup failed");
 tracing::error!(error = ?error, "startup failed");
-println!("diagnostic_display: {}", error.diagnostic_display());
-println!("diagnostic_debug: {}", error.diagnostic_debug());
+println!("to_display_json: {}", error.to_display_json());
+println!("to_debug_json: {}", error.to_debug_json());
 
 // Wrap again, preserving the full source chain.
 let error = error.map_inner(|source| StartupError { source });
@@ -719,10 +719,10 @@ ERROR startup failed error=cannot open configuration
 Backtrace (disabled):
 ```
 ```text
-diagnostic_display: {"root":"cannot open configuration","sources":["permission denied"]}
+to_display_json: {"root":"cannot open configuration","sources":["permission denied"]}
 ```
 ```text
-diagnostic_debug: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
+to_debug_json: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
 ```
 ```text
 replacement: startup failed <- cannot open configuration <- permission denied
@@ -744,7 +744,7 @@ Instead, construct a user-facing message from two sources:
 <summary>Example Implementation</summary>
 
 ```rust,ignore
-use eros::{Context, ErrorUnion, IntoDynUnion, SendSyncError, TypeSet};
+use eros::{Context, ErrorUnion, IntoAnyUnion, SendSyncError, TypeSet};
 
 #[derive(Debug)]
 struct SystemDiskError;

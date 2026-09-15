@@ -12,7 +12,7 @@ use core::ptr;
 #[cfg(feature = "std")]
 use std::any::TypeId;
 
-use crate::context::ContextSource;
+use crate::context::ContextValue;
 #[cfg(feature = "context")]
 use crate::context::ErosContext;
 use crate::type_set::{
@@ -602,7 +602,7 @@ where
     pub fn latest_context_error(&self) -> Option<&dyn SendSyncError> {
         #[cfg(feature = "context")]
         for context in self.inner.context.iter().rev() {
-            if let crate::context::ContextSource::Error(err) = &context.context {
+            if let crate::context::ContextValue::Error(err) = &context.context {
                 return Some(err.as_ref());
             }
         }
@@ -639,7 +639,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn context<C: Into<ContextSource>>(mut self, context: C) -> Self {
+    pub fn context<C: Into<ContextValue>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
             .context
@@ -652,7 +652,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn user_context<C: Into<ContextSource>>(mut self, context: C) -> Self {
+    pub fn user_context<C: Into<ContextValue>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
             .context
@@ -664,7 +664,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn with_context<F, C: Into<ContextSource>>(mut self, f: F) -> Self
+    pub fn with_context<F, C: Into<ContextValue>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
     {
@@ -680,7 +680,7 @@ where
     #[allow(unused_mut)]
     #[allow(unused_variables)]
     #[cfg_attr(feature = "location", track_caller)]
-    pub fn with_user_context<F, C: Into<ContextSource>>(mut self, f: F) -> Self
+    pub fn with_user_context<F, C: Into<ContextValue>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
     {
@@ -831,14 +831,14 @@ impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
     }
 }
 
-pub trait IntoDynUnion<S> {
+pub trait IntoAnyUnion<S> {
     /// Converts the result's error into an [`ErrorUnion<AnyError>`].
     ///
     /// Existing unions retain their context, location, and backtrace.
     fn any_union(self) -> Result<S, ErrorUnion>;
 }
 
-impl<S, F: SendSyncError> IntoDynUnion<S> for Result<S, F> {
+impl<S, F: SendSyncError> IntoAnyUnion<S> for Result<S, F> {
     #[cfg_attr(feature = "location", track_caller)]
     fn any_union(self) -> Result<S, ErrorUnion> {
         match self {
@@ -848,7 +848,7 @@ impl<S, F: SendSyncError> IntoDynUnion<S> for Result<S, F> {
     }
 }
 
-impl<S, E: TypeSet> IntoDynUnion<S> for Result<S, ErrorUnion<E>> {
+impl<S, E: TypeSet> IntoAnyUnion<S> for Result<S, ErrorUnion<E>> {
     fn any_union(self) -> Result<S, ErrorUnion> {
         self.map_err(|e| ErrorUnion::erase(e))
     }

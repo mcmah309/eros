@@ -49,7 +49,7 @@ pub fn format_error(input: TokenStream) -> TokenStream {
                 .chars()
                 .all(|ch| ch.is_uppercase() || ch.is_ascii_digit() || ch == '_')
         {
-            return quote! { #crate_path::StrError::Static(#message) }.into();
+            return quote! { #crate_path::MsgError::Static(#message) }.into();
         }
     }
 
@@ -69,7 +69,7 @@ pub fn format_error(input: TokenStream) -> TokenStream {
             // Preserve the original literal's span for implicit captures. Let
             // Rust's formatter parse placeholders and report invalid formats.
             return quote! {
-                #crate_path::StrError::Owned(#crate_path::__private::format!(#message))
+                #crate_path::MsgError::Owned(#crate_path::__private::format!(#message))
             }
             .into();
         }
@@ -78,7 +78,7 @@ pub fn format_error(input: TokenStream) -> TokenStream {
 
     // All braces were escaped pairs; unescape them in the static message.
     let literal = LitStr::new(&literal, message.span());
-    quote! { #crate_path::StrError::Static(#literal) }.into()
+    quote! { #crate_path::MsgError::Static(#literal) }.into()
 }
 
 /// Arguments parsed from `#[context("format string", arg1, arg2, ...)]`

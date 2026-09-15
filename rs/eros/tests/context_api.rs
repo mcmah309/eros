@@ -1,39 +1,39 @@
-use eros::{Context, ContextSource, ErrorUnion, SendSyncError, StrError};
+use eros::{Context, ContextValue, ErrorUnion, SendSyncError, MsgError};
 use std::{borrow::Cow, cell::Cell};
 
 #[test]
-fn context_sources_preserve_storage_and_error_identity() {
+fn context_values_preserve_storage_and_error_identity() {
     for source in [
-        ContextSource::from("static"),
+        ContextValue::from("static"),
         Cow::Borrowed("static").into(),
     ] {
-        assert!(matches!(source, ContextSource::Static("static")));
+        assert!(matches!(source, ContextValue::Static("static")));
         assert_eq!(source.to_string(), "static");
         assert_eq!(format!("{source:?}"), "Static(\"static\")");
     }
     for source in [
-        ContextSource::from(String::from("owned")),
+        ContextValue::from(String::from("owned")),
         Cow::<str>::Owned(String::from("owned")).into(),
     ] {
-        assert!(matches!(&source, ContextSource::Owned(value) if value == "owned"));
+        assert!(matches!(&source, ContextValue::Owned(value) if value == "owned"));
         assert_eq!(source.to_string(), "owned");
     }
-    let boxed: Box<dyn SendSyncError> = Box::new(StrError::from("error"));
+    let boxed: Box<dyn SendSyncError> = Box::new(MsgError::from("error"));
     let ptr = boxed.as_ref() as *const dyn SendSyncError as *const ();
-    let source = ContextSource::from(boxed);
+    let source = ContextValue::from(boxed);
     assert_eq!(source.to_string(), "error");
-    let ContextSource::Error(error) = source else {
+    let ContextValue::Error(error) = source else {
         panic!("expected an error context")
     };
     assert_eq!(error.as_ref() as *const dyn SendSyncError as *const (), ptr);
-    assert!(error.as_ref().as_any().is::<StrError>());
+    assert!(error.as_ref().as_any().is::<MsgError>());
 }
 
 // Conversion must be deferred too: even eager context values should only be
 // converted on failures when context recording is enabled.
 struct CountConversion<'a>(&'a Cell<usize>);
 
-impl From<CountConversion<'_>> for ContextSource {
+impl From<CountConversion<'_>> for ContextValue {
     fn from(value: CountConversion<'_>) -> Self {
         value.0.set(value.0.get() + 1);
         "counted context".into()
@@ -94,13 +94,13 @@ macro_rules! context_contract {
 
 context_contract!(
     plain_result_context_is_lazy,
-    Ok::<_, StrError>("success"),
-    Err::<(), _>(StrError::from("root"))
+    Ok::<_, MsgError>("success"),
+    Err::<(), _>(MsgError::from("root"))
 );
 context_contract!(
     typed_result_context_is_lazy,
-    Ok::<_, ErrorUnion<(StrError,)>>("success"),
-    Err::<(), ErrorUnion<(StrError,)>>(ErrorUnion::new(StrError::from("root")))
+    Ok::<_, ErrorUnion<(MsgError,)>>("success"),
+    Err::<(), ErrorUnion<(MsgError,)>>(ErrorUnion::new(MsgError::from("root")))
 );
 context_contract!(
     erased_result_context_is_lazy,
@@ -193,13 +193,13 @@ mod user_context {
 
     user_contract!(
         plain_result,
-        Ok::<_, StrError>("success"),
-        Err::<(), _>(StrError::from("root"))
+        Ok::<_, MsgError>("success"),
+        Err::<(), _>(MsgError::from("root"))
     );
     user_contract!(
         typed_result,
-        Ok::<_, ErrorUnion<(StrError,)>>("success"),
-        Err::<(), ErrorUnion<(StrError,)>>(ErrorUnion::new(StrError::from("root")))
+        Ok::<_, ErrorUnion<(MsgError,)>>("success"),
+        Err::<(), ErrorUnion<(MsgError,)>>(ErrorUnion::new(MsgError::from("root")))
     );
     user_contract!(
         erased_result,
@@ -210,10 +210,10 @@ mod user_context {
 
     #[test]
     fn direct_contexts_filter_internal_details_and_survive_mapping_and_erasure() {
-        let error: ErrorUnion<(StrError,)> = ErrorUnion::new(StrError::from("root"));
+        let error: ErrorUnion<(MsgError,)> = ErrorUnion::new(MsgError::from("root"));
         assert_eq!(error.user_contexts().count(), 0);
         let calls = Cell::new(0);
-        let boxed: Box<dyn SendSyncError> = Box::new(StrError::from("public error"));
+        let boxed: Box<dyn SendSyncError> = Box::new(MsgError::from("public error"));
         let error = error
             .context("internal before")
             .user_context("public first")
@@ -231,7 +231,7 @@ mod user_context {
         );
         let error = error
             .map_single(|error| error)
-            .map_inner(|_| StrError::from("replacement"));
+            .map_inner(|_| MsgError::from("replacement"));
         let error: ErrorUnion = error.into();
         assert_eq!(
             error
@@ -242,7 +242,7 @@ mod user_context {
         );
         assert!(matches!(
             error.user_contexts().last(),
-            Some(ContextSource::Error(_))
+            Some(ContextValue::Error(_))
         ));
     }
 }

@@ -5,11 +5,11 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use eros::{ErrorUnion, SendSyncError, StrError};
+use eros::{ErrorUnion, SendSyncError, MsgError};
 
 #[derive(Debug)]
 struct ConfigError {
-    cause: StrError,
+    cause: MsgError,
 }
 
 impl fmt::Display for ConfigError {
@@ -26,7 +26,7 @@ impl Error for ConfigError {
 
 fn config_error() -> ConfigError {
     ConfigError {
-        cause: StrError::from("permission denied"),
+        cause: MsgError::from("permission denied"),
     }
 }
 
@@ -78,7 +78,7 @@ fn closure_owns_the_typed_root_and_can_explicitly_retain_it_as_source() {
         .downcast_ref::<ConfigError>()
         .unwrap();
     assert_eq!(previous.cause.as_str(), "permission denied");
-    assert!(previous.source().unwrap().is::<StrError>());
+    assert!(previous.source().unwrap().is::<MsgError>());
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn closure_can_replace_the_old_root_with_an_unrelated_error_and_chain() {
     assert!(!format!("{error:#?}").contains("original failure"));
     #[cfg(feature = "diagnostic")]
     assert_eq!(
-        error.diagnostic_display(),
+        error.to_display_json(),
         serde_json::json!({
             "root": "cannot open configuration",
             "sources": ["permission denied"]
@@ -105,7 +105,7 @@ fn closure_can_replace_the_old_root_with_an_unrelated_error_and_chain() {
 #[test]
 fn closure_can_drop_the_source_chain_completely() {
     let error: ErrorUnion = ErrorUnion::new(config_error());
-    let error = error.map_inner(|_| StrError::from("configuration unavailable"));
+    let error = error.map_inner(|_| MsgError::from("configuration unavailable"));
 
     assert_eq!(error.to_string(), "configuration unavailable");
     assert!(error.source().is_none());
@@ -143,11 +143,11 @@ fn identity_and_repeated_replacements_receive_the_actual_root() {
 
     let error = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<StartupError>());
-        StrError::from("replacement leaf")
+        MsgError::from("replacement leaf")
     });
-    assert!(error.is_inner::<StrError>());
+    assert!(error.is_inner::<MsgError>());
     assert_eq!(
-        error.downcast_inner::<StrError>().unwrap().as_str(),
+        error.downcast_inner::<MsgError>().unwrap().as_str(),
         "replacement leaf"
     );
 }
@@ -161,7 +161,7 @@ fn closure_can_downcast_and_consume_the_old_error() {
         old.cause
     });
 
-    assert!(error.is_inner::<StrError>());
+    assert!(error.is_inner::<MsgError>());
     assert_eq!(error.to_string(), "permission denied");
     assert!(error.source().is_none());
 }
@@ -286,7 +286,7 @@ fn aligned_anyerror_root_can_be_retained_as_source_then_replaced() {
     let error: ErrorUnion<eros::AnyError> = error.into();
     let error = error.map_inner(|old| {
         drop(old);
-        StrError::from("replacement leaf")
+        MsgError::from("replacement leaf")
     });
     assert_eq!(drops.load(Ordering::SeqCst), 1);
     #[cfg(feature = "context")]
@@ -404,7 +404,7 @@ fn panicking_closure_drops_root_and_context_without_leaking() {
     let error = error.context(Box::new(DropError(context_drops.clone())) as Box<dyn SendSyncError>);
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _: ErrorUnion<(StrError,)> = error.map_inner(|_old| panic!("replacement failed"));
+        let _: ErrorUnion<(MsgError,)> = error.map_inner(|_old| panic!("replacement failed"));
     }));
 
     assert!(result.is_err());

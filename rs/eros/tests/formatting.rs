@@ -137,7 +137,7 @@ fn erasing_the_union_preserves_every_format_and_captured_metadata() {
         format!("{typed:#?}"),
     ];
     #[cfg(feature = "diagnostic")]
-    let diagnostic_expected = [typed.diagnostic_display(), typed.diagnostic_debug()];
+    let diagnostic_expected = [typed.to_display_json(), typed.to_debug_json()];
     let erased: ErrorUnion = typed.into();
 
     assert_eq!(
@@ -151,7 +151,7 @@ fn erasing_the_union_preserves_every_format_and_captured_metadata() {
     );
     #[cfg(feature = "diagnostic")]
     assert_eq!(
-        [erased.diagnostic_display(), erased.diagnostic_debug()],
+        [erased.to_display_json(), erased.to_debug_json()],
         diagnostic_expected
     );
 }
@@ -171,7 +171,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     let expected_debug = format!("{error:?}");
     let expected_alternate_debug = format!("{error:#?}");
     #[cfg(feature = "diagnostic")]
-    let expected_diagnostic = error.diagnostic_debug();
+    let expected_diagnostic = error.to_debug_json();
     let native = error.into_dyn_error();
 
     // A native Error reporter visits source() itself. Its root must therefore
@@ -191,7 +191,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert_eq!(format!("{recovered:?}"), expected_debug);
     assert_eq!(format!("{recovered:#?}"), expected_alternate_debug);
     #[cfg(feature = "diagnostic")]
-    assert_eq!(recovered.diagnostic_debug(), expected_diagnostic);
+    assert_eq!(recovered.to_debug_json(), expected_diagnostic);
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
         .strip_prefix("cannot open configuration")
         .unwrap();
     #[cfg(feature = "diagnostic")]
-    let mut expected_diagnostic = error.diagnostic_debug();
+    let mut expected_diagnostic = error.to_debug_json();
 
     let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
         assert!(old.as_ref().as_any().is::<NativeError>());
@@ -266,8 +266,8 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     {
         expected_diagnostic["root"] = expected_display["root"].clone();
         expected_diagnostic["sources"] = expected_display["sources"].clone();
-        assert_eq!(error.diagnostic_display(), expected_display);
-        assert_eq!(error.diagnostic_debug(), expected_diagnostic);
+        assert_eq!(error.to_display_json(), expected_display);
+        assert_eq!(error.to_debug_json(), expected_diagnostic);
     }
 
     let error: ErrorUnion<eros::AnyError> = error.into();
@@ -282,8 +282,8 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     );
     #[cfg(feature = "diagnostic")]
     {
-        assert_eq!(error.diagnostic_display(), expected_display);
-        assert_eq!(error.diagnostic_debug(), expected_diagnostic);
+        assert_eq!(error.to_display_json(), expected_display);
+        assert_eq!(error.to_debug_json(), expected_diagnostic);
     }
 }
 
@@ -332,7 +332,7 @@ fn anyhow_owned_and_shared_adapters_preserve_source_order_after_new_root() {
         );
         #[cfg(feature = "diagnostic")]
         assert_eq!(
-            error.diagnostic_display(),
+            error.to_display_json(),
             serde_json::json!({"root": "startup failed", "sources": expected_sources})
         );
     }
@@ -355,7 +355,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
         #[cfg(feature = "diagnostic")]
         if original_status == std::backtrace::BacktraceStatus::Captured {
             assert!(
-                error.diagnostic_debug()["backtrace"]["text"]
+                error.to_debug_json()["backtrace"]["text"]
                     .as_str()
                     .unwrap()
                     .contains("anyhow_failure_origin")
@@ -561,11 +561,11 @@ fn tracing_percent_and_question_mark_use_the_public_human_formats() {
 
 #[cfg(feature = "diagnostic")]
 #[test]
-fn diagnostic_display_is_data_with_the_same_root_and_source_messages() {
+fn to_display_json_is_data_with_the_same_root_and_source_messages() {
     let error = start_service().unwrap_err();
 
     assert_eq!(
-        error.diagnostic_display(),
+        error.to_display_json(),
         serde_json::json!({
             "root": "cannot open configuration",
             "sources": ["permission denied"],
@@ -574,14 +574,14 @@ fn diagnostic_display_is_data_with_the_same_root_and_source_messages() {
 
     let bare = eros::error!("configuration missing");
     assert_eq!(
-        bare.diagnostic_display(),
+        bare.to_display_json(),
         serde_json::json!({"root": "configuration missing", "sources": []})
     );
 }
 
 #[cfg(feature = "diagnostic")]
 #[test]
-fn diagnostic_debug_includes_contexts_locations_and_backtrace_status() {
+fn to_debug_json_includes_contexts_locations_and_backtrace_status() {
     let native = NativeError::caused_by(
         "cannot open configuration",
         NativeError::leaf("permission denied"),
@@ -592,7 +592,7 @@ fn diagnostic_debug_includes_contexts_locations_and_backtrace_status() {
     let error = error.context("read /etc/app.toml");
     let _outer_line = line!() + 1;
     let error = error.context("start service");
-    let diagnostic = error.diagnostic_debug();
+    let diagnostic = error.to_debug_json();
 
     assert_eq!(diagnostic["root"], "cannot open configuration");
     assert_eq!(
@@ -675,7 +675,7 @@ fn diagnostic_contexts_preserve_user_facing_markers_in_stack_order() {
     let error = eros::error!("permission denied")
         .context("read /etc/app.toml")
         .user_context("Choose a readable configuration file.");
-    let diagnostic = error.diagnostic_debug();
+    let diagnostic = error.to_debug_json();
     let contexts = diagnostic["contexts"].as_array().unwrap();
 
     assert_eq!(contexts.len(), 2);
