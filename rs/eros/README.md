@@ -400,7 +400,7 @@ impl std::fmt::Display for CrateError {
 
 impl std::error::Error for CrateError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.0)
+        Some(self.0.as_ref())
     }
 }
 
