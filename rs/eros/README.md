@@ -11,10 +11,10 @@
 Choose the signature that fits your API:
 
 ```rust,ignore
-// Propagate errors without listing their types.
+// Propagate errors without their types.
 fn load_config() -> eros::Result<Config>
 
-// Specify the errors callers can handle.
+// Propagate errors with their types.
 fn load_config() -> eros::Result<Config, (io::Error, ParseError)>
 ```
 
