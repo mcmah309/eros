@@ -45,23 +45,18 @@ macro_rules! bail {
 /// messages use [`MsgError::from_owned`](crate::MsgError::from_owned). Storage is selected
 /// at compile time. Escape literal braces as `{{` and `}}`, just like `format!`.
 ///
-/// All-caps names, such as `NOT_FOUND` or `messages::NOT_FOUND`, must refer to a
-/// `&'static str`. These messages borrow the text and keep it unchanged:
+/// Wrap string constants and variables explicitly in [`MsgError`](crate::MsgError).
+/// Static messages borrow the text and keep it unchanged:
 /// ```
 /// static NOT_FOUND: &str = "User {id} not found";
-/// let error = eros::error!(NOT_FOUND);
+/// let error = eros::error!(eros::MsgError::from_static(NOT_FOUND));
 /// assert_eq!(error.to_string(), "User {id} not found");
 /// ```
 ///
-/// Other expressions wrap the original error. Put an all-caps error value in a
-/// block to bypass the string convention:
+/// Other expressions wrap the original error:
 /// ```
 /// let source = std::fmt::Error;
 /// let error = eros::error!(source);
-/// assert!(error.is_inner::<std::fmt::Error>());
-///
-/// const ERROR: std::fmt::Error = std::fmt::Error;
-/// let error = eros::error!({ ERROR });
 /// assert!(error.is_inner::<std::fmt::Error>());
 /// ```
 #[macro_export]

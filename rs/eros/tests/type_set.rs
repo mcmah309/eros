@@ -117,7 +117,7 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
         let display = format!("{error}");
         let debug = format!("{error:?}");
         let original = error.inner() as *const dyn SendSyncError as *const ();
-        let error = ErrorUnion::<E>::try_from_dyn_error(error.into_dyn_error()).unwrap();
+        let error = ErrorUnion::<E>::try_from_dyn_error(Box::new(error.into_std_error())).unwrap();
         assert_eq!(
             error.inner() as *const dyn SendSyncError as *const (),
             original

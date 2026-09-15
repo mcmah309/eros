@@ -16,12 +16,12 @@ fn ensuring() -> renamed::Result<()> {
 
 fn main() {
     static ERROR: &str = "static message";
-    let _: renamed::ErrorUnion = renamed::error!(ERROR);
+    let _: renamed::ErrorUnion = renamed::error!(renamed::MsgError::from_static(ERROR));
     const ROOT_ERROR: renamed::MsgError = renamed::MsgError::from_static("error");
-    let _: renamed::ErrorUnion = renamed::error!({ ROOT_ERROR });
-    let _: renamed::Result<()> = (|| renamed::bail!(ERROR))();
+    let _: renamed::ErrorUnion = renamed::error!(ROOT_ERROR);
+    let _: renamed::Result<()> = (|| renamed::bail!(renamed::MsgError::from_static(ERROR)))();
     let _: renamed::Result<()> = (|| {
-        renamed::ensure!(false, ERROR);
+        renamed::ensure!(false, renamed::MsgError::from_static(ERROR));
         renamed::Result::Ok(())
     })();
     let _: renamed::ErrorUnion = renamed::error!("literal");
@@ -29,7 +29,8 @@ fn main() {
     let value = 7;
     let _: renamed::ErrorUnion = renamed::error!("captured {value}");
     let _: renamed::ErrorUnion = renamed::error!(renamed::MsgError::from_static("expression"));
-    let _: renamed::Result<(), (renamed::MsgError,)> = (|| renamed::bail!(ERROR))();
+    let _: renamed::Result<(), (renamed::MsgError,)> =
+        (|| renamed::bail!(renamed::MsgError::from_static(ERROR)))();
     let _: renamed::Result<(), (renamed::MsgError,)> = (|| renamed::bail!("value {}", 7))();
     let _: renamed::Result<(), (renamed::MsgError,)> = (|| {
         renamed::ensure!(false, "typed {value}");

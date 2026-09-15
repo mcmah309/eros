@@ -467,7 +467,7 @@ fn failed_native_adapter_downcast_retains_the_original_adapter() {
     let error: ErrorUnion<Pair> = ErrorUnion::new(MsgError::from("original"));
     let error = error.context("retained context");
     let report = format!("{error:?}");
-    let adapter = error.into_dyn_error();
+    let adapter = Box::new(error.into_std_error());
     let original = &*adapter as *const dyn eros::SendSyncError as *const ();
     let adapter = ErrorUnion::<(MsgError,)>::try_from_dyn_error(adapter).unwrap_err();
     assert_eq!(

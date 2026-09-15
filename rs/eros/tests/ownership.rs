@@ -409,7 +409,7 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
     let error: ErrorUnion = union(&root, &context).into();
     let original = error.inner() as *const dyn SendSyncError as *const ();
     let report = format!("{error:?}");
-    let adapter = error.into_dyn_error();
+    let adapter = Box::new(error.into_std_error());
     let adapter_address = &*adapter as *const dyn SendSyncError as *const ();
 
     // Even a matching payload cannot change the adapter's original set parameter.
@@ -438,7 +438,7 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
 fn typed_adapter_recovery_requires_its_original_set() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
-    let adapter = union(&root, &context).into_dyn_error();
+    let adapter = Box::new(union(&root, &context).into_std_error());
     let adapter = ErrorUnion::<AnyError>::try_from_dyn_error(adapter).unwrap_err();
     let error = ErrorUnion::<(Tracked,)>::try_from_dyn_error(adapter).unwrap();
     // This path uses the singleton's unchecked extraction, so the set must be exact.

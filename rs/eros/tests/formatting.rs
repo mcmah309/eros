@@ -172,7 +172,34 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     let expected_alternate_debug = format!("{error:#?}");
     #[cfg(feature = "diagnostic")]
     let expected_diagnostic = error.to_debug_json();
-    let native = error.into_dyn_error();
+    let original_root = error.inner() as *const dyn eros::SendSyncError as *const ();
+    #[cfg(feature = "location")]
+    let original_location = error.location();
+
+    // The concrete adapter works at generic Error boundaries and keeps the
+    // existing allocation, diagnostics, and exact typed set when recovered.
+    fn accepts_error<E: Error + Send + Sync + 'static>(error: E) -> E {
+        error
+    }
+    let native: eros::StdError<(NativeError,)> = accepts_error(error.into_std_error());
+    assert_eq!(
+        native.as_union().inner() as *const dyn eros::SendSyncError as *const (),
+        original_root
+    );
+    assert_eq!(native.to_string(), "cannot open configuration");
+    assert_eq!(format!("{native:#}"), "cannot open configuration");
+    assert_eq!(
+        native_chain_messages(&native),
+        ["cannot open configuration", "permission denied"]
+    );
+    assert_eq!(format!("{native:?}"), expected_debug);
+    assert_eq!(format!("{native:#?}"), expected_alternate_debug);
+    let error: ErrorUnion<(NativeError,)> = native.into_union();
+    #[cfg(feature = "location")]
+    assert!(core::ptr::eq(error.location(), original_location));
+    let native: Box<dyn eros::SendSyncError> = Box::new(error.into_std_error());
+
+    assert!(native.as_ref().as_any().is::<eros::StdError<(NativeError,)>>());
 
     // A native Error reporter visits source() itself. Its root must therefore
     // format only the root message, or it would print each cause twice.

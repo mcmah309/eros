@@ -1,0 +1,35 @@
+error[E0277]: the trait bound `&str: SendSyncError` is not satisfied
+ --> tests/trybuild/error_macro_rejects_bare_string.rs:4:13
+  |
+4 |     let _ = eros::error!(MESSAGE);
+  |             ^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `str`
+  |
+  = note: required for `&str` to implement `std::error::Error`
+  = note: required for `&str` to implement `SendSyncError`
+note: required by a bound in `ErrorUnion::new`
+ --> src/error_union.rs
+  |
+  |     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
+  |            --- required by a bound in this associated function
+  |     where
+  |         T: SendSyncError,
+  |            ^^^^^^^^^^^^^ required by this bound in `ErrorUnion::new`
+  = note: this error originates in the macro `eros::error` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `&str: SendSyncError` is not satisfied
+ --> tests/trybuild/error_macro_rejects_bare_string.rs:5:13
+  |
+5 |     let _ = eros::error!(message);
+  |             ^^^^^^^^^^^^^^^^^^^^^ the trait `std::error::Error` is not implemented for `str`
+  |
+  = note: required for `&str` to implement `std::error::Error`
+  = note: required for `&str` to implement `SendSyncError`
+note: required by a bound in `ErrorUnion::new`
+ --> src/error_union.rs
+  |
+  |     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
+  |            --- required by a bound in this associated function
+  |     where
+  |         T: SendSyncError,
+  |            ^^^^^^^^^^^^^ required by this bound in `ErrorUnion::new`
+  = note: this error originates in the macro `eros::error` (in Nightly builds, run with -Z macro-backtrace for more info)

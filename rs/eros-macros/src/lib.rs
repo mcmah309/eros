@@ -5,8 +5,8 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
-    Expr, ItemFn, LitStr, Token, ext::IdentExt, parse::ParseStream, parse_macro_input,
-    punctuated::Punctuated, token::Comma,
+    Expr, ItemFn, LitStr, Token, parse::ParseStream, parse_macro_input, punctuated::Punctuated,
+    token::Comma,
 };
 
 struct FormatErrorInput {
@@ -38,19 +38,6 @@ pub fn format_error(input: TokenStream) -> TokenStream {
     let mut expr = &message;
     while let Expr::Group(group) = expr {
         expr = &group.expr;
-    }
-
-    if let Expr::Path(path) = expr
-        && let Some(segment) = path.path.segments.last()
-    {
-        let name = segment.ident.unraw().to_string();
-        if name.chars().any(char::is_uppercase)
-            && name
-                .chars()
-                .all(|ch| ch.is_uppercase() || ch.is_ascii_digit() || ch == '_')
-        {
-            return quote! { #crate_path::MsgError::from_static(#message) }.into();
-        }
     }
 
     let Expr::Lit(syn::ExprLit {

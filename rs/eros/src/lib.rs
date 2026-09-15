@@ -24,6 +24,7 @@ mod formatting;
 mod macros;
 mod msg_error;
 mod narrowing;
+pub mod prelude;
 mod recovery;
 mod root_error;
 pub mod type_set;
@@ -45,6 +46,7 @@ pub use context::ContextFrame;
 pub use context::ContextValue;
 pub use error_union::ErrorUnion;
 pub use error_union::SendSyncError;
+pub use error_union::StdError;
 pub use msg_error::MsgError;
 pub use type_set::{
     E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, E13, E14, E15, E16, E17, E18, E19, E20, E21,

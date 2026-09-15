@@ -3,9 +3,7 @@
 extern crate alloc;
 
 use alloc::string::ToString;
-use eros::{
-    AnyError, ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError, error,
-};
+use eros::{AnyError, ErrorUnion, MsgError, SendSyncError, error, prelude::*};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotEnoughMemory;
@@ -57,27 +55,27 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_display(captured.inner(), "val = 7")?;
 
     static ERROR: &str = "static message";
-    let named = eros::error!(ERROR);
+    let named = eros::error!(MsgError::from_static(ERROR));
     assert_display(named.inner(), ERROR)?;
 
     let named = named.downcast_inner::<Timeout>().unwrap_err();
     assert_eq_str(named.downcast_inner::<MsgError>().unwrap().as_str(), ERROR)?;
 
-    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(MsgError::from_static(ERROR)))();
     let recovered: eros::Result<u8, (Timeout,)> =
         result.recover(|error: ErrorUnion<(MsgError,)>| {
             assert_eq!(error.into_single().as_str(), ERROR);
             7
         });
     assert_eq(recovered.recover::<Timeout, _>(|_| 0).into_value(), 7)?;
-    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(MsgError::from_static(ERROR)))();
     let recovered: eros::Result<u8, (Timeout,)> =
         result.try_recover(|error: ErrorUnion<(MsgError,)>| {
             assert_eq!(error.into_single().as_str(), ERROR);
             Err(ErrorUnion::new(Timeout))
         });
     assert_eq(recovered.unwrap_err().into_single(), Timeout)?;
-    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(MsgError::from_static(ERROR)))();
     let value = result
         .recover(|error: ErrorUnion<(Timeout, MsgError)>| {
             assert!(matches!(error.as_enum(), eros::E2::B(_)));
@@ -85,7 +83,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
         })
         .into_value();
     assert_eq(value, 7)?;
-    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(MsgError::from_static(ERROR)))();
     let recovered: eros::Result<u8, (NotEnoughMemory,)> = result
         .try_recover(|_: ErrorUnion<(MsgError, Timeout)>| Err(ErrorUnion::new(NotEnoughMemory)));
     assert_eq(recovered.unwrap_err().into_single(), NotEnoughMemory)?;
@@ -101,12 +99,17 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_type::<MsgError>(union.inner(), "bail MsgError")?;
 
     let r: Result<(), ErrorUnion<(NotEnoughMemory,)>> =
-        Err(NotEnoughMemory).union::<_, (NotEnoughMemory,)>();
+        Err(NotEnoughMemory).union::<(NotEnoughMemory,), _>();
     let union = r.unwrap_err();
     assert_type::<NotEnoughMemory>(union.inner(), "NotEnoughMemory")?;
     assert_eq(union.into_single(), NotEnoughMemory)?;
 
     let u: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
+    let u = Err::<(), _>(u).context("waiting for response").unwrap_err();
+    let native = u.into_std_error();
+    assert_display(&native, "Timeout")?;
+    assert_eq(native.as_union().contexts().len(), 1)?;
+    let u = native.into_union();
     assert_eq(u.as_ref(), &Timeout)?;
     assert_eq(u.into_single(), Timeout)?;
 
@@ -223,20 +226,20 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
 fn bailing_function() -> eros::Result<()> {
     const BAIL_ERROR: &str = "boom from bail";
-    eros::bail!(BAIL_ERROR)
+    eros::bail!(MsgError::from_static(BAIL_ERROR))
 }
 
 fn chain_with_question() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> {
     let _: () =
         Err::<(), NotEnoughMemory>(NotEnoughMemory)
-            .union::<_, (NotEnoughMemory, Timeout, InvalidPassword)>()?;
+            .union::<(NotEnoughMemory, Timeout, InvalidPassword), _>()?;
     Ok(())
 }
 
 fn chain_with_failure() -> Result<(), ErrorUnion<(NotEnoughMemory, Timeout, InvalidPassword)>> {
     let _: () =
         Err::<(), NotEnoughMemory>(NotEnoughMemory)
-            .union::<_, (NotEnoughMemory, Timeout, InvalidPassword)>()?;
+            .union::<(NotEnoughMemory, Timeout, InvalidPassword), _>()?;
     Ok(())
 }
 

@@ -7,7 +7,7 @@ fn main() {
     let _ = error.widen::<(std::io::Error, u16), _>();
 
     let result: Result<(), std::io::Error> = Ok(());
-    let _ = result.union::<_, (std::io::Error, u16)>();
+    let _ = result.union::<(std::io::Error, u16), _>();
 
     let result: Result<(), ErrorUnion<(std::io::Error,)>> = Ok(());
     let _ = result.widen::<(std::io::Error, u16), _>();

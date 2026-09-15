@@ -100,7 +100,7 @@ fn error_macro_supports_literals_formatted_messages_and_error_expressions() {
 }
 
 #[test]
-fn error_macro_uses_static_storage_for_all_caps_names() {
+fn error_macro_preserves_explicit_static_messages() {
     static ERROR: &str = "User {id} {{not found}}";
     const _ERROR_404: &str = "User not found";
     mod messages {
@@ -113,12 +113,15 @@ fn error_macro_uses_static_storage_for_all_caps_names() {
     }
 
     for (error, expected) in [
-        (eros::error!(ERROR), ERROR),
-        (eros::error!(ERROR,), ERROR),
-        (eros::error!(r#ERROR), ERROR),
-        (eros::error!(_ERROR_404), _ERROR_404),
-        (eros::error!(messages::NOT_FOUND), messages::NOT_FOUND),
-        (forwarded!(ERROR), ERROR),
+        (eros::error!(MsgError::from_static(ERROR)), ERROR),
+        (eros::error!(MsgError::from_static(ERROR),), ERROR),
+        (eros::error!(MsgError::from_static(r#ERROR)), ERROR),
+        (eros::error!(MsgError::from_static(_ERROR_404)), _ERROR_404),
+        (
+            eros::error!(MsgError::from_static(messages::NOT_FOUND)),
+            messages::NOT_FOUND,
+        ),
+        (forwarded!(MsgError::from_static(ERROR)), ERROR),
     ] {
         let message = error.downcast_inner::<MsgError>().unwrap();
         assert_eq!(message.as_str(), expected);
@@ -127,16 +130,28 @@ fn error_macro_uses_static_storage_for_all_caps_names() {
 }
 
 #[test]
-fn error_macro_preserves_other_error_expressions() {
+fn error_macro_preserves_error_expressions_regardless_of_capitalization() {
     use std::fmt::Error as FormatError;
     let error = FormatError;
     let _123 = FormatError;
     const ERROR: std::fmt::Error = std::fmt::Error;
+    mod errors {
+        pub const ERROR: std::fmt::Error = std::fmt::Error;
+    }
+    macro_rules! forwarded {
+        ($error:expr) => {
+            eros::error!($error)
+        };
+    }
 
     for error in [
         eros::error!(error),
         eros::error!(_123),
         eros::error!(FormatError),
+        eros::error!(ERROR),
+        eros::error!(r#ERROR),
+        eros::error!(errors::ERROR,),
+        forwarded!(ERROR),
         eros::error!({ ERROR }),
     ] {
         assert!(error.is_inner::<std::fmt::Error>());
@@ -144,20 +159,20 @@ fn error_macro_preserves_other_error_expressions() {
 }
 
 #[test]
-fn bail_and_ensure_support_all_caps_messages() {
+fn bail_and_ensure_preserve_explicit_static_messages() {
     static ERROR: &str = "User not found";
     fn bail() -> eros::Result<()> {
-        eros::bail!(ERROR)
+        eros::bail!(MsgError::from_static(ERROR))
     }
     fn bail_with_trailing_comma() -> eros::Result<()> {
-        eros::bail!(ERROR,)
+        eros::bail!(MsgError::from_static(ERROR),)
     }
     fn ensure(ok: bool) -> eros::Result<()> {
-        eros::ensure!(ok, ERROR);
+        eros::ensure!(ok, MsgError::from_static(ERROR));
         Ok(())
     }
     fn ensure_with_trailing_comma(ok: bool) -> eros::Result<()> {
-        eros::ensure!(ok, ERROR,);
+        eros::ensure!(ok, MsgError::from_static(ERROR),);
         Ok(())
     }
 
@@ -229,7 +244,7 @@ fn bail_and_ensure_infer_typed_error_sets() {
     }
     fn named() -> eros::Result<(), Pair> {
         static ERROR: &str = "static {message}";
-        eros::bail!(ERROR)
+        eros::bail!(MsgError::from_static(ERROR))
     }
     fn captured(value: u8) -> eros::Result<(), Pair> {
         eros::bail!("value {value}",)
@@ -239,7 +254,7 @@ fn bail_and_ensure_infer_typed_error_sets() {
     }
     fn expression() -> eros::Result<(), Pair> {
         const ERROR: std::fmt::Error = std::fmt::Error;
-        eros::bail!({ ERROR },)
+        eros::bail!(ERROR,)
     }
     fn ensure(ok: bool, conditions: &Cell<u8>, arguments: &Cell<u8>) -> eros::Result<u8, Pair> {
         eros::ensure!(
@@ -256,7 +271,8 @@ fn bail_and_ensure_infer_typed_error_sets() {
         Ok(42)
     }
     fn ensure_expression(ok: bool) -> eros::Result<(), (std::fmt::Error,)> {
-        eros::ensure!(ok, std::fmt::Error);
+        const ERROR: std::fmt::Error = std::fmt::Error;
+        eros::ensure!(ok, ERROR);
         Ok(())
     }
     assert_eq!(literal().unwrap_err().into_single().as_str(), "literal");

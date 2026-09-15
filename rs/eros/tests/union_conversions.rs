@@ -1,4 +1,4 @@
-use eros::{AnyError, ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{AnyError, ErrorUnion, MsgError, SendSyncError, prelude::*};
 use std::{fmt, io, num::ParseIntError};
 
 type Input = (MsgError, fmt::Error, io::Error);
@@ -9,13 +9,13 @@ type Expanded = (ParseIntError, fmt::Error, MsgError, io::Error);
 fn union_inserts_each_concrete_error_at_its_declared_position() {
     let errors: [eros::Result<(), Input>; 3] = [
         Err(MsgError::from(String::from("owned message"))).union(),
-        Err(fmt::Error).union(),
+        Err(fmt::Error).union::<Input, _>().context("format response"),
         Err(io::Error::new(io::ErrorKind::PermissionDenied, "denied")).union(),
     ];
     for (index, result) in errors.into_iter().enumerate() {
         let error = result.unwrap_err();
         #[cfg(feature = "context")]
-        assert_eq!(error.contexts().len(), 0);
+        assert_eq!(error.contexts().len(), usize::from(index == 1));
         match (index, error.into_enum()) {
             (0, eros::E3::A(error)) => assert_eq!(error.as_str(), "owned message"),
             (1, eros::E3::B(fmt::Error)) => {}
