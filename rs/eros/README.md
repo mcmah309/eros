@@ -6,7 +6,19 @@
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 [<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std-support)
 
-Eros is the swiss army knife of error handling approaches. It works well in both libraries and binaries.
+**Eros: typed errors when you need them, easy propagation everywhere.**
+
+Combine error types without defining custom enums. Handle the failures you care about and propagate the rest with context. Choose precise error types or a simple catch-all result for each API, in libraries and applications alike.
+
+Choose the signature that fits your API:
+
+```rust,ignore
+// Propagate errors without listing their types.
+fn load_config() -> eros::Result<Config>
+
+// Specify the errors callers can handle.
+fn load_config() -> eros::Result<Config, (io::Error, ParseError)>
+```
 
 Built on the following philosophy:
 1. Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. [Link](#optional-typed-errors)
