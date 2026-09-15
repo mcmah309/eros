@@ -1,7 +1,10 @@
 use alloc::boxed::Box;
+#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
 use core::{mem, ptr};
 
-use crate::{ErrorUnion, SendSyncError, TypeSet, error_union::ErrorUnionInner};
+#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
+use crate::error_union::ErrorUnionInner;
+use crate::{ErrorUnion, SendSyncError, TypeSet};
 
 impl<E: TypeSet> ErrorUnion<E> {
     /// Replaces the inner error, passing ownership of the old boxed error to a closure.
@@ -14,6 +17,9 @@ impl<E: TypeSet> ErrorUnion<E> {
     ///
     /// Context, the original Eros capture location, and the saved Eros backtrace
     /// are preserved. No new backtrace or location is captured.
+    ///
+    /// When all three features are disabled, the closure receives the existing
+    /// error allocation. The replacement is still boxed separately.
     ///
     /// The returned union has the replacement type as its single variant.
     /// For a union with a single variant, [`Self::map_single`] passes the concrete
@@ -54,8 +60,13 @@ impl<E: TypeSet> ErrorUnion<E> {
         T: SendSyncError,
         F: FnOnce(Box<dyn SendSyncError>) -> T,
     {
-        let raw = Box::into_raw(self.inner);
+        #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+        {
+            ErrorUnion::new_from_parts(f(self.into_inner()))
+        }
+        #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
         unsafe {
+            let raw = Box::into_raw(self.inner);
             // The saved function pointer knows the old error's concrete type
             // and moves it into a box, just as into_inner() does.
             let root = ((*raw).into_box_fn)(ptr::addr_of_mut!((*raw).error));

@@ -50,6 +50,11 @@ impl core::error::Error for Box<dyn SendSyncError> {
     }
 }
 
+// Without metadata, into_inner reuses this allocation as a Box of the error.
+#[cfg_attr(
+    not(any(feature = "backtrace", feature = "context", feature = "location")),
+    repr(transparent)
+)]
 pub(crate) struct ErrorUnionInner<T: ?Sized> {
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
@@ -59,10 +64,12 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     pub(crate) location: &'static core::panic::Location<'static>,
     /// Re-boxes the error field into a fresh allocation.
     /// Stored at construction so the concrete type is still known.
+    #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
     pub(crate) into_box_fn: fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
     pub(crate) error: T,
 }
 
+#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
 fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
     // SAFETY: caller guarantees ptr points to a live T
     let value: T = unsafe { ptr::read(ptr as *const dyn SendSyncError as *const T) };
@@ -82,6 +89,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             context: Vec::new(),
             #[cfg(feature = "location")]
             location: core::panic::Location::caller(),
+            #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
             into_box_fn: make_box::<T>,
             error: t,
         })
@@ -103,6 +111,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             context,
             #[cfg(feature = "location")]
             location,
+            #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
             into_box_fn: make_box::<T>,
             error: t,
         })
@@ -168,6 +177,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
             #[cfg(feature = "location")]
             let location = ptr::read(ptr::addr_of!((*raw_container).location));
 
+            #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
             let into_box_fn = ptr::read(ptr::addr_of!((*raw_container).into_box_fn));
 
             // Deallocate the Box allocation itself.
@@ -184,6 +194,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
                 context,
                 #[cfg(feature = "location")]
                 location,
+                #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
                 into_box_fn,
                 error: downcasted_value,
             }
@@ -517,8 +528,19 @@ where
     }
 
     /// Extracts the boxed inner error, discarding context, location, and backtrace.
+    ///
+    /// Reuses the existing allocation when all three features are disabled.
     pub fn into_inner(self) -> Box<dyn SendSyncError> {
         let raw = Box::into_raw(self.inner);
+        #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+        // SAFETY: ErrorUnionInner is repr(transparent) without metadata, so the
+        // error has the same address, size, and alignment as the allocation.
+        // Projecting the field preserves its trait-object metadata. Ownership
+        // transfers to the returned Box, including for zero-sized errors.
+        unsafe {
+            Box::from_raw(ptr::addr_of_mut!((*raw).error))
+        }
+        #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
         unsafe {
             let into_box_fn = (*raw).into_box_fn;
             let error_ptr = ptr::addr_of_mut!((*raw).error);
@@ -992,6 +1014,26 @@ mod tests {
         }
     }
     impl std::error::Error for BarError {}
+
+    #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+    #[test]
+    fn inner_without_metadata_has_the_error_layout() {
+        fn check<T: SendSyncError>(error: T) {
+            assert_eq!(
+                core::alloc::Layout::new::<ErrorUnionInner<T>>(),
+                core::alloc::Layout::new::<T>()
+            );
+            let inner = ErrorUnionInner::new(error);
+            assert_eq!(
+                core::alloc::Layout::for_value(&*inner),
+                core::alloc::Layout::for_value(&inner.error)
+            );
+        }
+
+        check(FooError("owned".into()));
+        check(BarError(42));
+        check(fmt::Error);
+    }
 
     #[test]
     fn downcast_error_unchecked_correct_type_recovers_value() {

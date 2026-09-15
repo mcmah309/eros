@@ -39,6 +39,54 @@ fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<(Tra
     error.context(ContextValue::from(context))
 }
 
+#[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+#[test]
+fn boxed_extraction_reuses_the_original_allocation() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let error: ErrorUnion = ErrorUnion::new(tracked(&drops));
+    let original = error.inner() as *const dyn SendSyncError as *const ();
+
+    let boxed = error.into_inner();
+    assert_eq!(
+        boxed.as_ref() as *const dyn SendSyncError as *const (),
+        original
+    );
+    let root = boxed.as_ref().as_any().downcast_ref::<Tracked>().unwrap();
+    assert_eq!(root.payload, [1, 2, 3]);
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    drop(boxed);
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+#[test]
+fn boxed_mapping_reuses_the_original_allocation() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let error: ErrorUnion = ErrorUnion::new(tracked(&drops));
+    let original = error.inner() as *const dyn SendSyncError as *const ();
+
+    let error = error.map_inner(|old| {
+        assert_eq!(
+            old.as_ref() as *const dyn SendSyncError as *const (),
+            original
+        );
+        old
+    });
+    let boxed = error.into_single();
+    assert_eq!(
+        boxed
+            .as_ref()
+            .as_any()
+            .downcast_ref::<Tracked>()
+            .unwrap()
+            .payload,
+        [1, 2, 3]
+    );
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    drop(boxed);
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
 #[test]
 fn owned_extraction_moves_the_root_and_drops_metadata_exactly_once() {
     for extract in [

@@ -187,7 +187,7 @@ The `location` feature flag adds a location at compile time for error creation a
 
 ### Optimizations
 
-Eros comes with the `context` and `backtrace` feature flags enabled by default. If this is disabled, backtrace and context tracking are removed from `ErrorUnion<T>` and all context methods become a no-op. Thus it may be optimized away by the compiler. 
+Eros comes with the `context` and `backtrace` feature flags enabled by default. Disabling them removes backtrace and context tracking from `ErrorUnion<T>`, and all context methods become a no-op. Thus, it may be optimized away by the compiler.
 
 `ErrorUnion`'s stack size is pointer size (uses a `Box`). Boxing errors is a common trick to increase performance and decrease stack memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
 
@@ -366,19 +366,19 @@ Only annotated parameters are included in the generated context. Parameters with
 
 `eros`'s flexibility and optimizations make it the perfect option for both libraries and binaries.
 
-*Libraries should consider disabling default features* and allowing downstream crates to enable this. This can then be enabled for tests only in the library.
+*Libraries should consider setting `default-features = false` on their `eros` dependency* and allowing downstream crates to enable the features they need. The library can enable these features for its own tests.
 
 #### Public APIs
 
 ##### Approach A: Exposing `ErrorUnion` in Public APIs
 
-Exposing `ErrorUnion` in a public API is perfectly fine and sometimes preferred. It allows multiple crates to use the power of these constructs together. see the [Optimizations](#optimizations) section for more info. Make sure to re-export these constructs if exposed.
+Exposing `ErrorUnion` in a public API is sometimes preferred, especially if crates are internal. It allows multiple crates to use the power of these constructs together.
 
-Before choosing this approach ask "Will a downstream care about differentiating between these types?" e.g. exposing a `io::Error` may or may not be useful. In fact, it may be more useful for a downstream to expose a type specific to the crate e.g. `CrateError`. One could then expose an e.g.`ErrorUnion<(CrateError,)>`. But if it is desired to hide `ErrorUnion` altogether, approach B dives deeper into this.
+Before choosing this approach ask "Will a downstream care about differentiating between these types?" e.g. exposing a `io::Error` may or may not be useful. In fact, it may be more useful for a downstream to expose a type specific to the crate e.g. `CrateError`. One could then expose an e.g.`ErrorUnion<(CrateError,)>`. But if it is desired to remove `ErrorUnion` altogether, approach B dives deeper into this.
 
-##### Approach B: Hiding `ErrorUnion` behind Concrete Crate Errors
+##### Approach B: Replacing `ErrorUnion` With Concrete Crate Errors
 
-If one wants to add a custom error type for all public APIs without exposing constructs like `ErrorUnion`, use the `into_inner` method at these boundaries. This is a common pattern, since most crates already define their own error type for public-facing APIs.
+If one wants to add a custom error type for public APIs without exposing constructs like `ErrorUnion`, use the `into_inner()` method at these boundaries. This is a common pattern, since most crates already define their own error type for public-facing APIs.
 
 <details>
 
@@ -421,7 +421,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a thin wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally.
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a thin wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the existing allocation (no-op) so there is no cost to use `eros` in a library for any downstreams.
 
 This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `into_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
 
