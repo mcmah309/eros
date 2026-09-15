@@ -174,6 +174,104 @@ fn result_narrow_covers_success_matching_error_and_remainder() {
 }
 
 #[test]
+fn recover_preserves_success_and_only_calls_the_matching_handler() {
+    let success: eros::Result<String, Pair> = Ok(String::from("original success"));
+    let original = success.as_ref().unwrap().as_ptr();
+    let success: eros::Result<String, (fmt::Error,)> =
+        success.recover::<MsgError, _>(|_| panic!("must not handle success"));
+    let success = success.unwrap();
+    assert_eq!(success.as_ptr(), original);
+
+    // Infers the target from the handler and accepts an FnOnce closure.
+    let replacement = String::from("recovered");
+    let result: eros::Result<String, Pair> = Err(ErrorUnion::new(MsgError::from("match")));
+    let mut calls = 0;
+    let result: eros::Result<String, (fmt::Error,)> =
+        result.recover(|error: ErrorUnion<(MsgError,)>| {
+            calls += 1;
+            assert_eq!(error.into_single().as_str(), "match");
+            replacement
+        });
+    assert_eq!(calls, 1);
+    assert_eq!(result.unwrap(), "recovered");
+}
+
+#[test]
+fn recover_preserves_error_identity_and_metadata_in_both_branches() {
+    for matches in [true, false] {
+        let error: ErrorUnion<Triple> = if matches {
+            ErrorUnion::new(fmt::Error)
+        } else {
+            ErrorUnion::new(MsgError::from("unhandled"))
+        };
+        let error = error.context("inner").context("outer");
+        #[cfg(feature = "user_context")]
+        let error = error.user_context("user message");
+        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let report = format!("{error:?}");
+        #[cfg(feature = "diagnostic")]
+        let diagnostic = error.to_debug_json();
+        let result: eros::Result<(), Triple> = Err(error);
+        let mut calls = 0;
+        // fmt::Error is in the middle, and the remainder retains its order.
+        let result: eros::Result<(), (MsgError, std::io::Error)> =
+            result.recover::<fmt::Error, _>(|error| {
+                calls += 1;
+                assert_eq!(
+                    error.inner() as *const dyn SendSyncError as *const (),
+                    original
+                );
+                assert_eq!(format!("{error:?}"), report);
+                #[cfg(feature = "diagnostic")]
+                assert_eq!(error.to_debug_json(), diagnostic);
+                assert_eq!(error.into_single(), fmt::Error);
+            });
+        assert_eq!(calls, usize::from(matches));
+        if matches {
+            result.unwrap();
+        } else {
+            let error = result.unwrap_err();
+            assert_eq!(
+                error.inner() as *const dyn SendSyncError as *const (),
+                original
+            );
+            assert_eq!(format!("{error:?}"), report);
+            #[cfg(feature = "diagnostic")]
+            assert_eq!(error.to_debug_json(), diagnostic);
+            assert!(matches!(error.into_enum(), E2::A(_)));
+        }
+    }
+}
+
+#[test]
+fn recover_can_handle_each_type_until_the_error_set_is_empty() {
+    for (error, expected) in [
+        (ErrorUnion::new(MsgError::from("first")), 2),
+        (ErrorUnion::new(fmt::Error), 1),
+    ] {
+        let result: eros::Result<u8, Pair> = Err(error);
+        // Start with the last tuple member, then handle the remaining one.
+        let result: eros::Result<u8, ()> = result
+            .recover::<fmt::Error, _>(|_| 1)
+            .recover::<MsgError, _>(|_| 2);
+        assert_eq!(result.unwrap(), expected);
+    }
+}
+
+#[test]
+fn recover_does_not_match_source_or_context_errors() {
+    let root = std::io::Error::other(MsgError::from("source"));
+    let error: ErrorUnion<(std::io::Error, MsgError)> = ErrorUnion::new(root);
+    let context: Box<dyn SendSyncError> = Box::new(MsgError::from("context"));
+    let error = error.context(context);
+    let report = format!("{error:?}");
+    let result: eros::Result<(), (std::io::Error, MsgError)> = Err(error);
+    let remainder: eros::Result<(), (std::io::Error,)> =
+        result.recover::<MsgError, _>(|_| panic!("must check only the inner error"));
+    assert_eq!(format!("{:?}", remainder.unwrap_err()), report);
+}
+
+#[test]
 fn result_conversions_preserve_success_values_and_error_metadata() {
     let success: Result<String, MsgError> = Ok("typed".into());
     let success: eros::Result<_, Pair> = success.union();

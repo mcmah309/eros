@@ -1,4 +1,4 @@
-use eros::{AnyError, ContextValue, ErrorUnion, SendSyncError};
+use eros::{AnyError, ContextValue, ErrorUnion, ReshapeUnion, SendSyncError};
 use std::{
     fmt,
     sync::{
@@ -107,6 +107,27 @@ fn owned_extraction_moves_the_root_and_drops_metadata_exactly_once() {
         drop(value);
         assert_eq!(root.load(Ordering::SeqCst), 1);
     }
+}
+
+#[test]
+fn recover_keeps_the_error_alive_in_the_handler_and_drops_it_once_on_unwind() {
+    let root = Arc::new(AtomicUsize::new(0));
+    let context = Arc::new(AtomicUsize::new(0));
+    let result: eros::Result<(), (fmt::Error, Tracked)> = Err(union(&root, &context).widen());
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = result.recover::<Tracked, _>(|error| {
+            assert_eq!(error.payload, [1, 2, 3]);
+            assert_eq!(root.load(Ordering::SeqCst), 0);
+            assert_eq!(
+                context.load(Ordering::SeqCst),
+                usize::from(!cfg!(feature = "context"))
+            );
+            panic!("recovery failed");
+        });
+    }));
+    assert!(outcome.is_err());
+    assert_eq!(root.load(Ordering::SeqCst), 1);
+    assert_eq!(context.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -229,7 +250,24 @@ fn erased_owned_downcast_cannot_create_an_anyerror_marker() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
     let error: ErrorUnion = union(&root, &context).into();
-    assert!(error.downcast_inner::<AnyError>().is_none());
+    let original = error.inner() as *const dyn SendSyncError as *const ();
+    let report = format!("{error:?}");
+    let error = match error.downcast_inner::<AnyError>() {
+        Ok(marker) => match marker {},
+        Err(error) => error,
+    };
+    let error = error.downcast_inner::<fmt::Error>().unwrap_err();
+    assert_eq!(
+        error.inner() as *const dyn SendSyncError as *const (),
+        original
+    );
+    assert_eq!(format!("{error:?}"), report);
+    assert_eq!(root.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        context.load(Ordering::SeqCst),
+        usize::from(!cfg!(feature = "context"))
+    );
+    drop(error);
     assert_eq!(root.load(Ordering::SeqCst), 1);
     assert_eq!(context.load(Ordering::SeqCst), 1);
 }

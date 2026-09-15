@@ -201,15 +201,6 @@ impl ErrorUnionInner<dyn SendSyncError> {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn downcast_error<T: 'static>(self: Box<Self>) -> Option<T> {
-        if self.is_error::<T>() {
-            Some(unsafe { self.downcast_error_unchecked::<T>() })
-        } else {
-            None
-        }
-    }
-
     pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
         (&self.error as &dyn Any).downcast_ref::<T>()
     }
@@ -491,8 +482,25 @@ where
         }
     }
 
-    pub fn downcast_inner<T: 'static>(self) -> Option<T> {
-        self.inner.downcast_error()
+    /// Extracts the inner error if its concrete type is `T`.
+    ///
+    /// On success, context, location, and backtrace are discarded. On failure,
+    /// returns the original union unchanged, including its error set and metadata.
+    /// This checks only the inner error, not its sources or contexts.
+    ///
+    /// ```
+    /// let error = eros::error!("failure").context("read configuration");
+    /// let error = error.downcast_inner::<std::fmt::Error>().unwrap_err();
+    /// let message = error.downcast_inner::<eros::MsgError>().unwrap();
+    /// assert_eq!(message.as_str(), "failure");
+    /// ```
+    pub fn downcast_inner<T: 'static>(self) -> Result<T, Self> {
+        if self.inner.is_error::<T>() {
+            // SAFETY: The concrete inner error type was checked above.
+            Ok(unsafe { self.inner.downcast_error_unchecked::<T>() })
+        } else {
+            Err(self)
+        }
     }
 
     pub fn downcast_inner_ref<T: 'static>(&self) -> Option<&T> {
@@ -716,7 +724,7 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
 
 //************************************************************************//
 
-/// Run widen and narrow directly on Results with ErrorUnions
+/// Reshapes error sets and handles specific error types directly on results.
 pub trait ReshapeUnion<S, E>
 where
     E: TypeSet,
@@ -744,6 +752,37 @@ where
     >
     where
         Target: 'static,
+        E::Variants: Narrow<Target, Index>;
+
+    /// Handles one error type, removing it from the result's possible errors.
+    ///
+    /// Calls `f` once on a matching error and returns its value as `Ok`. The
+    /// handler receives a single-type union with the original context, location,
+    /// and backtrace.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, ReshapeUnion};
+    /// use std::{io, num::ParseIntError};
+    ///
+    /// let result: eros::Result<u16, (io::Error, ParseIntError)> =
+    ///     Err(ErrorUnion::new(io::Error::other("cannot read port")));
+    /// let result: eros::Result<u16, (ParseIntError,)> =
+    ///     result.recover(|error: ErrorUnion<(io::Error,)>| {
+    ///         eprintln!("{error:?}; using port 8080");
+    ///         8080
+    ///     });
+    /// assert_eq!(result.unwrap(), 8080);
+    /// ```
+    #[allow(clippy::type_complexity)]
+    fn recover<Target, Index>(
+        self,
+        f: impl FnOnce(ErrorUnion<(Target,)>) -> S,
+    ) -> Result<
+        S,
+        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+    >
+    where
+        Target: SendSyncError,
         E::Variants: Narrow<Target, Index>;
 }
 
@@ -778,6 +817,30 @@ where
                 Ok(value) => Ok(value),
                 Err(err) => Err(Err(err)),
             },
+        }
+    }
+
+    fn recover<Target, Index>(
+        self,
+        f: impl FnOnce(ErrorUnion<(Target,)>) -> S,
+    ) -> Result<
+        S,
+        ErrorUnion<<<E::Variants as Narrow<Target, Index>>::Remainder as TupleForm>::Tuple>,
+    >
+    where
+        Target: SendSyncError,
+        E::Variants: Narrow<Target, Index>,
+    {
+        match self {
+            Ok(value) => Ok(value),
+            Err(error) if error.inner.is_error::<Target>() => Ok(f(ErrorUnion {
+                inner: error.inner,
+                _pd: PhantomData,
+            })),
+            Err(error) => Err(ErrorUnion {
+                inner: error.inner,
+                _pd: PhantomData,
+            }),
         }
     }
 }
@@ -1059,13 +1122,6 @@ mod tests {
         let inner = ErrorUnionInner::new(VecError(payload.clone()));
         let recovered: VecError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered.0, payload);
-    }
-
-    #[test]
-    #[should_panic]
-    fn downcast_error_panics_on_wrong_type() {
-        let inner = ErrorUnionInner::new(FooError("oops".into()));
-        inner.downcast_error::<BarError>().unwrap(); // should panic
     }
 
     #[test]
@@ -1439,24 +1495,28 @@ mod downcast_inner_tests {
     impl std::error::Error for BarError {}
 
     #[test]
-    fn downcast_inner_correct_type_returns_some() {
+    fn downcast_inner_correct_type_returns_ok() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("hello".into()));
         let result = union.downcast_inner::<FooError>();
-        assert_eq!(result, Some(FooError("hello".into())));
+        assert_eq!(result.unwrap(), FooError("hello".into()));
     }
 
     #[test]
-    fn downcast_inner_wrong_type_returns_none() {
+    fn downcast_inner_wrong_type_returns_original_union() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("hello".into()));
         let result = union.downcast_inner::<BarError>();
-        assert_eq!(result, None);
+        let union: ErrorUnion<(FooError, BarError)> = result.unwrap_err();
+        assert_eq!(
+            union.downcast_inner::<FooError>().unwrap(),
+            FooError("hello".into())
+        );
     }
 
     #[test]
     fn downcast_inner_multi_variant_correct_type() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(7));
         let result = union.downcast_inner::<BarError>();
-        assert_eq!(result, Some(BarError(7)));
+        assert_eq!(result.unwrap(), BarError(7));
     }
 
     #[test]
@@ -1474,14 +1534,11 @@ mod downcast_inner_tests {
         let payload = vec![1u8, 2, 3, 4, 5];
         let union: ErrorUnion<(VecError,)> = ErrorUnion::new(VecError(payload.clone()));
         let result = union.downcast_inner::<VecError>();
-        assert_eq!(result, Some(VecError(payload)));
+        assert_eq!(result.unwrap(), VecError(payload));
     }
 
     #[test]
-    fn downcast_inner_wrong_type_drops_value_without_leaking() {
-        // The Some(T) branch isn't taken; ensure the wrong-type path still
-        // doesn't leak the original error (it lives on inside `self`/`union`
-        // until `union` is dropped at the end of the test).
+    fn downcast_inner_wrong_type_retains_value_without_leaking() {
         #[derive(Debug, PartialEq)]
         struct VecError(Vec<u8>);
         impl fmt::Display for VecError {
@@ -1493,8 +1550,11 @@ mod downcast_inner_tests {
 
         let union: ErrorUnion<(VecError, FooError)> = ErrorUnion::new(VecError(vec![9, 9, 9]));
         let result = union.downcast_inner::<FooError>();
-        assert_eq!(result, None);
-        // `union`'s inner VecError is dropped normally here.
+        let union = result.unwrap_err();
+        assert_eq!(
+            union.downcast_inner::<VecError>().unwrap(),
+            VecError(vec![9, 9, 9])
+        );
     }
 
     #[test]

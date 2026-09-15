@@ -94,8 +94,8 @@ fn error_macro_supports_literals_formatted_messages_and_error_expressions() {
     },);
     assert_eq!(calls.get(), 2);
     assert_eq!(
-        error.downcast_inner::<std::fmt::Error>(),
-        Some(std::fmt::Error)
+        error.downcast_inner::<std::fmt::Error>().unwrap(),
+        std::fmt::Error
     );
 }
 
@@ -219,6 +219,108 @@ fn bail_macro_returns_early_for_each_message_form() {
         "value 7"
     );
     assert!(expression().unwrap_err().is_inner::<std::fmt::Error>());
+}
+
+#[test]
+fn bail_and_ensure_infer_typed_error_sets() {
+    type Pair = (std::fmt::Error, MsgError);
+    fn literal() -> eros::Result<(), (MsgError,)> {
+        eros::bail!("literal",)
+    }
+    fn named() -> eros::Result<(), Pair> {
+        static ERROR: &str = "static {message}";
+        eros::bail!(ERROR)
+    }
+    fn captured(value: u8) -> eros::Result<(), Pair> {
+        eros::bail!("value {value}",)
+    }
+    fn formatted(value: u8) -> eros::Result<(), Pair> {
+        eros::bail!("value {}", value,)
+    }
+    fn expression() -> eros::Result<(), Pair> {
+        const ERROR: std::fmt::Error = std::fmt::Error;
+        eros::bail!({ ERROR },)
+    }
+    fn ensure(ok: bool, conditions: &Cell<u8>, arguments: &Cell<u8>) -> eros::Result<u8, Pair> {
+        eros::ensure!(
+            {
+                conditions.set(conditions.get() + 1);
+                ok
+            },
+            "value {}",
+            {
+                arguments.set(arguments.get() + 1);
+                7
+            },
+        );
+        Ok(42)
+    }
+    fn ensure_expression(ok: bool) -> eros::Result<(), (std::fmt::Error,)> {
+        eros::ensure!(ok, std::fmt::Error);
+        Ok(())
+    }
+    assert_eq!(literal().unwrap_err().into_single().as_str(), "literal");
+    for (result, expected) in [
+        (named(), "static {message}"),
+        (captured(7), "value 7"),
+        (formatted(7), "value 7"),
+    ] {
+        assert_eq!(
+            result
+                .unwrap_err()
+                .narrow::<MsgError, _>()
+                .unwrap()
+                .as_str(),
+            expected
+        );
+    }
+    assert_eq!(
+        expression()
+            .unwrap_err()
+            .narrow::<std::fmt::Error, _>()
+            .unwrap(),
+        std::fmt::Error
+    );
+    let conditions = Cell::new(0);
+    let arguments = Cell::new(0);
+    assert_eq!(ensure(true, &conditions, &arguments).unwrap(), 42);
+    assert_eq!(conditions.get(), 1);
+    assert_eq!(arguments.get(), 0);
+    assert_eq!(
+        ensure(false, &conditions, &arguments)
+            .unwrap_err()
+            .to_string(),
+        "value 7"
+    );
+    assert_eq!(conditions.get(), 2);
+    assert_eq!(arguments.get(), 1);
+    ensure_expression(true).unwrap();
+    assert_eq!(
+        ensure_expression(false).unwrap_err().into_single(),
+        std::fmt::Error
+    );
+}
+
+#[cfg(feature = "location")]
+#[test]
+fn typed_bail_and_ensure_capture_the_call_site() {
+    fn bailing(line: &Cell<u32>) -> eros::Result<(), (MsgError,)> {
+        line.set(line!() + 1);
+        eros::bail!("typed bail")
+    }
+    fn ensuring(line: &Cell<u32>) -> eros::Result<(), (MsgError,)> {
+        line.set(line!() + 1);
+        eros::ensure!(false, "typed ensure {}", 7);
+        Ok(())
+    }
+    for call in [bailing, ensuring] {
+        let line = Cell::new(0);
+        let report = format!("{:?}", call(&line).unwrap_err());
+        assert!(
+            report.contains(&format!("{}:{}:", file!(), line.get())),
+            "{report}"
+        );
+    }
 }
 
 #[test]

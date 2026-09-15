@@ -1,20 +1,36 @@
 /// Returns early with an [`ErrorUnion`](crate::ErrorUnion) wrapped in `Err`.
 ///
+/// The error set is inferred from the return type. Typed results must include
+/// the supplied error type.
+///
+/// ```
+/// fn validate(port: u16) -> eros::Result<(), (eros::MsgError,)> {
+///     if port == 0 {
+///         eros::bail!("port must be nonzero");
+///     }
+///     Ok(())
+/// }
+/// assert!(validate(0).is_err());
+/// ```
+///
 /// See [`error!`](crate::error!) for more syntax information.
 #[macro_export]
 macro_rules! bail {
-    ($msg:literal $(,)?) => {
-        return $crate::Result::Err($crate::error!($msg))
-    };
-    ($err:expr $(,)?) => {
-        return $crate::Result::Err($crate::error!($err))
-    };
+    ($err:expr $(,)?) => {{
+        let error = $crate::__private::format_error!($crate, $err);
+        return $crate::Result::Err($crate::ErrorUnion::new(error))
+    }};
     ($fmt:expr, $($arg:tt)*) => {
-        return $crate::Result::Err($crate::error!($fmt, $($arg)*))
+        return $crate::Result::Err($crate::ErrorUnion::new(
+            $crate::MsgError::from_owned($crate::__private::format!($fmt, $($arg)*))
+        ))
     };
 }
 
 /// Creates an [`ErrorUnion`](crate::ErrorUnion) from a message or error.
+///
+/// The returned union uses [`AnyError`](crate::AnyError). [`bail!`](crate::bail!)
+/// and [`ensure!`](crate::ensure!) instead infer the error set from the return type.
 ///
 /// String literals work like `format!`:
 /// ```
@@ -60,7 +76,18 @@ macro_rules! error {
 }
 
 /// Returns an [`ErrorUnion`](crate::ErrorUnion) error if the condition is false.
-/// 
+///
+/// The error set is inferred from the return type, as with [`bail!`](crate::bail!).
+/// The condition is evaluated once; the error is constructed only on failure.
+///
+/// ```
+/// fn validate(port: u16) -> eros::Result<(), (eros::MsgError,)> {
+///     eros::ensure!(port != 0, "port must be nonzero");
+///     Ok(())
+/// }
+/// assert!(validate(0).is_err());
+/// ```
+///
 /// See [`error!`](crate::error!) for more syntax information.
 #[macro_export]
 macro_rules! ensure {

@@ -29,6 +29,12 @@ fn main() {
     let value = 7;
     let _: renamed::ErrorUnion = renamed::error!("captured {value}");
     let _: renamed::ErrorUnion = renamed::error!(renamed::MsgError::from_static("expression"));
+    let _: renamed::Result<(), (renamed::MsgError,)> = (|| renamed::bail!(ERROR))();
+    let _: renamed::Result<(), (renamed::MsgError,)> = (|| renamed::bail!("value {}", 7))();
+    let _: renamed::Result<(), (renamed::MsgError,)> = (|| {
+        renamed::ensure!(false, "typed {value}");
+        renamed::Result::Ok(())
+    })();
     let _ = bailing();
     let _ = ensuring();
 }

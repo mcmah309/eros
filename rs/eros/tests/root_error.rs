@@ -298,7 +298,7 @@ fn aligned_anyerror_root_can_be_retained_as_source_then_replaced() {
 }
 
 #[test]
-fn wrong_type_owned_downcast_drops_root_and_context() {
+fn wrong_type_owned_downcast_retains_root_and_context_until_drop() {
     let drops = Arc::new(AtomicUsize::new(0));
     let error = eros::error!("original failure").map_inner(|_| AlignedError {
         payload: vec![73; 8193],
@@ -309,7 +309,18 @@ fn wrong_type_owned_downcast_drops_root_and_context() {
     #[cfg(feature = "context")]
     let error = error.context(Box::new(DropError(context_drops.clone())) as Box<dyn SendSyncError>);
 
-    assert!(error.downcast_inner::<ConfigError>().is_none());
+    let original = error.inner() as *const dyn SendSyncError as *const ();
+    let report = format!("{error:?}");
+    let error = error.downcast_inner::<ConfigError>().unwrap_err();
+    assert_eq!(
+        error.inner() as *const dyn SendSyncError as *const (),
+        original
+    );
+    assert_eq!(format!("{error:?}"), report);
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    #[cfg(feature = "context")]
+    assert_eq!(context_drops.load(Ordering::SeqCst), 0);
+    drop(error);
     assert_eq!(drops.load(Ordering::SeqCst), 1);
     #[cfg(feature = "context")]
     assert_eq!(context_drops.load(Ordering::SeqCst), 1);

@@ -97,19 +97,14 @@ fn load_port(path: &str) -> eros::Result<u16, (io::Error, ParseIntError)> {
 
 // I/O Error is no longer tracked, we handled internally.
 fn port_or_default(path: &str) -> Result<u16, ParseIntError> {
-    // Narrow the `ErrorUnion` and handle the `io::Error` case!
-    match load_port(path).narrow::<io::Error, _>() {
-        Ok(io_error) => {
-            // let _: io::Error = io_error;
-            eprintln!("Could not read {path}: {io_error}; using port 8080");
-            Ok(8080)
-        }
-        Err(result) => {
-            // let _: eros::Result<(), (ParseIntError,)> = result;
-            // Only ParseIntError remains, so we *can* unwrap the single-type union.
-            result.map_err(|error| error.into_single())
-        }
-    }
+    load_port(path)
+        .recover::<io::Error, _>(|io_error| {
+            // The handler retains the error's context and backtrace.
+            eprintln!("Could not read {path}: {io_error:?}; using port 8080");
+            8080
+        })
+        // Only ParseIntError remains. We *can* extract it at the API boundary if we want.
+        .map_err(|error| error.into_single())
 }
 
 fn main() {
@@ -118,6 +113,11 @@ fn main() {
     }
 }
 ```
+
+`recover` handles one error type and removes it from the result's error set.
+Successful values and other errors pass through unchanged. For manual branching,
+use `narrow` to extract a concrete error or `subset` to preserve its diagnostics
+in a smaller union.
 
 And to expand an `ErrorUnion` just call `widen`
 

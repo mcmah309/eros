@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `eros::type_set::End: Contains<std::fmt::Error, _>` is not satisfied
+ --> tests/trybuild/cannot_bail_with_unlisted_error.rs:4:5
+  |
+4 |     eros::bail!(std::fmt::Error)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Contains<std::fmt::Error, _>` is not implemented for `eros::type_set::End`
+  |
+help: the trait `Contains<T, eros::type_set::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl<T> Contains<T, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `Contains<std::fmt::Error, eros::type_set::Cons<_, ()>>`
+note: required by a bound in `ErrorUnion::new`
+ --> src/error_union.rs
+  |
+  |     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
+  |            --- required by a bound in this associated function
+...
+  |         OutSet::Variants: Contains<T, Index>,
+  |                           ^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::new`
+  = note: this error originates in the macro `eros::bail` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -3,7 +3,9 @@
 extern crate alloc;
 
 use alloc::string::ToString;
-use eros::{AnyError, ErrorUnion, IntoAnyUnion, IntoUnion, SendSyncError, MsgError, error};
+use eros::{
+    AnyError, ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError, error,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotEnoughMemory;
@@ -57,6 +59,22 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     static ERROR: &str = "static message";
     let named = eros::error!(ERROR);
     assert_display(named.inner(), ERROR)?;
+
+    let named = named.downcast_inner::<Timeout>().unwrap_err();
+    assert_eq_str(named.downcast_inner::<MsgError>().unwrap().as_str(), ERROR)?;
+
+    let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(ERROR))();
+    let recovered: eros::Result<u8, (Timeout,)> =
+        result.recover(|error: ErrorUnion<(MsgError,)>| {
+            assert_eq!(error.into_single().as_str(), ERROR);
+            7
+        });
+    assert_eq(recovered.unwrap(), 7)?;
+    let result: eros::Result<(), (Timeout, MsgError)> = (|| {
+        eros::ensure!(false, "typed {}", 7);
+        Ok(())
+    })();
+    assert_display(result.unwrap_err().inner(), "typed 7")?;
 
     let r: eros::Result<()> = bailing_function();
     let union = r.expect_err("bail should error");
