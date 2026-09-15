@@ -1,0 +1,8 @@
+error[E0308]: mismatched types
+  --> tests/trybuild/cannot_coerce_error_set.rs:26:5
+   |
+26 |     error
+   |     ^^^^^ one type is more general than the other
+   |
+   = note: expected struct `ErrorUnion<(Callback<fn(&())>, FromUtf8Error)>`
+              found struct `ErrorUnion<(Callback<for<'a> fn(&'a ())>, FromUtf8Error)>`

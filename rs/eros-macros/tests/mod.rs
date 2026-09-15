@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-// ── Baseline ────────────────────────────────────────────────────────
+//************************************************************************//
 
 #[eros_macros::context("arg1 is {}", arg1)]
 fn test_function(arg1: &str, arg2: String, arg3: i32) -> eros::Result<String> {
@@ -15,7 +15,7 @@ fn test() {
     assert!(format!("{:?}", error).contains("    1. arg1 is test\n"));
 }
 
-// ── Async free functions ─────────────────────────────────────────────────────
+//************************************************************************//
 
 #[eros_macros::context("async arg is {}", value)]
 async fn async_function(value: u32) -> eros::Result<u32> {
@@ -40,7 +40,7 @@ async fn test_async_function_ok_passes_through() {
     assert_eq!(result, "ok: https://example.com");
 }
 
-// ── &self methods ────────────────────────────────────────────────────────────
+//************************************************************************//
 
 struct Fetcher {
     base_url: String,
@@ -92,7 +92,7 @@ fn test_shared_ref_ok_passes_through() {
     assert_eq!(f.fetch_ok().unwrap(), "http://localhost");
 }
 
-// ── &mut self methods ─────────────────────────────────────────────────────────
+//************************************************************************//
 
 struct Counter {
     count: u32,
@@ -137,7 +137,7 @@ fn test_mut_ref_ok_no_context_noise() {
     assert_eq!(c.count, 0);
 }
 
-// ── self (by-value) methods ───────────────────────────────────────────────────
+//************************************************************************//
 
 struct Wrapper(String);
 
@@ -167,7 +167,7 @@ fn test_value_receiver_ok_passes_through() {
     assert_eq!(w.consume_ok().unwrap(), "hello");
 }
 
-// ── Async &self methods ───────────────────────────────────────────────────────
+//************************************************************************//
 
 struct AsyncClient {
     host: String,
@@ -203,7 +203,7 @@ async fn test_async_shared_ref_ok_passes_through() {
     assert_eq!(client.fetch_ok().await.unwrap(), "api.example.com");
 }
 
-// ── Async &mut self methods ───────────────────────────────────────────────────
+//************************************************************************//
 
 struct AsyncQueue {
     items: Vec<String>,
@@ -237,7 +237,7 @@ async fn test_async_mut_ref_ok_mutates_state() {
     assert_eq!(q.items, vec!["first"]);
 }
 
-// ── Context string formatting edge cases ────────────────────────────────────
+//************************************************************************//
 
 #[eros_macros::context("no format args at all")]
 fn no_args_function() -> eros::Result<()> {
@@ -272,7 +272,7 @@ fn test_context_with_debug_format_specifier() {
     assert!(format!("{:?}", error).contains("[1, 2, 3]"));
 }
 
-// ── Auto format string (#[fmt("{}")] / #[fmt("{:?}")]) ───────────────────────────────
+//************************************************************************//
 
 // Single #[fmt("{}")] param
 #[eros_macros::context]
@@ -398,7 +398,7 @@ async fn test_auto_debug_async_mut_self() {
     assert!(format!("{:?}", error).contains("input: [1, 2, 3]"));
 }
 
-// ── Clone in format args ─────────────────────────────────────────────────────
+//************************************************************************//
 
 // Basic owned value — without .clone() this would fail to compile because
 // `string` would be moved into the inner function before `with_context` runs.

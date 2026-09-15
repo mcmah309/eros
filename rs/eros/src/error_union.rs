@@ -247,7 +247,9 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// the call stack.
 pub struct ErrorUnion<E: TypeSet = AnyError> {
     pub(crate) inner: Box<ErrorUnionInner<dyn SendSyncError>>,
-    pub(crate) _pd: PhantomData<E>,
+    // TypeId checks require exact variant types. A subtype coercion of E could
+    // change a variant's TypeId and select the wrong unchecked enum downcast.
+    pub(crate) _pd: PhantomData<fn(E) -> E>,
 }
 
 impl<T> Deref for ErrorUnion<(T,)>
