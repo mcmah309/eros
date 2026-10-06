@@ -135,12 +135,6 @@ impl ContextMode {
 /// }
 /// ```
 ///
-/// Context expressions are evaluated only when the function returns an error
-/// and the `context` feature is enabled, after the function body has run.
-/// Expressions, including `.clone()` calls, are used as written. Use
-/// [`eager_context`] to format owned parameters before they are moved into
-/// the function body.
-///
 /// ## Auto format string from parameter attributes
 ///
 /// When no format string is provided, annotate individual parameters with
@@ -180,31 +174,7 @@ pub fn context(attr: TokenStream, item: TokenStream) -> TokenStream {
     context_impl(attr, item, ContextMode::Lazy)
 }
 
-/// Formats context before running a function body and attaches it to any
-/// returned error.
-///
-/// Unlike [`context`], this macro evaluates the format arguments and builds
-/// the message on every call, including successful calls and calls with the
-/// `context` feature disabled. Parameters are then passed into the body
-/// unchanged, so owned values do not need to implement `Clone`.
-///
-/// ```
-/// use eros::eager_context;
-///
-/// #[eager_context("Processing: {}", value)]
-/// fn process(value: String) -> eros::Result<()> {
-///     drop(value);
-///     eros::bail!("processing failed")
-/// }
-///
-/// let error = process("input".to_owned()).unwrap_err();
-/// assert_eq!(error.inner().to_string(), "processing failed");
-/// ```
-///
-/// With no format string, use `#[fmt("...")]` parameter attributes as with
-/// [`context`]. Both forms support async functions and `self`, `&self`, and
-/// `&mut self` receivers. Async functions format the message when the future
-/// is polled, before the body runs.
+/// Like [`context`], but formats before the body runs (including success) when context is enabled.
 #[proc_macro_attribute]
 pub fn eager_context(attr: TokenStream, item: TokenStream) -> TokenStream {
     context_impl(attr, item, ContextMode::Eager)
@@ -221,12 +191,6 @@ fn context_impl(attr: TokenStream, item: TokenStream, mode: ContextMode) -> Toke
 }
 
 fn expand_context(args: ContextArgs, func: ItemFn, mode: ContextMode) -> syn::Result<TokenStream2> {
-    let is_async = func.sig.asyncness.is_some();
-    let outer_name = &func.sig.ident;
-    let inner_name = syn::Ident::new(&format!("__{}_internal", outer_name), outer_name.span());
-
-    let has_receiver = matches!(func.sig.inputs.first(), Some(syn::FnArg::Receiver(_)));
-
     struct AnnotatedParam {
         ident: syn::Ident,
         fmt: ParamFmt,
@@ -329,6 +293,23 @@ fn expand_context(args: ContextArgs, func: ItemFn, mode: ContextMode) -> syn::Re
             quote! { eros::__private::format!(#fmt_lit, #(#arg_idents),*) }
         }
     };
+
+    if !cfg!(feature = "context") {
+        func.block.stmts.insert(
+            0,
+            syn::parse_quote! {
+                if false {
+                    let _ = #format_call;
+                }
+            },
+        );
+        return Ok(quote! { #func });
+    }
+
+    let is_async = func.sig.asyncness.is_some();
+    let outer_name = &func.sig.ident;
+    let inner_name = syn::Ident::new(&format!("__{}_internal", outer_name), outer_name.span());
+    let has_receiver = matches!(func.sig.inputs.first(), Some(syn::FnArg::Receiver(_)));
 
     let vis = &func.vis;
     let attrs = &func.attrs;

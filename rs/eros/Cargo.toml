@@ -38,7 +38,7 @@ default = ["context", "backtrace"]
 # `eros` is `no_std` (but still requires `alloc` for `Box`/`Vec`/`String` etc.).
 std = []
 # Enables context
-context = []
+context = ["eros-macros/context"]
 # Enables backtrace
 backtrace = ["std"]
 # Parses and removes the unnecessary noise from the backtrace before printing

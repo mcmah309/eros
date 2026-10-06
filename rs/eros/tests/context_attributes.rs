@@ -65,7 +65,7 @@ fn context_evaluates_clones_as_written_only_on_error() {
 }
 
 #[test]
-fn eager_context_evaluates_clones_before_body_on_success_and_error() {
+fn eager_context_evaluates_clones_before_body_only_when_enabled() {
     let events = RefCell::new(Vec::new());
     for fail in [false, true] {
         events.borrow_mut().clear();
@@ -74,7 +74,10 @@ fn eager_context_evaluates_clones_before_body_on_success_and_error() {
             events: &events,
         };
         let result = eager_clones(value, fail);
+        #[cfg(feature = "context")]
         assert_eq!(*events.borrow(), ["clone", "clone", "body"]);
+        #[cfg(not(feature = "context"))]
+        assert_eq!(*events.borrow(), ["body"]);
         if fail {
             let error = result.unwrap_err();
             assert_eq!(error.inner().to_string(), "failed");
@@ -97,4 +100,24 @@ fn implicit_capture(__eros_context: String) -> eros::Result<String> {
 #[test]
 fn eager_context_local_does_not_shadow_parameters() {
     assert_eq!(implicit_capture("original".to_owned()).unwrap(), "original");
+}
+
+#[cfg(not(feature = "context"))]
+mod disabled {
+    // Plain return values ensure the disabled expansion does not call Context methods.
+    #[eros::context("value={value}")]
+    fn lazy(value: String) -> String {
+        value
+    }
+
+    #[eros::eager_context]
+    fn eager(#[fmt("{}")] value: String) -> String {
+        value
+    }
+
+    #[test]
+    fn disabled_attributes_preserve_the_original_body() {
+        assert_eq!(lazy("lazy".into()), "lazy");
+        assert_eq!(eager("eager".into()), "eager");
+    }
 }

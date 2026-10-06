@@ -1,0 +1,32 @@
+error[E0277]: `NotDisplay` doesn't implement `std::fmt::Display`
+ --> tests/trybuild/context_requires_display.rs:3:29
+  |
+3 | #[eros::context("value={}", value)]
+  |                        --   ^^^^^ `NotDisplay` cannot be formatted with the default formatter
+  |                        |
+  |                        required by this formatting parameter
+  |
+help: the trait `std::fmt::Display` is not implemented for `NotDisplay`
+ --> tests/trybuild/context_requires_display.rs:1:1
+  |
+1 | struct NotDisplay;
+  | ^^^^^^^^^^^^^^^^^
+  = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+  = note: required for `&NotDisplay` to implement `std::fmt::Display`
+  = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the attribute macro `eros::context` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `NotDisplay` doesn't implement `std::fmt::Display`
+  --> tests/trybuild/context_requires_display.rs:10:27
+   |
+ 9 | #[eros::eager_context]
+   | ---------------------- in this attribute macro expansion
+10 | fn automatic(#[fmt("{}")] value: NotDisplay) -> eros::Result<()> {
+   |                           ^^^^^ `NotDisplay` cannot be formatted with the default formatter
+   |
+help: the trait `std::fmt::Display` is not implemented for `NotDisplay`
+  --> tests/trybuild/context_requires_display.rs:1:1
+   |
+ 1 | struct NotDisplay;
+   | ^^^^^^^^^^^^^^^^^
+   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the attribute macro `eros::eager_context` (in Nightly builds, run with -Z macro-backtrace for more info)
