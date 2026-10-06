@@ -1,0 +1,10 @@
+error[E0308]: mismatched types
+ --> tests/trybuild/cannot_recover_erased_omit_remainder.rs:5:35
+  |
+5 |     let _: eros::Result<(), ()> = result.recover::<MsgError, _>(|_| ());
+  |            --------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), ErrorUnion<()>>`, found `Result<(), ErrorUnion>`
+  |            |
+  |            expected due to this
+  |
+  = note: expected enum `Result<(), ErrorUnion<()>>`
+             found enum `Result<(), ErrorUnion<AnyError>>`

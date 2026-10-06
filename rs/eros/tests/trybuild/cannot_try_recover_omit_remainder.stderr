@@ -4,17 +4,11 @@ error[E0277]: the trait bound `eros::type_set::End: Narrow<std::fmt::Error, _>` 
 6 |     let _: eros::Result<(), (MsgError,)> = result.try_recover::<MsgError, _, _, _>(|_| Ok(()));
   |                                                                           ^ the trait `Narrow<std::fmt::Error, _>` is not implemented for `eros::type_set::End`
   |
-help: the trait `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, _>` is not implemented for `eros::type_set::Cons<MsgError, eros::type_set::End>`
-      but trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, eros::type_set::Cons<eros::type_set::End, eros::type_set::End>>` is implemented for it
+help: the trait `Narrow<Target, eros::type_set::End>` is implemented for `AnyError`
  --> src/type_set.rs
   |
-  | / impl<SubHead, SubTail, SuperHead, SuperTail, HeadIndex, TailIndex>
-  | |     SupersetOf<Cons<SubHead, SubTail>, Cons<HeadIndex, TailIndex>> for Cons<SuperHead, SuperTail>
-  | | where
-  | |     Cons<SuperHead, SuperTail>: Narrow<SubHead, HeadIndex>,
-  | |     <Cons<SuperHead, SuperTail> as Narrow<SubHead, HeadIndex>>::Remainder:
-  | |         SupersetOf<SubTail, TailIndex>,
-  | |_______________________________________^
+  | impl<Target: SendSyncError> Narrow<Target, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `Narrow<std::fmt::Error, eros::type_set::Recurse<_>>`
   = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
 note: required by a bound in `try_recover`

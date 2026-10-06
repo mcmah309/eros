@@ -6,16 +6,11 @@ error[E0277]: the trait bound `eros::type_set::End: Narrow<std::fmt::Error, _>` 
   |                    |
   |                    required by a bound introduced by this call
   |
-  = help: the following other types implement trait `RecoveryTarget<E, Index>`:
-            (A, B)
-            (A, B, C)
-            (A, B, C, D)
-            (A, B, C, D, E)
-            (A, B, C, D, E, F)
-            (A, B, C, D, E, F, G)
-            (A, B, C, D, E, F, G, H)
-            (A, B, C, D, E, F, G, H, I)
-          and $N others
+help: the trait `Narrow<Target, eros::type_set::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl<Target: SendSyncError> Narrow<Target, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::End>` to implement `Narrow<std::fmt::Error, eros::type_set::Recurse<_>>`
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
   = note: required for `std::fmt::Error` to implement `RecoveryTarget<(std::io::Error,), SingleRecovery<eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>>`
@@ -34,16 +29,11 @@ error[E0277]: the trait bound `eros::type_set::End: Narrow<std::fmt::Error, _>` 
 6 |     let _ = result.recover::<std::fmt::Error, _>(|_| ());
   |                    ^^^^^^^ the trait `Narrow<std::fmt::Error, _>` is not implemented for `eros::type_set::End`
   |
-  = help: the following other types implement trait `RecoveryTarget<E, Index>`:
-            (A, B)
-            (A, B, C)
-            (A, B, C, D)
-            (A, B, C, D, E)
-            (A, B, C, D, E, F)
-            (A, B, C, D, E, F, G)
-            (A, B, C, D, E, F, G, H)
-            (A, B, C, D, E, F, G, H, I)
-          and $N others
+help: the trait `Narrow<Target, eros::type_set::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl<Target: SendSyncError> Narrow<Target, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::End>` to implement `Narrow<std::fmt::Error, eros::type_set::Recurse<_>>`
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
   = note: required for `std::fmt::Error` to implement `RecoveryTarget<(std::io::Error,), SingleRecovery<eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>>`
@@ -56,6 +46,11 @@ error[E0277]: the trait bound `eros::type_set::End: Narrow<std::fmt::Error, _>` 
   |                    |
   |                    required by a bound introduced by this call
   |
+help: the trait `Narrow<Target, eros::type_set::End>` is implemented for `AnyError`
+ --> src/type_set.rs
+  |
+  | impl<Target: SendSyncError> Narrow<Target, End> for AnyError {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::End>` to implement `Narrow<std::fmt::Error, eros::type_set::Recurse<_>>`
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
   = note: required for `{closure@$DIR/tests/trybuild/cannot_recover_removed_group_member.rs:6:50: 6:53}` to implement `RecoveryHandler<std::fmt::Error, (std::io::Error,), SingleRecovery<eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>, ()>`

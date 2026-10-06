@@ -882,3 +882,17 @@ fn _superset_test() {
 
     is_superset::<T5sup, T5sub, T5rem, _>();
 }
+
+impl<Target: SendSyncError> Narrow<Target, End> for AnyError {
+    type Remainder = AnyError;
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<Head, Tail, TailIndex> SupersetOf<Cons<Head, Tail>, Cons<End, TailIndex>> for AnyError
+where
+    Head: SendSyncError,
+    AnyError: SupersetOf<Tail, TailIndex>,
+{
+    type Remainder = AnyError;
+    fn __seal(_: sealed::Token) {}
+}

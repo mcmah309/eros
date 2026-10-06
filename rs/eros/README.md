@@ -122,6 +122,33 @@ For manual branching, `narrow::<E, _>()` extracts `E` and discards its diagnosti
 Use `narrow::<(E,), _>()` or `narrow::<(A, B), _>()` to retain diagnostics in a
 smaller union. The unmatched remainder always retains its diagnostics.
 
+Untyped APIs can still support typed recovery. For example, use a default when
+a configuration file is missing, while propagating permission and parse errors:
+
+```rust
+use eros::{ErrorUnion, ReshapeUnion};
+use std::io;
+
+fn load_port(path: &str) -> eros::Result<u16> {
+    let contents = std::fs::read_to_string(path)?;
+    Ok(contents.trim().parse()?)
+}
+
+fn port_or_default(path: &str) -> eros::Result<u16> {
+    load_port(path).try_recover(|error: ErrorUnion<(io::Error,)>| {
+        if error.kind() == io::ErrorKind::NotFound {
+            Ok(8080)
+        } else {
+            Err(error.into())
+        }
+    })
+}
+```
+
+The handler receives a typed error with its diagnostics. Other errors remain
+`AnyError`. You can also use `narrow` to select a concrete error or typed group
+from an untyped union or result.
+
 Use `widen` to add possible error types:
 
 ```rust

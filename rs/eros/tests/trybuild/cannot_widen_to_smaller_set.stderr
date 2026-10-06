@@ -4,11 +4,17 @@ error[E0277]: the trait bound `eros::type_set::End: SupersetOf<eros::type_set::C
 5 |     let _: ErrorUnion<(std::fmt::Error,)> = error.widen();
   |                                                   ^^^^^ the trait `SupersetOf<eros::type_set::Cons<MsgError, eros::type_set::End>, _>` is not implemented for `eros::type_set::End`
   |
-help: the trait `SupersetOf<AnyError, eros::type_set::End>` is implemented for `AnyError`
+help: `AnyError` implements trait `SupersetOf<Other, Index>`
  --> src/type_set.rs
   |
-  | impl SupersetOf<AnyError, End> for AnyError {
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   impl SupersetOf<AnyError, End> for AnyError {
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SupersetOf<AnyError, eros::type_set::End>`
+...
+  | / impl<Head, Tail, TailIndex> SupersetOf<Cons<Head, Tail>, Cons<End, TailIndex>> for AnyError
+  | | where
+  | |     Head: SendSyncError,
+  | |     AnyError: SupersetOf<Tail, TailIndex>,
+  | |__________________________________________^ `SupersetOf<eros::type_set::Cons<Head, Tail>, eros::type_set::Cons<eros::type_set::End, TailIndex>>`
   = note: required for `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::Cons<MsgError, eros::type_set::End>>, eros::type_set::Cons<eros::type_set::End, _>>`
 note: required by a bound in `ErrorUnion::<E>::widen`
  --> src/error_union.rs

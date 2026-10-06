@@ -10,14 +10,6 @@ fn widen_to_empty(error: ErrorUnion) -> ErrorUnion<()> {
     error.widen()
 }
 
-fn narrow_to_concrete(error: ErrorUnion) {
-    let _ = error.narrow::<fmt::Error, _>();
-}
-
-fn subset_to_concrete(error: ErrorUnion) {
-    let _ = error.narrow::<(fmt::Error,), _>();
-}
-
 fn into_typed(error: ErrorUnion) -> ErrorUnion<(fmt::Error,)> {
     error.into()
 }
