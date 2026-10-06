@@ -42,6 +42,18 @@ pub enum CheckOutcome {
 }
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
+    let context_error = eager_owned_context(alloc::string::String::from("owned")).unwrap_err();
+    assert_eq_str(
+        context_error
+            .contexts()
+            .next()
+            .unwrap()
+            .value()
+            .as_str()
+            .unwrap(),
+        "value: owned\n",
+    )?;
+
     let untitled: ErrorUnion<AnyError> = error!("something went wrong");
     assert_type::<MsgError>(untitled.inner(), "MsgError present")?;
     assert_display(untitled.inner(), "something went wrong")?;
@@ -222,6 +234,12 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_eq_str(diagnostic["contexts"][0]["message"].as_str().unwrap(), "diagnostic context")?;
 
     Ok(())
+}
+
+#[eros::eager_context]
+fn eager_owned_context(#[fmt("{}")] value: alloc::string::String) -> eros::Result<()> {
+    drop(value);
+    eros::bail!("owned error")
 }
 
 fn bailing_function() -> eros::Result<()> {

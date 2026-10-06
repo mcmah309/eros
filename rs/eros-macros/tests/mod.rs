@@ -400,83 +400,81 @@ async fn test_auto_debug_async_mut_self() {
 
 //************************************************************************//
 
-// Basic owned value — without .clone() this would fail to compile because
-// `string` would be moved into the inner function before `with_context` runs.
-#[eros_macros::context("processing {}", string.clone())]
+// Eager formatting happens before owned parameters move into the body.
+#[eros_macros::eager_context("processing {}", string)]
 fn owned_string_function(string: String) -> eros::Result<()> {
     eros::bail!("owned error")
 }
 
 #[test]
-fn test_owned_string_clone_context_is_attached() {
+fn test_owned_string_eager_context_is_attached() {
     let error = owned_string_function("hello".to_owned()).unwrap_err();
     assert_eq!(error.inner().to_string(), "owned error");
     assert!(format!("{:?}", error).contains("    1. processing hello\n"));
 }
 
 #[test]
-fn test_owned_string_clone_ok_passes_through() {
-    #[eros_macros::context("value was {}", val.clone())]
+fn test_owned_string_eager_ok_passes_through() {
+    #[eros_macros::eager_context("value was {}", val)]
     fn returns_ok(val: String) -> eros::Result<String> {
         Ok(val)
     }
     assert_eq!(returns_ok("world".to_owned()).unwrap(), "world");
 }
 
-// Multiple owned params — each cloned independently.
-#[eros_macros::context("a={} b={}", a.clone(), b.clone())]
+// Multiple owned parameters.
+#[eros_macros::eager_context("a={} b={}", a, b)]
 fn two_owned_params(a: String, b: String) -> eros::Result<()> {
     eros::bail!("two owned error")
 }
 
 #[test]
-fn test_two_owned_params_both_cloned() {
+fn test_two_owned_params_eager_context() {
     let error = two_owned_params("foo".to_owned(), "bar".to_owned()).unwrap_err();
     let debug = format!("{:?}", error);
     assert!(debug.contains("    1. a=foo b=bar\n"));
 }
 
-// Mix of cloned owned and non-clone borrowed — the borrow needs no clone.
-#[eros_macros::context("name={} id={}", name.clone(), id)]
+// Mix of owned and Copy parameters.
+#[eros_macros::eager_context("name={} id={}", name, id)]
 fn mixed_owned_and_borrowed(name: String, id: u32) -> eros::Result<()> {
     eros::bail!("mixed error")
 }
 
 #[test]
-fn test_mixed_clone_and_plain_ref() {
+fn test_mixed_owned_and_copy_eager_context() {
     let error = mixed_owned_and_borrowed("alice".to_owned(), 42).unwrap_err();
     assert!(format!("{:?}", error).contains("    1. name=alice id=42\n"));
 }
 
-// Same param cloned twice in the format string — only one `let` binding
-// should be emitted (deduplication), and both format positions work.
-#[eros_macros::context("first={} again={}", val.clone(), val.clone())]
-fn duplicate_clone_same_param(val: String) -> eros::Result<()> {
-    eros::bail!("duplicate clone error")
+// The same owned parameter can appear twice in the format string.
+#[eros_macros::eager_context("first={} again={}", val, val)]
+fn duplicate_eager_same_param(val: String) -> eros::Result<()> {
+    eros::bail!("duplicate eager error")
 }
 
 #[test]
-fn test_duplicate_clone_same_param_compiles_and_works() {
-    let error = duplicate_clone_same_param("dup".to_owned()).unwrap_err();
+fn test_duplicate_eager_same_param_compiles_and_works() {
+    let error = duplicate_eager_same_param("dup".to_owned()).unwrap_err();
     assert!(format!("{:?}", error).contains("    1. first=dup again=dup\n"));
 }
 
-// Async free function with a cloned owned param.
-#[eros_macros::context("async processing {}", payload.clone())]
+// Async free function with an owned parameter.
+#[eros_macros::eager_context("async processing {}", payload)]
 async fn async_owned_function(payload: String) -> eros::Result<()> {
     eros::bail!("async owned error")
 }
 
 #[tokio::test]
-async fn test_async_owned_clone_context_is_attached() {
+async fn test_async_owned_eager_context_is_attached() {
     let error = async_owned_function("data".to_owned()).await.unwrap_err();
     assert_eq!(error.inner().to_string(), "async owned error");
     assert!(format!("{:?}", error).contains("    1. async processing data\n"));
 }
 
 #[tokio::test]
-async fn test_async_owned_clone_ok_passes_through() {
-    #[eros_macros::context("async val={}", v.clone())]
+async fn test_async_owned_eager_ok_passes_through() {
+    #[eros_macros::eager_context("async val={}", v)]
     async fn async_ok(v: String) -> eros::Result<String> {
         Ok(v)
     }
@@ -489,19 +487,19 @@ struct Dispatcher {
 }
 
 impl Dispatcher {
-    #[eros_macros::context("dispatching {} via {}", task.clone(), self.prefix)]
+    #[eros_macros::eager_context("dispatching {} via {}", task, self.prefix)]
     fn dispatch(&self, task: String) -> eros::Result<()> {
         eros::bail!("dispatch failed")
     }
 
-    #[eros_macros::context("ok dispatch {} via {}", task.clone(), self.prefix)]
+    #[eros_macros::eager_context("ok dispatch {} via {}", task, self.prefix)]
     fn dispatch_ok(&self, task: String) -> eros::Result<String> {
         Ok(format!("{}/{}", self.prefix, task))
     }
 }
 
 #[test]
-fn test_self_method_with_cloned_owned_param() {
+fn test_self_method_with_eager_owned_param() {
     let d = Dispatcher {
         prefix: "queue-A".to_owned(),
     };
@@ -511,23 +509,20 @@ fn test_self_method_with_cloned_owned_param() {
 }
 
 #[test]
-fn test_self_method_clone_ok_passes_through() {
+fn test_self_method_eager_ok_passes_through() {
     let d = Dispatcher {
         prefix: "queue-B".to_owned(),
     };
-    assert_eq!(
-        d.dispatch_ok("job-2".to_owned()).unwrap(),
-        "queue-B/job-2"
-    );
+    assert_eq!(d.dispatch_ok("job-2".to_owned()).unwrap(), "queue-B/job-2");
 }
 
-// &mut self method with a cloned owned param.
+// &mut self method with an owned parameter.
 struct Journal {
     entries: Vec<String>,
 }
 
 impl Journal {
-    #[eros_macros::context("writing entry {}", entry.clone())]
+    #[eros_macros::eager_context("writing entry {}", entry)]
     fn write(&mut self, entry: String) -> eros::Result<()> {
         if self.entries.len() >= 3 {
             eros::bail!("journal full");
@@ -538,7 +533,7 @@ impl Journal {
 }
 
 #[test]
-fn test_mut_self_method_clone_context_is_attached() {
+fn test_mut_self_method_eager_context_is_attached() {
     let mut j = Journal {
         entries: vec!["a".into(), "b".into(), "c".into()],
     };
@@ -547,26 +542,26 @@ fn test_mut_self_method_clone_context_is_attached() {
 }
 
 #[test]
-fn test_mut_self_method_clone_ok_mutates_state() {
+fn test_mut_self_method_eager_ok_mutates_state() {
     let mut j = Journal { entries: vec![] };
     j.write("first".to_owned()).unwrap();
     assert_eq!(j.entries, vec!["first"]);
 }
 
-// Async &self method with cloned owned param.
+// Async &self method with an owned parameter.
 struct AsyncWorker {
     name: String,
 }
 
 impl AsyncWorker {
-    #[eros_macros::context("worker {} processing {}", self.name, item.clone())]
+    #[eros_macros::eager_context("worker {} processing {}", self.name, item)]
     async fn process(&self, item: String) -> eros::Result<()> {
         eros::bail!("worker failed")
     }
 }
 
 #[tokio::test]
-async fn test_async_self_method_clone_context_is_attached() {
+async fn test_async_self_method_eager_context_is_attached() {
     let w = AsyncWorker {
         name: "w1".to_owned(),
     };
@@ -574,8 +569,8 @@ async fn test_async_self_method_clone_context_is_attached() {
     assert!(format!("{:?}", error).contains("    1. worker w1 processing task-X\n"));
 }
 
-// Custom Clone type — verifies the macro works for any Clone, not just String.
-#[derive(Clone, Debug)]
+// Owned parameters do not need to implement Clone.
+#[derive(Debug)]
 struct JobId(u64);
 
 impl std::fmt::Display for JobId {
@@ -584,25 +579,129 @@ impl std::fmt::Display for JobId {
     }
 }
 
-#[eros_macros::context("running {}", id.clone())]
-fn custom_clone_type(id: JobId) -> eros::Result<()> {
+#[eros_macros::eager_context("running {}", id)]
+fn custom_eager_type(id: JobId) -> eros::Result<()> {
     eros::bail!("job failed")
 }
 
 #[test]
-fn test_custom_clone_type_display_in_context() {
-    let error = custom_clone_type(JobId(7)).unwrap_err();
+fn test_custom_eager_type_display_in_context() {
+    let error = custom_eager_type(JobId(7)).unwrap_err();
     assert!(format!("{:?}", error).contains("    1. running job#7\n"));
 }
 
-// Debug format specifier with .clone().
-#[eros_macros::context("payload={:?}", data.clone())]
-fn debug_clone_function(data: Vec<u8>) -> eros::Result<()> {
-    eros::bail!("debug clone error")
+// Debug formatting of an owned parameter.
+#[eros_macros::eager_context("payload={:?}", data)]
+fn debug_eager_function(data: Vec<u8>) -> eros::Result<()> {
+    eros::bail!("debug eager error")
 }
 
 #[test]
-fn test_clone_with_debug_format_specifier() {
-    let error = debug_clone_function(vec![10, 20, 30]).unwrap_err();
+fn test_eager_with_debug_format_specifier() {
+    let error = debug_eager_function(vec![10, 20, 30]).unwrap_err();
     assert!(format!("{:?}", error).contains("payload=[10, 20, 30]"));
+}
+
+#[eros_macros::eager_context]
+fn eager_auto_owned(
+    #[fmt("{}")] id: JobId,
+    ignored: String,
+    #[fmt("{:?}")] data: Vec<u8>,
+) -> eros::Result<()> {
+    drop((id, ignored, data));
+    Err(eros::error!("auto owned error"))?;
+    Ok(())
+}
+
+#[test]
+fn test_eager_auto_owned_params_without_clone() {
+    let error = eager_auto_owned(JobId(9), "secret".into(), vec![1, 2]).unwrap_err();
+    let message = error.contexts().next().unwrap().to_string();
+    assert_eq!(message, "id: job#9\ndata: [1, 2]\n");
+}
+
+#[eros_macros::eager_context()]
+async fn eager_auto_async(#[fmt("{}")] value: String) -> eros::Result<String> {
+    Ok(value)
+}
+
+#[tokio::test]
+async fn test_eager_auto_async_ok() {
+    assert_eq!(eager_auto_async("owned".into()).await.unwrap(), "owned");
+}
+
+struct EagerReceiver {
+    value: String,
+}
+
+impl EagerReceiver {
+    #[eros_macros::eager_context("consuming {}", self.value)]
+    fn consume(self) -> eros::Result<()> {
+        drop(self.value);
+        eros::bail!("consumed")
+    }
+
+    #[eros_macros::eager_context("before={} input={}", self.value, input)]
+    async fn replace(&mut self, input: String) -> eros::Result<()> {
+        self.value = input;
+        eros::bail!("replaced")
+    }
+
+    #[eros_macros::eager_context("async consuming {}", self.value)]
+    async fn consume_async(self) -> eros::Result<()> {
+        drop(self.value);
+        eros::bail!("async consumed")
+    }
+}
+
+#[test]
+fn test_eager_consuming_receiver() {
+    let receiver = EagerReceiver {
+        value: "original".into(),
+    };
+    let error = receiver.consume().unwrap_err();
+    assert_eq!(
+        error.contexts().next().unwrap().to_string(),
+        "consuming original"
+    );
+}
+
+#[tokio::test]
+async fn test_eager_async_mut_receiver_captures_input_state() {
+    let mut receiver = EagerReceiver {
+        value: "original".into(),
+    };
+    let future = receiver.replace("updated".into());
+    let error = future.await.unwrap_err();
+    assert_eq!(receiver.value, "updated");
+    assert_eq!(
+        error.contexts().next().unwrap().to_string(),
+        "before=original input=updated"
+    );
+}
+
+#[tokio::test]
+async fn test_eager_async_consuming_receiver() {
+    let receiver = EagerReceiver {
+        value: "original".into(),
+    };
+    let error = receiver.consume_async().await.unwrap_err();
+    assert_eq!(
+        error.contexts().next().unwrap().to_string(),
+        "async consuming original"
+    );
+}
+
+#[eros_macros::eager_context("static message")]
+fn eager_no_args() -> eros::Result<()> {
+    eros::bail!("failed")
+}
+
+#[test]
+fn test_eager_static_message() {
+    let error = eager_no_args().unwrap_err();
+    assert_eq!(
+        error.contexts().next().unwrap().to_string(),
+        "static message"
+    );
 }

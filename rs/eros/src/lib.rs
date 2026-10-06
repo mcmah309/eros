@@ -33,7 +33,7 @@ mod union_to_enum;
 mod user_context;
 
 // re-export macro
-pub use eros_macros::context;
+pub use eros_macros::{context, eager_context};
 
 // aliases
 pub type Result<T, E = AnyError> = core::result::Result<T, ErrorUnion<E>>;

@@ -334,6 +334,7 @@ To help with this, `eros` provides the `context` attribute macro. The macro wrap
 ```rust
 use eros::{Context, context};
 
+// Use #[eager_context(...)] to format owned parameters before the body runs, even on success.
 #[context("Failed to load server port from {}", path)]
 fn load_port(path: &str) -> eros::Result<u16> {
     let contents = std::fs::read_to_string(path)?;

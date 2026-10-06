@@ -110,19 +110,18 @@ struct ParamFmt {
     specifier: String,
 }
 
-/// If `expr` is of the form `<ident>.clone()` with no other method chaining,
-/// returns `Some(ident)`. Otherwise returns `None`.
-fn extract_clone_ident(expr: &Expr) -> Option<&syn::Ident> {
-    let Expr::MethodCall(mc) = expr else {
-        return None;
-    };
-    if mc.method != "clone" || !mc.args.is_empty() || mc.turbofish.is_some() {
-        return None;
+enum ContextMode {
+    Lazy,
+    Eager,
+}
+
+impl ContextMode {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Lazy => "context",
+            Self::Eager => "eager_context",
+        }
     }
-    let Expr::Path(path_expr) = mc.receiver.as_ref() else {
-        return None;
-    };
-    path_expr.path.get_ident()
 }
 
 /// Automatically wraps a function body with `eros` context.
@@ -136,29 +135,11 @@ fn extract_clone_ident(expr: &Expr) -> Option<&syn::Ident> {
 /// }
 /// ```
 ///
-/// ## Cloning owned values
-///
-/// When passing an owned value that would be moved into the function, use
-/// `.clone()` in the format args. The macro will clone the value before the
-/// inner call and use the original (un-cloned) expression inside
-/// `with_context`, avoiding borrow-checker conflicts.
-///
-/// ```rust,ignore
-/// #[context("Processing: {}", value.clone())]
-/// fn process(value: String) -> eros::Result<()> {
-///     // ...
-/// }
-/// ```
-///
-/// Expands to:
-///
-/// ```rust,ignore
-/// fn process(value: String) -> eros::Result<()> {
-///     let value_cloned = value.clone();
-///     __process_internal(value_cloned)
-///         .with_context(|| format!("Processing: {}", value))
-/// }
-/// ```
+/// Context expressions are evaluated only when the function returns an error
+/// and the `context` feature is enabled, after the function body has run.
+/// Expressions, including `.clone()` calls, are used as written. Use
+/// [`eager_context`] to format owned parameters before they are moved into
+/// the function body.
 ///
 /// ## Auto format string from parameter attributes
 ///
@@ -168,7 +149,7 @@ fn extract_clone_ident(expr: &Expr) -> Option<&syn::Ident> {
 ///
 /// ```rust,ignore
 /// #[context]
-/// fn process(#[fmt("{}")] name: &str, count: usize, #[fmt("{:?}")] flags: Flags) -> eros::Result<()> {
+/// fn process(#[fmt("{}")] name: &str, count: usize, #[fmt("{:?}")] flags: &Flags) -> eros::Result<()> {
 ///     // ...
 /// }
 /// ```
@@ -178,11 +159,11 @@ fn extract_clone_ident(expr: &Expr) -> Option<&syn::Ident> {
 /// ```rust,ignore
 /// #[doc(hidden)]
 /// #[track_caller]
-/// fn __process_internal(name: &str, count: usize, flags: Flags) -> eros::Result<()> {
+/// fn __process_internal(name: &str, count: usize, flags: &Flags) -> eros::Result<()> {
 ///     // ...
 /// }
 ///
-/// fn process(name: &str, count: usize, flags: Flags) -> eros::Result<()> {
+/// fn process(name: &str, count: usize, flags: &Flags) -> eros::Result<()> {
 ///     use eros::Context as _;
 ///     __process_internal(name, count, flags)
 ///         .with_context(|| format!("name: {}\nflags: {:?}\n", name, flags))
@@ -196,16 +177,50 @@ fn extract_clone_ident(expr: &Expr) -> Option<&syn::Ident> {
 /// always refers to the real receiver — no aliasing required.
 #[proc_macro_attribute]
 pub fn context(attr: TokenStream, item: TokenStream) -> TokenStream {
+    context_impl(attr, item, ContextMode::Lazy)
+}
+
+/// Formats context before running a function body and attaches it to any
+/// returned error.
+///
+/// Unlike [`context`], this macro evaluates the format arguments and builds
+/// the message on every call, including successful calls and calls with the
+/// `context` feature disabled. Parameters are then passed into the body
+/// unchanged, so owned values do not need to implement `Clone`.
+///
+/// ```
+/// use eros::eager_context;
+///
+/// #[eager_context("Processing: {}", value)]
+/// fn process(value: String) -> eros::Result<()> {
+///     drop(value);
+///     eros::bail!("processing failed")
+/// }
+///
+/// let error = process("input".to_owned()).unwrap_err();
+/// assert_eq!(error.inner().to_string(), "processing failed");
+/// ```
+///
+/// With no format string, use `#[fmt("...")]` parameter attributes as with
+/// [`context`]. Both forms support async functions and `self`, `&self`, and
+/// `&mut self` receivers. Async functions format the message when the future
+/// is polled, before the body runs.
+#[proc_macro_attribute]
+pub fn eager_context(attr: TokenStream, item: TokenStream) -> TokenStream {
+    context_impl(attr, item, ContextMode::Eager)
+}
+
+fn context_impl(attr: TokenStream, item: TokenStream, mode: ContextMode) -> TokenStream {
     let args = parse_macro_input!(attr as ContextArgs);
     let func = parse_macro_input!(item as ItemFn);
 
-    match expand_context(args, func) {
+    match expand_context(args, func, mode) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
 
-fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> {
+fn expand_context(args: ContextArgs, func: ItemFn, mode: ContextMode) -> syn::Result<TokenStream2> {
     let is_async = func.sig.asyncness.is_some();
     let outer_name = &func.sig.ident;
     let inner_name = syn::Ident::new(&format!("__{}_internal", outer_name), outer_name.span());
@@ -277,61 +292,27 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
         });
     }
 
-    struct CloneBinding {
-        /// `ident_cloned` — the name of the pre-cloned local.
-        clone_ident: syn::Ident,
-        /// The original `ident.clone()` expression, used to initialise the
-        /// binding and to replace the format-arg in `with_context`.
-        clone_expr: Expr,
-        /// The bare `ident`, used as the call argument to the inner function.
-        bare_ident: syn::Ident,
-    }
-
-    let (clone_bindings, format_call): (Vec<CloneBinding>, TokenStream2) = match args {
+    let format_call = match args {
         ContextArgs::Explicit {
             format_str,
             format_args,
         } => {
-            let mut bindings: Vec<CloneBinding> = Vec::new();
-
-            // Rewritten args for the `format!` inside `with_context` — clones
-            // are stripped back to bare idents.
-            let context_args: Vec<Expr> = format_args
-                .iter()
-                .map(|expr| {
-                    if let Some(ident) = extract_clone_ident(expr) {
-                        let clone_ident =
-                            syn::Ident::new(&format!("{}_cloned", ident), ident.span());
-                        // Only push once per unique ident.
-                        if !bindings.iter().any(|b| b.bare_ident == *ident) {
-                            bindings.push(CloneBinding {
-                                clone_ident: clone_ident.clone(),
-                                clone_expr: expr.clone(),
-                                bare_ident: ident.clone(),
-                            });
-                        }
-                        syn::parse_quote!(#ident)
-                    } else {
-                        expr.clone()
-                    }
-                })
-                .collect();
-
-            let fmt_call = if context_args.is_empty() {
+            if format_args.is_empty() {
                 quote! { eros::__private::format!(#format_str) }
             } else {
-                quote! { eros::__private::format!(#format_str, #(#context_args),*) }
-            };
-
-            (bindings, fmt_call)
+                quote! { eros::__private::format!(#format_str, #format_args) }
+            }
         }
 
         ContextArgs::Auto => {
             if annotated.is_empty() {
                 return Err(syn::Error::new_spanned(
                     &func.sig.ident,
-                    "`#[context]` with no format string requires at least one parameter \
-                     annotated with `#[fmt(\"...\")]`",
+                    format!(
+                        "`#[{}]` with no format string requires at least one parameter \
+                         annotated with `#[fmt(\"...\")]`",
+                        mode.name(),
+                    ),
                 ));
             }
 
@@ -345,7 +326,7 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
             }
 
             let fmt_lit = syn::LitStr::new(&fmt_str, proc_macro2::Span::call_site());
-            (vec![], quote! { eros::__private::format!(#fmt_lit, #(#arg_idents),*) })
+            quote! { eros::__private::format!(#fmt_lit, #(#arg_idents),*) }
         }
     };
 
@@ -363,14 +344,6 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
         .filter_map(|arg| match arg {
             syn::FnArg::Typed(pat_type) => {
                 let pat = &pat_type.pat;
-                if let syn::Pat::Ident(pat_ident) = pat.as_ref()
-                    && let Some(binding) = clone_bindings
-                        .iter()
-                        .find(|b| b.bare_ident == pat_ident.ident)
-                {
-                    let ci = &binding.clone_ident;
-                    return Some(quote! { #ci });
-                }
                 Some(quote! { #pat })
             }
             syn::FnArg::Receiver(_) => None,
@@ -389,14 +362,16 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
         raw_call
     };
 
-    let clone_let_stmts: Vec<TokenStream2> = clone_bindings
-        .iter()
-        .map(|b| {
-            let ci = &b.clone_ident;
-            let ce = &b.clone_expr;
-            quote! { let #ci = #ce; }
-        })
-        .collect();
+    let context_call = match mode {
+        ContextMode::Lazy => quote! { #awaited_call.with_context(|| #format_call) },
+        ContextMode::Eager => {
+            let message = syn::Ident::new("__eros_context", proc_macro2::Span::mixed_site());
+            quote! {
+                let #message = #format_call;
+                #awaited_call.context(#message)
+            }
+        }
+    };
 
     Ok(quote! {
         #[doc(hidden)]
@@ -406,8 +381,7 @@ fn expand_context(args: ContextArgs, func: ItemFn) -> syn::Result<TokenStream2> 
         #(#attrs)*
         #vis #sig {
             use eros::Context as _;
-            #(#clone_let_stmts)*
-            #awaited_call.with_context(|| #format_call)
+            #context_call
         }
     })
 }
