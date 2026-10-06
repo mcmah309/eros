@@ -2,7 +2,7 @@
 name = "eros"
 version = "0.8.0"
 edition = "2024"
-description = "Error handling that is precise, no boilerplate, ergonomic, context aware, and performant."
+description = "Ergonomic error handling with typed or untyped errors, context, and no enum boilerplate."
 license = "Apache-2.0"
 repository = "https://github.com/mcmah309/eros"
 categories = ["rust-patterns", "no-std"]
