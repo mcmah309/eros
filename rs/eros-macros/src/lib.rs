@@ -11,98 +11,71 @@ use syn::{
 
 mod error_enum;
 
-/// Keeps a tuple alias and generates a named error enum with union conversions.
+/// Keeps a tuple alias and generates the explicitly named owned error enum.
 ///
 /// ```rust
 /// use std::fmt;
-/// #[eros_macros::error_enum("operation failed: {0}")]
+/// #[eros_macros::error_enum(AppFailure, "operation failed: {0}")]
 /// #[non_exhaustive]
-/// type Name = (std::io::Error, fmt::Error);
+/// type AppErrors = (std::io::Error, fmt::Error);
 ///
-/// let union: eros::ErrorUnion<Name> = eros::ErrorUnion::new(fmt::Error);
-/// let error = NameError::from(union);
-/// assert!(matches!(error, NameError::FmtError(_)));
-/// assert_eq!(error.to_string(), "operation failed: an error occurred when formatting an argument");
+/// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(fmt::Error);
+/// match union.into() {
+///     AppFailure::StdIoError(error) => eprintln!("I/O error: {error}"),
+///     AppFailure::FmtError(error) => assert_eq!(error, fmt::Error),
+/// }
 /// ```
 ///
-/// Pass an identifier to override the generated enum name:
-///
-/// ```rust
-/// #[eros_macros::error_enum(PublicError)]
-/// type Internal = (std::fmt::Error,);
-/// let union: eros::ErrorUnion<Internal> = eros::ErrorUnion::new(std::fmt::Error);
-/// let error = PublicError::from(union);
-/// assert_eq!(error.to_string(), std::fmt::Error.to_string());
-/// ```
-///
-/// A custom name can also be followed by a display format string:
-/// `#[error_enum(PublicError, "operation failed: {0}")]`.
+/// The name is required and used exactly as written. An optional display format
+/// follows it: `#[error_enum(AppFailure, "operation failed: {0}")]`. Without a
+/// format, `Display` delegates to the contained error, preserving formatter flags.
+/// `{0}` or `{}` formats the contained error; fixed strings and escaped braces
+/// also work. `Debug`, `Display`, and `core::error::Error` are implemented
+/// automatically, and `Error::source()` returns the contained error.
 ///
 /// The alias must be a nongeneric tuple of 1–26 path types. Variant names join
-/// the path segments in PascalCase (ignoring generic arguments). This attribute
-/// generates only `NameError` with concrete payloads. Add [`error_enum_ref`] for
-/// `NameErrorRef<'a>` with shared references, or [`error_enum_mut`] for
-/// `NameErrorMut<'a>` with mutable references. Convert with
-/// `NameError::from(union_of)`, `NameErrorRef::from(&union_of)`, or
-/// `NameErrorMut::from(&mut union_of)`. Custom names use the same `Ref`/`Mut` suffixes.
-/// With no arguments (`#[error_enum]` or `#[error_enum()]`), `Display` delegates
-/// directly to the contained error, preserving the formatter's flags. An
-/// optional format string can customize the message: `{0}` (or `{}`) formats
-/// the contained error. Fixed strings and escaped braces also work. `Debug`,
-/// `Display`, and `core::error::Error` are implemented automatically, with the contained error
-/// returned by `Error::source`, including for borrowed enums.
-/// Attributes below this macro apply to the owned enum until the next enum marker.
-/// Rust evaluates `cfg` and `cfg_attr` before macro expansion, so disabling
-/// conditions anywhere in the declaration remove the alias and all requested enums.
-///
-/// Use [`error_enum_ref`] and [`error_enum_mut`] to generate the shared or mutable
-/// enum and direct the following annotations to it. Each marker takes annotations until the next
-/// enum marker or the tuple alias:
+/// path segments in PascalCase, ignoring generic arguments. Attributes below
+/// each macro apply to its enum until the next enum macro or the alias.
+/// [`error_enum_ref`] and [`error_enum_mut`] accept the same name and optional
+/// display arguments, work independently, and can be stacked in any order:
 ///
 /// ```rust
-/// #[eros_macros::error_enum]
+/// #[eros_macros::error_enum_mut(MutableFailure)]
 /// #[non_exhaustive]
-/// #[eros_macros::error_enum_ref]
+/// #[eros_macros::error_enum(OwnedFailure)]
+/// #[non_exhaustive]
+/// #[eros_macros::error_enum_ref(SharedFailure)]
 /// #[derive(Clone, Copy)]
-/// #[non_exhaustive]
-/// #[eros_macros::error_enum_mut]
-/// #[non_exhaustive]
-/// type Name = (std::io::Error, std::fmt::Error);
+/// type AppErrors = (std::fmt::Error,);
 ///
-/// let mut union_of: eros::ErrorUnion<Name> = eros::ErrorUnion::new(std::fmt::Error);
-/// let shared = NameErrorRef::from(&union_of);
-/// let shared_copy = shared;
-/// assert!(matches!(shared, NameErrorRef::StdFmtError(_)));
-/// assert!(matches!(shared_copy, NameErrorRef::StdFmtError(_)));
-/// let mutable = NameErrorMut::from(&mut union_of);
-/// assert!(matches!(mutable, NameErrorMut::StdFmtError(_)));
+/// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
+/// let shared: SharedFailure<'_> = (&union).into();
+/// let _copy = shared;
+/// let _shared_again = shared;
+/// let _mutable: MutableFailure<'_> = (&mut union).into();
+/// let _owned: OwnedFailure = union.into();
 /// ```
 ///
-/// Each marker works on its own and may appear at most once, in any order.
-/// Only the requested enums and conversions are generated. Set the name and display
-/// on `error_enum`; the borrowed markers take no arguments. Without `error_enum`,
-/// borrowed names use the tuple alias followed by `ErrorRef` or `ErrorMut`, and
-/// `Display` delegates to the contained error. Automatic `Debug`, `Display`, and
-/// `Error` implementations apply to every requested enum.
+/// Only explicitly requested enums and conversions are generated. Use
+/// [`error_enums`] to generate all three with shared attributes and formatting.
+/// Rust evaluates `cfg` and `cfg_attr` before macro expansion, so disabling
+/// conditions anywhere in the declaration remove the alias and its enums.
 #[proc_macro_attribute]
 pub fn error_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_error_enum(error_enum::EnumKind::Owned, attr, item)
 }
 
-/// Keeps a tuple alias and generates its shared error enum and union conversion.
-/// Subsequent annotations apply to that enum, stopping at the next enum marker
-/// or the tuple alias.
-///
-/// This marker takes no arguments and works on its own or alongside [`error_enum`]
-/// and [`error_enum_mut`] in any order. See [`error_enum`] for a stacked example.
+/// Keeps a tuple alias and generates the explicitly named shared error enum.
+/// Accepts the same arguments as [`error_enum`]; subsequent attributes apply to
+/// this enum until the next enum macro or the alias.
 ///
 /// ```rust
-/// #[eros_macros::error_enum_ref]
+/// #[eros_macros::error_enum_ref(SharedFailure, "shared: {0}")]
 /// #[derive(Clone, Copy)]
-/// type Name = (std::fmt::Error,);
-/// let union: eros::ErrorUnion<Name> = eros::ErrorUnion::new(std::fmt::Error);
+/// type AppErrors = (std::fmt::Error,);
+/// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
 /// match (&union).into() {
-///     NameErrorRef::StdFmtError(error) => assert_eq!(error, &std::fmt::Error),
+///     SharedFailure::StdFmtError(error) => assert_eq!(error, &std::fmt::Error),
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -110,24 +83,45 @@ pub fn error_enum_ref(attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_error_enum(error_enum::EnumKind::Ref, attr, item)
 }
 
-/// Keeps a tuple alias and generates its mutable error enum and union conversion.
-/// Subsequent annotations apply to that enum, stopping at the next enum marker
-/// or the tuple alias.
-///
-/// This marker takes no arguments and works on its own or alongside [`error_enum`]
-/// and [`error_enum_ref`] in any order. See [`error_enum`] for a stacked example.
+/// Keeps a tuple alias and generates the explicitly named mutable error enum.
+/// Accepts the same arguments as [`error_enum`]; subsequent attributes apply to
+/// this enum until the next enum macro or the alias.
 ///
 /// ```rust
-/// #[eros_macros::error_enum_mut]
-/// type Name = (std::fmt::Error,);
-/// let mut union: eros::ErrorUnion<Name> = eros::ErrorUnion::new(std::fmt::Error);
+/// #[eros_macros::error_enum_mut(MutableFailure, "mutable: {0}")]
+/// type AppErrors = (std::fmt::Error,);
+/// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
 /// match (&mut union).into() {
-///     NameErrorMut::StdFmtError(error) => *error = std::fmt::Error,
+///     MutableFailure::StdFmtError(error) => *error = std::fmt::Error,
 /// }
 /// ```
 #[proc_macro_attribute]
 pub fn error_enum_mut(attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_error_enum(error_enum::EnumKind::Mut, attr, item)
+}
+
+/// Keeps a tuple alias and generates owned, shared, and mutable error enums.
+///
+/// The required name is used for the owned enum; `Ref` and `Mut` are appended
+/// for the borrowed enums. An optional display format applies to all three.
+/// Every attribute below this macro is placed on each generated enum. Use the
+/// individual macros when names, formatting, or annotations need to differ.
+/// This shorthand cannot be combined with the individual enum macros on one alias.
+///
+/// ```rust
+/// #[eros_macros::error_enums(AppFailure, "operation failed: {0}")]
+/// #[non_exhaustive]
+/// #[derive(PartialEq, Eq)]
+/// type AppErrors = (std::fmt::Error,);
+/// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
+/// let shared: AppFailureRef<'_> = (&union).into();
+/// assert_eq!(shared, AppFailureRef::StdFmtError(&std::fmt::Error));
+/// let _mutable: AppFailureMut<'_> = (&mut union).into();
+/// let _owned: AppFailure = union.into();
+/// ```
+#[proc_macro_attribute]
+pub fn error_enums(attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_error_enum(error_enum::EnumKind::All, attr, item)
 }
 
 fn expand_error_enum(

@@ -1,6 +1,6 @@
 use std::fmt::Error;
 
-#[eros::error_enum("{0}")]
+#[eros::error_enum(InvalidError, "{0}")]
 type Invalid = (
     Error,
     Error,

@@ -1,7 +1,7 @@
-#[eros::error_enum]
+#[eros::error_enum(BareError)]
 type Bare = (std::fmt::Error,);
 
-#[eros::error_enum()]
+#[eros::error_enum(EmptyError)]
 type Empty = (std::fmt::Error,);
 
 fn main() {

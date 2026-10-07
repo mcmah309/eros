@@ -22,7 +22,7 @@ note: required by a bound in `ErrorUnion`
    | pub struct ErrorUnion<E: TypeSet = AnyError> {
    |                          ^^^^^^^ required by this bound in `ErrorUnion`
 
-warning: use of deprecated method `eros::ErrorUnion::<E>::into_enum`: use #[eros::error_enum] and convert with EnumName::from(union_of)
+warning: use of deprecated method `eros::ErrorUnion::<E>::into_enum`: use #[eros::error_enum(EnumName)] and convert with EnumName::from(union_of)
  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:4:11
   |
 4 |     error.into_enum()
@@ -45,7 +45,7 @@ note: required by a bound in `ErrorUnion::<E>::into_enum`
   |         E::Enum: From<Self>,
   |                  ^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::into_enum`
 
-warning: use of deprecated method `eros::ErrorUnion::<E>::as_enum`: use #[eros::error_enum] and convert with EnumName::from(&union_of)
+warning: use of deprecated method `eros::ErrorUnion::<E>::as_enum`: use #[eros::error_enum_ref(EnumName)] and convert with EnumName::from(&union_of)
  --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:8:11
   |
 8 |     error.as_enum()
@@ -66,7 +66,7 @@ note: required by a bound in `ErrorUnion::<E>::as_enum`
   |         E::RefEnum<'a>: From<&'a Self>,
   |                         ^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::as_enum`
 
-warning: use of deprecated method `eros::ErrorUnion::<E>::as_mut_enum`: use #[eros::error_enum] and convert with EnumName::from(&mut union_of)
+warning: use of deprecated method `eros::ErrorUnion::<E>::as_mut_enum`: use #[eros::error_enum_mut(EnumName)] and convert with EnumName::from(&mut union_of)
   --> tests/trybuild/any_error_cannot_be_extracted_as_marker.rs:12:11
    |
 12 |     error.as_mut_enum()

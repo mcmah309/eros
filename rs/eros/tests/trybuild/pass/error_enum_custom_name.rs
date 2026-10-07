@@ -4,8 +4,8 @@ extern crate eros;
 
 #[eros::error_enum(CustomError)]
 #[non_exhaustive]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enum_ref(CustomErrorRef)]
+#[eros::error_enum_mut(CustomErrorMut)]
 pub type DefaultDisplay = (::core::fmt::Error, eros::MsgError);
 
 #[eros::error_enum(FormattedError, "operation failed: {0}")]

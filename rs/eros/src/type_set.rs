@@ -621,132 +621,132 @@ impl<A> From<A> for E1<A> {
 }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E1<A> { A(A) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E2<A, B> { A(A), B(B) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E3<A, B, C> { A(A), B(B), C(C) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E4<A, B, C, D> { A(A), B(B), C(C), D(D) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E5<A, B, C, D, E> { A(A), B(B), C(C), D(D), E(E) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E6<A, B, C, D, E, F> { A(A), B(B), C(C), D(D), E(E), F(F) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E7<A, B, C, D, E, F, G> { A(A), B(B), C(C), D(D), E(E), F(F), G(G) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E8<A, B, C, D, E, F, G, H> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E9<A, B, C, D, E, F, G, H, I> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E10<A, B, C, D, E, F, G, H, I, J> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E11<A, B, C, D, E, F, G, H, I, J, K> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E12<A, B, C, D, E, F, G, H, I, J, K, L> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E13<A, B, C, D, E, F, G, H, I, J, K, L, M> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E14<A, B, C, D, E, F, G, H, I, J, K, L, M, N> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E15<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E17<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E19<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E21<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E23<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E24<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E25<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X), Y(Y) }
 
 #[eros_macros::__error_enum]
-#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(\"...\")] on a tuple alias for a named enum")]
+#[deprecated(since = "0.8.1", note = "use #[eros::error_enum(EnumName)] on a tuple alias for a named enum")]
 #[rustfmt::skip]
 pub enum E26<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> { A(A), B(B), C(C), D(D), E(E), F(F), G(G), H(H), I(I), J(J), K(K), L(L), M(M), N(N), O(O), P(P), Q(Q), R(R), S(S), T(T), U(U), V(V), W(W), X(X), Y(Y), Z(Z) }
 

@@ -2,12 +2,12 @@
 
 extern crate eros;
 
-#[eros::error_enum("{0}")]
+#[eros::error_enum(NamedError, "{0}")]
 #[non_exhaustive]
-#[eros::error_enum_ref]
+#[eros::error_enum_ref(NamedErrorRef, "{0}")]
 #[derive(::core::clone::Clone, ::core::marker::Copy)]
 #[doc = "Shared view"]
-#[eros::error_enum_mut]
+#[eros::error_enum_mut(NamedErrorMut, "{0}")]
 #[non_exhaustive]
 #[doc = "Mutable view"]
 pub type Named = (::core::fmt::Error, eros::MsgError);

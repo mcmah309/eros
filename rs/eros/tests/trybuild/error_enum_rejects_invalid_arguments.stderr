@@ -10,11 +10,11 @@ error: expected `,`
 4 | #[eros::error_enum(CustomError "message")]
   |                                ^^^^^^^^^
 
-error: unexpected token
- --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:7:31
+error: expected identifier
+ --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:7:20
   |
 7 | #[eros::error_enum("message", CustomError)]
-  |                               ^^^^^^^^^^^
+  |                    ^^^^^^^^^
 
 error: unexpected token
   --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:10:44

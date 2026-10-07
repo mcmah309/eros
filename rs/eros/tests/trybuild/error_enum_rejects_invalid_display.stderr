@@ -1,18 +1,18 @@
 error: invalid reference to positional argument 1 (there is 1 argument)
- --> tests/trybuild/error_enum_rejects_invalid_display.rs:1:30
+ --> tests/trybuild/error_enum_rejects_invalid_display.rs:1:44
   |
-1 | #[eros::error_enum("invalid {1}")]
-  |                              ^
+1 | #[eros::error_enum(InvalidError, "invalid {1}")]
+  |                                            ^
   |
   = note: positional arguments are zero-based
 
 error: argument never used
  --> tests/trybuild/error_enum_rejects_invalid_display.rs:1:1
   |
-1 | #[eros::error_enum("invalid {1}")]
-  | ^^^^^^^^^^^^^^^^^^^-------------^^
-  | |                  |
-  | |                  formatting specifier missing
+1 | #[eros::error_enum(InvalidError, "invalid {1}")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-------------^^
+  | |                                |
+  | |                                formatting specifier missing
   | argument never used
   |
   = note: this error originates in the attribute macro `eros::error_enum` (in Nightly builds, run with -Z macro-backtrace for more info)

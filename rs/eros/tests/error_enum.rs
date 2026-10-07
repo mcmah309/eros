@@ -7,20 +7,16 @@ use std::{
     },
 };
 
-#[eros::error_enum("operation failed: {0}")]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enums(NameError, "operation failed: {0}")]
 pub type Name = (std::io::Error, fmt::Error);
 
 #[eros::error_enum(PublicError)]
 #[non_exhaustive]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enum_ref(PublicErrorRef)]
+#[eros::error_enum_mut(PublicErrorMut)]
 pub type Internal = (io::Error, fmt::Error);
 
-#[eros::error_enum(FormattedError, "operation failed: {0}")]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enums(FormattedError, "operation failed: {0}")]
 type InternalFormatted = (io::Error, fmt::Error);
 
 #[test]
@@ -74,13 +70,11 @@ impl fmt::Display for FormatAwareError {
 
 impl std::error::Error for FormatAwareError {}
 
-#[eros::error_enum]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enums(DelegatedError)]
 type Delegated = (FormatAwareError, fmt::Error);
 
-#[eros::error_enum()]
-type EmptyArgs = (FormatAwareError, fmt::Error);
+#[eros::error_enum(TrailingCommaError)]
+type TrailingComma = (FormatAwareError, fmt::Error);
 
 #[test]
 fn default_display_delegates_for_all_variants_and_preserves_formatting_flags() {
@@ -104,12 +98,12 @@ fn default_display_delegates_for_all_variants_and_preserves_formatting_flags() {
         assert_display(&owned, std::error::Error::source(&owned).unwrap());
     }
 
-    let errors: [ErrorUnion<EmptyArgs>; 2] = [
+    let errors: [ErrorUnion<TrailingComma>; 2] = [
         ErrorUnion::new(FormatAwareError),
         ErrorUnion::new(fmt::Error),
     ];
     for union in errors {
-        let owned: EmptyArgsError = union.into();
+        let owned: TrailingCommaError = union.into();
         assert_display(&owned, std::error::Error::source(&owned).unwrap());
     }
 }
@@ -202,7 +196,7 @@ fn automatic_error_traits_format_and_expose_each_contained_source() {
     }
 }
 
-#[eros::error_enum("{0}")]
+#[eros::error_enum(SingleError, "{0}")]
 type Single = (MsgError,);
 
 #[test]
@@ -216,7 +210,7 @@ fn singleton_preserves_owned_storage_and_tuple_alias() {
 
 type E0 = MsgError;
 
-#[eros::error_enum("{0}")]
+#[eros::error_enum(ShadowedError, "{0}")]
 type Shadowed = (E0, fmt::Error);
 
 #[test]
@@ -243,9 +237,7 @@ impl Drop for DropError {
     }
 }
 
-#[eros::error_enum("{0}")]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enums(TrackedError, "{0}")]
 type Tracked = (DropError, MsgError);
 
 #[test]
@@ -269,11 +261,11 @@ mod snake_case {
     pub use std::fmt::Error as r#type;
 }
 
-#[eros::error_enum("fixed {{message}}")]
+#[eros::error_enum(RawError, "fixed {{message}}")]
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-#[eros::error_enum_ref]
-#[eros::error_enum_mut]
+#[eros::error_enum_ref(RawErrorRef, "fixed {{message}}")]
+#[eros::error_enum_mut(RawErrorMut, "fixed {{message}}")]
 type Raw = (snake_case::r#type,);
 
 #[test]
@@ -290,24 +282,24 @@ fn names_handle_snake_case_and_raw_identifiers() {
     assert_eq!(error, error.clone());
 }
 
-#[eros::error_enum("{0}")]
+#[eros::error_enum(DisabledAliasError, "{0}")]
 #[cfg_attr(all(), cfg(any()), derive(Clone))]
 type DisabledAlias = (fmt::Error,);
 
 #[eros::error_enum(ScopedError)]
-#[eros::error_enum_ref]
+#[eros::error_enum_ref(ScopedErrorRef)]
 #[derive(Clone, Copy)]
 #[non_exhaustive]
 #[doc = "Shared error view"]
-#[eros::error_enum_mut]
+#[eros::error_enum_mut(ScopedErrorMut)]
 #[non_exhaustive]
 type Scoped = (io::Error, fmt::Error);
 
-#[eros::error_enum]
-#[eros::error_enum_mut]
+#[eros::error_enum(ComparableError)]
+#[eros::error_enum_mut(ComparableErrorMut)]
 #[derive(PartialEq, Eq)]
 #[doc = "Mutable error view"]
-#[eros::error_enum_ref]
+#[eros::error_enum_ref(ComparableErrorRef)]
 #[cfg_attr(all(), derive(Clone, Copy))]
 type Comparable = (fmt::Error,);
 
@@ -332,16 +324,16 @@ fn annotations_apply_to_the_selected_borrowed_enum() {
     );
 }
 
-#[eros::error_enum_ref]
+#[eros::error_enum_ref(SharedFirstErrorRef, "shared-first: {0}")]
 #[derive(Clone, Copy)]
 #[eros::error_enum(SharedFirstError, "shared-first: {0}")]
-#[eros::error_enum_mut]
+#[eros::error_enum_mut(SharedFirstErrorMut, "shared-first: {0}")]
 #[derive(PartialEq, Eq)]
 type SharedFirst = (fmt::Error,);
 
-#[eros::error_enum_mut]
+#[eros::error_enum_mut(MutableFirstErrorMut, "mutable-first: {0}")]
 #[derive(PartialEq, Eq)]
-#[eros::error_enum_ref]
+#[eros::error_enum_ref(MutableFirstErrorRef, "mutable-first: {0}")]
 #[derive(Clone, Copy)]
 #[eros::error_enum(MutableFirstError, "mutable-first: {0}")]
 type MutableFirst = (fmt::Error,);
@@ -376,9 +368,7 @@ fn borrowed_markers_can_appear_before_the_owned_marker() {
 }
 
 mod exported {
-    #[eros::error_enum("{0}")]
-    #[eros::error_enum_ref]
-    #[eros::error_enum_mut]
+    #[eros::error_enums(PublicError, "{0}")]
     pub type Public = (core::fmt::Error,);
 }
 

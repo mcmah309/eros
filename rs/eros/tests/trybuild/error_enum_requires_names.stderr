@@ -1,0 +1,63 @@
+error: unexpected end of input, expected an enum name
+ --> tests/trybuild/error_enum_requires_names.rs:1:1
+  |
+1 | #[eros::error_enum]
+  | ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `eros::error_enum` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+ --> tests/trybuild/error_enum_requires_names.rs:4:1
+  |
+4 | #[eros::error_enum_ref]
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `eros::error_enum_ref` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+ --> tests/trybuild/error_enum_requires_names.rs:7:1
+  |
+7 | #[eros::error_enum_mut]
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `eros::error_enum_mut` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+  --> tests/trybuild/error_enum_requires_names.rs:10:1
+   |
+10 | #[eros::error_enums]
+   | ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+  --> tests/trybuild/error_enum_requires_names.rs:13:1
+   |
+13 | #[eros::error_enum()]
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `eros::error_enum` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+  --> tests/trybuild/error_enum_requires_names.rs:16:1
+   |
+16 | #[eros::error_enum_ref()]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `eros::error_enum_ref` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+  --> tests/trybuild/error_enum_requires_names.rs:19:1
+   |
+19 | #[eros::error_enum_mut()]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `eros::error_enum_mut` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected end of input, expected an enum name
+  --> tests/trybuild/error_enum_requires_names.rs:22:1
+   |
+22 | #[eros::error_enums()]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
