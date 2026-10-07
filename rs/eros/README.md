@@ -401,6 +401,34 @@ format!(
 
 Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
 
+## Error Enum Macro
+
+`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error`, `<Alias>ErrorRef<'a>`, and `<Alias>ErrorMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations:
+
+```rust
+use eros::ErrorUnion;
+use std::{fmt, io};
+
+#[eros::error_enum]
+pub type App = (io::Error, fmt::Error);
+
+let mut union_of: ErrorUnion<App> = ErrorUnion::new(fmt::Error);
+let shared = AppErrorRef::from(&union_of);
+assert!(matches!(shared, AppErrorRef::FmtError(_)));
+let mutable = AppErrorMut::from(&mut union_of);
+assert!(matches!(mutable, AppErrorMut::FmtError(_)));
+let error = AppError::from(union_of);
+assert!(matches!(error, AppError::FmtError(_)));
+```
+
+Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Customize the name, display, or both:
+
+- Custom name: `#[eros::error_enum(CustomError)]`
+- Custom display: `#[eros::error_enum("operation failed: {0}")]`
+- Both: `#[eros::error_enum(CustomError, "operation failed: {0}")]`
+
+`{0}` formats the contained error.
+
 ## Best Practices
 
 ### Use In Libraries
@@ -464,49 +492,18 @@ pub fn public_api() -> Result<(), CrateError> {
 
 This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the existing allocation (no-op) so there is no cost to use `eros` in a library for any downstreams.
 
-This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `into_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
+For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
 <details>
 
 <summary>Example Implementation</summary>
 
 ```rust
-use eros::{E2, ErrorUnion, IntoUnion};
+use eros::IntoUnion;
 use std::{fmt, io};
 
-#[derive(Debug)]
-pub enum CrateError {
-    Io(io::Error),
-    Format(fmt::Error),
-}
-
-impl std::fmt::Display for CrateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CrateError::Io(e) => write!(f, "{}", e),
-            CrateError::Format(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-impl std::error::Error for CrateError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            CrateError::Io(e) => e.source(),
-            CrateError::Format(e) => e.source(),
-        }
-    }
-}
-
-impl From<ErrorUnion<(io::Error, fmt::Error)>> for CrateError {
-    fn from(error: ErrorUnion<(io::Error, fmt::Error)>) -> Self {
-        // `into_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
-        match error.into_enum() {
-            E2::A(e) => CrateError::Io(e),
-            E2::B(e) => CrateError::Format(e),
-        }
-    }
-}
+#[eros::error_enum("crate operation failed: {0}")]
+pub type Crate = (io::Error, fmt::Error);
 
 fn regular_typed_result1() -> Result<(), io::Error> {
     Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"))
@@ -516,7 +513,7 @@ fn regular_typed_result2() -> Result<(), fmt::Error> {
     Err(fmt::Error)
 }
 
-fn internal_api() -> eros::Result<(), (io::Error, fmt::Error)> {
+fn internal_api() -> eros::Result<(), Crate> {
     regular_typed_result1().union()?;
     regular_typed_result2().union()?;
     Ok(())
@@ -529,8 +526,8 @@ pub fn public_api() -> Result<(), CrateError> {
 fn main() {
     match public_api() {
         Ok(()) => println!("Success!"),
-        Err(CrateError::Io(e)) => println!("IO error: {}", e),
-        Err(CrateError::Format(e)) => println!("Format error: {}", e),
+        Err(CrateError::IoError(e)) => println!("IO error: {}", e),
+        Err(CrateError::FmtError(e)) => println!("Format error: {}", e),
     }
 }
 ```
