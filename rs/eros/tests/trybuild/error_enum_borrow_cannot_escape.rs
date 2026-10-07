@@ -1,4 +1,6 @@
 #[eros::error_enum]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 type Local = (std::fmt::Error,);
 
 fn shared() -> LocalErrorRef<'static> {

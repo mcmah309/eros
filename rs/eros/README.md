@@ -638,7 +638,7 @@ Other backtrace examples in this README use `[N frames hidden for brevity]` to m
 
 ### Error Enum Macro
 
-`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error`, `<Alias>ErrorRef<'a>`, and `<Alias>ErrorMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations. This is useful if you need to operate on multiple specific branches of the error, or want to expose the error to an outside api without exposing `ErrorUnion` (see [here](#approach-b-replacing-errorunion-with-concrete-crate-errors)).
+`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error` with named variants and automatic `Debug`, `Display`, and `Error` implementations. This is useful if you need to operate on multiple specific branches of the error, or want to expose the error to an outside api without exposing `ErrorUnion` (see [here](#approach-b-replacing-errorunion-with-concrete-crate-errors)).
 
 ```rust
 use eros::ErrorUnion;
@@ -654,7 +654,11 @@ match union_of.into() {
 }
 ```
 
-Here the variants are `IoError` and `FmtError`. To borrow instead, convert `&union_of` into `AppErrorRef` or `&mut union_of` into `AppErrorMut`. `Display` delegates to the contained error, and `Error::source()` returns it. Customize the name, display, or both:
+Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it.
+
+Use `#[eros::error_enum_ref]` or `#[eros::error_enum_mut]` for borrowed enums; each attribute works independently or stacked in any order and generates only its own enum and conversion.
+
+Customize the name, display, or both:
 
 - Custom name: `#[eros::error_enum(CustomError)]`
 - Custom display: `#[eros::error_enum("operation failed: {0}")]`

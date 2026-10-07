@@ -16,20 +16,20 @@ error: borrowed enum markers take no arguments; place annotations below the mark
 10 | #[eros::error_enum_mut(non_exhaustive)]
    |                        ^^^^^^^^^^^^^^
 
-error: borrowed enum markers require #[eros::error_enum] on the same tuple alias
-  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:14:6
+error: error_enum_ref must appear only once on a tuple alias
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:14:1
    |
-14 | type MissingOwned = (std::fmt::Error,);
-   |      ^^^^^^^^^^^^
+14 | #[eros::error_enum_ref]
+   | ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: borrowed enum markers require #[eros::error_enum] on the same tuple alias
-  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:17:6
+error: error_enum_mut must appear only once on a tuple alias
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:18:1
    |
-17 | type MissingOwnedMut = (std::fmt::Error,);
-   |      ^^^^^^^^^^^^^^^
+18 | #[eros::error_enum_mut]
+   | ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: error_enum must appear only once on a tuple alias
-  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:20:1
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:22:1
    |
-20 | #[eros::error_enum]
+22 | #[eros::error_enum]
    | ^^^^^^^^^^^^^^^^^^^

@@ -42,6 +42,22 @@ pub(crate) enum EnumKind {
 }
 
 impl EnumKind {
+    fn index(self) -> usize {
+        match self {
+            Self::Owned => 0,
+            Self::Ref => 1,
+            Self::Mut => 2,
+        }
+    }
+
+    fn marker(self) -> &'static str {
+        match self {
+            Self::Owned => "error_enum",
+            Self::Ref => "error_enum_ref",
+            Self::Mut => "error_enum_mut",
+        }
+    }
+
     fn from_path(path: &syn::Path) -> Option<Self> {
         match path.segments.last()?.ident.to_string().as_str() {
             "error_enum" => Some(Self::Owned),
@@ -67,6 +83,7 @@ impl EnumKind {
 
 #[derive(Default)]
 struct EnumAnnotations {
+    present: [bool; 3],
     owned: Vec<Attribute>,
     shared: Vec<Attribute>,
     mutable: Vec<Attribute>,
@@ -80,8 +97,19 @@ fn collect_annotations(
     let args = kind.parse_args(tokens)?;
     let mut owned_args = matches!(kind, EnumKind::Owned).then_some(args);
     let mut annotations = EnumAnnotations::default();
+    annotations.present[kind.index()] = true;
     for attr in std::mem::take(&mut alias.attrs) {
         if let Some(next_kind) = EnumKind::from_path(attr.path()) {
+            if annotations.present[next_kind.index()] {
+                return Err(syn::Error::new_spanned(
+                    attr,
+                    format!(
+                        "{} must appear only once on a tuple alias",
+                        next_kind.marker()
+                    ),
+                ));
+            }
+            annotations.present[next_kind.index()] = true;
             let tokens = match &attr.meta {
                 Meta::Path(_) => TokenStream::new(),
                 Meta::List(list) => list.tokens.clone(),
@@ -94,12 +122,6 @@ fn collect_annotations(
             };
             let args = next_kind.parse_args(tokens)?;
             if matches!(next_kind, EnumKind::Owned) {
-                if owned_args.is_some() {
-                    return Err(syn::Error::new_spanned(
-                        attr,
-                        "error_enum must appear only once on a tuple alias",
-                    ));
-                }
                 owned_args = Some(args);
             }
             kind = next_kind;
@@ -112,12 +134,7 @@ fn collect_annotations(
             .push(attr);
         }
     }
-    let args = owned_args.ok_or_else(|| {
-        syn::Error::new_spanned(
-            &alias.ident,
-            "borrowed enum markers require #[eros::error_enum] on the same tuple alias",
-        )
-    })?;
+    let args = owned_args.unwrap_or_default();
     Ok((args, annotations))
 }
 
@@ -198,13 +215,18 @@ pub(crate) fn expand_alias(
     let base_name = base_name.trim_start_matches("r#");
     let ref_name = format_ident!("{base_name}Ref", span = enum_name.span());
     let mut_name = format_ident!("{base_name}Mut", span = enum_name.span());
-    if [&enum_name, &ref_name, &mut_name].contains(&&alias.ident) {
+    if [&enum_name, &ref_name, &mut_name]
+        .into_iter()
+        .zip(annotations.present)
+        .any(|(name, present)| present && name == &alias.ident)
+    {
         return Err(syn::Error::new_spanned(
             &enum_name,
             "generated enum name must differ from the tuple alias name",
         ));
     }
     let EnumAnnotations {
+        present: [has_owned, has_ref, has_mut],
         owned: attrs,
         shared: ref_attrs,
         mutable: mut_attrs,
@@ -219,9 +241,9 @@ pub(crate) fn expand_alias(
     let crate_path = eros_path()?;
     let conversions = conversions(
         [
-            quote!(#enum_name),
-            quote!(#ref_name<'__eros_enum>),
-            quote!(#mut_name<'__eros_enum>),
+            has_owned.then(|| quote!(#enum_name)),
+            has_ref.then(|| quote!(#ref_name<'__eros_enum>)),
+            has_mut.then(|| quote!(#mut_name<'__eros_enum>)),
         ],
         &Generics::default(),
         &types,
@@ -229,51 +251,72 @@ pub(crate) fn expand_alias(
         &crate_path,
         [&gating, &ref_gating, &mut_gating],
     );
-    let owned_traits = error_traits(
-        &enum_name,
-        &Generics::default(),
-        &variants,
-        args.display.as_ref(),
-        &gating,
-        false,
-    );
+    let owned_traits = has_owned.then(|| {
+        error_traits(
+            &enum_name,
+            &Generics::default(),
+            &variants,
+            args.display.as_ref(),
+            &gating,
+            false,
+        )
+    });
     let borrow_generics = syn::parse_quote!(<'__eros_enum>);
-    let ref_traits = error_traits(
-        &ref_name,
-        &borrow_generics,
-        &variants,
-        args.display.as_ref(),
-        &ref_gating,
-        true,
-    );
-    let mut_traits = error_traits(
-        &mut_name,
-        &borrow_generics,
-        &variants,
-        args.display.as_ref(),
-        &mut_gating,
-        true,
-    );
+    let ref_traits = has_ref.then(|| {
+        error_traits(
+            &ref_name,
+            &borrow_generics,
+            &variants,
+            args.display.as_ref(),
+            &ref_gating,
+            true,
+        )
+    });
+    let mut_traits = has_mut.then(|| {
+        error_traits(
+            &mut_name,
+            &borrow_generics,
+            &variants,
+            args.display.as_ref(),
+            &mut_gating,
+            true,
+        )
+    });
 
+    let owned_enum = has_owned.then(|| {
+        quote! {
+            #(#attrs)*
+            #[derive(::core::fmt::Debug)]
+            #vis enum #enum_name {
+                #(#variants(#types)),*
+            }
+        }
+    });
+    let ref_enum = has_ref.then(|| {
+        quote! {
+            #(#gating)*
+            #(#ref_attrs)*
+            #[derive(::core::fmt::Debug)]
+            #vis enum #ref_name<'__eros_enum> {
+                #(#variants(&'__eros_enum #types)),*
+            }
+        }
+    });
+    let mut_enum = has_mut.then(|| {
+        quote! {
+            #(#gating)*
+            #(#mut_attrs)*
+            #[derive(::core::fmt::Debug)]
+            #vis enum #mut_name<'__eros_enum> {
+                #(#variants(&'__eros_enum mut #types)),*
+            }
+        }
+    });
     Ok(quote! {
         #alias
-        #(#attrs)*
-        #[derive(::core::fmt::Debug)]
-        #vis enum #enum_name {
-            #(#variants(#types)),*
-        }
-        #(#gating)*
-        #(#ref_attrs)*
-        #[derive(::core::fmt::Debug)]
-        #vis enum #ref_name<'__eros_enum> {
-            #(#variants(&'__eros_enum #types)),*
-        }
-        #(#gating)*
-        #(#mut_attrs)*
-        #[derive(::core::fmt::Debug)]
-        #vis enum #mut_name<'__eros_enum> {
-            #(#variants(&'__eros_enum mut #types)),*
-        }
+        #owned_enum
+        #ref_enum
+        #mut_enum
         #conversions
         #owned_traits
         #ref_traits
@@ -361,9 +404,9 @@ pub(crate) fn expand_numbered(item: ItemEnum) -> syn::Result<TokenStream> {
     let gating = gating_attrs(&item.attrs)?;
     let conversions = conversions(
         [
-            quote!(#name<#(#types),*>),
-            quote!(#name<#(&'__eros_enum #types),*>),
-            quote!(#name<#(&'__eros_enum mut #types),*>),
+            Some(quote!(#name<#(#types),*>)),
+            Some(quote!(#name<#(&'__eros_enum #types),*>)),
+            Some(quote!(#name<#(&'__eros_enum mut #types),*>)),
         ],
         &item.generics,
         &types,
@@ -431,7 +474,7 @@ fn gating_attrs(attrs: &[Attribute]) -> syn::Result<Vec<Attribute>> {
 }
 
 fn conversions(
-    targets: [TokenStream; 3],
+    targets: [Option<TokenStream>; 3],
     generics: &Generics,
     types: &[Type],
     variants: &[Ident],
@@ -481,31 +524,46 @@ fn conversions(
     let owned = dispatch(format_ident!("downcast_error_unchecked"));
     let shared = dispatch(format_ident!("downcast_error_ref_unchecked"));
     let mutable = dispatch(format_ident!("downcast_error_mut_unchecked"));
+    let owned_conversion = owned_enum.map(|owned_enum| {
+        quote! {
+            #(#owned_gating)*
+            impl #impl_generics ::core::convert::From<#union_type> for #owned_enum #where_clause {
+                #[inline]
+                fn from(union_of: #union_type) -> Self {
+                    #owned
+                }
+            }
+        }
+    });
+    let ref_conversion = ref_enum.map(|ref_enum| {
+        quote! {
+            #(#ref_gating)*
+            impl #borrow_generics ::core::convert::From<&'__eros_enum #union_type>
+                for #ref_enum #borrow_where
+            {
+                #[inline]
+                fn from(union_of: &'__eros_enum #union_type) -> Self {
+                    #shared
+                }
+            }
+        }
+    });
+    let mut_conversion = mut_enum.map(|mut_enum| {
+        quote! {
+            #(#mut_gating)*
+            impl #borrow_generics ::core::convert::From<&'__eros_enum mut #union_type>
+                for #mut_enum #borrow_where
+            {
+                #[inline]
+                fn from(union_of: &'__eros_enum mut #union_type) -> Self {
+                    #mutable
+                }
+            }
+        }
+    });
     quote! {
-        #(#owned_gating)*
-        impl #impl_generics ::core::convert::From<#union_type> for #owned_enum #where_clause {
-            #[inline]
-            fn from(union_of: #union_type) -> Self {
-                #owned
-            }
-        }
-        #(#ref_gating)*
-        impl #borrow_generics ::core::convert::From<&'__eros_enum #union_type>
-            for #ref_enum #borrow_where
-        {
-            #[inline]
-            fn from(union_of: &'__eros_enum #union_type) -> Self {
-                #shared
-            }
-        }
-        #(#mut_gating)*
-        impl #borrow_generics ::core::convert::From<&'__eros_enum mut #union_type>
-            for #mut_enum #borrow_where
-        {
-            #[inline]
-            fn from(union_of: &'__eros_enum mut #union_type) -> Self {
-                #mutable
-            }
-        }
+        #owned_conversion
+        #ref_conversion
+        #mut_conversion
     }
 }

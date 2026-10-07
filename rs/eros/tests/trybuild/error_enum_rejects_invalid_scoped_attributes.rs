@@ -11,10 +11,12 @@ type Assigned = (std::fmt::Error,);
 type UnexpectedArgument = (std::fmt::Error,);
 
 #[eros::error_enum_ref]
-type MissingOwned = (std::fmt::Error,);
+#[eros::error_enum_ref]
+type DuplicateRef = (std::fmt::Error,);
 
 #[eros::error_enum_mut]
-type MissingOwnedMut = (std::fmt::Error,);
+#[eros::error_enum_mut]
+type DuplicateMut = (std::fmt::Error,);
 
 #[eros::error_enum]
 #[eros::error_enum]

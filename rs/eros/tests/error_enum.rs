@@ -8,13 +8,19 @@ use std::{
 };
 
 #[eros::error_enum("operation failed: {0}")]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 pub type Name = (std::io::Error, fmt::Error);
 
 #[eros::error_enum(PublicError)]
 #[non_exhaustive]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 pub type Internal = (io::Error, fmt::Error);
 
 #[eros::error_enum(FormattedError, "operation failed: {0}")]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 type InternalFormatted = (io::Error, fmt::Error);
 
 #[test]
@@ -69,6 +75,8 @@ impl fmt::Display for FormatAwareError {
 impl std::error::Error for FormatAwareError {}
 
 #[eros::error_enum]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 type Delegated = (FormatAwareError, fmt::Error);
 
 #[eros::error_enum()]
@@ -236,6 +244,8 @@ impl Drop for DropError {
 }
 
 #[eros::error_enum("{0}")]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 type Tracked = (DropError, MsgError);
 
 #[test]
@@ -262,6 +272,8 @@ mod snake_case {
 #[eros::error_enum("fixed {{message}}")]
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
+#[eros::error_enum_ref]
+#[eros::error_enum_mut]
 type Raw = (snake_case::r#type,);
 
 #[test]
@@ -365,6 +377,8 @@ fn borrowed_markers_can_appear_before_the_owned_marker() {
 
 mod exported {
     #[eros::error_enum("{0}")]
+    #[eros::error_enum_ref]
+    #[eros::error_enum_mut]
     pub type Public = (core::fmt::Error,);
 }
 
