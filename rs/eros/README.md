@@ -638,7 +638,7 @@ Other backtrace examples in this README use `[N frames hidden for brevity]` to m
 
 ### Error Enum Macro
 
-`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error`, `<Alias>ErrorRef<'a>`, and `<Alias>ErrorMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations:
+`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error`, `<Alias>ErrorRef<'a>`, and `<Alias>ErrorMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations. This is useful if you need to operate on multiple specific branches of the error, or want to expose the error to an outside api without exposing `ErrorUnion` (see [here](#approach-b-replacing-errorunion-with-concrete-crate-errors)).
 
 ```rust
 use eros::ErrorUnion;
@@ -647,16 +647,14 @@ use std::{fmt, io};
 #[eros::error_enum]
 pub type App = (io::Error, fmt::Error);
 
-let mut union_of: ErrorUnion<App> = ErrorUnion::new(fmt::Error);
-let shared = AppErrorRef::from(&union_of);
-assert!(matches!(shared, AppErrorRef::FmtError(_)));
-let mutable = AppErrorMut::from(&mut union_of);
-assert!(matches!(mutable, AppErrorMut::FmtError(_)));
-let error = AppError::from(union_of);
-assert!(matches!(error, AppError::FmtError(_)));
+let union_of: ErrorUnion<App> = ErrorUnion::new(fmt::Error);
+match union_of.into() {
+    AppError::IoError(error) => eprintln!("I/O error: {error}"),
+    AppError::FmtError(error) => eprintln!("Formatting error: {error}"),
+}
 ```
 
-Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Customize the name, display, or both:
+Here the variants are `IoError` and `FmtError`. To borrow instead, convert `&union_of` into `AppErrorRef` or `&mut union_of` into `AppErrorMut`. `Display` delegates to the contained error, and `Error::source()` returns it. Customize the name, display, or both:
 
 - Custom name: `#[eros::error_enum(CustomError)]`
 - Custom display: `#[eros::error_enum("operation failed: {0}")]`
