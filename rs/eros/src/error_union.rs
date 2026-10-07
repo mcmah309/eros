@@ -120,10 +120,12 @@ impl ErrorUnionInner<dyn SendSyncError> {
     }
 
     #[allow(unstable_name_collisions)]
+    #[inline]
     pub(crate) fn is_error<T: 'static>(&self) -> bool {
         self.error.type_id() == TypeId::of::<T>()
     }
 
+    #[inline]
     pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self: Box<Self>) -> T {
         debug_assert!(self.is_error::<T>());
 
@@ -156,6 +158,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
         }
     }
 
+    #[inline]
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
         self: Box<Self>,
     ) -> ErrorUnionInner<T> {
@@ -203,6 +206,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
         }
     }
 
+    #[inline]
     pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
         (&self.error as &dyn Any).downcast_ref::<T>()
     }
@@ -215,6 +219,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
         unsafe { &*(error as *const dyn Any as *const T) }
     }
 
+    #[inline]
     pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
         (&mut self.error as &mut dyn Any).downcast_mut::<T>()
     }
@@ -266,6 +271,7 @@ where
 {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &T {
         (&self.inner.error as &dyn Any).downcast_ref::<T>().unwrap()
     }
@@ -529,6 +535,7 @@ where
     /// let message = error.downcast_inner::<eros::MsgError>().unwrap();
     /// assert_eq!(message.as_str(), "failure");
     /// ```
+    #[inline]
     pub fn downcast_inner<T: 'static>(self) -> Result<T, Self> {
         if self.inner.is_error::<T>() {
             // SAFETY: The concrete inner error type was checked above.
@@ -538,15 +545,18 @@ where
         }
     }
 
+    #[inline]
     pub fn downcast_inner_ref<T: 'static>(&self) -> Option<&T> {
         self.inner.downcast_error_ref()
     }
 
+    #[inline]
     pub fn downcast_inner_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.inner.downcast_error_mut()
     }
 
     /// Returns true if the inner error is of type `T`
+    #[inline]
     pub fn is_inner<T: 'static>(&self) -> bool {
         self.inner.is_error::<T>()
     }
@@ -757,12 +767,14 @@ where
 }
 
 impl<A: SendSyncError> AsRef<A> for ErrorUnion<(A,)> {
+    #[inline]
     fn as_ref(&self) -> &A {
         self.inner.downcast_error_ref().unwrap()
     }
 }
 
 impl<A: SendSyncError> AsMut<A> for ErrorUnion<(A,)> {
+    #[inline]
     fn as_mut(&mut self) -> &mut A {
         self.inner.downcast_error_mut().unwrap()
     }
@@ -772,6 +784,7 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
     /// Convert the inner type of an `ErrorUnion` with a single possible type to that type.
     ///
     /// Use `as_ref` or `as_mut` if you want to borrow the inner type instead of consuming the `ErrorUnion`.
+    #[inline]
     pub fn into_single(self) -> A {
         unsafe { self.inner.downcast_error_unchecked() }
     }

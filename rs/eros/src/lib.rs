@@ -23,6 +23,7 @@ pub mod __private {
     ///
     /// # Safety
     /// `T` must be the exact concrete type of the union's inner error.
+    #[inline]
     pub unsafe fn downcast_error_unchecked<T: 'static>(union_of: ErrorUnion<impl TypeSet>) -> T {
         // SAFETY: The caller guarantees that the inner error is T.
         unsafe { union_of.inner.downcast_error_unchecked::<T>() }

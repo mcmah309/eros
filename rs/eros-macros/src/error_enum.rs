@@ -353,6 +353,7 @@ fn conversions(
     quote! {
         #(#gating)*
         impl #impl_generics ::core::convert::From<#union_type> for #name<#(#types),*> #where_clause {
+            #[inline]
             fn from(union_of: #union_type) -> Self {
                 #owned
             }
@@ -361,6 +362,7 @@ fn conversions(
         impl #borrow_generics ::core::convert::From<&'__eros_enum #union_type>
             for #name<#(&'__eros_enum #types),*> #borrow_where
         {
+            #[inline]
             fn from(union_of: &'__eros_enum #union_type) -> Self {
                 #shared
             }
@@ -369,6 +371,7 @@ fn conversions(
         impl #borrow_generics ::core::convert::From<&'__eros_enum mut #union_type>
             for #name<#(&'__eros_enum mut #types),*> #borrow_where
         {
+            #[inline]
             fn from(union_of: &'__eros_enum mut #union_type) -> Self {
                 #mutable
             }
