@@ -1,0 +1,11 @@
+error: generated enum name must differ from the tuple alias name
+ --> tests/trybuild/error_enum_borrowed_name_matches_alias.rs:1:20
+  |
+1 | #[eros::error_enum(SharedError)]
+  |                    ^^^^^^^^^^^
+
+error: generated enum name must differ from the tuple alias name
+ --> tests/trybuild/error_enum_borrowed_name_matches_alias.rs:4:20
+  |
+4 | #[eros::error_enum(MutableError)]
+  |                    ^^^^^^^^^^^^

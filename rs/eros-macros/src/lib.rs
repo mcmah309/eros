@@ -39,18 +39,19 @@ mod error_enum;
 /// `#[error_enum(PublicError, "operation failed: {0}")]`.
 ///
 /// The alias must be a nongeneric tuple of 1–26 path types. Variant names join
-/// the path segments in PascalCase (ignoring generic arguments). `NameError`
-/// has one defaulted payload parameter per variant, so borrowed conversions
-/// produce `NameError<&T, ...>` and `NameError<&mut T, ...>`.
+/// the path segments in PascalCase (ignoring generic arguments). Generates
+/// `NameError` with concrete payloads, `NameErrorRef<'a>` with shared references,
+/// and `NameErrorMut<'a>` with mutable references. Convert with
+/// `NameError::from(union_of)`, `NameErrorRef::from(&union_of)`, or
+/// `NameErrorMut::from(&mut union_of)`. Custom names use the same `Ref`/`Mut` suffixes.
 /// With no arguments (`#[error_enum]` or `#[error_enum()]`), `Display` delegates
 /// directly to the contained error, preserving the formatter's flags. An
 /// optional format string can customize the message: `{0}` (or `{}`) formats
 /// the contained error. Fixed strings and escaped braces also work. `Debug`,
 /// `Display`, and `core::error::Error` are implemented automatically, with the contained error
-/// returned by `Error::source`. Borrowed forms implement `Debug` and `Display`;
-/// the `Error` implementation requires each payload to be an error with a
-/// `'static` lifetime.
-/// Attributes below this macro and above the alias apply to the generated enum.
+/// returned by `Error::source`, including for borrowed enums.
+/// Attributes below this macro and above the alias apply to the owned enum;
+/// configuration gates apply to the alias, all three enums, and their implementations.
 #[proc_macro_attribute]
 pub fn error_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as error_enum::ErrorEnumArgs);

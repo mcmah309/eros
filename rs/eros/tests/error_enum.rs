@@ -25,13 +25,13 @@ fn custom_names_support_all_conversions_and_optional_display() {
     ];
     for mut union in errors {
         let message = union.inner().to_string();
-        let shared: PublicError<&io::Error, &fmt::Error> = (&union).into();
+        let shared: PublicErrorRef<'_> = (&union).into();
         assert_eq!(shared.to_string(), message);
-        let shared: FormattedError<&io::Error, &fmt::Error> = (&union).into();
+        let shared: FormattedErrorRef<'_> = (&union).into();
         assert_eq!(shared.to_string(), format!("operation failed: {message}"));
-        let mutable: PublicError<&mut io::Error, &mut fmt::Error> = (&mut union).into();
+        let mutable: PublicErrorMut<'_> = (&mut union).into();
         assert_eq!(mutable.to_string(), message);
-        let mutable: FormattedError<&mut io::Error, &mut fmt::Error> = (&mut union).into();
+        let mutable: FormattedErrorMut<'_> = (&mut union).into();
         assert_eq!(mutable.to_string(), format!("operation failed: {message}"));
         let owned: PublicError = union.into();
         assert_eq!(owned.to_string(), message);
@@ -87,10 +87,10 @@ fn default_display_delegates_for_all_variants_and_preserves_formatting_flags() {
         ErrorUnion::new(fmt::Error),
     ];
     for mut union in errors {
-        let borrowed: DelegatedError<&FormatAwareError, &fmt::Error> = (&union).into();
+        let borrowed: DelegatedErrorRef<'_> = (&union).into();
         assert_display(&borrowed, union.inner());
         let expected = union.inner().to_string();
-        let mutable: DelegatedError<&mut FormatAwareError, &mut fmt::Error> = (&mut union).into();
+        let mutable: DelegatedErrorMut<'_> = (&mut union).into();
         assert_eq!(mutable.to_string(), expected);
         let owned: DelegatedError = union.into();
         assert_display(&owned, std::error::Error::source(&owned).unwrap());
@@ -114,19 +114,19 @@ fn converts_every_named_variant_owned_shared_and_mutable() {
     ];
     for (index, mut union) in errors.into_iter().enumerate() {
         let original = union.inner() as *const dyn eros::SendSyncError as *const ();
-        let borrowed: NameError<&io::Error, &fmt::Error> = (&union).into();
+        let borrowed: NameErrorRef<'_> = (&union).into();
         match (index, borrowed) {
-            (0, NameError::StdIoError(error)) => {
+            (0, NameErrorRef::StdIoError(error)) => {
                 assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
                 assert_eq!(error as *const io::Error as *const (), original);
             }
-            (1, NameError::FmtError(error)) => assert_eq!(error, &fmt::Error),
+            (1, NameErrorRef::FmtError(error)) => assert_eq!(error, &fmt::Error),
             _ => panic!("wrong borrowed variant"),
         }
-        let mutable: NameError<&mut io::Error, &mut fmt::Error> = (&mut union).into();
+        let mutable: NameErrorMut<'_> = (&mut union).into();
         match (index, mutable) {
-            (0, NameError::StdIoError(error)) => *error = io::Error::other("updated"),
-            (1, NameError::FmtError(error)) => *error = fmt::Error,
+            (0, NameErrorMut::StdIoError(error)) => *error = io::Error::other("updated"),
+            (1, NameErrorMut::FmtError(error)) => *error = fmt::Error,
             _ => panic!("wrong mutable variant"),
         }
         let owned: NameError = union.into();
@@ -143,17 +143,37 @@ fn converts_every_named_variant_owned_shared_and_mutable() {
 fn automatic_error_traits_format_and_expose_each_contained_source() {
     fn require_error<E: std::error::Error>() {}
     require_error::<NameError>();
+    require_error::<NameErrorRef<'_>>();
+    require_error::<NameErrorMut<'_>>();
     let errors: [ErrorUnion<Name>; 2] = [
         ErrorUnion::new(io::Error::other("disk failed")),
         ErrorUnion::new(fmt::Error),
     ];
-    for union in errors {
+    for mut union in errors {
         let inner_message = union.inner().to_string();
-        let borrowed: NameError<&io::Error, &fmt::Error> = (&union).into();
+        let original = union.inner() as *const dyn eros::SendSyncError as *const ();
+        fn assert_source(error: &dyn std::error::Error, original: *const ()) {
+            let source = error.source().unwrap();
+            assert_eq!(
+                source as *const dyn std::error::Error as *const (),
+                original
+            );
+            assert!(source.is::<io::Error>() || source.is::<fmt::Error>());
+        }
+        let borrowed = NameErrorRef::from(&union);
         assert_eq!(
             borrowed.to_string(),
             format!("operation failed: {inner_message}")
         );
+        assert_source(&borrowed, original);
+        assert!(!format!("{borrowed:?}").is_empty());
+        let mutable = NameErrorMut::from(&mut union);
+        assert_eq!(
+            mutable.to_string(),
+            format!("operation failed: {inner_message}")
+        );
+        assert_source(&mutable, original);
+        assert!(!format!("{mutable:?}").is_empty());
         let owned: NameError = union.into();
         assert_eq!(
             owned.to_string(),
@@ -192,7 +212,7 @@ type E0 = MsgError;
 type Shadowed = (E0, fmt::Error);
 
 #[test]
-fn payload_parameters_do_not_shadow_error_types() {
+fn preserves_error_types_named_like_former_payload_parameters() {
     let union: ErrorUnion<Shadowed> = ErrorUnion::new(MsgError::from("original type"));
     let enum_error: ShadowedError = union.into();
     assert!(matches!(enum_error, ShadowedError::E0(_)));
@@ -225,8 +245,8 @@ fn conversion_moves_payload_and_drops_metadata_once() {
     let union: ErrorUnion<Tracked> = ErrorUnion::new(DropError(payload_drops.clone()));
     let context: Box<dyn eros::SendSyncError> = Box::new(DropError(context_drops.clone()));
     let mut union = union.context(context);
-    let _: TrackedError<&DropError, &MsgError> = (&union).into();
-    let _: TrackedError<&mut DropError, &mut MsgError> = (&mut union).into();
+    let _: TrackedErrorRef<'_> = (&union).into();
+    let _: TrackedErrorMut<'_> = (&mut union).into();
     assert_eq!(payload_drops.load(Ordering::SeqCst), 0);
     let owned: TrackedError = union.into();
     assert_eq!(payload_drops.load(Ordering::SeqCst), 0);
@@ -246,7 +266,12 @@ type Raw = (snake_case::r#type,);
 
 #[test]
 fn names_handle_snake_case_and_raw_identifiers() {
-    let union: ErrorUnion<Raw> = ErrorUnion::new(fmt::Error);
+    let mut union: ErrorUnion<Raw> = ErrorUnion::new(fmt::Error);
+    // Clone/Copy on the owned enum must not be copied to mutable references.
+    let RawErrorRef::SnakeCaseType(error) = RawErrorRef::from(&union);
+    assert_eq!(error, &fmt::Error);
+    let RawErrorMut::SnakeCaseType(error) = RawErrorMut::from(&mut union);
+    assert_eq!(error, &mut fmt::Error);
     let error = RawError::from(union);
     assert!(matches!(error, RawError::SnakeCaseType(_)));
     assert_eq!(error.to_string(), "fixed {message}");
@@ -264,7 +289,15 @@ mod exported {
 
 #[test]
 fn generated_enum_preserves_alias_visibility() {
-    let union: ErrorUnion<exported::Public> = ErrorUnion::new(fmt::Error);
+    let mut union: ErrorUnion<exported::Public> = ErrorUnion::new(fmt::Error);
+    assert!(matches!(
+        exported::PublicErrorRef::from(&union),
+        exported::PublicErrorRef::CoreFmtError(_)
+    ));
+    assert!(matches!(
+        exported::PublicErrorMut::from(&mut union),
+        exported::PublicErrorMut::CoreFmtError(_)
+    ));
     assert!(matches!(
         exported::PublicError::from(union),
         exported::PublicError::CoreFmtError(_)

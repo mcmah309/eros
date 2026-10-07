@@ -46,10 +46,10 @@ pub enum CheckOutcome {
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let mut named: ErrorUnion<NamedErrors> = ErrorUnion::new(Timeout);
-    let borrowed: NamedErrorsError<&NotEnoughMemory, &Timeout> = (&named).into();
-    assert!(matches!(borrowed, NamedErrorsError::Timeout(_)));
-    let mutable: NamedErrorsError<&mut NotEnoughMemory, &mut Timeout> = (&mut named).into();
-    assert!(matches!(mutable, NamedErrorsError::Timeout(_)));
+    let borrowed: NamedErrorsErrorRef<'_> = (&named).into();
+    assert!(matches!(borrowed, NamedErrorsErrorRef::Timeout(_)));
+    let mutable: NamedErrorsErrorMut<'_> = (&mut named).into();
+    assert!(matches!(mutable, NamedErrorsErrorMut::Timeout(_)));
     assert!(matches!(
         NamedErrorsError::from(named),
         NamedErrorsError::Timeout(Timeout)

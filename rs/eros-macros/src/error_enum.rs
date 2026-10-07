@@ -102,76 +102,98 @@ pub(crate) fn expand_alias(args: ErrorEnumArgs, mut alias: ItemType) -> syn::Res
     let enum_name = args.name.unwrap_or_else(|| {
         format_ident!("{}Error", alias.ident.to_string().trim_start_matches("r#"))
     });
-    if enum_name == alias.ident {
+    let base_name = enum_name.to_string();
+    let base_name = base_name.trim_start_matches("r#");
+    let ref_name = format_ident!("{base_name}Ref", span = enum_name.span());
+    let mut_name = format_ident!("{base_name}Mut", span = enum_name.span());
+    if [&enum_name, &ref_name, &mut_name].contains(&&alias.ident) {
         return Err(syn::Error::new_spanned(
             &enum_name,
             "generated enum name must differ from the tuple alias name",
         ));
     }
-    // Defaults resolve in the enum's scope, so payload parameters must not
-    // shadow any identifiers in the original error types.
-    fn type_idents(tokens: TokenStream, names: &mut HashSet<String>) {
-        for token in tokens {
-            match token {
-                proc_macro2::TokenTree::Ident(ident) => {
-                    names.insert(ident.to_string().trim_start_matches("r#").to_owned());
-                }
-                proc_macro2::TokenTree::Group(group) => type_idents(group.stream(), names),
-                _ => {}
-            }
-        }
-    }
-    let mut used = HashSet::new();
-    used.insert(enum_name.to_string().trim_start_matches("r#").to_owned());
-    type_idents(quote!(#(#types)*), &mut used);
-    let payloads: Vec<_> = (0..types.len())
-        .map(|i| {
-            let mut name = format!("E{i}");
-            while used.contains(&name) {
-                name.push('_');
-            }
-            format_ident!("{name}")
-        })
-        .collect();
     let gating = gating_attrs(&alias.attrs)?;
     let attrs = std::mem::replace(&mut alias.attrs, gating.clone());
     let vis = &alias.vis;
     let crate_path = eros_path()?;
     let conversions = conversions(
-        &enum_name,
+        [
+            quote!(#enum_name),
+            quote!(#ref_name<'__eros_enum>),
+            quote!(#mut_name<'__eros_enum>),
+        ],
         &Generics::default(),
         &types,
         &variants,
         &crate_path,
         &gating,
     );
-    let traits = error_traits(
+    let owned_traits = error_traits(
         &enum_name,
-        &payloads,
+        &Generics::default(),
         &variants,
         args.display.as_ref(),
         &gating,
+        false,
+    );
+    let borrow_generics = syn::parse_quote!(<'__eros_enum>);
+    let ref_traits = error_traits(
+        &ref_name,
+        &borrow_generics,
+        &variants,
+        args.display.as_ref(),
+        &gating,
+        true,
+    );
+    let mut_traits = error_traits(
+        &mut_name,
+        &borrow_generics,
+        &variants,
+        args.display.as_ref(),
+        &gating,
+        true,
     );
 
     Ok(quote! {
         #alias
         #(#attrs)*
         #[derive(::core::fmt::Debug)]
-        #vis enum #enum_name<#(#payloads = #types),*> {
-            #(#variants(#payloads)),*
+        #vis enum #enum_name {
+            #(#variants(#types)),*
+        }
+        #(#gating)*
+        #[derive(::core::fmt::Debug)]
+        #vis enum #ref_name<'__eros_enum> {
+            #(#variants(&'__eros_enum #types)),*
+        }
+        #(#gating)*
+        #[derive(::core::fmt::Debug)]
+        #vis enum #mut_name<'__eros_enum> {
+            #(#variants(&'__eros_enum mut #types)),*
         }
         #conversions
-        #traits
+        #owned_traits
+        #ref_traits
+        #mut_traits
     })
 }
 
 fn error_traits(
     name: &Ident,
-    payloads: &[Ident],
+    generics: &Generics,
     variants: &[Ident],
     display: Option<&LitStr>,
     gating: &[Attribute],
+    borrowed: bool,
 ) -> TokenStream {
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    // Return the concrete error, rather than the reference payload. This lets
+    // borrowed enums implement Error without requiring the borrow to be 'static.
+    let source = if borrowed {
+        quote!(&**error)
+    } else {
+        quote!(error)
+    };
     // A fixed message (including escaped braces) takes no formatting argument.
     // Otherwise Rust's formatter validates the format string against the one
     // positional argument: the variant's contained error.
@@ -200,20 +222,18 @@ fn error_traits(
         .collect();
     quote! {
         #(#gating)*
-        impl<#(#payloads: ::core::fmt::Display + ::core::fmt::Debug),*>
-            ::core::fmt::Display for #name<#(#payloads),*>
+        impl #impl_generics ::core::fmt::Display for #name #type_generics #where_clause
         {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 match self { #(#arms),* }
             }
         }
         #(#gating)*
-        impl<#(#payloads: ::core::error::Error + 'static),*>
-            ::core::error::Error for #name<#(#payloads),*>
+        impl #impl_generics ::core::error::Error for #name #type_generics #where_clause
         {
             fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
                 match self {
-                    #(Self::#variants(error) => ::core::option::Option::Some(error)),*
+                    #(Self::#variants(error) => ::core::option::Option::Some(#source)),*
                 }
             }
         }
@@ -234,8 +254,13 @@ pub(crate) fn expand_numbered(item: ItemEnum) -> syn::Result<TokenStream> {
         types.push(fields.unnamed[0].ty.clone());
         variants.push(variant.ident.clone());
     }
+    let name = &item.ident;
     let conversions = conversions(
-        &item.ident,
+        [
+            quote!(#name<#(#types),*>),
+            quote!(#name<#(&'__eros_enum #types),*>),
+            quote!(#name<#(&'__eros_enum mut #types),*>),
+        ],
         &item.generics,
         &types,
         &variants,
@@ -302,13 +327,14 @@ fn gating_attrs(attrs: &[Attribute]) -> syn::Result<Vec<Attribute>> {
 }
 
 fn conversions(
-    name: &Ident,
+    targets: [TokenStream; 3],
     generics: &Generics,
     types: &[Type],
     variants: &[Ident],
     crate_path: &TokenStream,
     gating: &[Attribute],
 ) -> TokenStream {
+    let [owned_enum, ref_enum, mut_enum] = targets;
     let mut bounded = generics.clone();
     for ty in types {
         bounded
@@ -352,7 +378,7 @@ fn conversions(
     let mutable = dispatch(format_ident!("downcast_error_mut_unchecked"));
     quote! {
         #(#gating)*
-        impl #impl_generics ::core::convert::From<#union_type> for #name<#(#types),*> #where_clause {
+        impl #impl_generics ::core::convert::From<#union_type> for #owned_enum #where_clause {
             #[inline]
             fn from(union_of: #union_type) -> Self {
                 #owned
@@ -360,7 +386,7 @@ fn conversions(
         }
         #(#gating)*
         impl #borrow_generics ::core::convert::From<&'__eros_enum #union_type>
-            for #name<#(&'__eros_enum #types),*> #borrow_where
+            for #ref_enum #borrow_where
         {
             #[inline]
             fn from(union_of: &'__eros_enum #union_type) -> Self {
@@ -369,7 +395,7 @@ fn conversions(
         }
         #(#gating)*
         impl #borrow_generics ::core::convert::From<&'__eros_enum mut #union_type>
-            for #name<#(&'__eros_enum mut #types),*> #borrow_where
+            for #mut_enum #borrow_where
         {
             #[inline]
             fn from(union_of: &'__eros_enum mut #union_type) -> Self {
