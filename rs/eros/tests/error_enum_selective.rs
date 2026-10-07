@@ -68,6 +68,21 @@ macro_rules! enum_case {
                     $(check_conversion!($kind, union, message);)*
                 }
             }
+
+            #[test]
+            fn converts_singleton_subsets_for_requested_enums() {
+                #[allow(unused_mut)]
+                let mut union: ErrorUnion<(io::Error,)> = ErrorUnion::new(io::Error::other("io error"));
+                #[allow(unused_mut)]
+                let mut message = union.inner().to_string();
+                $(check_conversion!($kind, union, message);)*
+
+                #[allow(unused_mut)]
+                let mut union: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
+                #[allow(unused_mut)]
+                let mut message = union.inner().to_string();
+                $(check_conversion!($kind, union, message);)*
+            }
         }
     };
 }

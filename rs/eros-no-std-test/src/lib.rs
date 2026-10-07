@@ -47,7 +47,7 @@ pub enum CheckOutcome {
 }
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
-    let mut named: ErrorUnion<NamedErrors> = ErrorUnion::new(Timeout);
+    let mut named: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
     let borrowed: NamedErrorsErrorRef<'_> = (&named).into();
     assert!(matches!(borrowed, NamedErrorsErrorRef::Timeout(_)));
     let mutable: NamedErrorsErrorMut<'_> = (&mut named).into();

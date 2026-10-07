@@ -33,7 +33,8 @@ mod error_enum;
 /// also work. `Debug`, `Display`, and `core::error::Error` are implemented
 /// automatically, and `Error::source()` returns the contained error.
 ///
-/// `From<ErrorUnion<Alias>>` converts the typed union into the enum.
+/// `From<ErrorUnion<Subset>>` converts any tuple of the enum's error types into
+/// the enum, in any order. Shared and mutable references work the same way.
 /// `TryFrom<ErrorUnion<AnyError>>` checks the concrete inner error and returns
 /// the original union on a mismatch. Successful owned conversions discard
 /// context, location, and backtrace. The shared and mutable enum macros generate

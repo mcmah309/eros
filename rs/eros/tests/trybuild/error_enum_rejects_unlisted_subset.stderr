@@ -1,0 +1,80 @@
+error[E0277]: the trait bound `std::io::Error: __ErosEnumMember` is not satisfied
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:10:39
+   |
+10 |     let _: AppErrorRef<'_> = (&union).into();
+   |                                       ^^^^ the trait `__ErosEnumMember` is not implemented for `std::io::Error`
+   |
+help: the following other types implement trait `__ErosEnumMember`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | `MsgError`
+   | `std::fmt::Error`
+note: required for `(std::fmt::Error, std::io::Error)` to implement `__ErosEnumSubset`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required for `AppErrorRef<'_>` to implement `From<&ErrorUnion<(std::fmt::Error, std::io::Error)>>`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `&ErrorUnion<(std::fmt::Error, std::io::Error)>` to implement `Into<AppErrorRef<'_>>`
+   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `std::io::Error: __ErosEnumMember` is not satisfied
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:11:43
+   |
+11 |     let _: AppErrorMut<'_> = (&mut union).into();
+   |                                           ^^^^ the trait `__ErosEnumMember` is not implemented for `std::io::Error`
+   |
+help: the following other types implement trait `__ErosEnumMember`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | `MsgError`
+   | `std::fmt::Error`
+note: required for `(std::fmt::Error, std::io::Error)` to implement `__ErosEnumSubset`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required for `AppErrorMut<'_>` to implement `From<&mut ErrorUnion<(std::fmt::Error, std::io::Error)>>`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `&mut ErrorUnion<(std::fmt::Error, std::io::Error)>` to implement `Into<AppErrorMut<'_>>`
+   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `std::io::Error: __ErosEnumMember` is not satisfied
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:12:29
+   |
+12 |     let _: AppError = union.into();
+   |                             ^^^^ the trait `__ErosEnumMember` is not implemented for `std::io::Error`
+   |
+help: the following other types implement trait `__ErosEnumMember`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | `MsgError`
+   | `std::fmt::Error`
+note: required for `(std::fmt::Error, std::io::Error)` to implement `__ErosEnumSubset`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required for `AppError` to implement `From<ErrorUnion<(std::fmt::Error, std::io::Error)>>`
+  --> tests/trybuild/error_enum_rejects_unlisted_subset.rs:4:1
+   |
+ 4 | #[eros::error_enums(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `ErrorUnion<(std::fmt::Error, std::io::Error)>` to implement `Into<AppError>`
+   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)

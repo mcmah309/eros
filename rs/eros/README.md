@@ -656,6 +656,21 @@ match union_of.into() {
 
 Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Every attribute below `error_enums` applies to all three enums. The generated enums also implement `TryFrom` for `ErrorUnion<AnyError>`
 
+Generated `From` conversions accept any tuple of the enum's error types, including subsets and reordered tuples. This works for owned unions and shared or mutable references, without calling `widen` first:
+
+```rust
+use eros::ErrorUnion;
+use std::{fmt, io};
+
+#[eros::error_enums(AppFailure)]
+type App = (io::Error, fmt::Error, eros::MsgError);
+
+let mut subset: ErrorUnion<(fmt::Error, io::Error)> = ErrorUnion::new(fmt::Error);
+let _shared = AppFailureRef::from(&subset);
+let _mutable = AppFailureMut::from(&mut subset);
+let _owned = AppFailure::from(subset);
+```
+
 The name is required, and an optional display format applies to all three enums:
 
 - Default display: `#[eros::error_enums(AppFailure)]`
