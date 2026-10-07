@@ -1,0 +1,5 @@
+error: error_enum variants must be path types
+ --> tests/trybuild/error_enum_rejects_non_path.rs:2:17
+  |
+2 | type Invalid = (&'static std::fmt::Error,);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^

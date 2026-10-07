@@ -1,0 +1,20 @@
+error: error_enum requires between 1 and 26 variants
+  --> tests/trybuild/error_enum_rejects_too_many.rs:4:16
+   |
+ 4 |   type Invalid = (
+   |  ________________^
+ 5 | |     Error,
+ 6 | |     Error,
+ 7 | |     Error,
+...  |
+31 | |     Error,
+32 | | );
+   | |_^
+
+warning: unused import: `std::fmt::Error`
+ --> tests/trybuild/error_enum_rejects_too_many.rs:1:5
+  |
+1 | use std::fmt::Error;
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

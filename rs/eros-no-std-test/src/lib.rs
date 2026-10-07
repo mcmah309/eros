@@ -35,6 +35,9 @@ impl core::fmt::Display for InvalidPassword {
 }
 impl core::error::Error for InvalidPassword {}
 
+#[eros::error_enum(NamedErrorsError)]
+pub type NamedErrors = (NotEnoughMemory, Timeout);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckOutcome {
     Ok,
@@ -42,6 +45,16 @@ pub enum CheckOutcome {
 }
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
+    let mut named: ErrorUnion<NamedErrors> = ErrorUnion::new(Timeout);
+    let borrowed: NamedErrorsError<&NotEnoughMemory, &Timeout> = (&named).into();
+    assert!(matches!(borrowed, NamedErrorsError::Timeout(_)));
+    let mutable: NamedErrorsError<&mut NotEnoughMemory, &mut Timeout> = (&mut named).into();
+    assert!(matches!(mutable, NamedErrorsError::Timeout(_)));
+    assert!(matches!(
+        NamedErrorsError::from(named),
+        NamedErrorsError::Timeout(Timeout)
+    ));
+
     let context_error = eager_owned_context(alloc::string::String::from("owned")).unwrap_err();
     assert_eq_str(
         context_error

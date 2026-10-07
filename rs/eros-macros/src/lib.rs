@@ -9,6 +9,69 @@ use syn::{
     token::Comma,
 };
 
+mod error_enum;
+
+/// Keeps a tuple alias and generates a named error enum with union conversions.
+///
+/// ```rust
+/// use std::fmt;
+/// #[eros_macros::error_enum("operation failed: {0}")]
+/// #[non_exhaustive]
+/// type Name = (std::io::Error, fmt::Error);
+///
+/// let union: eros::ErrorUnion<Name> = eros::ErrorUnion::new(fmt::Error);
+/// let error = NameError::from(union);
+/// assert!(matches!(error, NameError::FmtError(_)));
+/// assert_eq!(error.to_string(), "operation failed: an error occurred when formatting an argument");
+/// ```
+///
+/// Pass an identifier to override the generated enum name:
+///
+/// ```rust
+/// #[eros_macros::error_enum(PublicError)]
+/// type Internal = (std::fmt::Error,);
+/// let union: eros::ErrorUnion<Internal> = eros::ErrorUnion::new(std::fmt::Error);
+/// let error = PublicError::from(union);
+/// assert_eq!(error.to_string(), std::fmt::Error.to_string());
+/// ```
+///
+/// A custom name can also be followed by a display format string:
+/// `#[error_enum(PublicError, "operation failed: {0}")]`.
+///
+/// The alias must be a nongeneric tuple of 1–26 path types. Variant names join
+/// the path segments in PascalCase (ignoring generic arguments). `NameError`
+/// has one defaulted payload parameter per variant, so borrowed conversions
+/// produce `NameError<&T, ...>` and `NameError<&mut T, ...>`.
+/// With no arguments (`#[error_enum]` or `#[error_enum()]`), `Display` delegates
+/// directly to the contained error, preserving the formatter's flags. An
+/// optional format string can customize the message: `{0}` (or `{}`) formats
+/// the contained error. Fixed strings and escaped braces also work. `Debug`,
+/// `Display`, and `core::error::Error` are implemented automatically, with the contained error
+/// returned by `Error::source`. Borrowed forms implement `Debug` and `Display`;
+/// the `Error` implementation requires each payload to be an error with a
+/// `'static` lifetime.
+/// Attributes below this macro and above the alias apply to the generated enum.
+#[proc_macro_attribute]
+pub fn error_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as error_enum::ErrorEnumArgs);
+    let alias = parse_macro_input!(item as syn::ItemType);
+    match error_enum::expand_alias(args, alias) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
+/// Generates the legacy numbered enums' conversions at their declarations.
+#[doc(hidden)]
+#[proc_macro_attribute]
+pub fn __error_enum(_: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::ItemEnum);
+    match error_enum::expand_numbered(item) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
 struct FormatErrorInput {
     crate_path: syn::Path,
     message: Expr,

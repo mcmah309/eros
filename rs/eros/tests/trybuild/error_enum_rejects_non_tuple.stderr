@@ -1,0 +1,5 @@
+error: error_enum requires a tuple alias
+ --> tests/trybuild/error_enum_rejects_non_tuple.rs:2:16
+  |
+2 | type Invalid = std::fmt::Error;
+  |                ^^^^^^^^^^^^^^^

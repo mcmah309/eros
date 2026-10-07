@@ -1,0 +1,5 @@
+error: error_enum requires a nongeneric tuple alias
+ --> tests/trybuild/error_enum_rejects_generic_alias.rs:2:13
+  |
+2 | type Invalid<T> = (T,);
+  |             ^^^

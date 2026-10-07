@@ -1,5 +1,6 @@
-//! Exercise every variant of every supported arity. The conversions contain
+//! Exercise every variant of every supported arity. The conversions use
 //! unchecked downcasts, so testing only E2 or the last E26 variant is insufficient.
+#![allow(deprecated)] // Exercise compatibility conversions deliberately.
 use eros::ErrorUnion;
 use std::fmt;
 
