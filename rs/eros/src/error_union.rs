@@ -119,15 +119,14 @@ impl ErrorUnionInner<dyn SendSyncError> {
         })
     }
 
-    #[allow(unstable_name_collisions)]
     #[inline]
-    pub(crate) fn is_error<T: 'static>(&self) -> bool {
-        self.error.type_id() == TypeId::of::<T>()
+    pub(crate) fn is_error_type<T: 'static>(&self) -> bool {
+        Any::type_id(&self.error) == TypeId::of::<T>()
     }
 
     #[inline]
     pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self: Box<Self>) -> T {
-        debug_assert!(self.is_error::<T>());
+        debug_assert!(self.is_error_type::<T>());
 
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
@@ -162,7 +161,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
         self: Box<Self>,
     ) -> ErrorUnionInner<T> {
-        debug_assert!(self.is_error::<T>());
+        debug_assert!(self.is_error_type::<T>());
 
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
@@ -537,7 +536,7 @@ where
     /// ```
     #[inline]
     pub fn downcast_inner<T: 'static>(self) -> Result<T, Self> {
-        if self.inner.is_error::<T>() {
+        if self.inner.is_error_type::<T>() {
             // SAFETY: The concrete inner error type was checked above.
             Ok(unsafe { self.inner.downcast_error_unchecked::<T>() })
         } else {
@@ -558,7 +557,7 @@ where
     /// Returns true if the inner error is of type `T`
     #[inline]
     pub fn is_inner<T: 'static>(&self) -> bool {
-        self.inner.is_error::<T>()
+        self.inner.is_error_type::<T>()
     }
 
     #[cfg(feature = "backtrace")]
@@ -1318,7 +1317,7 @@ mod tests {
     #[test]
     fn downcast_error_unchecked_correct_type_recovers_value() {
         let inner = ErrorUnionInner::new(FooError("hello".into()));
-        assert!(inner.is_error::<FooError>());
+        assert!(inner.is_error_type::<FooError>());
         let recovered: FooError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered, FooError("hello".into()));
     }
