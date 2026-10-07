@@ -401,34 +401,6 @@ format!(
 
 Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
 
-## Error Enum Macro
-
-`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error`, `<Alias>ErrorRef<'a>`, and `<Alias>ErrorMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations:
-
-```rust
-use eros::ErrorUnion;
-use std::{fmt, io};
-
-#[eros::error_enum]
-pub type App = (io::Error, fmt::Error);
-
-let mut union_of: ErrorUnion<App> = ErrorUnion::new(fmt::Error);
-let shared = AppErrorRef::from(&union_of);
-assert!(matches!(shared, AppErrorRef::FmtError(_)));
-let mutable = AppErrorMut::from(&mut union_of);
-assert!(matches!(mutable, AppErrorMut::FmtError(_)));
-let error = AppError::from(union_of);
-assert!(matches!(error, AppError::FmtError(_)));
-```
-
-Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Customize the name, display, or both:
-
-- Custom name: `#[eros::error_enum(CustomError)]`
-- Custom display: `#[eros::error_enum("operation failed: {0}")]`
-- Both: `#[eros::error_enum(CustomError, "operation failed: {0}")]`
-
-`{0}` formats the contained error.
-
 ## Best Practices
 
 ### Use In Libraries
@@ -663,6 +635,34 @@ WARN Something went wrong
 ### Better Backtrace
 
 Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `better_backtrace` to filter recognized dependency and runtime frames automatically.
+
+### Error Enum Macro
+
+`#[eros::error_enum]` keeps a tuple alias and generates `<Alias>Error`, `<Alias>ErrorRef<'a>`, and `<Alias>ErrorMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations:
+
+```rust
+use eros::ErrorUnion;
+use std::{fmt, io};
+
+#[eros::error_enum]
+pub type App = (io::Error, fmt::Error);
+
+let mut union_of: ErrorUnion<App> = ErrorUnion::new(fmt::Error);
+let shared = AppErrorRef::from(&union_of);
+assert!(matches!(shared, AppErrorRef::FmtError(_)));
+let mutable = AppErrorMut::from(&mut union_of);
+assert!(matches!(mutable, AppErrorMut::FmtError(_)));
+let error = AppError::from(union_of);
+assert!(matches!(error, AppError::FmtError(_)));
+```
+
+Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Customize the name, display, or both:
+
+- Custom name: `#[eros::error_enum(CustomError)]`
+- Custom display: `#[eros::error_enum("operation failed: {0}")]`
+- Both: `#[eros::error_enum(CustomError, "operation failed: {0}")]`
+
+`{0}` formats the contained error.
 
 ### Adding Source Chains
 
