@@ -22,4 +22,9 @@ fn main() {
     let _: typeRef<'_> = ::core::convert::From::from(&union);
     let _: typeMut<'_> = ::core::convert::From::from(&mut union);
     let _: r#type = ::core::convert::From::from(union);
+
+    let mut union: eros::ErrorUnion<eros::AnyError> = eros::ErrorUnion::new(::core::fmt::Error);
+    let _: FailureRef<'_> = ::core::convert::TryFrom::try_from(&union).unwrap();
+    let _: FailureMut<'_> = ::core::convert::TryFrom::try_from(&mut union).unwrap();
+    let _: Failure = ::core::convert::TryFrom::try_from(union).unwrap();
 }

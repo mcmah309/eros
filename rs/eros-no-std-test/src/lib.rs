@@ -57,6 +57,28 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
         NamedErrorsError::Timeout(Timeout)
     ));
 
+    let mut erased: ErrorUnion<AnyError> = ErrorUnion::new(Timeout);
+    assert!(matches!(
+        NamedErrorsErrorRef::try_from(&erased).unwrap(),
+        NamedErrorsErrorRef::Timeout(_)
+    ));
+    assert!(matches!(
+        NamedErrorsErrorMut::try_from(&mut erased).unwrap(),
+        NamedErrorsErrorMut::Timeout(_)
+    ));
+    assert!(matches!(
+        NamedErrorsError::try_from(erased).unwrap(),
+        NamedErrorsError::Timeout(Timeout)
+    ));
+    let mut erased: ErrorUnion<AnyError> = ErrorUnion::new(InvalidPassword);
+    assert!(NamedErrorsErrorRef::try_from(&erased).is_err());
+    assert!(NamedErrorsErrorMut::try_from(&mut erased).is_err());
+    assert!(
+        NamedErrorsError::try_from(erased)
+            .unwrap_err()
+            .is_inner::<InvalidPassword>()
+    );
+
     let context_error = eager_owned_context(alloc::string::String::from("owned")).unwrap_err();
     assert_eq_str(
         context_error

@@ -33,6 +33,13 @@ mod error_enum;
 /// also work. `Debug`, `Display`, and `core::error::Error` are implemented
 /// automatically, and `Error::source()` returns the contained error.
 ///
+/// `From<ErrorUnion<Alias>>` converts the typed union into the enum.
+/// `TryFrom<ErrorUnion<AnyError>>` checks the concrete inner error and returns
+/// the original union on a mismatch. Successful owned conversions discard
+/// context, location, and backtrace. The shared and mutable enum macros generate
+/// corresponding conversions from references, returning the original borrow
+/// on a mismatch and preserving diagnostics.
+///
 /// The alias must be a nongeneric tuple of 1–26 path types. Variant names join
 /// path segments in PascalCase, ignoring generic arguments. Attributes below
 /// each macro apply to its enum until the next enum macro or the alias.

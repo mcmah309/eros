@@ -20,6 +20,9 @@ macro_rules! check_arity {
         #[test]
         fn $test() {
             type Set = ($(Payload<$n>,)+);
+            type Shared<'a> = eros::$enum<$(&'a Payload<$n>),+>;
+            type Mutable<'a> = eros::$enum<$(&'a mut Payload<$n>),+>;
+            type Owned = eros::$enum<$(Payload<$n>),+>;
             $(
                 let original = format!("payload {}", $n);
                 let mut error: ErrorUnion<Set> = ErrorUnion::new(Payload::<$n>(original.clone()));
@@ -49,10 +52,30 @@ macro_rules! check_arity {
                 let adapter = Box::new(error.into_std_error());
                 assert!(std::error::Error::source(adapter.as_ref()).is_none());
                 let error = ErrorUnion::<Set>::try_from_dyn_error(adapter).unwrap();
-                let erased: ErrorUnion = error.into();
+                let mut erased: ErrorUnion = error.into();
                 assert_eq!(format!("{erased:?}"), report);
-                assert_eq!(erased.downcast_inner::<Payload<$n>>().unwrap().0, original);
+                let shared: Shared<'_> = (&erased).try_into().unwrap();
+                match shared {
+                    eros::$enum::$variant(payload) => assert_eq!(payload.0, original),
+                    #[allow(unreachable_patterns)]
+                    _ => panic!("wrong fallible borrowed variant for {}", $n),
+                }
+                let mutable: Mutable<'_> = (&mut erased).try_into().unwrap();
+                match mutable {
+                    eros::$enum::$variant(payload) => payload.0.push_str(" updated"),
+                    #[allow(unreachable_patterns)]
+                    _ => panic!("wrong fallible mutable variant for {}", $n),
+                }
+                let owned: Owned = erased.try_into().unwrap();
+                match owned {
+                    eros::$enum::$variant(payload) => assert_eq!(payload.0, format!("{original} updated")),
+                    #[allow(unreachable_patterns)]
+                    _ => panic!("wrong fallible owned variant for {}", $n),
+                }
             )+
+            let erased: ErrorUnion = ErrorUnion::new(Payload::<26>("unmatched".into()));
+            let unmatched = Owned::try_from(erased).err().unwrap();
+            assert_eq!(unmatched.downcast_inner::<Payload<26>>().unwrap().0, "unmatched");
         }
     };
 }

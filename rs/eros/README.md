@@ -654,7 +654,7 @@ match union_of.into() {
 }
 ```
 
-Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Every attribute below `error_enums` applies to all three enums.
+Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Every attribute below `error_enums` applies to all three enums. The generated enums also implement `TryFrom` for `ErrorUnion<AnyError>`
 
 The name is required, and an optional display format applies to all three enums:
 

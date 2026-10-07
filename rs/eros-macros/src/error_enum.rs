@@ -455,19 +455,39 @@ fn conversions(
     borrowed.params.insert(0, syn::parse_quote!('__eros_enum));
     let (borrow_generics, _, borrow_where) = borrowed.split_for_impl();
     let union_type = quote!(#crate_path::ErrorUnion<(#(#types,)*)>);
+    let erased_union_type = quote!(#crate_path::ErrorUnion<#crate_path::AnyError>);
 
-    let dispatch = |method: Ident| {
+    let dispatch = |method: Ident, fallible: bool| {
         let last = types.len() - 1;
-        let branches = variants.iter().zip(types).take(last).map(|(variant, ty)| {
-            // SAFETY: The dispatch condition checks the exact concrete type.
-            quote! {
-                if union_of.is_inner::<#ty>() {
-                    return Self::#variant(unsafe {
+        let checked = if fallible { types.len() } else { last };
+        let branches = variants
+            .iter()
+            .zip(types)
+            .take(checked)
+            .map(|(variant, ty)| {
+                // SAFETY: The dispatch condition checks the exact concrete type.
+                let value = quote! {
+                    Self::#variant(unsafe {
                         #crate_path::__private::#method::<#ty>(union_of)
-                    });
+                    })
+                };
+                let value = if fallible {
+                    quote!(::core::result::Result::Ok(#value))
+                } else {
+                    value
+                };
+                quote! {
+                    if union_of.is_inner::<#ty>() {
+                        return #value;
+                    }
                 }
-            }
-        });
+            });
+        if fallible {
+            return quote! {
+                #(#branches)*
+                ::core::result::Result::Err(union_of)
+            };
+        }
         let last_type = &types[last];
         let last_variant = &variants[last];
         // SAFETY: ErrorUnion's sealed type-set relations and invariant type
@@ -481,9 +501,12 @@ fn conversions(
             })
         }
     };
-    let owned = dispatch(format_ident!("downcast_error_unchecked"));
-    let shared = dispatch(format_ident!("downcast_error_ref_unchecked"));
-    let mutable = dispatch(format_ident!("downcast_error_mut_unchecked"));
+    let owned = dispatch(format_ident!("downcast_error_unchecked"), false);
+    let shared = dispatch(format_ident!("downcast_error_ref_unchecked"), false);
+    let mutable = dispatch(format_ident!("downcast_error_mut_unchecked"), false);
+    let try_owned = dispatch(format_ident!("downcast_error_unchecked"), true);
+    let try_shared = dispatch(format_ident!("downcast_error_ref_unchecked"), true);
+    let try_mutable = dispatch(format_ident!("downcast_error_mut_unchecked"), true);
     let owned_conversion = owned_enum.map(|owned_enum| {
         quote! {
             #(#owned_gating)*
@@ -491,6 +514,19 @@ fn conversions(
                 #[inline]
                 fn from(union_of: #union_type) -> Self {
                     #owned
+                }
+            }
+            #(#owned_gating)*
+            impl #impl_generics ::core::convert::TryFrom<#erased_union_type>
+                for #owned_enum #where_clause
+            {
+                type Error = #erased_union_type;
+
+                #[inline]
+                fn try_from(union_of: #erased_union_type)
+                    -> ::core::result::Result<Self, #erased_union_type>
+                {
+                    #try_owned
                 }
             }
         }
@@ -506,6 +542,19 @@ fn conversions(
                     #shared
                 }
             }
+            #(#ref_gating)*
+            impl #borrow_generics ::core::convert::TryFrom<&'__eros_enum #erased_union_type>
+                for #ref_enum #borrow_where
+            {
+                type Error = &'__eros_enum #erased_union_type;
+
+                #[inline]
+                fn try_from(union_of: &'__eros_enum #erased_union_type)
+                    -> ::core::result::Result<Self, &'__eros_enum #erased_union_type>
+                {
+                    #try_shared
+                }
+            }
         }
     });
     let mut_conversion = mut_enum.map(|mut_enum| {
@@ -517,6 +566,19 @@ fn conversions(
                 #[inline]
                 fn from(union_of: &'__eros_enum mut #union_type) -> Self {
                     #mutable
+                }
+            }
+            #(#mut_gating)*
+            impl #borrow_generics ::core::convert::TryFrom<&'__eros_enum mut #erased_union_type>
+                for #mut_enum #borrow_where
+            {
+                type Error = &'__eros_enum mut #erased_union_type;
+
+                #[inline]
+                fn try_from(union_of: &'__eros_enum mut #erased_union_type)
+                    -> ::core::result::Result<Self, &'__eros_enum mut #erased_union_type>
+                {
+                    #try_mutable
                 }
             }
         }

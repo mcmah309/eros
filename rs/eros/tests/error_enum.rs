@@ -1,4 +1,4 @@
-use eros::{ErrorUnion, MsgError};
+use eros::{AnyError, ErrorUnion, MsgError};
 use std::{
     fmt, io,
     sync::{
@@ -142,6 +142,39 @@ fn converts_every_named_variant_owned_shared_and_mutable() {
 }
 
 #[test]
+fn try_from_erased_union_matches_every_variant_and_preserves_borrows() {
+    let errors: [ErrorUnion<AnyError>; 2] = [
+        ErrorUnion::new(io::Error::new(io::ErrorKind::PermissionDenied, "original")),
+        ErrorUnion::new(fmt::Error),
+    ];
+    for (index, mut union) in errors.into_iter().enumerate() {
+        let original = union.inner() as *const dyn eros::SendSyncError as *const ();
+        match NameErrorRef::try_from(&union).unwrap() {
+            NameErrorRef::StdIoError(error) if index == 0 => {
+                assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+                assert_eq!(error as *const io::Error as *const (), original);
+            }
+            NameErrorRef::FmtError(error) if index == 1 => assert_eq!(error, &fmt::Error),
+            _ => panic!("wrong borrowed variant"),
+        }
+        match NameErrorMut::try_from(&mut union).unwrap() {
+            NameErrorMut::StdIoError(error) if index == 0 => {
+                assert_eq!(error as *mut io::Error as *const (), original);
+                *error = io::Error::other("updated");
+            }
+            NameErrorMut::FmtError(error) if index == 1 => *error = fmt::Error,
+            _ => panic!("wrong mutable variant"),
+        }
+        let owned: NameError = union.try_into().unwrap();
+        match owned {
+            NameError::StdIoError(error) if index == 0 => assert_eq!(error.to_string(), "updated"),
+            NameError::FmtError(fmt::Error) if index == 1 => {}
+            _ => panic!("wrong owned variant"),
+        }
+    }
+}
+
+#[test]
 fn automatic_error_traits_format_and_expose_each_contained_source() {
     fn require_error<E: std::error::Error>() {}
     require_error::<NameError>();
@@ -208,6 +241,42 @@ fn singleton_preserves_owned_storage_and_tuple_alias() {
     assert_eq!(message.as_str().as_ptr(), original);
 }
 
+#[test]
+fn singleton_try_from_checks_type_and_preserves_owned_storage() {
+    let message = String::from("owned payload");
+    let original = message.as_ptr();
+    let union: ErrorUnion<AnyError> = ErrorUnion::new(MsgError::from(message));
+    let SingleError::MsgError(message) = SingleError::try_from(union).unwrap();
+    assert_eq!(message.as_str().as_ptr(), original);
+
+    let union: ErrorUnion<AnyError> = ErrorUnion::new(fmt::Error);
+    let union = SingleError::try_from(union).unwrap_err();
+    assert!(union.is_inner::<fmt::Error>());
+}
+
+type Error = fmt::Error;
+
+#[eros::error_enums(ErrorVariant)]
+type ErrorAlias = (Error,);
+
+#[test]
+fn error_variant_does_not_conflict_with_try_from_associated_type() {
+    let union: ErrorUnion<ErrorAlias> = ErrorUnion::new(fmt::Error);
+    let mut union: ErrorUnion<AnyError> = union.into();
+    assert!(matches!(
+        ErrorVariantRef::try_from(&union).unwrap(),
+        ErrorVariantRef::Error(_)
+    ));
+    assert!(matches!(
+        ErrorVariantMut::try_from(&mut union).unwrap(),
+        ErrorVariantMut::Error(_)
+    ));
+    assert!(matches!(
+        ErrorVariant::try_from(union).unwrap(),
+        ErrorVariant::Error(fmt::Error)
+    ));
+}
+
 type E0 = MsgError;
 
 #[eros::error_enum(ShadowedError, "{0}")]
@@ -253,6 +322,35 @@ fn conversion_moves_payload_and_drops_metadata_once() {
     let owned: TrackedError = union.into();
     assert_eq!(payload_drops.load(Ordering::SeqCst), 0);
     assert_eq!(context_drops.load(Ordering::SeqCst), 1);
+    drop(owned);
+    assert_eq!(payload_drops.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn failed_try_from_returns_original_union_and_borrows_with_diagnostics() {
+    let payload_drops = Arc::new(AtomicUsize::new(0));
+    let union: ErrorUnion<AnyError> = ErrorUnion::new(DropError(payload_drops.clone()));
+    // Matching context types must not be mistaken for the inner error.
+    let context: Box<dyn eros::SendSyncError> = Box::new(fmt::Error);
+    let mut union = union.context(context);
+    let original = union.inner() as *const dyn eros::SendSyncError as *const ();
+    let report = format!("{union:?}");
+
+    let shared = NameErrorRef::try_from(&union).unwrap_err();
+    assert!(std::ptr::eq(shared, &union));
+    let union_address = &mut union as *mut ErrorUnion<AnyError>;
+    let mutable = NameErrorMut::try_from(&mut union).unwrap_err();
+    assert_eq!(mutable as *mut ErrorUnion<AnyError>, union_address);
+    let union = NameError::try_from(union).unwrap_err();
+    assert_eq!(
+        union.inner() as *const dyn eros::SendSyncError as *const (),
+        original
+    );
+    assert_eq!(format!("{union:?}"), report);
+    assert_eq!(payload_drops.load(Ordering::SeqCst), 0);
+
+    let owned = TrackedError::try_from(union).unwrap();
+    assert_eq!(payload_drops.load(Ordering::SeqCst), 0);
     drop(owned);
     assert_eq!(payload_drops.load(Ordering::SeqCst), 1);
 }
