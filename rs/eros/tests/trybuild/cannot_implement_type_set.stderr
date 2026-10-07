@@ -37,9 +37,9 @@ note: required by a bound in `TypeSet`
           and $N others
 
 error[E0277]: the trait bound `CustomSet: type_set::sealed::Sealed` is not satisfied
-  --> tests/trybuild/cannot_implement_type_set.rs:13:20
+  --> tests/trybuild/cannot_implement_type_set.rs:10:20
    |
-13 | impl TupleForm for CustomSet {
+10 | impl TupleForm for CustomSet {
    |                    ^^^^^^^^^ unsatisfied trait bound
    |
 help: the trait `type_set::sealed::Sealed` is not implemented for `CustomSet`

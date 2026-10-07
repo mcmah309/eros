@@ -1,4 +1,4 @@
-use eros::{AnyError, E26, ErrorUnion, SendSyncError, TypeSet};
+use eros::{AnyError, ErrorUnion, SendSyncError, TypeSet};
 use std::fmt;
 
 #[derive(Debug)]
@@ -147,19 +147,16 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
 }
 
 #[test]
-fn largest_error_set_supports_enum_conversions_and_reshaping() {
+fn largest_error_set_supports_reshaping() {
     let error: ErrorUnion<(TestError<25>,)> = ErrorUnion::new(TestError::<25>);
-    let mut error: ErrorUnion<AllErrors> = error.widen();
-    assert!(matches!(error.as_enum(), E26::Z(_)));
-    assert!(matches!(error.as_mut_enum(), E26::Z(_)));
-    assert!(matches!(error.into_enum(), E26::Z(_)));
+    let error: ErrorUnion<AllErrors> = error.widen();
+    assert!(error.is_inner::<TestError<25>>());
 
     let error: ErrorUnion<AllErrors> = ErrorUnion::new(TestError::<25>);
     let remainder = error.narrow::<TestError<0>, _>().unwrap_err();
     assert!(remainder.narrow::<TestError<25>, _>().is_ok());
 
     let error: ErrorUnion<AllErrors> = ErrorUnion::new(TestError::<25>);
-    let selected: Result<ErrorUnion<AllErrors>, ErrorUnion<()>> =
-        error.narrow::<AllErrors, _>();
-    assert!(matches!(selected.unwrap().as_enum(), E26::Z(_)));
+    let selected: Result<ErrorUnion<AllErrors>, ErrorUnion<()>> = error.narrow::<AllErrors, _>();
+    assert!(selected.unwrap().is_inner::<TestError<25>>());
 }

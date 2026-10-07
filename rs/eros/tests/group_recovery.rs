@@ -1,8 +1,11 @@
-use eros::{E2, ErrorUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::{fmt, io, net::AddrParseError, num::ParseIntError};
 
 type Input = (MsgError, io::Error, fmt::Error, ParseIntError);
+#[eros::error_enum(SelectedError)]
+#[eros::error_enum_ref(SelectedErrorRef)]
 type Selected = (fmt::Error, MsgError);
+#[eros::error_enum(RemainingError)]
 type Remaining = (io::Error, ParseIntError);
 
 fn input_errors() -> [ErrorUnion<Input>; 4] {
@@ -35,9 +38,9 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
-            match (index, error.into_enum()) {
-                (0, E2::B(error)) => assert_eq!(error.as_str(), "message"),
-                (2, E2::A(fmt::Error)) => {}
+            match (index, SelectedError::from(error)) {
+                (0, SelectedError::MsgError(error)) => assert_eq!(error.as_str(), "message"),
+                (2, SelectedError::FmtError(fmt::Error)) => {}
                 _ => panic!("wrong selected variant or tuple order"),
             }
             7
@@ -55,8 +58,8 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
-            match (index, error.into_enum()) {
-                (1, E2::A(_)) | (3, E2::B(_)) => {}
+            match (index, RemainingError::from(error)) {
+                (1, RemainingError::IoError(_)) | (3, RemainingError::ParseIntError(_)) => {}
                 _ => panic!("wrong remaining variant or tuple order"),
             }
         }
@@ -65,6 +68,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
 
 #[test]
 fn try_recover_groups_keep_original_and_fallback_diagnostics() {
+    #[eros::error_enum(OutputError)]
     type Output = (ParseIntError, AddrParseError, io::Error);
     for (index, error) in input_errors().into_iter().enumerate() {
         let error = error.context("original operation");
@@ -101,8 +105,10 @@ fn try_recover_groups_keep_original_and_fallback_diagnostics() {
             expected_ptr
         );
         assert_eq!(format!("{error:?}"), expected_report);
-        match (index, error.into_enum()) {
-            (0 | 2, eros::E3::B(_)) | (1, eros::E3::C(_)) | (3, eros::E3::A(_)) => {}
+        match (index, OutputError::from(error)) {
+            (0 | 2, OutputError::AddrParseError(_))
+            | (1, OutputError::IoError(_))
+            | (3, OutputError::ParseIntError(_)) => {}
             _ => panic!("wrong output variant"),
         }
     }
@@ -134,7 +140,10 @@ fn fallible_group_handler_can_reintroduce_handled_types() {
     let result: eros::Result<(), (io::Error, MsgError, fmt::Error)> = Err(error);
     let result: eros::Result<(), (MsgError, fmt::Error, io::Error)> = result
         .try_recover::<Selected, _, _, _>(|error| {
-            assert!(matches!(error.as_enum(), E2::A(_)));
+            assert!(matches!(
+                SelectedErrorRef::from(&error),
+                SelectedErrorRef::FmtError(_)
+            ));
             Err(error.widen())
         });
     let error = result.unwrap_err();

@@ -127,7 +127,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(MsgError::from_static(ERROR)))();
     let value = result
         .recover(|error: ErrorUnion<(Timeout, MsgError)>| {
-            assert!(matches!(error.as_enum(), eros::E2::B(_)));
+            assert!(error.is_inner::<MsgError>());
             7
         })
         .into_value();
@@ -346,7 +346,7 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
 
 #[cfg(test)]
 mod tests {
-    use super::{NotEnoughMemory, Timeout, run_no_std_checks};
+    use super::{NamedErrors, NamedErrorsError, NotEnoughMemory, Timeout, run_no_std_checks};
     use eros::{AnyError, Context, ErrorUnion, SendSyncError, MsgError};
 
     #[test]
@@ -379,12 +379,18 @@ mod tests {
     }
 
     #[test]
-    fn into_enum_works() {
-        let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(Timeout);
-        assert!(matches!(u.into_enum(), eros::E2::B(Timeout)));
+    fn named_enum_works() {
+        let u: ErrorUnion<NamedErrors> = ErrorUnion::new(Timeout);
+        assert!(matches!(
+            NamedErrorsError::from(u),
+            NamedErrorsError::Timeout(Timeout)
+        ));
 
-        let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(NotEnoughMemory);
-        assert!(matches!(u.into_enum(), eros::E2::A(NotEnoughMemory)));
+        let u: ErrorUnion<NamedErrors> = ErrorUnion::new(NotEnoughMemory);
+        assert!(matches!(
+            NamedErrorsError::from(u),
+            NamedErrorsError::NotEnoughMemory(NotEnoughMemory)
+        ));
     }
 
     #[test]

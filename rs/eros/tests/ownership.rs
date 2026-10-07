@@ -26,6 +26,9 @@ impl Drop for Tracked {
     }
 }
 
+#[eros::error_enum(TrackedError)]
+type TrackedSet = (Tracked,);
+
 fn tracked(drops: &Arc<AtomicUsize>) -> Tracked {
     Tracked {
         payload: vec![1, 2, 3],
@@ -33,7 +36,7 @@ fn tracked(drops: &Arc<AtomicUsize>) -> Tracked {
     }
 }
 
-fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<(Tracked,)> {
+fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<TrackedSet> {
     let error: ErrorUnion<(Tracked,)> = ErrorUnion::new(tracked(root));
     let context: Box<dyn SendSyncError> = Box::new(tracked(context));
     error.context(ContextValue::from(context))
@@ -94,7 +97,7 @@ fn owned_extraction_moves_the_root_and_drops_metadata_exactly_once() {
         |error: ErrorUnion<(Tracked,)>| error.narrow::<Tracked, _>().unwrap(),
         |error: ErrorUnion<(Tracked,)>| error.downcast_inner::<Tracked>().unwrap(),
         |error: ErrorUnion<(Tracked,)>| {
-            let eros::E1::A(value) = error.into_enum();
+            let TrackedError::Tracked(value) = TrackedError::from(error);
             value
         },
     ] {
@@ -143,7 +146,11 @@ fn union_and_widen_move_the_error_without_dropping_it() {
     let error: ErrorUnion<(Tracked, fmt::Error)> = result.unwrap_err().widen();
     assert_eq!(root.load(Ordering::SeqCst), 0);
     assert_eq!(
-        error.downcast_inner_ref::<Tracked>().unwrap().payload.as_ptr(),
+        error
+            .downcast_inner_ref::<Tracked>()
+            .unwrap()
+            .payload
+            .as_ptr(),
         original
     );
     drop(error);
@@ -196,8 +203,8 @@ fn try_recover_drops_original_metadata_and_transfers_fallback_ownership() {
         let fallback = union(&fallback_root, &fallback_context);
         let result: eros::Result<Tracked, (fmt::Error, Tracked)> =
             Err(union(&root, &context).widen());
-        let result: eros::Result<Tracked, (Tracked, fmt::Error)> =
-            result.try_recover::<Tracked, _, _, _>(|error| {
+        let result: eros::Result<Tracked, (Tracked, fmt::Error)> = result
+            .try_recover::<Tracked, _, _, _>(|error| {
                 assert_eq!(error.payload, [1, 2, 3]);
                 assert_eq!(root.load(Ordering::SeqCst), 0);
                 if succeeds {

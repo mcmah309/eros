@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Attribute, Generics, Ident, ItemEnum, ItemType, LitStr, Meta, Type};
+use syn::{Attribute, Generics, Ident, ItemType, LitStr, Meta, Type};
 
 #[derive(Clone)]
 pub(crate) struct ErrorEnumArgs {
@@ -271,7 +271,6 @@ pub(crate) fn expand_alias(
     }
     let conversions = conversions(
         targets,
-        &Generics::default(),
         &types,
         &variants,
         &crate_path,
@@ -346,37 +345,6 @@ fn error_traits(
     }
 }
 
-pub(crate) fn expand_numbered(item: ItemEnum) -> syn::Result<TokenStream> {
-    validate_arity(item.variants.len(), &item)?;
-    let mut types = Vec::new();
-    let mut variants = Vec::new();
-    for variant in &item.variants {
-        let syn::Fields::Unnamed(fields) = &variant.fields else {
-            return Err(syn::Error::new_spanned(variant, "expected a tuple variant"));
-        };
-        if fields.unnamed.len() != 1 {
-            return Err(syn::Error::new_spanned(variant, "expected one payload"));
-        }
-        types.push(fields.unnamed[0].ty.clone());
-        variants.push(variant.ident.clone());
-    }
-    let name = &item.ident;
-    let gating = gating_attrs(&item.attrs)?;
-    let conversions = conversions(
-        [
-            Some(quote!(#name<#(#types),*>)),
-            Some(quote!(#name<#(&'__eros_enum #types),*>)),
-            Some(quote!(#name<#(&'__eros_enum mut #types),*>)),
-        ],
-        &item.generics,
-        &types,
-        &variants,
-        &quote!(crate),
-        [&gating, &gating, &gating],
-    );
-    Ok(quote! { #item #conversions })
-}
-
 fn validate_arity(count: usize, item: impl quote::ToTokens) -> syn::Result<()> {
     if !(1..=26).contains(&count) {
         return Err(syn::Error::new_spanned(
@@ -435,7 +403,6 @@ fn gating_attrs(attrs: &[Attribute]) -> syn::Result<Vec<Attribute>> {
 
 fn conversions(
     targets: [Option<TokenStream>; 3],
-    generics: &Generics,
     types: &[Type],
     variants: &[Ident],
     crate_path: &TokenStream,
@@ -443,7 +410,7 @@ fn conversions(
 ) -> TokenStream {
     let [owned_enum, ref_enum, mut_enum] = targets;
     let [owned_gating, ref_gating, mut_gating] = gating;
-    let mut bounded = generics.clone();
+    let mut bounded = Generics::default();
     for ty in types {
         bounded
             .make_where_clause()
@@ -455,46 +422,33 @@ fn conversions(
     borrowed.params.insert(0, syn::parse_quote!('__eros_enum));
     let (borrow_generics, _, borrow_where) = borrowed.split_for_impl();
     let mut from_bounded = bounded.clone();
-    // Named enums have concrete payload types, so a private membership trait
-    // can prove that every source variant belongs to the enum. Keep the legacy
-    // generic numbered enums' exact-tuple conversions.
-    let (union_type, subset_proofs) = if generics.params.is_empty() {
-        let tokens = quote!(#(#types)* #owned_enum #ref_enum #mut_enum).to_string();
-        let mut used: HashSet<_> = tokens
-            .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
-            .map(str::to_owned)
-            .collect();
-        let mut fresh = |base: &str| {
-            let mut name = base.to_owned();
-            while !used.insert(name.clone()) {
-                name.push('_');
-            }
-            format_ident!("{name}")
-        };
-        let member = fresh("__ErosEnumMember");
-        let subset = fresh("__ErosEnumSubset");
-        let source = fresh("__ErosEnumSource");
-        from_bounded.params.push(syn::parse_quote!(#source));
-        let predicates = &mut from_bounded.make_where_clause().predicates;
-        predicates.push(syn::parse_quote!(#source: #crate_path::TypeSet + #subset));
-        let tuples = (1..=26).map(|arity| {
-            let parameters: Vec<_> = (0..arity).map(|n| format_ident!("T{n}")).collect();
-            quote! {
-                impl<#(#parameters: #member),*> #subset for (#(#parameters,)*) {}
-            }
-        });
-        let proofs = quote! {
-            trait #member {}
-            #(impl #member for #types {})*
-
-            trait #subset {}
-            impl #subset for () {}
-            #(#tuples)*
-        };
-        (quote!(#crate_path::ErrorUnion<#source>), Some(proofs))
-    } else {
-        (quote!(#crate_path::ErrorUnion<(#(#types,)*)>), None)
+    // Private membership bounds prove that every source variant belongs to
+    // the enum, without exposing a trait that callers could extend.
+    let tokens = quote!(#(#types)* #owned_enum #ref_enum #mut_enum).to_string();
+    let mut used: HashSet<_> = tokens
+        .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
+        .map(str::to_owned)
+        .collect();
+    let mut fresh = |base: &str| {
+        let mut name = base.to_owned();
+        while !used.insert(name.clone()) {
+            name.push('_');
+        }
+        format_ident!("{name}")
     };
+    let member = fresh("__ErosEnumMember");
+    let subset = fresh("__ErosEnumSubset");
+    let source = fresh("__ErosEnumSource");
+    from_bounded.params.push(syn::parse_quote!(#source));
+    let predicates = &mut from_bounded.make_where_clause().predicates;
+    predicates.push(syn::parse_quote!(#source: #crate_path::TypeSet + #subset));
+    let tuples = (1..=26).map(|arity| {
+        let parameters: Vec<_> = (0..arity).map(|n| format_ident!("T{n}")).collect();
+        quote! {
+            impl<#(#parameters: #member),*> #subset for (#(#parameters,)*) {}
+        }
+    });
+    let union_type = quote!(#crate_path::ErrorUnion<#source>);
     let (from_generics, _, from_where) = from_bounded.split_for_impl();
     let mut from_borrowed = from_bounded.clone();
     from_borrowed
@@ -630,20 +584,18 @@ fn conversions(
             }
         }
     });
-    let implementations = quote! {
-        #owned_conversion
-        #ref_conversion
-        #mut_conversion
-    };
-    if let Some(proofs) = subset_proofs {
-        // The proof traits cannot be named or extended outside this scope.
-        quote! {
-            const _: () = {
-                #proofs
-                #implementations
-            };
-        }
-    } else {
-        implementations
+    quote! {
+        const _: () = {
+            trait #member {}
+            #(impl #member for #types {})*
+
+            trait #subset {}
+            impl #subset for () {}
+            #(#tuples)*
+
+            #owned_conversion
+            #ref_conversion
+            #mut_conversion
+        };
     }
 }

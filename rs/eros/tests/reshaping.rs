@@ -1,6 +1,8 @@
-use eros::{E2, ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::fmt;
 
+#[eros::error_enum(PairError)]
+#[eros::error_enum_ref(PairErrorRef)]
 type Pair = (MsgError, fmt::Error);
 type Triple = (MsgError, fmt::Error, std::io::Error);
 
@@ -32,9 +34,9 @@ fn group_narrow_accepts_each_member_in_requested_order() {
         let report = format!("{error:?}");
         let selected = error.narrow::<(fmt::Error, MsgError), _>().unwrap();
         assert_eq!(format!("{selected:?}"), report);
-        match (index, selected.into_enum()) {
-            (0, E2::B(error)) => assert_eq!(error.as_str(), "message"),
-            (1, E2::A(fmt::Error)) => {}
+        match (index, PairError::from(selected)) {
+            (0, PairError::MsgError(error)) => assert_eq!(error.as_str(), "message"),
+            (1, PairError::FmtError(fmt::Error)) => {}
             _ => panic!("selected changed the active variant"),
         }
     }
@@ -54,7 +56,10 @@ fn full_narrow_target_can_be_reordered_and_has_an_empty_remainder() {
     let error: ErrorUnion<Pair> = ErrorUnion::new(fmt::Error);
     let selected: Result<ErrorUnion<(fmt::Error, MsgError)>, ErrorUnion<()>> =
         error.narrow::<(fmt::Error, MsgError), _>();
-    assert!(matches!(selected.unwrap().into_enum(), E2::A(fmt::Error)));
+    assert!(matches!(
+        PairError::from(selected.unwrap()),
+        PairError::FmtError(fmt::Error)
+    ));
 }
 
 #[test]
@@ -62,6 +67,10 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
     use std::{io, num::ParseIntError};
 
     type Variants = (MsgError, fmt::Error, io::Error, ParseIntError);
+    #[eros::error_enum_ref(SelectedErrorRef)]
+    type Selected = (io::Error, fmt::Error);
+    #[eros::error_enum_ref(RemainingErrorRef)]
+    type Remaining = (MsgError, ParseIntError);
     let errors: [ErrorUnion<Variants>; 4] = [
         ErrorUnion::new(MsgError::from(String::from("message"))),
         ErrorUnion::new(fmt::Error),
@@ -80,30 +89,28 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
 
         // The requested order differs from the input; the complement must retain
         // its original order. The explicit types also check the computed sets.
-        let partition: Result<
-            ErrorUnion<(io::Error, fmt::Error)>,
-            ErrorUnion<(MsgError, ParseIntError)>,
-        > = error.narrow::<(io::Error, fmt::Error), _>();
+        let partition: Result<ErrorUnion<Selected>, ErrorUnion<Remaining>> =
+            error.narrow::<Selected, _>();
         let error: ErrorUnion<Variants> = match partition {
             Ok(selected) => {
                 assert!(matches!(index, 1 | 2), "selected an unlisted variant");
-                match selected.as_enum() {
-                    E2::A(error) => {
+                match SelectedErrorRef::from(&selected) {
+                    SelectedErrorRef::IoError(error) => {
                         assert_eq!(index, 2);
                         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
                     }
-                    E2::B(_) => assert_eq!(index, 1),
+                    SelectedErrorRef::FmtError(_) => assert_eq!(index, 1),
                 }
                 selected.widen()
             }
             Err(remainder) => {
                 assert!(matches!(index, 0 | 3), "rejected a requested variant");
-                match remainder.as_enum() {
-                    E2::A(error) => {
+                match RemainingErrorRef::from(&remainder) {
+                    RemainingErrorRef::MsgError(error) => {
                         assert_eq!(index, 0);
                         assert_eq!(error.as_str(), "message");
                     }
-                    E2::B(error) => {
+                    RemainingErrorRef::ParseIntError(error) => {
                         assert_eq!(index, 3);
                         assert_eq!(error.kind(), &std::num::IntErrorKind::InvalidDigit);
                     }
@@ -158,17 +165,13 @@ fn result_narrow_covers_success_matching_error_and_remainder() {
     );
 
     let matching: eros::Result<(), Pair> = Err(ErrorUnion::new(MsgError::from("match")));
-    assert_eq!(
-        matching.narrow::<MsgError, _>().unwrap().as_str(),
-        "match"
-    );
+    assert_eq!(matching.narrow::<MsgError, _>().unwrap().as_str(), "match");
 
     let other: ErrorUnion<Pair> = ErrorUnion::new(fmt::Error);
     let other = other.context("retain me");
     let report = format!("{other:?}");
     let result: eros::Result<(), Pair> = Err(other);
-    let remainder: eros::Result<(), (fmt::Error,)> =
-        result.narrow::<MsgError, _>().unwrap_err();
+    let remainder: eros::Result<(), (fmt::Error,)> = result.narrow::<MsgError, _>().unwrap_err();
     let error = remainder.unwrap_err();
     assert_eq!(format!("{error:?}"), report);
     assert_eq!(error.into_single(), fmt::Error);
@@ -205,8 +208,8 @@ fn result_group_narrow_preserves_successes_and_both_error_branches() {
         > = result.narrow::<(fmt::Error, MsgError), _>();
         let error: ErrorUnion<Triple> = match selected {
             Ok(error) => {
-                match (index, error.as_enum()) {
-                    (0, E2::B(_)) | (1, E2::A(_)) => {}
+                match (index, PairErrorRef::from(&error)) {
+                    (0, PairErrorRef::MsgError(_)) | (1, PairErrorRef::FmtError(_)) => {}
                     _ => panic!("incorrect selected variant"),
                 }
                 error.widen()
@@ -322,7 +325,7 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
-            assert!(matches!(error.into_enum(), E2::A(_)));
+            assert!(error.is_inner::<MsgError>());
         }
     }
 }
@@ -461,10 +464,7 @@ fn mutable_erased_root_and_boxed_error_trait_refer_to_the_actual_error() {
     assert!(boxed.as_any().is::<Box<dyn eros::SendSyncError>>());
     assert!(boxed.as_ref().as_any().is::<MsgError>());
     let source = std::error::Error::source(&boxed).unwrap();
-    assert_eq!(
-        source.downcast_ref::<MsgError>().unwrap().as_str(),
-        "after"
-    );
+    assert_eq!(source.downcast_ref::<MsgError>().unwrap().as_str(), "after");
 }
 
 #[test]

@@ -144,17 +144,6 @@ fn expand_error_enum(
     }
 }
 
-/// Generates the legacy numbered enums' conversions at their declarations.
-#[doc(hidden)]
-#[proc_macro_attribute]
-pub fn __error_enum(_: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as syn::ItemEnum);
-    match error_enum::expand_numbered(item) {
-        Ok(tokens) => tokens.into(),
-        Err(error) => error.to_compile_error().into(),
-    }
-}
-
 struct FormatErrorInput {
     crate_path: syn::Path,
     message: Expr,

@@ -1,25 +1,31 @@
 use eros::{AnyError, ErrorUnion, MsgError, SendSyncError, prelude::*};
 use std::{fmt, io, num::ParseIntError};
 
+#[eros::error_enum(InputError)]
 type Input = (MsgError, fmt::Error, io::Error);
 type Reordered = (io::Error, MsgError, fmt::Error);
+#[eros::error_enum_ref(ExpandedErrorRef)]
 type Expanded = (ParseIntError, fmt::Error, MsgError, io::Error);
 
 #[test]
 fn union_inserts_each_concrete_error_at_its_declared_position() {
     let errors: [eros::Result<(), Input>; 3] = [
         Err(MsgError::from(String::from("owned message"))).union(),
-        Err(fmt::Error).union::<Input, _>().context("format response"),
+        Err(fmt::Error)
+            .union::<Input, _>()
+            .context("format response"),
         Err(io::Error::new(io::ErrorKind::PermissionDenied, "denied")).union(),
     ];
     for (index, result) in errors.into_iter().enumerate() {
         let error = result.unwrap_err();
         #[cfg(feature = "context")]
         assert_eq!(error.contexts().len(), usize::from(index == 1));
-        match (index, error.into_enum()) {
-            (0, eros::E3::A(error)) => assert_eq!(error.as_str(), "owned message"),
-            (1, eros::E3::B(fmt::Error)) => {}
-            (2, eros::E3::C(error)) => assert_eq!(error.kind(), io::ErrorKind::PermissionDenied),
+        match (index, InputError::from(error)) {
+            (0, InputError::MsgError(error)) => assert_eq!(error.as_str(), "owned message"),
+            (1, InputError::FmtError(fmt::Error)) => {}
+            (2, InputError::IoError(error)) => {
+                assert_eq!(error.kind(), io::ErrorKind::PermissionDenied)
+            }
             _ => panic!("union changed the concrete error or its position"),
         }
     }
@@ -73,10 +79,12 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
                 let error: ErrorUnion<Reordered> = error.widen();
                 error.widen()
             };
-            match (index, error.as_enum()) {
-                (0, eros::E4::C(error)) => assert_eq!(error.as_str(), "message"),
-                (1, eros::E4::B(_)) => {}
-                (2, eros::E4::D(error)) => assert_eq!(error.kind(), io::ErrorKind::Other),
+            match (index, ExpandedErrorRef::from(&error)) {
+                (0, ExpandedErrorRef::MsgError(error)) => assert_eq!(error.as_str(), "message"),
+                (1, ExpandedErrorRef::FmtError(_)) => {}
+                (2, ExpandedErrorRef::IoError(error)) => {
+                    assert_eq!(error.kind(), io::ErrorKind::Other)
+                }
                 _ => panic!("widen changed the active variant"),
             }
             let error: ErrorUnion<AnyError> = if as_result {
