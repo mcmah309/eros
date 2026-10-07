@@ -282,6 +282,87 @@ fn names_handle_snake_case_and_raw_identifiers() {
 #[cfg_attr(all(), cfg(any()), derive(Clone))]
 type DisabledAlias = (fmt::Error,);
 
+#[eros::error_enum(ScopedError)]
+#[eros::error_enum_ref]
+#[derive(Clone, Copy)]
+#[non_exhaustive]
+#[doc = "Shared error view"]
+#[eros::error_enum_mut]
+#[non_exhaustive]
+type Scoped = (io::Error, fmt::Error);
+
+#[eros::error_enum]
+#[eros::error_enum_mut]
+#[derive(PartialEq, Eq)]
+#[doc = "Mutable error view"]
+#[eros::error_enum_ref]
+#[cfg_attr(all(), derive(Clone, Copy))]
+type Comparable = (fmt::Error,);
+
+#[test]
+fn annotations_apply_to_the_selected_borrowed_enum() {
+    let mut union_of: ErrorUnion<Scoped> = ErrorUnion::new(io::Error::other("borrowed"));
+    let shared = ScopedErrorRef::from(&union_of);
+    let shared_copy = shared;
+    let shared_clone = shared.clone();
+    assert_eq!(shared.to_string(), shared_copy.to_string());
+    assert_eq!(shared.to_string(), shared_clone.to_string());
+    let mutable = ScopedErrorMut::from(&mut union_of);
+    assert_eq!(mutable.to_string(), "borrowed");
+    let owned = ScopedError::from(union_of);
+    assert_eq!(owned.to_string(), "borrowed");
+
+    let mut first: ErrorUnion<Comparable> = ErrorUnion::new(fmt::Error);
+    let mut second: ErrorUnion<Comparable> = ErrorUnion::new(fmt::Error);
+    assert_eq!(
+        ComparableErrorMut::from(&mut first),
+        ComparableErrorMut::from(&mut second)
+    );
+}
+
+#[eros::error_enum_ref]
+#[derive(Clone, Copy)]
+#[eros::error_enum(SharedFirstError, "shared-first: {0}")]
+#[eros::error_enum_mut]
+#[derive(PartialEq, Eq)]
+type SharedFirst = (fmt::Error,);
+
+#[eros::error_enum_mut]
+#[derive(PartialEq, Eq)]
+#[eros::error_enum_ref]
+#[derive(Clone, Copy)]
+#[eros::error_enum(MutableFirstError, "mutable-first: {0}")]
+type MutableFirst = (fmt::Error,);
+
+#[test]
+fn borrowed_markers_can_appear_before_the_owned_marker() {
+    let mut first: ErrorUnion<SharedFirst> = ErrorUnion::new(fmt::Error);
+    let mut second: ErrorUnion<SharedFirst> = ErrorUnion::new(fmt::Error);
+    let shared = SharedFirstErrorRef::from(&first);
+    let shared_copy = shared;
+    assert_eq!(shared.to_string(), shared_copy.to_string());
+    assert_eq!(shared.to_string(), format!("shared-first: {}", fmt::Error));
+    let expected = shared_copy.to_string();
+    assert_eq!(
+        SharedFirstErrorMut::from(&mut first),
+        SharedFirstErrorMut::from(&mut second)
+    );
+    assert_eq!(SharedFirstError::from(first).to_string(), expected);
+
+    let mut first: ErrorUnion<MutableFirst> = ErrorUnion::new(fmt::Error);
+    let mut second: ErrorUnion<MutableFirst> = ErrorUnion::new(fmt::Error);
+    let shared = MutableFirstErrorRef::from(&first);
+    let shared_copy = shared;
+    assert_eq!(shared.to_string(), shared_copy.to_string());
+    assert_eq!(shared.to_string(), format!("mutable-first: {}", fmt::Error));
+    let expected = shared_copy.to_string();
+    assert_eq!(
+        MutableFirstErrorMut::from(&mut first),
+        MutableFirstErrorMut::from(&mut second)
+    );
+    assert_eq!(MutableFirstError::from(first).to_string(), expected);
+}
+
 mod exported {
     #[eros::error_enum("{0}")]
     pub type Public = (core::fmt::Error,);

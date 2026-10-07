@@ -36,6 +36,10 @@ impl core::fmt::Display for InvalidPassword {
 impl core::error::Error for InvalidPassword {}
 
 #[eros::error_enum(NamedErrorsError)]
+#[eros::error_enum_ref]
+#[derive(Clone, Copy)]
+#[eros::error_enum_mut]
+#[non_exhaustive]
 pub type NamedErrors = (NotEnoughMemory, Timeout);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

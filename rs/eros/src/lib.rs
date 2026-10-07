@@ -71,7 +71,7 @@ pub mod type_set;
 mod user_context;
 
 // re-export macro
-pub use eros_macros::{context, eager_context, error_enum};
+pub use eros_macros::{context, eager_context, error_enum, error_enum_mut, error_enum_ref};
 
 // aliases
 pub type Result<T, E = AnyError> = core::result::Result<T, ErrorUnion<E>>;
