@@ -699,7 +699,7 @@ println!("{error}");
 Update preparation failed <- TLS certificate has expired
 ```
 
-For a union with a single possible error type, `map_single` passes the concrete error to the closure and preserves context, location, and backtrace. Or use `into_single` to extract that error and discard the metadata.
+For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving context, location, and backtrace. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
 
 ### Diagnostic Logging
 

@@ -795,9 +795,22 @@ impl<A: SendSyncError> AsMut<A> for ErrorUnion<(A,)> {
 }
 
 impl<A: SendSyncError> ErrorUnion<(A,)> {
+    /// Borrows the single concrete inner error, preserving context, location, and backtrace.
+    #[inline]
+    pub fn as_single(&self) -> &A {
+        self.as_ref()
+    }
+
+    /// Mutably borrows the single concrete inner error, preserving context, location, and backtrace.
+    #[inline]
+    pub fn as_single_mut(&mut self) -> &mut A {
+        self.as_mut()
+    }
+
     /// Convert the inner type of an `ErrorUnion` with a single possible type to that type.
     ///
-    /// Use `as_ref` or `as_mut` if you want to borrow the inner type instead of consuming the `ErrorUnion`.
+    /// Use [`Self::as_single`] or [`Self::as_single_mut`] to borrow the inner type
+    /// instead of consuming the `ErrorUnion`.
     #[inline]
     pub fn into_single(self) -> A {
         unsafe { self.inner.downcast_error_unchecked() }

@@ -406,7 +406,12 @@ fn singleton_borrowing_and_mapping_preserve_owned_values_and_metadata() {
     let mut error: ErrorUnion<(MsgError,)> = MsgError::from("before").into();
     assert_eq!(error.as_str(), "before"); // Deref
     assert!(std::ptr::eq::<MsgError>(&*error, error.as_ref()));
-    *error.as_mut() = MsgError::from(String::from("after"));
+    assert!(std::ptr::eq(error.as_single(), error.as_ref()));
+    let original = error.as_single() as *const MsgError;
+    assert_eq!(error.as_single_mut() as *const MsgError, original);
+    *error.as_single_mut() = MsgError::from(String::from("after"));
+    assert_eq!(error.as_single().as_str(), "after");
+    assert_eq!(error.as_mut() as *const MsgError, original);
     let error = error.context("mapping");
     let report = format!("{error:?}");
     let mut calls = 0;
