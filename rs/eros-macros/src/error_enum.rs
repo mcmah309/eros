@@ -465,7 +465,9 @@ fn conversions(
             .zip(types)
             .take(checked)
             .map(|(variant, ty)| {
-                // SAFETY: The dispatch condition checks the exact concrete type.
+                // SAFETY: The fully qualified inherent method checks the exact
+                // concrete type. Method-call syntax here would let a caller's
+                // extension trait on &mut ErrorUnion spoof this safety check.
                 let value = quote! {
                     Self::#variant(unsafe {
                         #crate_path::__private::#method::<#ty>(union_of)
@@ -477,7 +479,7 @@ fn conversions(
                     value
                 };
                 quote! {
-                    if union_of.is_inner::<#ty>() {
+                    if #crate_path::ErrorUnion::is_inner::<#ty>(&union_of) {
                         return #value;
                     }
                 }
