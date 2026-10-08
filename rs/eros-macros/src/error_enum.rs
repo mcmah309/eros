@@ -194,6 +194,11 @@ pub(crate) fn expand_alias(
                         .collect::<String>()
                 })
                 .collect();
+            let name = name
+                .strip_suffix("Error")
+                .filter(|name| !name.is_empty())
+                .unwrap_or(&name)
+                .to_owned();
             if !names.insert(name.clone()) {
                 return Err(syn::Error::new_spanned(
                     ty,

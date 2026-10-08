@@ -10,8 +10,8 @@ macro_rules! check_conversion {
             $message
         );
         match error {
-            AppErrorRef::IoError(error) => assert_eq!(error.to_string(), $message),
-            AppErrorRef::FmtError(error) => assert_eq!(error.to_string(), $message),
+            AppErrorRef::Io(error) => assert_eq!(error.to_string(), $message),
+            AppErrorRef::Fmt(error) => assert_eq!(error.to_string(), $message),
         }
     };
     (mutable, $union:ident, $message:ident) => {
@@ -22,11 +22,11 @@ macro_rules! check_conversion {
             $message
         );
         match error {
-            AppErrorMut::IoError(error) => {
+            AppErrorMut::Io(error) => {
                 *error = io::Error::other("updated");
                 $message = String::from("updated");
             }
-            AppErrorMut::FmtError(error) => *error = fmt::Error,
+            AppErrorMut::Fmt(error) => *error = fmt::Error,
         }
         assert_eq!($union.inner().to_string(), $message);
     };
@@ -38,8 +38,8 @@ macro_rules! check_conversion {
             $message
         );
         match error {
-            AppError::IoError(error) => assert_eq!(error.to_string(), $message),
-            AppError::FmtError(error) => assert_eq!(error.to_string(), $message),
+            AppError::Io(error) => assert_eq!(error.to_string(), $message),
+            AppError::Fmt(error) => assert_eq!(error.to_string(), $message),
         }
     };
 }
@@ -286,8 +286,8 @@ fn individual_macros_use_exact_names_and_independent_display_formats() {
     let mutable: Editable<'_> = (&mut union).into();
     assert_eq!(mutable.to_string(), "mutable: before");
     match mutable {
-        Editable::IoError(error) => *error = io::Error::other("after"),
-        Editable::FmtError(_) => panic!("wrong variant"),
+        Editable::Io(error) => *error = io::Error::other("after"),
+        Editable::Fmt(_) => panic!("wrong variant"),
     }
     let owned: Owned = union.into();
     assert_eq!(owned.to_string(), "owned: after");

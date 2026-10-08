@@ -39,8 +39,8 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
             match (index, SelectedError::from(error)) {
-                (0, SelectedError::MsgError(error)) => assert_eq!(error.as_str(), "message"),
-                (2, SelectedError::FmtError(fmt::Error)) => {}
+                (0, SelectedError::Msg(error)) => assert_eq!(error.as_str(), "message"),
+                (2, SelectedError::Fmt(fmt::Error)) => {}
                 _ => panic!("wrong selected variant or tuple order"),
             }
             7
@@ -59,7 +59,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
             match (index, RemainingError::from(error)) {
-                (1, RemainingError::IoError(_)) | (3, RemainingError::ParseIntError(_)) => {}
+                (1, RemainingError::Io(_)) | (3, RemainingError::ParseInt(_)) => {}
                 _ => panic!("wrong remaining variant or tuple order"),
             }
         }
@@ -106,9 +106,9 @@ fn try_recover_groups_keep_original_and_fallback_diagnostics() {
         );
         assert_eq!(format!("{error:?}"), expected_report);
         match (index, OutputError::from(error)) {
-            (0 | 2, OutputError::AddrParseError(_))
-            | (1, OutputError::IoError(_))
-            | (3, OutputError::ParseIntError(_)) => {}
+            (0 | 2, OutputError::AddrParse(_))
+            | (1, OutputError::Io(_))
+            | (3, OutputError::ParseInt(_)) => {}
             _ => panic!("wrong output variant"),
         }
     }
@@ -142,7 +142,7 @@ fn fallible_group_handler_can_reintroduce_handled_types() {
         .try_recover::<Selected, _, _, _>(|error| {
             assert!(matches!(
                 SelectedErrorRef::from(&error),
-                SelectedErrorRef::FmtError(_)
+                SelectedErrorRef::Fmt(_)
             ));
             Err(error.widen())
         });

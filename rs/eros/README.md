@@ -498,8 +498,8 @@ pub fn public_api() -> Result<(), CrateError> {
 fn main() {
     match public_api() {
         Ok(()) => println!("Success!"),
-        Err(CrateError::IoError(e)) => println!("IO error: {}", e),
-        Err(CrateError::FmtError(e)) => println!("Format error: {}", e),
+        Err(CrateError::Io(e)) => println!("IO error: {}", e),
+        Err(CrateError::Fmt(e)) => println!("Format error: {}", e),
     }
 }
 ```
@@ -649,12 +649,12 @@ pub type ErrorSet = (io::Error, fmt::Error);
 
 let union_of: ErrorUnion<ErrorSet> = ErrorUnion::new(fmt::Error);
 match union_of.into() {
-    Error::IoError(error) => eprintln!("I/O error: {error}"),
-    Error::FmtError(error) => eprintln!("Formatting error: {error}"),
+    Error::Io(error) => eprintln!("I/O error: {error}"),
+    Error::Fmt(error) => eprintln!("Formatting error: {error}"),
 }
 ```
 
-Here the variants are `IoError` and `FmtError`. `Display` delegates to the contained error, and `Error::source()` returns it. Every attribute below `error_enums` applies to all three enums. The generated enums also implement `TryFrom` for `ErrorUnion<AnyError>`
+Here the variants are `Io` and `Fmt`: generated variant names strip a trailing `Error` unless that would leave an empty name. `Display` delegates to the contained error, and `Error::source()` returns it. Every attribute below `error_enums` applies to all three enums. The generated enums also implement `TryFrom` for `ErrorUnion<AnyError>`
 
 Generated `From` conversions accept any tuple of the enum's error types, including subsets and reordered tuples. This works for owned unions and shared or mutable references, without calling `widen` first:
 

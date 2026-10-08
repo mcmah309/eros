@@ -35,8 +35,8 @@ fn group_narrow_accepts_each_member_in_requested_order() {
         let selected = error.narrow::<(fmt::Error, MsgError), _>().unwrap();
         assert_eq!(format!("{selected:?}"), report);
         match (index, PairError::from(selected)) {
-            (0, PairError::MsgError(error)) => assert_eq!(error.as_str(), "message"),
-            (1, PairError::FmtError(fmt::Error)) => {}
+            (0, PairError::Msg(error)) => assert_eq!(error.as_str(), "message"),
+            (1, PairError::Fmt(fmt::Error)) => {}
             _ => panic!("selected changed the active variant"),
         }
     }
@@ -58,7 +58,7 @@ fn full_narrow_target_can_be_reordered_and_has_an_empty_remainder() {
         error.narrow::<(fmt::Error, MsgError), _>();
     assert!(matches!(
         PairError::from(selected.unwrap()),
-        PairError::FmtError(fmt::Error)
+        PairError::Fmt(fmt::Error)
     ));
 }
 
@@ -95,22 +95,22 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
             Ok(selected) => {
                 assert!(matches!(index, 1 | 2), "selected an unlisted variant");
                 match SelectedErrorRef::from(&selected) {
-                    SelectedErrorRef::IoError(error) => {
+                    SelectedErrorRef::Io(error) => {
                         assert_eq!(index, 2);
                         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
                     }
-                    SelectedErrorRef::FmtError(_) => assert_eq!(index, 1),
+                    SelectedErrorRef::Fmt(_) => assert_eq!(index, 1),
                 }
                 selected.widen()
             }
             Err(remainder) => {
                 assert!(matches!(index, 0 | 3), "rejected a requested variant");
                 match RemainingErrorRef::from(&remainder) {
-                    RemainingErrorRef::MsgError(error) => {
+                    RemainingErrorRef::Msg(error) => {
                         assert_eq!(index, 0);
                         assert_eq!(error.as_str(), "message");
                     }
-                    RemainingErrorRef::ParseIntError(error) => {
+                    RemainingErrorRef::ParseInt(error) => {
                         assert_eq!(index, 3);
                         assert_eq!(error.kind(), &std::num::IntErrorKind::InvalidDigit);
                     }
@@ -209,7 +209,7 @@ fn result_group_narrow_preserves_successes_and_both_error_branches() {
         let error: ErrorUnion<Triple> = match selected {
             Ok(error) => {
                 match (index, PairErrorRef::from(&error)) {
-                    (0, PairErrorRef::MsgError(_)) | (1, PairErrorRef::FmtError(_)) => {}
+                    (0, PairErrorRef::Msg(_)) | (1, PairErrorRef::Fmt(_)) => {}
                     _ => panic!("incorrect selected variant"),
                 }
                 error.widen()

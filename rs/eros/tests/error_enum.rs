@@ -118,24 +118,24 @@ fn converts_every_named_variant_owned_shared_and_mutable() {
         let original = union.inner() as *const dyn eros::SendSyncError as *const ();
         let borrowed: NameErrorRef<'_> = (&union).into();
         match (index, borrowed) {
-            (0, NameErrorRef::StdIoError(error)) => {
+            (0, NameErrorRef::StdIo(error)) => {
                 assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
                 assert_eq!(error as *const io::Error as *const (), original);
             }
-            (1, NameErrorRef::FmtError(error)) => assert_eq!(error, &fmt::Error),
+            (1, NameErrorRef::Fmt(error)) => assert_eq!(error, &fmt::Error),
             _ => panic!("wrong borrowed variant"),
         }
         let mutable: NameErrorMut<'_> = (&mut union).into();
         match (index, mutable) {
-            (0, NameErrorMut::StdIoError(error)) => *error = io::Error::other("updated"),
-            (1, NameErrorMut::FmtError(error)) => *error = fmt::Error,
+            (0, NameErrorMut::StdIo(error)) => *error = io::Error::other("updated"),
+            (1, NameErrorMut::Fmt(error)) => *error = fmt::Error,
             _ => panic!("wrong mutable variant"),
         }
         let owned: NameError = union.into();
         assert!(!format!("{owned:?}").is_empty());
         match (index, owned) {
-            (0, NameError::StdIoError(error)) => assert_eq!(error.to_string(), "updated"),
-            (1, NameError::FmtError(fmt::Error)) => {}
+            (0, NameError::StdIo(error)) => assert_eq!(error.to_string(), "updated"),
+            (1, NameError::Fmt(fmt::Error)) => {}
             _ => panic!("wrong owned variant"),
         }
     }
@@ -150,25 +150,25 @@ fn try_from_erased_union_matches_every_variant_and_preserves_borrows() {
     for (index, mut union) in errors.into_iter().enumerate() {
         let original = union.inner() as *const dyn eros::SendSyncError as *const ();
         match NameErrorRef::try_from(&union).unwrap() {
-            NameErrorRef::StdIoError(error) if index == 0 => {
+            NameErrorRef::StdIo(error) if index == 0 => {
                 assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
                 assert_eq!(error as *const io::Error as *const (), original);
             }
-            NameErrorRef::FmtError(error) if index == 1 => assert_eq!(error, &fmt::Error),
+            NameErrorRef::Fmt(error) if index == 1 => assert_eq!(error, &fmt::Error),
             _ => panic!("wrong borrowed variant"),
         }
         match NameErrorMut::try_from(&mut union).unwrap() {
-            NameErrorMut::StdIoError(error) if index == 0 => {
+            NameErrorMut::StdIo(error) if index == 0 => {
                 assert_eq!(error as *mut io::Error as *const (), original);
                 *error = io::Error::other("updated");
             }
-            NameErrorMut::FmtError(error) if index == 1 => *error = fmt::Error,
+            NameErrorMut::Fmt(error) if index == 1 => *error = fmt::Error,
             _ => panic!("wrong mutable variant"),
         }
         let owned: NameError = union.try_into().unwrap();
         match owned {
-            NameError::StdIoError(error) if index == 0 => assert_eq!(error.to_string(), "updated"),
-            NameError::FmtError(fmt::Error) if index == 1 => {}
+            NameError::StdIo(error) if index == 0 => assert_eq!(error.to_string(), "updated"),
+            NameError::Fmt(fmt::Error) if index == 1 => {}
             _ => panic!("wrong owned variant"),
         }
     }
@@ -217,11 +217,11 @@ fn automatic_error_traits_format_and_expose_each_contained_source() {
         let source = std::error::Error::source(&owned).unwrap();
         assert_eq!(source.to_string(), inner_message);
         match &owned {
-            NameError::StdIoError(error) => assert!(std::ptr::eq(
+            NameError::StdIo(error) => assert!(std::ptr::eq(
                 source.downcast_ref::<io::Error>().unwrap(),
                 error,
             )),
-            NameError::FmtError(error) => assert!(std::ptr::eq(
+            NameError::Fmt(error) => assert!(std::ptr::eq(
                 source.downcast_ref::<fmt::Error>().unwrap(),
                 error,
             )),
@@ -237,7 +237,7 @@ fn singleton_preserves_owned_storage_and_tuple_alias() {
     let message = String::from("owned payload");
     let original = message.as_ptr();
     let result: eros::Result<(), Single> = Err(ErrorUnion::new(MsgError::from(message)));
-    let SingleError::MsgError(message) = SingleError::from(result.unwrap_err());
+    let SingleError::Msg(message) = SingleError::from(result.unwrap_err());
     assert_eq!(message.as_str().as_ptr(), original);
 }
 
@@ -246,7 +246,7 @@ fn singleton_try_from_checks_type_and_preserves_owned_storage() {
     let message = String::from("owned payload");
     let original = message.as_ptr();
     let union: ErrorUnion<AnyError> = ErrorUnion::new(MsgError::from(message));
-    let SingleError::MsgError(message) = SingleError::try_from(union).unwrap();
+    let SingleError::Msg(message) = SingleError::try_from(union).unwrap();
     assert_eq!(message.as_str().as_ptr(), original);
 
     let union: ErrorUnion<AnyError> = ErrorUnion::new(fmt::Error);
@@ -475,14 +475,14 @@ fn generated_enum_preserves_alias_visibility() {
     let mut union: ErrorUnion<exported::Public> = ErrorUnion::new(fmt::Error);
     assert!(matches!(
         exported::PublicErrorRef::from(&union),
-        exported::PublicErrorRef::CoreFmtError(_)
+        exported::PublicErrorRef::CoreFmt(_)
     ));
     assert!(matches!(
         exported::PublicErrorMut::from(&mut union),
-        exported::PublicErrorMut::CoreFmtError(_)
+        exported::PublicErrorMut::CoreFmt(_)
     ));
     assert!(matches!(
         exported::PublicError::from(union),
-        exported::PublicError::CoreFmtError(_)
+        exported::PublicError::CoreFmt(_)
     ));
 }

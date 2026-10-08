@@ -88,8 +88,8 @@ fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
         #[cfg(feature = "diagnostic")]
         assert_eq!(error.to_debug_json(), diagnostic);
         match (index, OutputError::from(error)) {
-            (0, OutputError::MsgError(error)) => assert_eq!(error.as_str(), "message"),
-            (1, OutputError::FmtError(fmt::Error)) => {}
+            (0, OutputError::Msg(error)) => assert_eq!(error.as_str(), "message"),
+            (1, OutputError::Fmt(fmt::Error)) => {}
             _ => panic!("wrong remaining variant"),
         }
     }

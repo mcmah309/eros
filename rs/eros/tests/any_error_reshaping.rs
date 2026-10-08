@@ -91,10 +91,10 @@ fn erased_group_narrow_builds_typed_unions_and_preserves_both_branches() {
                 Ok(selected) => {
                     snapshot.assert_preserved(&selected);
                     match (index, SelectedErrorRef::from(&selected)) {
-                        (0, SelectedErrorRef::MsgError(error)) => {
+                        (0, SelectedErrorRef::Msg(error)) => {
                             assert_eq!(error.as_str(), "message")
                         }
-                        (1, SelectedErrorRef::FmtError(_)) => {}
+                        (1, SelectedErrorRef::Fmt(_)) => {}
                         _ => panic!("selected the wrong typed variant"),
                     }
                     selected.into()
@@ -156,7 +156,7 @@ fn erased_result_narrow_preserves_success_and_routes_each_error() {
                         snapshot.assert_preserved(&error);
                         assert!(matches!(
                             (index, SelectedErrorRef::from(&error)),
-                            (0, SelectedErrorRef::MsgError(_)) | (1, SelectedErrorRef::FmtError(_))
+                            (0, SelectedErrorRef::Msg(_)) | (1, SelectedErrorRef::Fmt(_))
                         ));
                         continue;
                     }
@@ -201,7 +201,7 @@ fn erased_recover_handles_single_and_group_targets_without_losing_unknown_errors
                     snapshot.assert_preserved(&error);
                     assert!(matches!(
                         (index, SelectedErrorRef::from(&error)),
-                        (0, SelectedErrorRef::MsgError(_)) | (1, SelectedErrorRef::FmtError(_))
+                        (0, SelectedErrorRef::Msg(_)) | (1, SelectedErrorRef::Fmt(_))
                     ));
                     String::from("recovered")
                 })
@@ -248,7 +248,7 @@ fn erased_try_recover_preserves_success_remainders_and_handler_errors() {
                 snapshot.assert_preserved(&error);
                 assert!(matches!(
                     (index, SelectedErrorRef::from(&error)),
-                    (0, SelectedErrorRef::MsgError(_)) | (1, SelectedErrorRef::FmtError(_))
+                    (0, SelectedErrorRef::Msg(_)) | (1, SelectedErrorRef::Fmt(_))
                 ));
                 if fails {
                     Err(replacement)

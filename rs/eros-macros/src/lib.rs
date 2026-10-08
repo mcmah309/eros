@@ -21,8 +21,8 @@ mod error_enum;
 ///
 /// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(fmt::Error);
 /// match union.into() {
-///     AppFailure::StdIoError(error) => eprintln!("I/O error: {error}"),
-///     AppFailure::FmtError(error) => assert_eq!(error, fmt::Error),
+///     AppFailure::StdIo(error) => eprintln!("I/O error: {error}"),
+///     AppFailure::Fmt(error) => assert_eq!(error, fmt::Error),
 /// }
 /// ```
 ///
@@ -42,7 +42,8 @@ mod error_enum;
 /// on a mismatch and preserving diagnostics.
 ///
 /// The alias must be a nongeneric tuple of 1–26 path types. Variant names join
-/// path segments in PascalCase, ignoring generic arguments. Attributes below
+/// path segments in PascalCase, ignoring generic arguments, then strip a trailing
+/// `Error` unless that would leave an empty name. Attributes below
 /// each macro apply to its enum until the next enum macro or the alias.
 /// [`error_enum_ref`] and [`error_enum_mut`] accept the same name and optional
 /// display arguments, work independently, and can be stacked in any order:
@@ -83,7 +84,7 @@ pub fn error_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// type AppErrors = (std::fmt::Error,);
 /// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
 /// match (&union).into() {
-///     SharedFailure::StdFmtError(error) => assert_eq!(error, &std::fmt::Error),
+///     SharedFailure::StdFmt(error) => assert_eq!(error, &std::fmt::Error),
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -100,7 +101,7 @@ pub fn error_enum_ref(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// type AppErrors = (std::fmt::Error,);
 /// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
 /// match (&mut union).into() {
-///     MutableFailure::StdFmtError(error) => *error = std::fmt::Error,
+///     MutableFailure::StdFmt(error) => *error = std::fmt::Error,
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -123,7 +124,7 @@ pub fn error_enum_mut(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// type AppErrors = (std::fmt::Error,);
 /// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
 /// let shared: AppFailureRef<'_> = (&union).into();
-/// assert_eq!(shared, AppFailureRef::StdFmtError(&std::fmt::Error));
+/// assert_eq!(shared, AppFailureRef::StdFmt(&std::fmt::Error));
 /// let _mutable: AppFailureMut<'_> = (&mut union).into();
 /// let _owned: AppFailure = union.into();
 /// ```

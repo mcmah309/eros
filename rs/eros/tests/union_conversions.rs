@@ -21,9 +21,9 @@ fn union_inserts_each_concrete_error_at_its_declared_position() {
         #[cfg(feature = "context")]
         assert_eq!(error.contexts().len(), usize::from(index == 1));
         match (index, InputError::from(error)) {
-            (0, InputError::MsgError(error)) => assert_eq!(error.as_str(), "owned message"),
-            (1, InputError::FmtError(fmt::Error)) => {}
-            (2, InputError::IoError(error)) => {
+            (0, InputError::Msg(error)) => assert_eq!(error.as_str(), "owned message"),
+            (1, InputError::Fmt(fmt::Error)) => {}
+            (2, InputError::Io(error)) => {
                 assert_eq!(error.kind(), io::ErrorKind::PermissionDenied)
             }
             _ => panic!("union changed the concrete error or its position"),
@@ -80,9 +80,9 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
                 error.widen()
             };
             match (index, ExpandedErrorRef::from(&error)) {
-                (0, ExpandedErrorRef::MsgError(error)) => assert_eq!(error.as_str(), "message"),
-                (1, ExpandedErrorRef::FmtError(_)) => {}
-                (2, ExpandedErrorRef::IoError(error)) => {
+                (0, ExpandedErrorRef::Msg(error)) => assert_eq!(error.as_str(), "message"),
+                (1, ExpandedErrorRef::Fmt(_)) => {}
+                (2, ExpandedErrorRef::Io(error)) => {
                     assert_eq!(error.kind(), io::ErrorKind::Other)
                 }
                 _ => panic!("widen changed the active variant"),
