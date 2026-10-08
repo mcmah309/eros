@@ -66,14 +66,26 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     pub(crate) location: &'static core::panic::Location<'static>,
     /// Re-boxes the error field into a fresh allocation.
     /// Stored at construction so the concrete type is still known.
+    ///
+    /// # Safety
+    /// The pointer must refer to the live error field of the concrete type this
+    /// function was selected for. The caller must transfer ownership of the
+    /// value and prevent the original field from being used or dropped again.
     #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-    pub(crate) into_box_fn: fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
+    pub(crate) into_box_fn: unsafe fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
     pub(crate) error: T,
 }
 
+/// Moves the pointed-to error into a fresh box.
+///
+/// # Safety
+/// `ptr` must be valid and properly aligned for reading an initialized value of
+/// exactly `T`. The caller must have exclusive access to the value and transfer
+/// its ownership, preventing the original value from being used or dropped again.
 #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
-    // SAFETY: caller guarantees ptr points to a live T
+unsafe fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
+    // SAFETY: the caller guarantees a valid, aligned pointer to an initialized T
+    // and transfers ownership so the original value will not be used or dropped.
     let value: T = unsafe { ptr::read(ptr as *const dyn SendSyncError as *const T) };
     Box::new(value)
 }
@@ -630,6 +642,9 @@ where
             let into_box_fn = (*raw).into_box_fn;
             let error_ptr = ptr::addr_of_mut!((*raw).error);
 
+            // SAFETY: the function was selected for this error's concrete type,
+            // and we own the live error field. ManuallyDrop prevents the original
+            // field from being dropped after its ownership moves into the box.
             let boxed = (into_box_fn)(error_ptr);
 
             // Drop remaining fields, free the allocation (same pattern as downcast_error_unchecked)

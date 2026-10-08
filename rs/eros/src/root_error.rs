@@ -67,8 +67,9 @@ impl<E: TypeSet> ErrorUnion<E> {
         #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
         unsafe {
             let raw = Box::into_raw(self.inner);
-            // The saved function pointer knows the old error's concrete type
-            // and moves it into a box, just as into_inner() does.
+            // SAFETY: the function was selected for this error's concrete type,
+            // and we own the live error field. The container is freed below using
+            // ManuallyDrop, so the original error is not used or dropped again.
             let root = ((*raw).into_box_fn)(ptr::addr_of_mut!((*raw).error));
             #[cfg(feature = "backtrace")]
             let backtrace = ptr::read(ptr::addr_of!((*raw).backtrace));
