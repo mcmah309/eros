@@ -475,7 +475,7 @@ use eros::IntoUnion;
 use std::{fmt, io};
 
 #[eros::error_enums(CrateError, "crate operation failed: {0}")]
-pub type Crate = (io::Error, fmt::Error);
+pub type CrateSet = (io::Error, fmt::Error);
 
 fn regular_typed_result1() -> Result<(), io::Error> {
     Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"))
@@ -485,7 +485,7 @@ fn regular_typed_result2() -> Result<(), fmt::Error> {
     Err(fmt::Error)
 }
 
-fn internal_api() -> eros::Result<(), Crate> {
+fn internal_api() -> eros::Result<(), CrateSet> {
     regular_typed_result1().union()?;
     regular_typed_result2().union()?;
     Ok(())
@@ -644,13 +644,13 @@ Other backtrace examples in this README use `[N frames hidden for brevity]` to m
 use eros::ErrorUnion;
 use std::{fmt, io};
 
-#[eros::error_enums(AppFailure)]
-pub type App = (io::Error, fmt::Error);
+#[eros::error_enums(Error)]
+pub type Set = (io::Error, fmt::Error);
 
-let union_of: ErrorUnion<App> = ErrorUnion::new(fmt::Error);
+let union_of: ErrorUnion<Set> = ErrorUnion::new(fmt::Error);
 match union_of.into() {
-    AppFailure::IoError(error) => eprintln!("I/O error: {error}"),
-    AppFailure::FmtError(error) => eprintln!("Formatting error: {error}"),
+    Error::IoError(error) => eprintln!("I/O error: {error}"),
+    Error::FmtError(error) => eprintln!("Formatting error: {error}"),
 }
 ```
 
