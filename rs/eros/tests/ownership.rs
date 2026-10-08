@@ -136,6 +136,47 @@ fn recover_keeps_the_error_alive_in_the_handler_and_drops_it_once_on_unwind() {
     assert_eq!(context.load(Ordering::SeqCst), 1);
 }
 
+#[cfg(feature = "context")]
+#[test]
+fn extraction_frees_the_container_when_context_drop_panics() {
+    #[derive(Debug)]
+    struct PanickingContext;
+
+    impl fmt::Display for PanickingContext {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("panicking context")
+        }
+    }
+
+    impl std::error::Error for PanickingContext {}
+
+    impl Drop for PanickingContext {
+        fn drop(&mut self) {
+            panic!("context drop");
+        }
+    }
+
+    for extract in [
+        |error: ErrorUnion<(Tracked,)>| drop(error.into_single()),
+        |error: ErrorUnion<(Tracked,)>| drop(error.into_inner()),
+    ] {
+        let root = Arc::new(AtomicUsize::new(0));
+        let context = Arc::new(AtomicUsize::new(0));
+        let panicking: Box<dyn SendSyncError> = Box::new(PanickingContext);
+        let trailing: Box<dyn SendSyncError> = Box::new(tracked(&context));
+        let error: ErrorUnion<(Tracked,)> = ErrorUnion::new(tracked(&root));
+        let error = error.context(panicking).context(trailing);
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract(error)));
+        assert_eq!(
+            outcome.unwrap_err().downcast_ref::<&str>(),
+            Some(&"context drop")
+        );
+        assert_eq!(root.load(Ordering::SeqCst), 1);
+        assert_eq!(context.load(Ordering::SeqCst), 1);
+        // Miri additionally checks that the outer allocation is freed.
+    }
+}
+
 #[test]
 fn union_and_widen_move_the_error_without_dropping_it() {
     let root = Arc::new(AtomicUsize::new(0));

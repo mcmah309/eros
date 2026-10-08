@@ -132,6 +132,13 @@ impl ErrorUnionInner<dyn SendSyncError> {
         let raw_container: *mut Self = Box::into_raw(self);
 
         unsafe {
+            // Own the allocation before any field destructor can panic, without
+            // automatically dropping fields that we move or drop manually.
+            let mut allocation: Box<mem::ManuallyDrop<Self>> =
+                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
+            // Derive a fresh pointer from the owning guard.
+            let raw_container = &raw mut **allocation;
+
             // Thin the fat pointer directly — no intermediate dyn Any cast needed.
             // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
             let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
@@ -145,13 +152,6 @@ impl ErrorUnionInner<dyn SendSyncError> {
             ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).context));
             #[cfg(feature = "location")]
             ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).location));
-
-            // Deallocate the Box allocation itself.
-            // We reconstruct a Box containing uninitialized/dead data, but wrapped in
-            // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
-            // it frees the underlying heap memory without touching the fields.
-            let _dead_box: Box<mem::ManuallyDrop<Self>> =
-                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
 
             downcasted_value
         }
@@ -639,6 +639,11 @@ where
         }
         #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
         unsafe {
+            // Free the allocation even if a context destructor panics.
+            let mut allocation: Box<mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>> =
+                Box::from_raw(raw as *mut _);
+            let raw = &raw mut **allocation;
+
             let into_box_fn = (*raw).into_box_fn;
             let error_ptr = ptr::addr_of_mut!((*raw).error);
 
@@ -651,9 +656,6 @@ where
             ptr::drop_in_place(ptr::addr_of_mut!((*raw).context));
             #[cfg(feature = "location")]
             ptr::drop_in_place(ptr::addr_of_mut!((*raw).location));
-
-            let _dead: Box<mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>> =
-                Box::from_raw(raw as *mut _);
 
             boxed
         }
