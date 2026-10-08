@@ -1,0 +1,5 @@
+error: error_enum_kind accepts only an enum name
+ --> tests/trybuild/error_enum_kind_rejects_display.rs:1:38
+  |
+1 | #[eros::error_enum_kind(InvalidKind, "operation failed: {0}")]
+  |                                      ^^^^^^^^^^^^^^^^^^^^^^^

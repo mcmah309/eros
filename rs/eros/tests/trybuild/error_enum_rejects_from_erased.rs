@@ -1,7 +1,9 @@
 use eros::{AnyError, ErrorUnion};
 use std::fmt;
 
-#[eros::error_enums(AppError)]
+#[eros::error_enum(AppError)]
+#[eros::error_enum_ref(AppErrorRef)]
+#[eros::error_enum_mut(AppErrorMut)]
 type App = (fmt::Error,);
 
 fn main() {

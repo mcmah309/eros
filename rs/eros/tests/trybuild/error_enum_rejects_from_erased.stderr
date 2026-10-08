@@ -1,7 +1,7 @@
 error[E0277]: the trait bound `AnyError: __ErosEnumSubset` is not satisfied
-  --> tests/trybuild/error_enum_rejects_from_erased.rs:10:39
+  --> tests/trybuild/error_enum_rejects_from_erased.rs:12:39
    |
-10 |     let _: AppErrorRef<'_> = (&union).into();
+12 |     let _: AppErrorRef<'_> = (&union).into();
    |                                       ^^^^ the trait `__ErosEnumSubset` is not implemented for `AnyError`
    |
    = help: the following other types implement trait `__ErosEnumSubset`:
@@ -17,15 +17,15 @@ error[E0277]: the trait bound `AnyError: __ErosEnumSubset` is not satisfied
 note: required for `AppErrorRef<'_>` to implement `From<&ErrorUnion>`
   --> tests/trybuild/error_enum_rejects_from_erased.rs:4:1
    |
- 4 | #[eros::error_enums(AppError)]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 4 | #[eros::error_enum(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: required for `&ErrorUnion` to implement `Into<AppErrorRef<'_>>`
-   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the attribute macro `eros::error_enum` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: the trait bound `AnyError: __ErosEnumSubset` is not satisfied
-  --> tests/trybuild/error_enum_rejects_from_erased.rs:11:43
+  --> tests/trybuild/error_enum_rejects_from_erased.rs:13:43
    |
-11 |     let _: AppErrorMut<'_> = (&mut union).into();
+13 |     let _: AppErrorMut<'_> = (&mut union).into();
    |                                           ^^^^ the trait `__ErosEnumSubset` is not implemented for `AnyError`
    |
    = help: the following other types implement trait `__ErosEnumSubset`:
@@ -41,15 +41,15 @@ error[E0277]: the trait bound `AnyError: __ErosEnumSubset` is not satisfied
 note: required for `AppErrorMut<'_>` to implement `From<&mut ErrorUnion>`
   --> tests/trybuild/error_enum_rejects_from_erased.rs:4:1
    |
- 4 | #[eros::error_enums(AppError)]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 4 | #[eros::error_enum(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: required for `&mut ErrorUnion` to implement `Into<AppErrorMut<'_>>`
-   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the attribute macro `eros::error_enum` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: the trait bound `AnyError: __ErosEnumSubset` is not satisfied
-  --> tests/trybuild/error_enum_rejects_from_erased.rs:12:29
+  --> tests/trybuild/error_enum_rejects_from_erased.rs:14:29
    |
-12 |     let _: AppError = union.into();
+14 |     let _: AppError = union.into();
    |                             ^^^^ the trait `__ErosEnumSubset` is not implemented for `AnyError`
    |
    = help: the following other types implement trait `__ErosEnumSubset`:
@@ -65,7 +65,7 @@ error[E0277]: the trait bound `AnyError: __ErosEnumSubset` is not satisfied
 note: required for `AppError` to implement `From<ErrorUnion>`
   --> tests/trybuild/error_enum_rejects_from_erased.rs:4:1
    |
- 4 | #[eros::error_enums(AppError)]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 4 | #[eros::error_enum(AppError)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: required for `ErrorUnion` to implement `Into<AppError>`
-   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the attribute macro `eros::error_enum` (in Nightly builds, run with -Z macro-backtrace for more info)

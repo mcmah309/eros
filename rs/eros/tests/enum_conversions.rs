@@ -19,13 +19,18 @@ macro_rules! check_arity {
         #[test]
         fn $test() {
             $(type $variant = Payload<$n>;)+
-            #[eros::error_enums(Owned)]
+            #[eros::error_enum(Owned)]
+            #[eros::error_enum_ref(OwnedRef)]
+            #[eros::error_enum_mut(OwnedMut)]
+            #[eros::error_enum_kind(Kind)]
             type Set = ($($variant,)+);
             type Shared<'a> = OwnedRef<'a>;
             type Mutable<'a> = OwnedMut<'a>;
             $(
                 let original = format!("payload {}", $n);
                 let mut error: ErrorUnion<Set> = ErrorUnion::new(Payload::<$n>(original.clone()));
+                assert!(matches!(Kind::from(&error), Kind::$variant));
+                assert!(matches!(Kind::from(&mut error), Kind::$variant));
                 assert_eq!(error.to_string(), format!("error {}: {original}", $n));
                 assert_eq!(format!("{error:#?}"), format!("error {}: {original}", $n));
                 match OwnedRef::from(&error) {
@@ -53,6 +58,8 @@ macro_rules! check_arity {
                 assert!(std::error::Error::source(adapter.as_ref()).is_none());
                 let error = ErrorUnion::<Set>::try_from_dyn_error(adapter).unwrap();
                 let mut erased: ErrorUnion = error.into();
+                assert!(matches!(Kind::try_from(&erased).unwrap(), Kind::$variant));
+                assert!(matches!(Kind::try_from(&mut erased).unwrap(), Kind::$variant));
                 assert_eq!(format!("{erased:?}"), report);
                 let shared: Shared<'_> = (&erased).try_into().unwrap();
                 match shared {
@@ -72,6 +79,10 @@ macro_rules! check_arity {
                     #[allow(unreachable_patterns)]
                     _ => panic!("wrong fallible owned variant for {}", $n),
                 }
+                let error: ErrorUnion<Set> = ErrorUnion::new(Payload::<$n>(original.clone()));
+                assert!(matches!(Kind::from(error), Kind::$variant));
+                let erased: ErrorUnion = ErrorUnion::new(Payload::<$n>(original.clone()));
+                assert!(matches!(Kind::try_from(erased).unwrap(), Kind::$variant));
             )+
             let erased: ErrorUnion = ErrorUnion::new(Payload::<26>("unmatched".into()));
             let unmatched = Owned::try_from(erased).err().unwrap();

@@ -13,7 +13,9 @@ trait SpoofTypeCheck {
 
 impl<E: TypeSet> SpoofTypeCheck for &mut ErrorUnion<E> {}
 
-#[eros::error_enums(CheckedError)]
+#[eros::error_enum(CheckedError)]
+#[eros::error_enum_ref(CheckedErrorRef)]
+#[eros::error_enum_mut(CheckedErrorMut)]
 type CheckedSet = (MsgError, fmt::Error);
 
 #[test]
@@ -51,7 +53,9 @@ mod spoofed_rejection {
 
     impl<E: TypeSet> SpoofTypeCheck for &mut ErrorUnion<E> {}
 
-    #[eros::error_enums(CheckedError)]
+    #[eros::error_enum(CheckedError)]
+    #[eros::error_enum_ref(CheckedErrorRef)]
+    #[eros::error_enum_mut(CheckedErrorMut)]
     type CheckedSet = (MsgError, fmt::Error);
 
     #[test]

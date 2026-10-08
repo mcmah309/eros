@@ -35,9 +35,17 @@ impl core::fmt::Display for InvalidPassword {
 }
 impl core::error::Error for InvalidPassword {}
 
-#[eros::error_enums(NamedErrorsError)]
+#[eros::error_enum(NamedErrorsError)]
 #[derive(PartialEq, Eq)]
 #[non_exhaustive]
+#[eros::error_enum_ref(NamedErrorsErrorRef)]
+#[derive(PartialEq, Eq)]
+#[non_exhaustive]
+#[eros::error_enum_mut(NamedErrorsErrorMut)]
+#[derive(PartialEq, Eq)]
+#[non_exhaustive]
+#[eros::error_enum_kind(NamedErrorKind)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub type NamedErrors = (NotEnoughMemory, Timeout);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +56,14 @@ pub enum CheckOutcome {
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let mut named: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
+    assert!(matches!(
+        NamedErrorKind::from(&named),
+        NamedErrorKind::Timeout
+    ));
+    assert!(matches!(
+        NamedErrorKind::from(&mut named),
+        NamedErrorKind::Timeout
+    ));
     let borrowed: NamedErrorsErrorRef<'_> = (&named).into();
     assert!(matches!(borrowed, NamedErrorsErrorRef::Timeout(_)));
     let mutable: NamedErrorsErrorMut<'_> = (&mut named).into();

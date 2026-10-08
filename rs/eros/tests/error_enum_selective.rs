@@ -222,14 +222,26 @@ enum_case!(
     []
 );
 
-#[eros::error_enums(Failure, "all: {0}")]
+#[eros::error_enum(Failure, "all: {0}")]
 #[non_exhaustive]
 #[repr(align(64))]
 #[cfg_attr(all(), derive(PartialEq, Eq))]
-#[doc = "An error with attributes shared by all three views."]
+#[doc = "An owned error with explicit attributes."]
+#[eros::error_enum_ref(FailureRef, "all: {0}")]
+#[non_exhaustive]
+#[repr(align(64))]
+#[cfg_attr(all(), derive(PartialEq, Eq))]
+#[doc = "A shared error with explicit attributes."]
+#[eros::error_enum_mut(FailureMut, "all: {0}")]
+#[non_exhaustive]
+#[repr(align(64))]
+#[cfg_attr(all(), derive(PartialEq, Eq))]
+#[doc = "A mutable error with explicit attributes."]
 type AllErrors = (fmt::Error,);
 
-#[eros::error_enums(DisabledFailure)]
+#[eros::error_enum(DisabledFailure)]
+#[eros::error_enum_ref(DisabledFailureRef)]
+#[eros::error_enum_mut(DisabledFailureMut)]
 #[cfg_attr(all(), cfg(any()))]
 type DisabledErrors = (fmt::Error,);
 
@@ -240,7 +252,7 @@ struct DisabledFailureMut;
 struct DisabledErrors;
 
 #[test]
-fn shorthand_propagates_attributes_and_display_to_all_enums() {
+fn stacked_macros_preserve_explicit_attributes_and_display() {
     assert_eq!(std::mem::align_of::<Failure>(), 64);
     assert_eq!(std::mem::align_of::<FailureRef<'_>>(), 64);
     assert_eq!(std::mem::align_of::<FailureMut<'_>>(), 64);

@@ -25,10 +25,10 @@ error: unexpected end of input, expected an enum name
 error: unexpected end of input, expected an enum name
   --> tests/trybuild/error_enum_requires_names.rs:10:1
    |
-10 | #[eros::error_enums]
-   | ^^^^^^^^^^^^^^^^^^^^
+10 | #[eros::error_enum_kind]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the attribute macro `eros::error_enum_kind` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: unexpected end of input, expected an enum name
   --> tests/trybuild/error_enum_requires_names.rs:13:1
@@ -57,7 +57,7 @@ error: unexpected end of input, expected an enum name
 error: unexpected end of input, expected an enum name
   --> tests/trybuild/error_enum_requires_names.rs:22:1
    |
-22 | #[eros::error_enums()]
-   | ^^^^^^^^^^^^^^^^^^^^^^
+22 | #[eros::error_enum_kind()]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: this error originates in the attribute macro `eros::error_enums` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the attribute macro `eros::error_enum_kind` (in Nightly builds, run with -Z macro-backtrace for more info)

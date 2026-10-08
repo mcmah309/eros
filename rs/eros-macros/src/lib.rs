@@ -65,8 +65,8 @@ mod error_enum;
 /// let _owned: OwnedFailure = union.into();
 /// ```
 ///
-/// Only explicitly requested enums and conversions are generated. Use
-/// [`error_enums`] to generate all three with shared attributes and formatting.
+/// Only explicitly requested enums and conversions are generated.
+/// Use [`error_enum_kind`] to generate an enum with payload-free variants.
 /// Rust evaluates `cfg` and `cfg_attr` before macro expansion, so disabling
 /// conditions anywhere in the declaration remove the alias and its enums.
 #[proc_macro_attribute]
@@ -109,28 +109,32 @@ pub fn error_enum_mut(attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_error_enum(error_enum::EnumKind::Mut, attr, item)
 }
 
-/// Keeps a tuple alias and generates owned, shared, and mutable error enums.
+/// Keeps a tuple alias and generates the explicitly named error kind enum.
 ///
-/// The required name is used for the owned enum; `Ref` and `Mut` are appended
-/// for the borrowed enums. An optional display format applies to all three.
-/// Every attribute below this macro is placed on each generated enum. Use the
-/// individual macros when names, formatting, or annotations need to differ.
-/// This shorthand cannot be combined with the individual enum macros on one alias.
+/// Every variant is a unit variant: the enum stores no error payloads and has
+/// no lifetime parameter. Names follow the same rules as [`error_enum`]. Only
+/// an enum name is accepted; `Debug` is implemented automatically. Additional
+/// attributes apply to this enum until the next enum macro or the alias.
+///
+/// `From` accepts owned, shared, and mutable `ErrorUnion` values whose tuple
+/// contains only listed error types, including subsets and reordered tuples.
+/// Borrowing leaves the error and its diagnostics intact. Owned conversion
+/// drops the error and its diagnostics. `TryFrom` accepts erased unions in all
+/// three forms and returns the original value or borrow when no type matches.
 ///
 /// ```rust
-/// #[eros_macros::error_enums(AppFailure, "operation failed: {0}")]
-/// #[non_exhaustive]
-/// #[derive(PartialEq, Eq)]
-/// type AppErrors = (std::fmt::Error,);
-/// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
-/// let shared: AppFailureRef<'_> = (&union).into();
-/// assert_eq!(shared, AppFailureRef::StdFmt(&std::fmt::Error));
-/// let _mutable: AppFailureMut<'_> = (&mut union).into();
-/// let _owned: AppFailure = union.into();
+/// use std::{fmt, io};
+/// #[eros_macros::error_enum_kind(AppErrorKind)]
+/// #[derive(Clone, Copy, PartialEq, Eq)]
+/// type AppErrors = (io::Error, fmt::Error);
+///
+/// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(fmt::Error);
+/// assert_eq!(AppErrorKind::from(&union), AppErrorKind::Fmt);
+/// assert!(union.is_inner::<fmt::Error>());
 /// ```
 #[proc_macro_attribute]
-pub fn error_enums(attr: TokenStream, item: TokenStream) -> TokenStream {
-    expand_error_enum(error_enum::EnumKind::All, attr, item)
+pub fn error_enum_kind(attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_error_enum(error_enum::EnumKind::Kind, attr, item)
 }
 
 fn expand_error_enum(

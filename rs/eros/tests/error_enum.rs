@@ -7,7 +7,9 @@ use std::{
     },
 };
 
-#[eros::error_enums(NameError, "operation failed: {0}")]
+#[eros::error_enum(NameError, "operation failed: {0}")]
+#[eros::error_enum_ref(NameErrorRef, "operation failed: {0}")]
+#[eros::error_enum_mut(NameErrorMut, "operation failed: {0}")]
 pub type Name = (std::io::Error, fmt::Error);
 
 #[eros::error_enum(PublicError)]
@@ -16,7 +18,9 @@ pub type Name = (std::io::Error, fmt::Error);
 #[eros::error_enum_mut(PublicErrorMut)]
 pub type Internal = (io::Error, fmt::Error);
 
-#[eros::error_enums(FormattedError, "operation failed: {0}")]
+#[eros::error_enum(FormattedError, "operation failed: {0}")]
+#[eros::error_enum_ref(FormattedErrorRef, "operation failed: {0}")]
+#[eros::error_enum_mut(FormattedErrorMut, "operation failed: {0}")]
 type InternalFormatted = (io::Error, fmt::Error);
 
 #[test]
@@ -70,7 +74,9 @@ impl fmt::Display for FormatAwareError {
 
 impl std::error::Error for FormatAwareError {}
 
-#[eros::error_enums(DelegatedError)]
+#[eros::error_enum(DelegatedError)]
+#[eros::error_enum_ref(DelegatedErrorRef)]
+#[eros::error_enum_mut(DelegatedErrorMut)]
 type Delegated = (FormatAwareError, fmt::Error);
 
 #[eros::error_enum(TrailingCommaError)]
@@ -256,7 +262,9 @@ fn singleton_try_from_checks_type_and_preserves_owned_storage() {
 
 type Error = fmt::Error;
 
-#[eros::error_enums(ErrorVariant)]
+#[eros::error_enum(ErrorVariant)]
+#[eros::error_enum_ref(ErrorVariantRef)]
+#[eros::error_enum_mut(ErrorVariantMut)]
 type ErrorAlias = (Error,);
 
 #[test]
@@ -306,7 +314,9 @@ impl Drop for DropError {
     }
 }
 
-#[eros::error_enums(TrackedError, "{0}")]
+#[eros::error_enum(TrackedError, "{0}")]
+#[eros::error_enum_ref(TrackedErrorRef, "{0}")]
+#[eros::error_enum_mut(TrackedErrorMut, "{0}")]
 type Tracked = (DropError, MsgError);
 
 #[test]
@@ -466,7 +476,9 @@ fn borrowed_markers_can_appear_before_the_owned_marker() {
 }
 
 mod exported {
-    #[eros::error_enums(PublicError, "{0}")]
+    #[eros::error_enum(PublicError, "{0}")]
+    #[eros::error_enum_ref(PublicErrorRef, "{0}")]
+    #[eros::error_enum_mut(PublicErrorMut, "{0}")]
     pub type Public = (core::fmt::Error,);
 }
 

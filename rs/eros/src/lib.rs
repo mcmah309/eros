@@ -72,7 +72,7 @@ mod user_context;
 
 // re-export macro
 pub use eros_macros::{
-    context, eager_context, error_enum, error_enum_mut, error_enum_ref, error_enums,
+    context, eager_context, error_enum, error_enum_kind, error_enum_mut, error_enum_ref,
 };
 
 // aliases

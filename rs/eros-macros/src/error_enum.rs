@@ -35,16 +35,16 @@ pub(crate) enum EnumKind {
     Owned,
     Ref,
     Mut,
-    All,
+    Kind,
 }
 
 impl EnumKind {
-    fn indices(self) -> &'static [usize] {
+    fn index(self) -> usize {
         match self {
-            Self::Owned => &[0],
-            Self::Ref => &[1],
-            Self::Mut => &[2],
-            Self::All => &[0, 1, 2],
+            Self::Owned => 0,
+            Self::Ref => 1,
+            Self::Mut => 2,
+            Self::Kind => 3,
         }
     }
 
@@ -53,7 +53,7 @@ impl EnumKind {
             Self::Owned => "error_enum",
             Self::Ref => "error_enum_ref",
             Self::Mut => "error_enum_mut",
-            Self::All => "error_enums",
+            Self::Kind => "error_enum_kind",
         }
     }
 
@@ -62,7 +62,7 @@ impl EnumKind {
             "error_enum" => Some(Self::Owned),
             "error_enum_ref" => Some(Self::Ref),
             "error_enum_mut" => Some(Self::Mut),
-            "error_enums" => Some(Self::All),
+            "error_enum_kind" => Some(Self::Kind),
             _ => None,
         }
     }
@@ -73,36 +73,34 @@ struct EnumSpec {
     attrs: Vec<Attribute>,
 }
 
-fn request_enums(
+fn request_enum(
     kind: EnumKind,
     args: ErrorEnumArgs,
-    enums: &mut [Option<EnumSpec>; 3],
+    enums: &mut [Option<EnumSpec>; 4],
     source: impl quote::ToTokens,
 ) -> syn::Result<()> {
-    for &index in kind.indices() {
-        if enums[index].is_some() {
+    if matches!(kind, EnumKind::Kind) {
+        if let Some(display) = &args.display {
             return Err(syn::Error::new_spanned(
-                source,
-                format!(
-                    "{} overlaps an enum already requested on this tuple alias",
-                    kind.marker()
-                ),
+                display,
+                "error_enum_kind accepts only an enum name",
             ));
         }
     }
-    for &index in kind.indices() {
-        let mut args = args.clone();
-        if matches!(kind, EnumKind::All) && index != 0 {
-            let base = args.name.to_string();
-            let base = base.trim_start_matches("r#");
-            let suffix = if index == 1 { "Ref" } else { "Mut" };
-            args.name = format_ident!("{base}{suffix}", span = args.name.span());
-        }
-        enums[index] = Some(EnumSpec {
-            args,
-            attrs: Vec::new(),
-        });
+    let index = kind.index();
+    if enums[index].is_some() {
+        return Err(syn::Error::new_spanned(
+            source,
+            format!(
+                "{} overlaps an enum already requested on this tuple alias",
+                kind.marker()
+            ),
+        ));
     }
+    enums[index] = Some(EnumSpec {
+        args,
+        attrs: Vec::new(),
+    });
     Ok(())
 }
 
@@ -110,10 +108,10 @@ fn collect_annotations(
     mut kind: EnumKind,
     tokens: TokenStream,
     alias: &mut ItemType,
-) -> syn::Result<[Option<EnumSpec>; 3]> {
+) -> syn::Result<[Option<EnumSpec>; 4]> {
     let args: ErrorEnumArgs = syn::parse2(tokens)?;
-    let mut enums = [None, None, None];
-    request_enums(kind, args, &mut enums, &alias.ident)?;
+    let mut enums = [None, None, None, None];
+    request_enum(kind, args, &mut enums, &alias.ident)?;
     for attr in std::mem::take(&mut alias.attrs) {
         if let Some(next_kind) = EnumKind::from_path(attr.path()) {
             let tokens = match &attr.meta {
@@ -127,12 +125,10 @@ fn collect_annotations(
                 }
             };
             let args = syn::parse2(tokens)?;
-            request_enums(next_kind, args, &mut enums, &attr)?;
+            request_enum(next_kind, args, &mut enums, &attr)?;
             kind = next_kind;
         } else {
-            for &index in kind.indices() {
-                enums[index].as_mut().unwrap().attrs.push(attr.clone());
-            }
+            enums[kind.index()].as_mut().unwrap().attrs.push(attr);
         }
     }
     Ok(enums)
@@ -237,14 +233,25 @@ pub(crate) fn expand_alias(
     alias.attrs = alias_gating;
     let vis = &alias.vis;
     let crate_path = eros_path()?;
-    let mut targets = [None, None, None];
-    let mut gating = [Vec::new(), Vec::new(), Vec::new()];
+    let mut targets = [None, None, None, None];
+    let mut gating = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     let mut declarations = Vec::new();
     for (index, spec) in enums.iter().enumerate() {
         let Some(spec) = spec else { continue };
         let name = &spec.args.name;
         let attrs = &spec.attrs;
         gating[index] = gating_attrs(attrs)?;
+        if index == 3 {
+            targets[index] = Some(quote!(#name));
+            declarations.push(quote! {
+                #(#attrs)*
+                #[derive(::core::fmt::Debug)]
+                #vis enum #name {
+                    #(#variants),*
+                }
+            });
+            continue;
+        }
         let generics: Generics = if index == 0 {
             Generics::default()
         } else {
@@ -279,7 +286,7 @@ pub(crate) fn expand_alias(
         &types,
         &variants,
         &crate_path,
-        [&gating[0], &gating[1], &gating[2]],
+        [&gating[0], &gating[1], &gating[2], &gating[3]],
     );
     Ok(quote! {
         #alias
@@ -407,14 +414,14 @@ fn gating_attrs(attrs: &[Attribute]) -> syn::Result<Vec<Attribute>> {
 }
 
 fn conversions(
-    targets: [Option<TokenStream>; 3],
+    targets: [Option<TokenStream>; 4],
     types: &[Type],
     variants: &[Ident],
     crate_path: &TokenStream,
-    gating: [&[Attribute]; 3],
+    gating: [&[Attribute]; 4],
 ) -> TokenStream {
-    let [owned_enum, ref_enum, mut_enum] = targets;
-    let [owned_gating, ref_gating, mut_gating] = gating;
+    let [owned_enum, ref_enum, mut_enum, kind_enum] = targets;
+    let [owned_gating, ref_gating, mut_gating, kind_gating] = gating;
     let mut bounded = Generics::default();
     for ty in types {
         bounded
@@ -429,7 +436,7 @@ fn conversions(
     let mut from_bounded = bounded.clone();
     // Private membership bounds prove that every source variant belongs to
     // the enum, without exposing a trait that callers could extend.
-    let tokens = quote!(#(#types)* #owned_enum #ref_enum #mut_enum).to_string();
+    let tokens = quote!(#(#types)* #owned_enum #ref_enum #mut_enum #kind_enum).to_string();
     let mut used: HashSet<_> = tokens
         .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
         .map(str::to_owned)
@@ -462,7 +469,15 @@ fn conversions(
     let (from_borrow_generics, _, from_borrow_where) = from_borrowed.split_for_impl();
     let erased_union_type = quote!(#crate_path::ErrorUnion<#crate_path::AnyError>);
 
-    let dispatch = |method: Ident, fallible: bool| {
+    let dispatch = |method: Option<Ident>, fallible: bool| {
+        let value = |variant: &Ident, ty: &Type| match &method {
+            Some(method) => quote! {
+                Self::#variant(unsafe {
+                    #crate_path::__private::#method::<#ty>(union_of)
+                })
+            },
+            None => quote!(Self::#variant),
+        };
         let last = types.len() - 1;
         let checked = if fallible { types.len() } else { last };
         let branches = variants
@@ -473,11 +488,7 @@ fn conversions(
                 // SAFETY: The fully qualified inherent method checks the exact
                 // concrete type. Method-call syntax here would let a caller's
                 // extension trait on &mut ErrorUnion spoof this safety check.
-                let value = quote! {
-                    Self::#variant(unsafe {
-                        #crate_path::__private::#method::<#ty>(union_of)
-                    })
-                };
+                let value = value(variant, ty);
                 let value = if fallible {
                     quote!(::core::result::Result::Ok(#value))
                 } else {
@@ -497,6 +508,7 @@ fn conversions(
         }
         let last_type = &types[last];
         let last_variant = &variants[last];
+        let last_value = value(last_variant, last_type);
         // SAFETY: ErrorUnion's sealed type-set relations and invariant type
         // parameter, along with the private subset proof for named enums,
         // guarantee it contains one of these exact types. After
@@ -504,17 +516,62 @@ fn conversions(
         // covers singletons without a dispatch check.
         quote! {
             #(#branches)*
-            Self::#last_variant(unsafe {
-                #crate_path::__private::#method::<#last_type>(union_of)
-            })
+            #last_value
         }
     };
-    let owned = dispatch(format_ident!("downcast_error_unchecked"), false);
-    let shared = dispatch(format_ident!("downcast_error_ref_unchecked"), false);
-    let mutable = dispatch(format_ident!("downcast_error_mut_unchecked"), false);
-    let try_owned = dispatch(format_ident!("downcast_error_unchecked"), true);
-    let try_shared = dispatch(format_ident!("downcast_error_ref_unchecked"), true);
-    let try_mutable = dispatch(format_ident!("downcast_error_mut_unchecked"), true);
+    let owned = dispatch(Some(format_ident!("downcast_error_unchecked")), false);
+    let shared = dispatch(Some(format_ident!("downcast_error_ref_unchecked")), false);
+    let mutable = dispatch(Some(format_ident!("downcast_error_mut_unchecked")), false);
+    let try_owned = dispatch(Some(format_ident!("downcast_error_unchecked")), true);
+    let try_shared = dispatch(Some(format_ident!("downcast_error_ref_unchecked")), true);
+    let try_mutable = dispatch(Some(format_ident!("downcast_error_mut_unchecked")), true);
+    let kind_conversion = kind_enum.map(|kind_enum| {
+        let kind = dispatch(None, false);
+        let try_kind = dispatch(None, true);
+        let conversions = (0..3).map(|index| {
+            let (source_type, erased_type, from_params, from_bounds, try_params, try_bounds) =
+                match index {
+                    0 => (
+                        union_type.clone(),
+                        erased_union_type.clone(),
+                        &from_generics,
+                        &from_where,
+                        &impl_generics,
+                        &where_clause,
+                    ),
+                    _ => {
+                        let mutability = (index == 2).then(|| quote!(mut));
+                        (
+                            quote!(&'__eros_enum #mutability #union_type),
+                            quote!(&'__eros_enum #mutability #erased_union_type),
+                            &from_borrow_generics,
+                            &from_borrow_where,
+                            &borrow_generics,
+                            &borrow_where,
+                        )
+                    }
+                };
+            quote! {
+                #(#kind_gating)*
+                impl #from_params ::core::convert::From<#source_type> for #kind_enum #from_bounds {
+                    #[inline]
+                    fn from(union_of: #source_type) -> Self {
+                        #kind
+                    }
+                }
+                #(#kind_gating)*
+                impl #try_params ::core::convert::TryFrom<#erased_type> for #kind_enum #try_bounds {
+                    type Error = #erased_type;
+
+                    #[inline]
+                    fn try_from(union_of: #erased_type) -> ::core::result::Result<Self, #erased_type> {
+                        #try_kind
+                    }
+                }
+            }
+        });
+        quote!(#(#conversions)*)
+    });
     let owned_conversion = owned_enum.map(|owned_enum| {
         quote! {
             #(#owned_gating)*
@@ -603,6 +660,7 @@ fn conversions(
             #owned_conversion
             #ref_conversion
             #mut_conversion
+            #kind_conversion
         };
     }
 }

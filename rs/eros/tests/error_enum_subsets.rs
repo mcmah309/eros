@@ -16,7 +16,9 @@ type X = Payload<0>;
 type Y = Payload<1>;
 type Z = Payload<2>;
 
-#[eros::error_enums(AppError)]
+#[eros::error_enum(AppError)]
+#[eros::error_enum_ref(AppErrorRef)]
+#[eros::error_enum_mut(AppErrorMut)]
 type App = (X, Y, Z);
 
 fn inspect<const N: u8>(payload: &Payload<N>, expected: u8, original: *const ()) -> *const u8 {
@@ -136,7 +138,11 @@ mod maximum_arity {
         ($($ty:ident: $n:literal),+) => {
             $(type $ty = Payload<$n>;)+
 
-            #[eros::error_enums(LargeError)]
+            #[eros::error_enum(LargeError)]
+
+            #[eros::error_enum_ref(LargeErrorRef)]
+
+            #[eros::error_enum_mut(LargeErrorMut)]
             type Large = ($($ty,)+);
 
             #[test]

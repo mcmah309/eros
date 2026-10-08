@@ -474,8 +474,8 @@ For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete
 use eros::IntoUnion;
 use std::{fmt, io};
 
-#[eros::error_enums(CrateError, "crate operation failed: {0}")]
-pub type CrateErrorSet = (io::Error, fmt::Error);
+#[eros::error_enum(CrateError, "crate operation failed: {0}")]
+pub type CrateErrors = (io::Error, fmt::Error);
 
 fn regular_typed_result1() -> Result<(), io::Error> {
     Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"))
@@ -485,7 +485,7 @@ fn regular_typed_result2() -> Result<(), fmt::Error> {
     Err(fmt::Error)
 }
 
-fn internal_api() -> eros::Result<(), CrateErrorSet> {
+fn internal_api() -> eros::Result<(), CrateErrors> {
     regular_typed_result1().union()?;
     regular_typed_result2().union()?;
     Ok(())
@@ -638,47 +638,34 @@ Other backtrace examples in this README use `[N frames hidden for brevity]` to m
 
 ### Error Enum Macro
 
-`#[eros::error_enums(Name)]` keeps a tuple alias and generates `Name`, `NameRef<'a>`, and `NameMut<'a>` with named variants and automatic `Debug`, `Display`, and `Error` implementations. This is useful if you need to operate on multiple specific branches of the error, or want to expose the error to an outside api without exposing `ErrorUnion` (see [here](#approach-b-replacing-errorunion-with-concrete-crate-errors)).
+`#[eros::error_enum(Name)]` keeps a tuple alias and generates an owned enum with `Debug`, `Display`, and `Error` implementations, useful for matching errors or [exposing a concrete public error](#approach-b-replacing-errorunion-with-concrete-crate-errors). Add `error_enum_ref` and `error_enum_mut` for borrowed views, or `error_enum_kind` for unit variants without payloads:
 
 ```rust
 use eros::ErrorUnion;
 use std::{fmt, io};
 
-#[eros::error_enums(Error)]
-pub type ErrorSet = (io::Error, fmt::Error);
+#[eros::error_enum(Error)]
+#[eros::error_enum_ref(ErrorRef)]
+#[eros::error_enum_mut(ErrorMut)]
+#[eros::error_enum_kind(ErrorKind)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub type Errors = (io::Error, fmt::Error);
 
-let union_of: ErrorUnion<ErrorSet> = ErrorUnion::new(fmt::Error);
-match union_of.into() {
+let mut union: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
+assert_eq!(ErrorKind::from(&union), ErrorKind::Fmt);
+let _shared: ErrorRef<'_> = (&union).into();
+let _mutable: ErrorMut<'_> = (&mut union).into();
+match Error::from(union) {
     Error::Io(error) => eprintln!("I/O error: {error}"),
     Error::Fmt(error) => eprintln!("Formatting error: {error}"),
 }
 ```
 
-Here the variants are `Io` and `Fmt`: generated variant names strip a trailing `Error` unless that would leave an empty name. `Display` delegates to the contained error, and `Error::source()` returns it. Every attribute below `error_enums` applies to all three enums. The generated enums also implement `TryFrom` for `ErrorUnion<AnyError>`
+Each macro works independently. Attributes below it apply to that enum until the next enum macro or the alias. Variant names join path segments in PascalCase and strip a trailing `Error` unless that would leave an empty name. The kind enum implements `Debug`; attach other derives explicitly.
 
-Generated `From` conversions accept any tuple of the enum's error types, including subsets and reordered tuples. This works for owned unions and shared or mutable references, without calling `widen` first:
+`Display` delegates to the contained error, and `Error::source()` returns it. An optional format, such as `#[eros::error_enum(Error, "operation failed: {0}")]`, customizes the message.
 
-```rust
-use eros::ErrorUnion;
-use std::{fmt, io};
-
-#[eros::error_enums(AppFailure)]
-type App = (io::Error, fmt::Error, eros::MsgError);
-
-let mut subset: ErrorUnion<(fmt::Error, io::Error)> = ErrorUnion::new(fmt::Error);
-let _shared = AppFailureRef::from(&subset);
-let _mutable = AppFailureMut::from(&mut subset);
-let _owned = AppFailure::from(subset);
-```
-
-The name is required, and an optional display format applies to all three enums:
-
-- Default display: `#[eros::error_enums(AppFailure)]`
-- Custom display: `#[eros::error_enums(AppFailure, "operation failed: {0}")]`
-
-`{0}` formats the contained error.
-
-To generate individual enums, use `#[eros::error_enum(Name)]`, `#[eros::error_enum_ref(Name)]`, or `#[eros::error_enum_mut(Name)]`, independently or stacked in any order.
+Conversions accept subsets and reordered tuples. Borrowing preserves diagnostics; owned conversion discards them. For erased unions (`ErrorUnion<AnyError>`), use `TryFrom`, which returns the original value or borrow on a mismatch.
 
 ### Adding Source Chains
 
