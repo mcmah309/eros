@@ -128,33 +128,16 @@ impl ErrorUnionInner<dyn SendSyncError> {
     pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self: Box<Self>) -> T {
         debug_assert!(self.is_error_type::<T>());
 
-        // Note: this prevents the Box from automatically dropping at the end of the function.
-        let raw_container: *mut Self = Box::into_raw(self);
-
-        unsafe {
-            // Own the allocation before any field destructor can panic, without
-            // automatically dropping fields that we move or drop manually.
-            let mut allocation: Box<mem::ManuallyDrop<Self>> =
-                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
-            // Derive a fresh pointer from the owning guard.
-            let raw_container = &raw mut **allocation;
-
-            // Thin the fat pointer directly — no intermediate dyn Any cast needed.
-            // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
-            let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
-            // Copy to the stack
-            let downcasted_value: T = ptr::read(thin_ptr);
-
-            // Destructively drop the remaining fields inside the container
-            #[cfg(feature = "backtrace")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).backtrace));
-            #[cfg(feature = "context")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).context));
-            #[cfg(feature = "location")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).location));
-
-            downcasted_value
+        let error;
+        {
+            // SAFETY: the caller guarantees the stored error is T, restoring
+            // the allocation's original concrete type.
+            let inner = unsafe { Box::from_raw(Box::into_raw(self) as *mut ErrorUnionInner<T>) };
+            error = inner.error;
+            // Drop the remaining fields and free the allocation while error is
+            // still a local, so it is also dropped if a field destructor panics.
         }
+        error
     }
 
     #[inline]
