@@ -117,7 +117,7 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
         let display = format!("{error}");
         let debug = format!("{error:?}");
         let original = error.inner() as *const dyn SendSyncError as *const ();
-        let error = ErrorUnion::<E>::try_from_dyn_error(Box::new(error.into_std_error())).unwrap();
+        let error = ErrorUnion::<E>::try_from_boxed_error(Box::new(error.into_std_error())).unwrap();
         assert_eq!(
             error.inner() as *const dyn SendSyncError as *const (),
             original
@@ -139,7 +139,7 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
 
     let unrelated: Box<dyn SendSyncError> = Box::new(eros::MsgError::from_static("unrelated"));
     let original = unrelated.as_ref() as *const dyn SendSyncError as *const ();
-    let unrelated = ErrorUnion::<AnyError>::try_from_dyn_error(unrelated).unwrap_err();
+    let unrelated = ErrorUnion::<AnyError>::try_from_boxed_error(unrelated).unwrap_err();
     assert_eq!(
         unrelated.as_ref() as *const dyn SendSyncError as *const (),
         original

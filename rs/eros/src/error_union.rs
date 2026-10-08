@@ -443,10 +443,10 @@ where
     ///
     /// let error = eros::error!("missing configuration");
     /// let boxed: Box<dyn SendSyncError> = Box::new(error.into_std_error());
-    /// let error: ErrorUnion = ErrorUnion::try_from_dyn_error(boxed).unwrap();
+    /// let error: ErrorUnion = ErrorUnion::try_from_boxed_error(boxed).unwrap();
     /// assert_eq!(error.to_string(), "missing configuration");
     /// ```
-    pub fn try_from_dyn_error(
+    pub fn try_from_boxed_error(
         error: Box<dyn SendSyncError>,
     ) -> Result<Self, Box<dyn SendSyncError>> {
         let error_ref = &*error as &dyn Any;
@@ -1356,17 +1356,17 @@ mod tests {
         let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
         assert!((&*dyn_err as &dyn Any).is::<StdError<(FooError,)>>());
         let recovered: ErrorUnion<(FooError,)> =
-            ErrorUnion::try_from_dyn_error(dyn_err).expect("round-trip should succeed");
+            ErrorUnion::try_from_boxed_error(dyn_err).expect("round-trip should succeed");
 
         assert_eq!(recovered.as_ref(), &FooError("roundtrip".into()));
     }
 
     #[test]
-    fn try_from_dyn_error_wrong_type_returns_err() {
+    fn try_from_boxed_error_wrong_type_returns_err() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("mismatch".into()));
         let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
 
-        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::try_from_dyn_error(dyn_err);
+        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::try_from_boxed_error(dyn_err);
         assert!(result.is_err(), "mismatched type should be returned as Err");
     }
 
@@ -1385,14 +1385,14 @@ mod tests {
     }
 
     #[test]
-    fn try_from_dyn_error_preserves_context() {
+    fn try_from_boxed_error_preserves_context() {
         let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("ctx".into()));
         #[cfg(feature = "context")]
         {
             union = union.context("some context");
         }
         let dyn_err = Box::new(union.into_std_error());
-        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
+        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::try_from_boxed_error(dyn_err).unwrap();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -1406,7 +1406,7 @@ mod tests {
         let dyn_err = Box::new(union.into_std_error());
 
         let recovered: ErrorUnion<(FooError, BarError)> =
-            ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
+            ErrorUnion::try_from_boxed_error(dyn_err).unwrap();
 
         let bar: BarError = recovered.narrow::<BarError, _>().unwrap();
         assert_eq!(bar, BarError(99));
@@ -1504,16 +1504,16 @@ mod tests {
     }
 
     #[test]
-    fn into_inner_dyn_error_not_roundtrippable_via_try_from_dyn_error() {
-        // Confirm that try_from_dyn_error correctly rejects a bare inner error
+    fn into_inner_dyn_error_not_roundtrippable_via_try_from_boxed_error() {
+        // Confirm that try_from_boxed_error correctly rejects a bare inner error
         // (since it's not wrapped in StdError).
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
         let bare_dyn = union_a.into_inner();
 
-        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_dyn_error(bare_dyn);
+        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_boxed_error(bare_dyn);
         assert!(
             result.is_err(),
-            "try_from_dyn_error should reject a bare inner error, not a StdError"
+            "try_from_boxed_error should reject a bare inner error, not a StdError"
         );
     }
 }

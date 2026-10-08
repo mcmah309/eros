@@ -461,14 +461,14 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
     let adapter_address = &*adapter as *const dyn SendSyncError as *const ();
 
     // Even a matching payload cannot change the adapter's original set parameter.
-    let adapter = ErrorUnion::<(Tracked,)>::try_from_dyn_error(adapter).unwrap_err();
-    let adapter = ErrorUnion::<(fmt::Error,)>::try_from_dyn_error(adapter).unwrap_err();
-    let adapter = ErrorUnion::<()>::try_from_dyn_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<(Tracked,)>::try_from_boxed_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<(fmt::Error,)>::try_from_boxed_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<()>::try_from_boxed_error(adapter).unwrap_err();
     assert_eq!(
         &*adapter as *const dyn SendSyncError as *const (),
         adapter_address
     );
-    let error = ErrorUnion::<AnyError>::try_from_dyn_error(adapter).unwrap();
+    let error = ErrorUnion::<AnyError>::try_from_boxed_error(adapter).unwrap();
     assert_eq!(
         error.inner() as *const dyn SendSyncError as *const (),
         original
@@ -487,8 +487,8 @@ fn typed_adapter_recovery_requires_its_original_set() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
     let adapter = Box::new(union(&root, &context).into_std_error());
-    let adapter = ErrorUnion::<AnyError>::try_from_dyn_error(adapter).unwrap_err();
-    let error = ErrorUnion::<(Tracked,)>::try_from_dyn_error(adapter).unwrap();
+    let adapter = ErrorUnion::<AnyError>::try_from_boxed_error(adapter).unwrap_err();
+    let error = ErrorUnion::<(Tracked,)>::try_from_boxed_error(adapter).unwrap();
     // This path uses the singleton's unchecked extraction, so the set must be exact.
     let value = error.into_single();
     assert_eq!(value.payload, [1, 2, 3]);

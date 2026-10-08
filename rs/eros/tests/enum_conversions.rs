@@ -56,7 +56,7 @@ macro_rules! check_arity {
                 let report = format!("{error:?}");
                 let adapter = Box::new(error.into_std_error());
                 assert!(std::error::Error::source(adapter.as_ref()).is_none());
-                let error = ErrorUnion::<Set>::try_from_dyn_error(adapter).unwrap();
+                let error = ErrorUnion::<Set>::try_from_boxed_error(adapter).unwrap();
                 let mut erased: ErrorUnion = error.into();
                 assert!(matches!(Kind::try_from(&erased).unwrap(), Kind::$variant));
                 assert!(matches!(Kind::try_from(&mut erased).unwrap(), Kind::$variant));
