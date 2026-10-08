@@ -298,6 +298,7 @@ fn _send_sync_error_assert() {
     is_send(&error_union);
     is_sync(&error_union);
     // is_error(&error_union); // todo when specialization is stabilized
+    is_error(&error_union.into_std_error());
 }
 
 unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
