@@ -1,0 +1,17 @@
+error[E0515]: cannot return value referencing local variable `union_of`
+ --> tests/trybuild/error_enum_borrow_cannot_escape.rs:8:5
+  |
+8 |     LocalErrorRef::from(&union_of)
+  |     ^^^^^^^^^^^^^^^^^^^^---------^
+  |     |                   |
+  |     |                   `union_of` is borrowed here
+  |     returns a value referencing data owned by the current function
+
+error[E0515]: cannot return value referencing local variable `union_of`
+  --> tests/trybuild/error_enum_borrow_cannot_escape.rs:13:5
+   |
+13 |     LocalErrorMut::from(&mut union_of)
+   |     ^^^^^^^^^^^^^^^^^^^^-------------^
+   |     |                   |
+   |     |                   `union_of` is borrowed here
+   |     returns a value referencing data owned by the current function

@@ -35,6 +35,19 @@ impl core::fmt::Display for InvalidPassword {
 }
 impl core::error::Error for InvalidPassword {}
 
+#[eros::error_enum(NamedErrorsError)]
+#[derive(PartialEq, Eq)]
+#[non_exhaustive]
+#[eros::error_enum_ref(NamedErrorsErrorRef)]
+#[derive(PartialEq, Eq)]
+#[non_exhaustive]
+#[eros::error_enum_mut(NamedErrorsErrorMut)]
+#[derive(PartialEq, Eq)]
+#[non_exhaustive]
+#[eros::error_enum_kind(NamedErrorKind)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub type NamedErrors = (NotEnoughMemory, Timeout);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckOutcome {
     Ok,
@@ -42,6 +55,46 @@ pub enum CheckOutcome {
 }
 
 pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
+    let mut named: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
+    assert!(matches!(
+        NamedErrorKind::from(&named),
+        NamedErrorKind::Timeout
+    ));
+    assert!(matches!(
+        NamedErrorKind::from(&mut named),
+        NamedErrorKind::Timeout
+    ));
+    let borrowed: NamedErrorsErrorRef<'_> = (&named).into();
+    assert!(matches!(borrowed, NamedErrorsErrorRef::Timeout(_)));
+    let mutable: NamedErrorsErrorMut<'_> = (&mut named).into();
+    assert!(matches!(mutable, NamedErrorsErrorMut::Timeout(_)));
+    assert!(matches!(
+        NamedErrorsError::from(named),
+        NamedErrorsError::Timeout(Timeout)
+    ));
+
+    let mut erased: ErrorUnion<AnyError> = ErrorUnion::new(Timeout);
+    assert!(matches!(
+        NamedErrorsErrorRef::try_from(&erased).unwrap(),
+        NamedErrorsErrorRef::Timeout(_)
+    ));
+    assert!(matches!(
+        NamedErrorsErrorMut::try_from(&mut erased).unwrap(),
+        NamedErrorsErrorMut::Timeout(_)
+    ));
+    assert!(matches!(
+        NamedErrorsError::try_from(erased).unwrap(),
+        NamedErrorsError::Timeout(Timeout)
+    ));
+    let mut erased: ErrorUnion<AnyError> = ErrorUnion::new(InvalidPassword);
+    assert!(NamedErrorsErrorRef::try_from(&erased).is_err());
+    assert!(NamedErrorsErrorMut::try_from(&mut erased).is_err());
+    assert!(
+        NamedErrorsError::try_from(erased)
+            .unwrap_err()
+            .is_inner::<InvalidPassword>()
+    );
+
     let context_error = eager_owned_context(alloc::string::String::from("owned")).unwrap_err();
     assert_eq_str(
         context_error
@@ -90,7 +143,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let result: eros::Result<u8, (Timeout, MsgError)> = (|| eros::bail!(MsgError::from_static(ERROR)))();
     let value = result
         .recover(|error: ErrorUnion<(Timeout, MsgError)>| {
-            assert!(matches!(error.as_enum(), eros::E2::B(_)));
+            assert!(error.is_inner::<MsgError>());
             7
         })
         .into_value();
@@ -309,7 +362,7 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
 
 #[cfg(test)]
 mod tests {
-    use super::{NotEnoughMemory, Timeout, run_no_std_checks};
+    use super::{NamedErrors, NamedErrorsError, NotEnoughMemory, Timeout, run_no_std_checks};
     use eros::{AnyError, Context, ErrorUnion, SendSyncError, MsgError};
 
     #[test]
@@ -342,12 +395,18 @@ mod tests {
     }
 
     #[test]
-    fn into_enum_works() {
-        let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(Timeout);
-        assert!(matches!(u.into_enum(), eros::E2::B(Timeout)));
+    fn named_enum_works() {
+        let u: ErrorUnion<NamedErrors> = ErrorUnion::new(Timeout);
+        assert!(matches!(
+            NamedErrorsError::from(u),
+            NamedErrorsError::Timeout(Timeout)
+        ));
 
-        let u: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(NotEnoughMemory);
-        assert!(matches!(u.into_enum(), eros::E2::A(NotEnoughMemory)));
+        let u: ErrorUnion<NamedErrors> = ErrorUnion::new(NotEnoughMemory);
+        assert!(matches!(
+            NamedErrorsError::from(u),
+            NamedErrorsError::NotEnoughMemory(NotEnoughMemory)
+        ));
     }
 
     #[test]

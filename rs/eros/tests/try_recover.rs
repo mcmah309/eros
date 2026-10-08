@@ -1,4 +1,4 @@
-use eros::{E2, ErrorUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{ErrorUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::{fmt, io, num::ParseIntError};
 
 #[test]
@@ -64,6 +64,7 @@ fn matching_handler_and_fallback_keep_their_own_metadata_and_identity() {
 #[test]
 fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
     type Input = (MsgError, io::Error, fmt::Error);
+    #[eros::error_enum(OutputError)]
     type Output = (fmt::Error, ParseIntError, MsgError);
     let errors: [ErrorUnion<Input>; 2] = [
         ErrorUnion::new(MsgError::from("message")),
@@ -86,9 +87,9 @@ fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
         assert_eq!(format!("{error:?}"), report);
         #[cfg(feature = "diagnostic")]
         assert_eq!(error.to_debug_json(), diagnostic);
-        match (index, error.into_enum()) {
-            (0, eros::E3::C(error)) => assert_eq!(error.as_str(), "message"),
-            (1, eros::E3::A(fmt::Error)) => {}
+        match (index, OutputError::from(error)) {
+            (0, OutputError::Msg(error)) => assert_eq!(error.as_str(), "message"),
+            (1, OutputError::Fmt(fmt::Error)) => {}
             _ => panic!("wrong remaining variant"),
         }
     }
@@ -112,7 +113,7 @@ fn destination_inference_supports_plain_and_union_fallbacks_with_new_error_types
     }
 
     for result in [plain_fallback(), union_fallback()] {
-        assert!(matches!(result.unwrap_err().into_enum(), E2::B(_)));
+        assert!(result.unwrap_err().is_inner::<ParseIntError>());
     }
 }
 
@@ -131,7 +132,7 @@ fn handler_can_reintroduce_the_handled_type_and_preserve_its_diagnostics() {
         original
     );
     assert_eq!(format!("{error:?}"), report);
-    assert!(matches!(error.into_enum(), E2::B(_)));
+    assert!(error.is_inner::<io::Error>());
 }
 
 #[test]
@@ -158,14 +159,14 @@ fn only_the_inner_error_is_matched() {
 fn chained_fallbacks_can_replace_reintroduce_and_finally_recover_an_error() {
     let result: eros::Result<u8, (MsgError, fmt::Error)> = Err(MsgError::from("original")).union();
     let mut calls = Vec::new();
-    let result: eros::Result<u8, (fmt::Error, io::Error)> =
-        result.try_recover::<MsgError, _, _, _>(|error| {
+    let result: eros::Result<u8, (fmt::Error, io::Error)> = result
+        .try_recover::<MsgError, _, _, _>(|error| {
             calls.push("replace");
             assert_eq!(error.as_str(), "original");
             Err(io::Error::other("fallback")).union()
         });
-    let result: eros::Result<u8, (io::Error, fmt::Error)> =
-        result.try_recover::<io::Error, _, _, _>(|error| {
+    let result: eros::Result<u8, (io::Error, fmt::Error)> = result
+        .try_recover::<io::Error, _, _, _>(|error| {
             calls.push("reintroduce");
             assert_eq!(error.kind(), io::ErrorKind::Other);
             Err(error.context("retry failed").widen())

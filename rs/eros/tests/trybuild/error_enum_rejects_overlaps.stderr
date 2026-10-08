@@ -1,0 +1,35 @@
+error: error_enum overlaps an enum already requested on this tuple alias
+ --> tests/trybuild/error_enum_rejects_overlaps.rs:2:1
+  |
+2 | #[eros::error_enum(SecondOwned)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: error_enum_ref overlaps an enum already requested on this tuple alias
+ --> tests/trybuild/error_enum_rejects_overlaps.rs:6:1
+  |
+6 | #[eros::error_enum_ref(SecondShared)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: error_enum_mut overlaps an enum already requested on this tuple alias
+  --> tests/trybuild/error_enum_rejects_overlaps.rs:10:1
+   |
+10 | #[eros::error_enum_mut(SecondMutable)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: error_enum_kind overlaps an enum already requested on this tuple alias
+  --> tests/trybuild/error_enum_rejects_overlaps.rs:14:1
+   |
+14 | #[eros::error_enum_kind(SecondKind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: generated enum names must be distinct
+  --> tests/trybuild/error_enum_rejects_overlaps.rs:18:25
+   |
+18 | #[eros::error_enum_kind(SameName)]
+   |                         ^^^^^^^^
+
+error: generated enum name must differ from the tuple alias name
+  --> tests/trybuild/error_enum_rejects_overlaps.rs:21:25
+   |
+21 | #[eros::error_enum_kind(SameAlias)]
+   |                         ^^^^^^^^^

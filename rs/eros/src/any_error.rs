@@ -46,7 +46,7 @@ where
     }
 }
 
-// Note we do not implement things like below and keep the pattern going up to 9,
+// Note we do not implement things like below and keep the pattern going up to 26,
 // because `into()` would only work/be implemented for one position and we can't implement
 // for all positions otherwise we would get conflicting From implementations.
 // I have also not found a generic way to implement from a Subset to a Superset (in all positions),

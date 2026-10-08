@@ -66,14 +66,26 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
     pub(crate) location: &'static core::panic::Location<'static>,
     /// Re-boxes the error field into a fresh allocation.
     /// Stored at construction so the concrete type is still known.
+    ///
+    /// # Safety
+    /// The pointer must refer to the live error field of the concrete type this
+    /// function was selected for. The caller must transfer ownership of the
+    /// value and prevent the original field from being used or dropped again.
     #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-    pub(crate) into_box_fn: fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
+    pub(crate) into_box_fn: unsafe fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
     pub(crate) error: T,
 }
 
+/// Moves the pointed-to error into a fresh box.
+///
+/// # Safety
+/// `ptr` must be valid and properly aligned for reading an initialized value of
+/// exactly `T`. The caller must have exclusive access to the value and transfer
+/// its ownership, preventing the original value from being used or dropped again.
 #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
-    // SAFETY: caller guarantees ptr points to a live T
+unsafe fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
+    // SAFETY: the caller guarantees a valid, aligned pointer to an initialized T
+    // and transfers ownership so the original value will not be used or dropped.
     let value: T = unsafe { ptr::read(ptr as *const dyn SendSyncError as *const T) };
     Box::new(value)
 }
@@ -119,47 +131,32 @@ impl ErrorUnionInner<dyn SendSyncError> {
         })
     }
 
-    #[allow(unstable_name_collisions)]
-    pub(crate) fn is_error<T: 'static>(&self) -> bool {
-        self.error.type_id() == TypeId::of::<T>()
+    #[inline]
+    pub(crate) fn is_error_type<T: 'static>(&self) -> bool {
+        Any::type_id(&self.error) == TypeId::of::<T>()
     }
 
+    #[inline]
     pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self: Box<Self>) -> T {
-        debug_assert!(self.is_error::<T>());
+        debug_assert!(self.is_error_type::<T>());
 
-        // Note: this prevents the Box from automatically dropping at the end of the function.
-        let raw_container: *mut Self = Box::into_raw(self);
-
-        unsafe {
-            // Thin the fat pointer directly — no intermediate dyn Any cast needed.
-            // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
-            let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
-            // Copy to the stack
-            let downcasted_value: T = ptr::read(thin_ptr);
-
-            // Destructively drop the remaining fields inside the container
-            #[cfg(feature = "backtrace")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).backtrace));
-            #[cfg(feature = "context")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).context));
-            #[cfg(feature = "location")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw_container).location));
-
-            // Deallocate the Box allocation itself.
-            // We reconstruct a Box containing uninitialized/dead data, but wrapped in
-            // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
-            // it frees the underlying heap memory without touching the fields.
-            let _dead_box: Box<mem::ManuallyDrop<Self>> =
-                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
-
-            downcasted_value
+        let error;
+        {
+            // SAFETY: the caller guarantees the stored error is T, restoring
+            // the allocation's original concrete type.
+            let inner = unsafe { Box::from_raw(Box::into_raw(self) as *mut ErrorUnionInner<T>) };
+            error = inner.error;
+            // Drop the remaining fields and free the allocation while error is
+            // still a local, so it is also dropped if a field destructor panics.
         }
+        error
     }
 
+    #[inline]
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
         self: Box<Self>,
     ) -> ErrorUnionInner<T> {
-        debug_assert!(self.is_error::<T>());
+        debug_assert!(self.is_error_type::<T>());
 
         // Note: this prevents the Box from automatically dropping at the end of the function.
         let raw_container: *mut Self = Box::into_raw(self);
@@ -203,25 +200,31 @@ impl ErrorUnionInner<dyn SendSyncError> {
         }
     }
 
+    #[inline]
     pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
         (&self.error as &dyn Any).downcast_ref::<T>()
     }
 
-    // todo when https://github.com/rust-lang/rust/issues/90850 is stabilized
-    // pub(crate) unsafe fn downcast_unchecked_error_ref<T: 'static>(&self) -> &T {
-    //     debug_assert!(self.is_error::<T>());
-    //     unsafe { (&self.error as &dyn Any).downcast_unchecked_ref::<T>() }
-    // }
+    #[inline]
+    pub(crate) unsafe fn downcast_error_ref_unchecked<T: Any>(&self) -> &T {
+        let error = &self.error as &dyn Any;
+        debug_assert!(error.is::<T>());
+        // SAFETY: The caller guarantees that T is the error's concrete type.
+        unsafe { &*(error as *const dyn Any as *const T) }
+    }
 
+    #[inline]
     pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
         (&mut self.error as &mut dyn Any).downcast_mut::<T>()
     }
 
-    // todo when https://github.com/rust-lang/rust/issues/90850 is stabilized
-    // pub(crate) unsafe fn downcast_unchecked_error_mut<T: 'static>(&mut self) -> &mut T {
-    //     debug_assert!(self.is_error::<T>());
-    //     unsafe { (&mut self.error as &mut dyn Any).downcast_unchecked_mut::<T>() }
-    // }
+    #[inline]
+    pub(crate) unsafe fn downcast_error_mut_unchecked<T: Any>(&mut self) -> &mut T {
+        let error = &mut self.error as &mut dyn Any;
+        debug_assert!(error.is::<T>());
+        // SAFETY: The caller guarantees that T is the error's concrete type.
+        unsafe { &mut *(error as *mut dyn Any as *mut T) }
+    }
 }
 
 /// `ErrorUnion` is an open sum type of errors. It differs from an enum
@@ -262,6 +265,7 @@ where
 {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &T {
         (&self.inner.error as &dyn Any).downcast_ref::<T>().unwrap()
     }
@@ -293,7 +297,8 @@ fn _send_sync_error_assert() {
         ErrorUnion::new(io::Error::other("yooo"));
     is_send(&error_union);
     is_sync(&error_union);
-    // is_error(&error_union); //todo
+    // is_error(&error_union); // todo when specialization is stabilized
+    is_error(&error_union.into_std_error());
 }
 
 unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
@@ -439,10 +444,10 @@ where
     ///
     /// let error = eros::error!("missing configuration");
     /// let boxed: Box<dyn SendSyncError> = Box::new(error.into_std_error());
-    /// let error: ErrorUnion = ErrorUnion::try_from_dyn_error(boxed).unwrap();
+    /// let error: ErrorUnion = ErrorUnion::try_from_boxed_error(boxed).unwrap();
     /// assert_eq!(error.to_string(), "missing configuration");
     /// ```
-    pub fn try_from_dyn_error(
+    pub fn try_from_boxed_error(
         error: Box<dyn SendSyncError>,
     ) -> Result<Self, Box<dyn SendSyncError>> {
         let error_ref = &*error as &dyn Any;
@@ -525,8 +530,9 @@ where
     /// let message = error.downcast_inner::<eros::MsgError>().unwrap();
     /// assert_eq!(message.as_str(), "failure");
     /// ```
+    #[inline]
     pub fn downcast_inner<T: 'static>(self) -> Result<T, Self> {
-        if self.inner.is_error::<T>() {
+        if self.inner.is_error_type::<T>() {
             // SAFETY: The concrete inner error type was checked above.
             Ok(unsafe { self.inner.downcast_error_unchecked::<T>() })
         } else {
@@ -534,17 +540,20 @@ where
         }
     }
 
+    #[inline]
     pub fn downcast_inner_ref<T: 'static>(&self) -> Option<&T> {
         self.inner.downcast_error_ref()
     }
 
+    #[inline]
     pub fn downcast_inner_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.inner.downcast_error_mut()
     }
 
     /// Returns true if the inner error is of type `T`
+    #[inline]
     pub fn is_inner<T: 'static>(&self) -> bool {
-        self.inner.is_error::<T>()
+        self.inner.is_error_type::<T>()
     }
 
     #[cfg(feature = "backtrace")]
@@ -626,9 +635,17 @@ where
         }
         #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
         unsafe {
+            // Free the allocation even if a context destructor panics.
+            let mut allocation: Box<mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>> =
+                Box::from_raw(raw as *mut _);
+            let raw = &raw mut **allocation;
+
             let into_box_fn = (*raw).into_box_fn;
             let error_ptr = ptr::addr_of_mut!((*raw).error);
 
+            // SAFETY: the function was selected for this error's concrete type,
+            // and we own the live error field. ManuallyDrop prevents the original
+            // field from being dropped after its ownership moves into the box.
             let boxed = (into_box_fn)(error_ptr);
 
             // Drop remaining fields, free the allocation (same pattern as downcast_error_unchecked)
@@ -638,9 +655,6 @@ where
             ptr::drop_in_place(ptr::addr_of_mut!((*raw).context));
             #[cfg(feature = "location")]
             ptr::drop_in_place(ptr::addr_of_mut!((*raw).location));
-
-            let _dead: Box<mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>> =
-                Box::from_raw(raw as *mut _);
 
             boxed
         }
@@ -667,32 +681,6 @@ where
             }
         }
         None
-    }
-
-    /// Converts the union into an owned enum for pattern matching.
-    ///
-    /// Context, location, and backtrace are discarded.
-    pub fn into_enum(self) -> E::Enum
-    where
-        E::Enum: From<Self>,
-    {
-        E::Enum::from(self)
-    }
-
-    /// Borrows the inner error as an enum of references for pattern matching.
-    pub fn as_enum<'a>(&'a self) -> E::RefEnum<'a>
-    where
-        E::RefEnum<'a>: From<&'a Self>,
-    {
-        E::RefEnum::from(self)
-    }
-
-    /// Borrows the inner error as an enum of mutable references for pattern matching.
-    pub fn as_mut_enum<'a>(&'a mut self) -> E::MutEnum<'a>
-    where
-        E::MutEnum<'a>: From<&'a mut Self>,
-    {
-        E::MutEnum::from(self)
     }
 
     /// Adds additional context. This becomes a no-op if the `context` feature is disabled.
@@ -753,21 +741,37 @@ where
 }
 
 impl<A: SendSyncError> AsRef<A> for ErrorUnion<(A,)> {
+    #[inline]
     fn as_ref(&self) -> &A {
         self.inner.downcast_error_ref().unwrap()
     }
 }
 
 impl<A: SendSyncError> AsMut<A> for ErrorUnion<(A,)> {
+    #[inline]
     fn as_mut(&mut self) -> &mut A {
         self.inner.downcast_error_mut().unwrap()
     }
 }
 
 impl<A: SendSyncError> ErrorUnion<(A,)> {
+    /// Borrows the single concrete inner error, preserving context, location, and backtrace.
+    #[inline]
+    pub fn as_single(&self) -> &A {
+        self.as_ref()
+    }
+
+    /// Mutably borrows the single concrete inner error, preserving context, location, and backtrace.
+    #[inline]
+    pub fn as_single_mut(&mut self) -> &mut A {
+        self.as_mut()
+    }
+
     /// Convert the inner type of an `ErrorUnion` with a single possible type to that type.
     ///
-    /// Use `as_ref` or `as_mut` if you want to borrow the inner type instead of consuming the `ErrorUnion`.
+    /// Use [`Self::as_single`] or [`Self::as_single_mut`] to borrow the inner type
+    /// instead of consuming the `ErrorUnion`.
+    #[inline]
     pub fn into_single(self) -> A {
         unsafe { self.inner.downcast_error_unchecked() }
     }
@@ -945,7 +949,7 @@ where
     /// ```
     fn into_value(self) -> S
     where
-        E: TypeSet<Enum = core::convert::Infallible>;
+        E: TypeSet<Variants = crate::type_set::End>;
 }
 
 impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
@@ -1019,11 +1023,11 @@ where
 
     fn into_value(self) -> S
     where
-        E: TypeSet<Enum = core::convert::Infallible>,
+        E: TypeSet<Variants = crate::type_set::End>,
     {
         match self {
             Ok(value) => value,
-            // TypeSet is sealed, and only () has an Infallible enum. A union
+            // TypeSet is sealed, and only () has an empty variant list. A union
             // with that empty set cannot be constructed through the safe API.
             Err(_) => unreachable!("an empty error set cannot contain an error"),
         }
@@ -1286,7 +1290,7 @@ mod tests {
     #[test]
     fn downcast_error_unchecked_correct_type_recovers_value() {
         let inner = ErrorUnionInner::new(FooError("hello".into()));
-        assert!(inner.is_error::<FooError>());
+        assert!(inner.is_error_type::<FooError>());
         let recovered: FooError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered, FooError("hello".into()));
     }
@@ -1353,17 +1357,17 @@ mod tests {
         let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
         assert!((&*dyn_err as &dyn Any).is::<StdError<(FooError,)>>());
         let recovered: ErrorUnion<(FooError,)> =
-            ErrorUnion::try_from_dyn_error(dyn_err).expect("round-trip should succeed");
+            ErrorUnion::try_from_boxed_error(dyn_err).expect("round-trip should succeed");
 
         assert_eq!(recovered.as_ref(), &FooError("roundtrip".into()));
     }
 
     #[test]
-    fn try_from_dyn_error_wrong_type_returns_err() {
+    fn try_from_boxed_error_wrong_type_returns_err() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("mismatch".into()));
         let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
 
-        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::try_from_dyn_error(dyn_err);
+        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::try_from_boxed_error(dyn_err);
         assert!(result.is_err(), "mismatched type should be returned as Err");
     }
 
@@ -1382,14 +1386,14 @@ mod tests {
     }
 
     #[test]
-    fn try_from_dyn_error_preserves_context() {
+    fn try_from_boxed_error_preserves_context() {
         let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("ctx".into()));
         #[cfg(feature = "context")]
         {
             union = union.context("some context");
         }
         let dyn_err = Box::new(union.into_std_error());
-        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
+        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::try_from_boxed_error(dyn_err).unwrap();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -1403,7 +1407,7 @@ mod tests {
         let dyn_err = Box::new(union.into_std_error());
 
         let recovered: ErrorUnion<(FooError, BarError)> =
-            ErrorUnion::try_from_dyn_error(dyn_err).unwrap();
+            ErrorUnion::try_from_boxed_error(dyn_err).unwrap();
 
         let bar: BarError = recovered.narrow::<BarError, _>().unwrap();
         assert_eq!(bar, BarError(99));
@@ -1501,16 +1505,16 @@ mod tests {
     }
 
     #[test]
-    fn into_inner_dyn_error_not_roundtrippable_via_try_from_dyn_error() {
-        // Confirm that try_from_dyn_error correctly rejects a bare inner error
+    fn into_inner_dyn_error_not_roundtrippable_via_try_from_boxed_error() {
+        // Confirm that try_from_boxed_error correctly rejects a bare inner error
         // (since it's not wrapped in StdError).
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
         let bare_dyn = union_a.into_inner();
 
-        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_dyn_error(bare_dyn);
+        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_boxed_error(bare_dyn);
         assert!(
             result.is_err(),
-            "try_from_dyn_error should reject a bare inner error, not a StdError"
+            "try_from_boxed_error should reject a bare inner error, not a StdError"
         );
     }
 }

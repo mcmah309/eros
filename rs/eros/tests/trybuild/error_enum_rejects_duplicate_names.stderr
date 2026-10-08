@@ -1,0 +1,5 @@
+error: duplicate generated variant `StdFmt`; use distinct type aliases
+ --> tests/trybuild/error_enum_rejects_duplicate_names.rs:2:34
+  |
+2 | type Invalid = (std::fmt::Error, std::fmt::Error);
+  |                                  ^^^^^^^^^^^^^^^

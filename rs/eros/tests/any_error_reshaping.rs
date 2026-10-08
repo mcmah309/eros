@@ -1,5 +1,8 @@
-use eros::{E2, ErrorUnion, MsgError, ReshapeUnion, SendSyncError, TypeSet};
+use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError, TypeSet};
 use std::{fmt, io};
+
+#[eros::error_enum_ref(SelectedErrorRef)]
+type Selected = (fmt::Error, MsgError);
 
 struct Snapshot {
     address: *const (),
@@ -77,7 +80,7 @@ fn erased_group_narrow_builds_typed_unions_and_preserves_both_branches() {
     for singleton in [false, true] {
         for (index, error) in errors().into_iter().enumerate() {
             let snapshot = Snapshot::new(&error);
-            let partition: Result<ErrorUnion<(fmt::Error, MsgError)>, ErrorUnion> = if singleton {
+            let partition: Result<ErrorUnion<Selected>, ErrorUnion> = if singleton {
                 error.narrow::<(MsgError,), _>().map(|error| error.widen())
             } else {
                 error.narrow::<(fmt::Error, MsgError), _>()
@@ -87,9 +90,11 @@ fn erased_group_narrow_builds_typed_unions_and_preserves_both_branches() {
             let error: ErrorUnion = match partition {
                 Ok(selected) => {
                     snapshot.assert_preserved(&selected);
-                    match (index, selected.as_enum()) {
-                        (0, E2::B(error)) => assert_eq!(error.as_str(), "message"),
-                        (1, E2::A(_)) => {}
+                    match (index, SelectedErrorRef::from(&selected)) {
+                        (0, SelectedErrorRef::Msg(error)) => {
+                            assert_eq!(error.as_str(), "message")
+                        }
+                        (1, SelectedErrorRef::Fmt(_)) => {}
                         _ => panic!("selected the wrong typed variant"),
                     }
                     selected.into()
@@ -143,15 +148,15 @@ fn erased_result_narrow_preserves_success_and_routes_each_error() {
             let snapshot = Snapshot::new(&error);
             let result: eros::Result<String> = Err(error);
             let remainder: eros::Result<String> = if group {
-                let selected: Result<ErrorUnion<(fmt::Error, MsgError)>, eros::Result<String>> =
+                let selected: Result<ErrorUnion<Selected>, eros::Result<String>> =
                     result.narrow::<(fmt::Error, MsgError), _>();
                 assert_eq!(selected.is_ok(), index < 2);
                 match selected {
                     Ok(error) => {
                         snapshot.assert_preserved(&error);
                         assert!(matches!(
-                            (index, error.as_enum()),
-                            (0, E2::B(_)) | (1, E2::A(_))
+                            (index, SelectedErrorRef::from(&error)),
+                            (0, SelectedErrorRef::Msg(_)) | (1, SelectedErrorRef::Fmt(_))
                         ));
                         continue;
                     }
@@ -191,12 +196,12 @@ fn erased_recover_handles_single_and_group_targets_without_losing_unknown_errors
             let result: eros::Result<String> = Err(error);
             let mut calls = 0;
             let result: eros::Result<String> = if group {
-                result.recover(|error: ErrorUnion<(fmt::Error, MsgError)>| {
+                result.recover(|error: ErrorUnion<Selected>| {
                     calls += 1;
                     snapshot.assert_preserved(&error);
                     assert!(matches!(
-                        (index, error.as_enum()),
-                        (0, E2::B(_)) | (1, E2::A(_))
+                        (index, SelectedErrorRef::from(&error)),
+                        (0, SelectedErrorRef::Msg(_)) | (1, SelectedErrorRef::Fmt(_))
                     ));
                     String::from("recovered")
                 })
@@ -238,20 +243,19 @@ fn erased_try_recover_preserves_success_remainders_and_handler_errors() {
             let replacement_snapshot = Snapshot::new(&replacement);
             let result: eros::Result<String> = Err(error);
             let mut calls = 0;
-            let result: eros::Result<String> =
-                result.try_recover(|error: ErrorUnion<(fmt::Error, MsgError)>| {
-                    calls += 1;
-                    snapshot.assert_preserved(&error);
-                    assert!(matches!(
-                        (index, error.as_enum()),
-                        (0, E2::B(_)) | (1, E2::A(_))
-                    ));
-                    if fails {
-                        Err(replacement)
-                    } else {
-                        Ok(String::from("recovered"))
-                    }
-                });
+            let result: eros::Result<String> = result.try_recover(|error: ErrorUnion<Selected>| {
+                calls += 1;
+                snapshot.assert_preserved(&error);
+                assert!(matches!(
+                    (index, SelectedErrorRef::from(&error)),
+                    (0, SelectedErrorRef::Msg(_)) | (1, SelectedErrorRef::Fmt(_))
+                ));
+                if fails {
+                    Err(replacement)
+                } else {
+                    Ok(String::from("recovered"))
+                }
+            });
             assert_eq!(calls, usize::from(index < 2));
             if index == 2 {
                 snapshot.assert_preserved(&result.unwrap_err());

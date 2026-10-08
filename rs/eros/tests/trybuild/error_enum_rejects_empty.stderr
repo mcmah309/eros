@@ -1,0 +1,5 @@
+error: error_enum requires between 1 and 26 variants
+ --> tests/trybuild/error_enum_rejects_empty.rs:2:16
+  |
+2 | type Invalid = ();
+  |                ^^

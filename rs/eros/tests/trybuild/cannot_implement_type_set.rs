@@ -5,9 +5,6 @@ struct CustomSet;
 
 impl TypeSet for CustomSet {
     type Variants = <() as TypeSet>::Variants;
-    type Enum = ();
-    type RefEnum<'a> = ();
-    type MutEnum<'a> = ();
 }
 
 impl TupleForm for CustomSet {

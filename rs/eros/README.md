@@ -464,49 +464,18 @@ pub fn public_api() -> Result<(), CrateError> {
 
 This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the existing allocation (no-op) so there is no cost to use `eros` in a library for any downstreams.
 
-This pattern works for `AnyError` as shown above, but it isn't limited to it. When the internal `ErrorUnion` uses a typed tuple instead, `into_enum` can be used to convert into an enum, which can then be mapped into the crate's own error enum — giving callers something they can exhaustively match on.
+For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
 <details>
 
 <summary>Example Implementation</summary>
 
 ```rust
-use eros::{E2, ErrorUnion, IntoUnion};
+use eros::IntoUnion;
 use std::{fmt, io};
 
-#[derive(Debug)]
-pub enum CrateError {
-    Io(io::Error),
-    Format(fmt::Error),
-}
-
-impl std::fmt::Display for CrateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CrateError::Io(e) => write!(f, "{}", e),
-            CrateError::Format(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-impl std::error::Error for CrateError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            CrateError::Io(e) => e.source(),
-            CrateError::Format(e) => e.source(),
-        }
-    }
-}
-
-impl From<ErrorUnion<(io::Error, fmt::Error)>> for CrateError {
-    fn from(error: ErrorUnion<(io::Error, fmt::Error)>) -> Self {
-        // `into_enum` converts the `ErrorUnion` into `E2<io::Error, fmt::Error>`,
-        match error.into_enum() {
-            E2::A(e) => CrateError::Io(e),
-            E2::B(e) => CrateError::Format(e),
-        }
-    }
-}
+#[eros::error_enum(CrateError, "crate operation failed: {0}")]
+pub type CrateErrors = (io::Error, fmt::Error);
 
 fn regular_typed_result1() -> Result<(), io::Error> {
     Err(io::Error::new(io::ErrorKind::AddrInUse, "message here"))
@@ -516,7 +485,7 @@ fn regular_typed_result2() -> Result<(), fmt::Error> {
     Err(fmt::Error)
 }
 
-fn internal_api() -> eros::Result<(), (io::Error, fmt::Error)> {
+fn internal_api() -> eros::Result<(), CrateErrors> {
     regular_typed_result1().union()?;
     regular_typed_result2().union()?;
     Ok(())
@@ -530,7 +499,7 @@ fn main() {
     match public_api() {
         Ok(()) => println!("Success!"),
         Err(CrateError::Io(e)) => println!("IO error: {}", e),
-        Err(CrateError::Format(e)) => println!("Format error: {}", e),
+        Err(CrateError::Fmt(e)) => println!("Format error: {}", e),
     }
 }
 ```
@@ -667,6 +636,37 @@ WARN Something went wrong
 
 Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `better_backtrace` to filter recognized dependency and runtime frames automatically.
 
+### Error Enum Macro
+
+`#[eros::error_enum(Name)]` keeps a tuple alias and generates an owned enum with `Debug`, `Display`, and `Error` implementations, useful for matching errors or [exposing a concrete public error](#approach-b-replacing-errorunion-with-concrete-crate-errors). Add `error_enum_ref` and `error_enum_mut` for borrowed views, or `error_enum_kind` for unit variants without payloads:
+
+```rust
+use eros::ErrorUnion;
+use std::{fmt, io};
+
+#[eros::error_enum(Error)]
+#[eros::error_enum_ref(ErrorRef)]
+#[eros::error_enum_mut(ErrorMut)]
+#[eros::error_enum_kind(ErrorKind)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub type Errors = (io::Error, fmt::Error);
+
+let mut union: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
+assert_eq!(ErrorKind::from(&union), ErrorKind::Fmt);
+let _shared: ErrorRef<'_> = (&union).into();
+let _mutable: ErrorMut<'_> = (&mut union).into();
+match Error::from(union) {
+    Error::Io(error) => eprintln!("I/O error: {error}"),
+    Error::Fmt(error) => eprintln!("Formatting error: {error}"),
+}
+```
+
+Each macro works independently. Attributes below it apply to that enum until the next enum macro or the alias. Variant names join path segments in PascalCase and strip a trailing `Error` unless that would leave an empty name. The kind enum implements `Debug`; attach other derives explicitly.
+
+`Display` delegates to the contained error, and `Error::source()` returns it. An optional format, such as `#[eros::error_enum(Error, "operation failed: {0}")]`, customizes the message.
+
+Conversions accept subsets and reordered tuples. Borrowing preserves diagnostics; owned conversion discards them. For erased unions (`ErrorUnion<AnyError>`), use `TryFrom`, which returns the original value or borrow on a mismatch.
+
 ### Adding Source Chains
 
 Use `map_inner` to change the main error while keeping the original failure as its source. The closure receives the boxed inner error; return an error that stores it and exposes it through `Error::source()`:
@@ -702,7 +702,7 @@ println!("{error}");
 Update preparation failed <- TLS certificate has expired
 ```
 
-For a union with a single possible error type, `map_single` passes the concrete error to the closure and preserves context, location, and backtrace. Or use `into_single` to extract that error and discard the metadata.
+For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving context, location, and backtrace. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
 
 ### Diagnostic Logging
 

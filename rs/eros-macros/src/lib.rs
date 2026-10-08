@@ -9,6 +9,146 @@ use syn::{
     token::Comma,
 };
 
+mod error_enum;
+
+/// Keeps a tuple alias and generates the explicitly named owned error enum.
+///
+/// ```rust
+/// use std::fmt;
+/// #[eros_macros::error_enum(AppFailure, "operation failed: {0}")]
+/// #[non_exhaustive]
+/// type AppErrors = (std::io::Error, fmt::Error);
+///
+/// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(fmt::Error);
+/// match union.into() {
+///     AppFailure::StdIo(error) => eprintln!("I/O error: {error}"),
+///     AppFailure::Fmt(error) => assert_eq!(error, fmt::Error),
+/// }
+/// ```
+///
+/// The name is required and used exactly as written. An optional display format
+/// follows it: `#[error_enum(AppFailure, "operation failed: {0}")]`. Without a
+/// format, `Display` delegates to the contained error, preserving formatter flags.
+/// `{0}` or `{}` formats the contained error; fixed strings and escaped braces
+/// also work. `Debug`, `Display`, and `core::error::Error` are implemented
+/// automatically, and `Error::source()` returns the contained error.
+///
+/// `From<ErrorUnion<Subset>>` converts any tuple of the enum's error types into
+/// the enum, in any order. Shared and mutable references work the same way.
+/// `TryFrom<ErrorUnion<AnyError>>` checks the concrete inner error and returns
+/// the original union on a mismatch. Successful owned conversions discard
+/// context, location, and backtrace. The shared and mutable enum macros generate
+/// corresponding conversions from references, returning the original borrow
+/// on a mismatch and preserving diagnostics.
+///
+/// The alias must be a nongeneric tuple of 1–26 path types. Variant names join
+/// path segments in PascalCase, ignoring generic arguments, then strip a trailing
+/// `Error` unless that would leave an empty name. Attributes below
+/// each macro apply to its enum until the next enum macro or the alias.
+/// [`error_enum_ref`] and [`error_enum_mut`] accept the same name and optional
+/// display arguments, work independently, and can be stacked in any order:
+///
+/// ```rust
+/// #[eros_macros::error_enum_mut(MutableFailure)]
+/// #[non_exhaustive]
+/// #[eros_macros::error_enum(OwnedFailure)]
+/// #[non_exhaustive]
+/// #[eros_macros::error_enum_ref(SharedFailure)]
+/// #[derive(Clone, Copy)]
+/// type AppErrors = (std::fmt::Error,);
+///
+/// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
+/// let shared: SharedFailure<'_> = (&union).into();
+/// let _copy = shared;
+/// let _shared_again = shared;
+/// let _mutable: MutableFailure<'_> = (&mut union).into();
+/// let _owned: OwnedFailure = union.into();
+/// ```
+///
+/// Only explicitly requested enums and conversions are generated.
+/// Use [`error_enum_kind`] to generate an enum with payload-free variants.
+/// Rust evaluates `cfg` and `cfg_attr` before macro expansion, so disabling
+/// conditions anywhere in the declaration remove the alias and its enums.
+#[proc_macro_attribute]
+pub fn error_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_error_enum(error_enum::EnumKind::Owned, attr, item)
+}
+
+/// Keeps a tuple alias and generates the explicitly named shared error enum.
+/// Accepts the same arguments as [`error_enum`]; subsequent attributes apply to
+/// this enum until the next enum macro or the alias.
+///
+/// ```rust
+/// #[eros_macros::error_enum_ref(SharedFailure, "shared: {0}")]
+/// #[derive(Clone, Copy)]
+/// type AppErrors = (std::fmt::Error,);
+/// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
+/// match (&union).into() {
+///     SharedFailure::StdFmt(error) => assert_eq!(error, &std::fmt::Error),
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn error_enum_ref(attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_error_enum(error_enum::EnumKind::Ref, attr, item)
+}
+
+/// Keeps a tuple alias and generates the explicitly named mutable error enum.
+/// Accepts the same arguments as [`error_enum`]; subsequent attributes apply to
+/// this enum until the next enum macro or the alias.
+///
+/// ```rust
+/// #[eros_macros::error_enum_mut(MutableFailure, "mutable: {0}")]
+/// type AppErrors = (std::fmt::Error,);
+/// let mut union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
+/// match (&mut union).into() {
+///     MutableFailure::StdFmt(error) => *error = std::fmt::Error,
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn error_enum_mut(attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_error_enum(error_enum::EnumKind::Mut, attr, item)
+}
+
+/// Keeps a tuple alias and generates the explicitly named error kind enum.
+///
+/// Every variant is a unit variant: the enum stores no error payloads and has
+/// no lifetime parameter. Names follow the same rules as [`error_enum`]. Only
+/// an enum name is accepted; `Debug` is implemented automatically. Additional
+/// attributes apply to this enum until the next enum macro or the alias.
+///
+/// `From` accepts owned, shared, and mutable `ErrorUnion` values whose tuple
+/// contains only listed error types, including subsets and reordered tuples.
+/// Borrowing leaves the error and its diagnostics intact. Owned conversion
+/// drops the error and its diagnostics. `TryFrom` accepts erased unions in all
+/// three forms and returns the original value or borrow when no type matches.
+///
+/// ```rust
+/// use std::{fmt, io};
+/// #[eros_macros::error_enum_kind(AppErrorKind)]
+/// #[derive(Clone, Copy, PartialEq, Eq)]
+/// type AppErrors = (io::Error, fmt::Error);
+///
+/// let union: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(fmt::Error);
+/// assert_eq!(AppErrorKind::from(&union), AppErrorKind::Fmt);
+/// assert!(union.is_inner::<fmt::Error>());
+/// ```
+#[proc_macro_attribute]
+pub fn error_enum_kind(attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_error_enum(error_enum::EnumKind::Kind, attr, item)
+}
+
+fn expand_error_enum(
+    kind: error_enum::EnumKind,
+    attr: TokenStream,
+    item: TokenStream,
+) -> TokenStream {
+    let alias = parse_macro_input!(item as syn::ItemType);
+    match error_enum::expand_alias(kind, attr.into(), alias) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
 struct FormatErrorInput {
     crate_path: syn::Path,
     message: Expr,

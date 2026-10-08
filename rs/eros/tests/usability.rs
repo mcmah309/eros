@@ -157,18 +157,20 @@ fn debug() {
 
 #[test]
 fn multi_match() {
-    use eros::E2;
+    #[eros::error_enum(Failure)]
+    #[eros::error_enum_ref(FailureRef)]
+    type Errors = (NotEnoughMemory, Timeout);
 
-    let o_1: ErrorUnion<(NotEnoughMemory, Timeout)> = ErrorUnion::new(NotEnoughMemory);
-    match o_1.as_enum() {
-        E2::A(_u) => {}
-        E2::B(_s) => {
+    let o_1: ErrorUnion<Errors> = ErrorUnion::new(NotEnoughMemory);
+    match FailureRef::from(&o_1) {
+        FailureRef::NotEnoughMemory(_u) => {}
+        FailureRef::Timeout(_s) => {
             unreachable!()
         }
     }
-    match o_1.into_enum() {
-        E2::A(_u) => {}
-        E2::B(_s) => {
+    match Failure::from(o_1) {
+        Failure::NotEnoughMemory(_u) => {}
+        Failure::Timeout(_s) => {
             unreachable!()
         }
     }
@@ -176,7 +178,8 @@ fn multi_match() {
 
 #[test]
 fn multi_narrow() {
-    use eros::E2;
+    #[eros::error_enum(Failure)]
+    type Errors = (Timeout, NotEnoughMemory);
 
     let o_1: ErrorUnion<(
         std::sync::mpsc::RecvError,
@@ -201,13 +204,9 @@ fn multi_narrow() {
         std::cell::BorrowError,
     )> = ErrorUnion::new(Timeout);
 
-    match o_2
-        .narrow::<(Timeout, NotEnoughMemory), _>()
-        .unwrap()
-        .into_enum()
-    {
-        E2::A(Timeout {}) => {}
-        E2::B(NotEnoughMemory {}) => {
+    match Failure::from(o_2.narrow::<Errors, _>().unwrap()) {
+        Failure::Timeout(Timeout {}) => {}
+        Failure::NotEnoughMemory(NotEnoughMemory {}) => {
             unreachable!()
         }
     }

@@ -1,0 +1,5 @@
+error: duplicate generated variant `Failure`; use distinct type aliases
+ --> tests/trybuild/error_enum_rejects_stripped_duplicate_names.rs:5:26
+  |
+5 | type Invalid = (Failure, FailureError);
+  |                          ^^^^^^^^^^^^
