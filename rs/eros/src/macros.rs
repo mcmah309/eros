@@ -4,6 +4,8 @@
 /// the supplied error type.
 ///
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// fn validate(port: u16) -> eros::Result<(), (eros::MsgError,)> {
 ///     if port == 0 {
 ///         eros::bail!("port must be nonzero");
@@ -11,10 +13,12 @@
 ///     Ok(())
 /// }
 /// assert!(validate(0).is_err());
+/// # }
 /// ```
 ///
 /// See [`error!`](crate::error!) for more syntax information.
 #[macro_export]
+#[cfg(feature = "alloc")]
 macro_rules! bail {
     ($err:expr $(,)?) => {{
         let error = $crate::__private::format_error!($crate, $err);
@@ -34,11 +38,14 @@ macro_rules! bail {
 ///
 /// String literals work like `format!`:
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// let id = 7;
 /// eros::error!("User not found");
 /// eros::error!("User {} not found", id);
 /// let error = eros::error!("User {id} not found");
 /// assert_eq!(error.to_string(), "User 7 not found");
+/// # }
 /// ```
 /// `error!` optimizes allocations unlike `format!`.
 /// Plain literals use [`MsgError::from_static`](crate::MsgError::from_static); formatted
@@ -48,18 +55,25 @@ macro_rules! bail {
 /// Wrap string constants and variables explicitly in [`MsgError`](crate::MsgError).
 /// Static messages borrow the text and keep it unchanged:
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// static NOT_FOUND: &str = "User {id} not found";
 /// let error = eros::error!(eros::MsgError::from_static(NOT_FOUND));
 /// assert_eq!(error.to_string(), "User {id} not found");
+/// # }
 /// ```
 ///
 /// Other expressions wrap the original error:
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// let source = std::fmt::Error;
 /// let error = eros::error!(source);
 /// assert!(error.is_inner::<std::fmt::Error>());
+/// # }
 /// ```
 #[macro_export]
+#[cfg(feature = "alloc")]
 macro_rules! error {
     ($msg:expr $(,)?) => {{
         let error = $crate::__private::format_error!($crate, $msg);
@@ -76,11 +90,14 @@ macro_rules! error {
 /// The condition is evaluated once; the error is constructed only on failure.
 ///
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// fn validate(port: u16) -> eros::Result<(), (eros::MsgError,)> {
 ///     eros::ensure!(port != 0, "port must be nonzero");
 ///     Ok(())
 /// }
 /// assert!(validate(0).is_err());
+/// # }
 /// ```
 ///
 /// See [`error!`](crate::error!) for more syntax information.
@@ -100,5 +117,36 @@ macro_rules! ensure {
         if !($test) {
             $crate::bail!($fmt, $($arg)*);
         }
+    };
+}
+
+/// Returns early with a zero-sized concrete error. String messages require `alloc`.
+#[cfg(not(feature = "alloc"))]
+#[macro_export]
+macro_rules! bail {
+    ($msg:literal $(,)?) => {
+        compile_error!("string error messages require the eros alloc feature")
+    };
+    ($err:expr $(,)?) => {
+        return $crate::Result::Err($crate::ErrorUnion::new($err))
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        compile_error!("formatted error messages require the eros alloc feature")
+    };
+}
+
+/// Creates an erased union containing a zero-sized concrete error.
+/// String messages require the `alloc` feature.
+#[cfg(not(feature = "alloc"))]
+#[macro_export]
+macro_rules! error {
+    ($msg:literal $(,)?) => {
+        compile_error!("string error messages require the eros alloc feature")
+    };
+    ($err:expr $(,)?) => {
+        $crate::ErrorUnion::new::<_, $crate::AnyError, _>($err)
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        compile_error!("formatted error messages require the eros alloc feature")
     };
 }

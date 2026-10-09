@@ -16,6 +16,8 @@ jobs:
           - ""
           - "--all-features"
           - "--no-default-features"
+          - "--no-default-features --features alloc"
+          - "--no-default-features --features alloc,location"
           - "--no-default-features --features std"
           - "--no-default-features --features context"
           - "--no-default-features --features location"
@@ -79,8 +81,11 @@ jobs:
         run: |
           cargo +nightly miri test -p eros
           cargo +nightly miri test -p eros --no-default-features
+          cargo +nightly miri test -p eros --no-default-features --features alloc
+          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition
           cargo +nightly miri test -p eros --release
           cargo +nightly miri test -p eros --release --no-default-features
+          cargo +nightly miri test -p eros --release --no-default-features --features alloc
 
   no-std:
     runs-on: ubuntu-latest
@@ -101,3 +106,17 @@ jobs:
         env:
           RUSTFLAGS: "--cfg test_in_ci"
         run: cargo test -p eros-no-std-test
+
+      - name: Test core-only APIs (on host)
+        run: cargo test -p eros-no-alloc-test --lib --features location
+
+      - name: Build embedded executable without an allocator
+        run: >-
+          cargo rustc -p eros-no-alloc-test --bin no-allocator
+          --features freestanding,location --target thumbv7em-none-eabihf --release
+          -- -C linker=rust-lld -C link-arg=--entry=_start
+
+      - name: Run executable without an allocator
+        run: |
+          CARGO_PROFILE_RELEASE_PANIC=abort cargo rustc -p eros-no-alloc-test --bin no-allocator --features freestanding,location --release -- -C relocation-model=static -C link-arg=-static -C link-arg=-nostartfiles
+          ./target/release/no-allocator

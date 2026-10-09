@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use std::fmt::Display;
 
 use eros::{ErrorUnion, IntoUnion, SendSyncError, error};

@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use std::{cell::RefCell, fmt};
 
 struct CloneProbe<'a> {

@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use eros::{ContextValue, MsgError};
 use std::{borrow::Cow, cell::Cell, error::Error};
 

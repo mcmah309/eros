@@ -1,3 +1,4 @@
+#[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, boxed::Box, string::String};
 use core::fmt::Display;
 use core::result::Result;
@@ -72,10 +73,16 @@ impl core::fmt::Display for ContextFrame {
 ///
 /// Convert static text, a `String`, a `Cow<'static, str>`, or a boxed
 /// [`SendSyncError`] into context. Static messages do not allocate.
+/// Without the `alloc` feature, only static text is accepted, and attaching it
+/// is a no-op because storing context requires the `context` feature.
 pub struct ContextValue(ContextValueInner);
 
 enum ContextValueInner {
+    #[cfg(feature = "alloc")]
     Message(Cow<'static, str>),
+    #[cfg(not(feature = "alloc"))]
+    Message(&'static str),
+    #[cfg(feature = "alloc")]
     Error(Box<dyn SendSyncError>),
 }
 
@@ -84,6 +91,7 @@ impl ContextValue {
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ContextValueInner::Message(message) => Some(message),
+            #[cfg(feature = "alloc")]
             ContextValueInner::Error(_) => None,
         }
     }
@@ -92,6 +100,7 @@ impl ContextValue {
     pub fn as_error(&self) -> Option<&dyn SendSyncError> {
         match &self.0 {
             ContextValueInner::Message(_) => None,
+            #[cfg(feature = "alloc")]
             ContextValueInner::Error(error) => Some(error.as_ref()),
         }
     }
@@ -101,6 +110,7 @@ impl core::fmt::Debug for ContextValue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             ContextValueInner::Message(message) => f.debug_tuple("Message").field(message).finish(),
+            #[cfg(feature = "alloc")]
             ContextValueInner::Error(error) => f.debug_tuple("Error").field(error).finish(),
         }
     }
@@ -110,6 +120,7 @@ impl core::fmt::Display for ContextValue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             ContextValueInner::Message(message) => f.write_str(message),
+            #[cfg(feature = "alloc")]
             ContextValueInner::Error(error) => write!(f, "{}", error),
         }
     }
@@ -117,22 +128,32 @@ impl core::fmt::Display for ContextValue {
 
 impl From<&'static str> for ContextValue {
     fn from(s: &'static str) -> ContextValue {
-        Self(ContextValueInner::Message(Cow::Borrowed(s)))
+        #[cfg(feature = "alloc")]
+        {
+            Self(ContextValueInner::Message(Cow::Borrowed(s)))
+        }
+        #[cfg(not(feature = "alloc"))]
+        {
+            Self(ContextValueInner::Message(s))
+        }
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<String> for ContextValue {
     fn from(s: String) -> ContextValue {
         Self(ContextValueInner::Message(Cow::Owned(s)))
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<Cow<'static, str>> for ContextValue {
     fn from(s: Cow<'static, str>) -> ContextValue {
         Self(ContextValueInner::Message(s))
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<Box<dyn SendSyncError>> for ContextValue {
     fn from(e: Box<dyn SendSyncError>) -> Self {
         Self(ContextValueInner::Error(e))

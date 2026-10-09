@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 #[test]
 #[cfg_attr(miri, ignore)]
 fn trybuild() {

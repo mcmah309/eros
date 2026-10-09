@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError, TypeSet};
 use std::{fmt, io};
 

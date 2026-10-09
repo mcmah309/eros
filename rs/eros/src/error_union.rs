@@ -1,13 +1,16 @@
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
 use core::any::Any;
-#[cfg(not(feature = "std"))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use core::any::TypeId;
 use core::fmt;
 use core::marker::PhantomData;
+#[cfg(feature = "alloc")]
 use core::mem;
 use core::ops::Deref;
+#[cfg(feature = "alloc")]
 use core::ptr;
 #[cfg(feature = "std")]
 use std::any::TypeId;
@@ -21,6 +24,8 @@ use crate::type_set::{
 };
 
 use crate::AnyError;
+#[cfg(not(feature = "alloc"))]
+use crate::zst_error::ZstError as ErrorUnionInner;
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: core::any::Any + core::error::Error + Send + Sync + 'static {
@@ -46,6 +51,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl core::error::Error for Box<dyn SendSyncError> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(&**self)
@@ -57,6 +63,7 @@ impl core::error::Error for Box<dyn SendSyncError> {
     not(any(feature = "backtrace", feature = "context", feature = "location")),
     repr(transparent)
 )]
+#[cfg(feature = "alloc")]
 pub(crate) struct ErrorUnionInner<T: ?Sized> {
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
@@ -82,7 +89,10 @@ pub(crate) struct ErrorUnionInner<T: ?Sized> {
 /// `ptr` must be valid and properly aligned for reading an initialized value of
 /// exactly `T`. The caller must have exclusive access to the value and transfer
 /// its ownership, preventing the original value from being used or dropped again.
-#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
+#[cfg(all(
+    feature = "alloc",
+    any(feature = "backtrace", feature = "context", feature = "location")
+))]
 unsafe fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
     // SAFETY: the caller guarantees a valid, aligned pointer to an initialized T
     // and transfers ownership so the original value will not be used or dropped.
@@ -90,7 +100,16 @@ unsafe fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn Sen
     Box::new(value)
 }
 
+#[cfg(feature = "alloc")]
 impl ErrorUnionInner<dyn SendSyncError> {
+    pub(crate) fn error(&self) -> &dyn SendSyncError {
+        &self.error
+    }
+
+    pub(crate) fn error_mut(&mut self) -> &mut dyn SendSyncError {
+        &mut self.error
+    }
+
     #[cfg_attr(feature = "location", track_caller)]
     pub(crate) fn new<T>(t: T) -> Box<ErrorUnionInner<dyn SendSyncError>>
     where
@@ -253,7 +272,10 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// flags enabled. This may include `Backtrace` and/or `Location`. Context can be added throughout
 /// the call stack.
 pub struct ErrorUnion<E: TypeSet = AnyError> {
+    #[cfg(feature = "alloc")]
     pub(crate) inner: Box<ErrorUnionInner<dyn SendSyncError>>,
+    #[cfg(not(feature = "alloc"))]
+    pub(crate) inner: ErrorUnionInner,
     // TypeId checks require exact variant types. A subtype coercion of E could
     // change a variant's TypeId and select the wrong unchecked enum downcast.
     pub(crate) _pd: PhantomData<fn(E) -> E>,
@@ -267,7 +289,7 @@ where
 
     #[inline]
     fn deref(&self) -> &T {
-        (&self.inner.error as &dyn Any).downcast_ref::<T>().unwrap()
+        self.inner.downcast_error_ref::<T>().unwrap()
     }
 }
 
@@ -308,6 +330,10 @@ unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
 
 impl ErrorUnion {
     /// Create a new `ErrorUnion`.
+    ///
+    /// Without the `alloc` feature, `T` must be zero-sized. A non-zero-sized
+    /// concrete error is rejected during compilation when this constructor is
+    /// instantiated. `location` capture remains available without allocation.
     #[cfg_attr(feature = "location", track_caller)]
     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
     where
@@ -366,6 +392,8 @@ impl ErrorUnion {
 /// context, location, or backtrace.
 ///
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// fn load() -> Result<(), eros::StdError> {
 ///     let result: eros::Result<()> = Err(eros::error!("missing configuration"));
 ///     result.map_err(eros::ErrorUnion::into_std_error)
@@ -373,6 +401,7 @@ impl ErrorUnion {
 ///
 /// fn accepts_error(_: impl core::error::Error + Send + Sync + 'static) {}
 /// accepts_error(load().unwrap_err());
+/// # }
 /// ```
 pub struct StdError<E = AnyError>(ErrorUnion<E>)
 where
@@ -436,8 +465,11 @@ where
     ///
     /// Returns the original boxed error unchanged if it is not an Eros adapter
     /// for the same error set `E`.
+    /// Requires the `alloc` feature.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, SendSyncError};
     /// # extern crate alloc;
     /// use alloc::boxed::Box;
@@ -446,7 +478,9 @@ where
     /// let boxed: Box<dyn SendSyncError> = Box::new(error.into_std_error());
     /// let error: ErrorUnion = ErrorUnion::try_from_boxed_error(boxed).unwrap();
     /// assert_eq!(error.to_string(), "missing configuration");
+    /// # }
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn try_from_boxed_error(
         error: Box<dyn SendSyncError>,
     ) -> Result<Self, Box<dyn SendSyncError>> {
@@ -481,6 +515,8 @@ where
     /// original union without extracting the marker as a concrete error.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, MsgError};
     /// use std::{fmt, io};
     ///
@@ -493,6 +529,7 @@ where
     /// // Extract the concrete error when its diagnostics are no longer needed.
     /// let message = selected.narrow::<MsgError, _>().unwrap();
     /// assert_eq!(message.as_str(), "permission denied");
+    /// # }
     /// ```
     #[allow(clippy::type_complexity)]
     pub fn narrow<Target, Index>(
@@ -525,10 +562,13 @@ where
     /// This checks only the inner error, not its sources or contexts.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// let error = eros::error!("failure").context("read configuration");
     /// let error = error.downcast_inner::<std::fmt::Error>().unwrap_err();
     /// let message = error.downcast_inner::<eros::MsgError>().unwrap();
     /// assert_eq!(message.as_str(), "failure");
+    /// # }
     /// ```
     #[inline]
     pub fn downcast_inner<T: 'static>(self) -> Result<T, Self> {
@@ -578,17 +618,22 @@ where
     /// Use [`ContextFrame::value`] to borrow each frame's message or error.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// let error = eros::error!("permission denied").context("read configuration");
     /// for frame in error.contexts() {
     ///     println!("{}", frame.value());
     ///     #[cfg(feature = "location")]
     ///     println!("  at {}", frame.location());
     /// }
+    /// # }
     /// ```
     ///
     /// With the `user_context` feature, filter for user-facing frames:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// # #[cfg(feature = "user_context")]
     /// # {
     /// let error = eros::error!("permission denied")
@@ -597,6 +642,7 @@ where
     /// for frame in error.contexts().filter(|frame| frame.is_user_facing()) {
     ///     println!("{frame}");
     /// }
+    /// # }
     /// # }
     /// ```
     #[cfg(feature = "context")]
@@ -607,22 +653,24 @@ where
     }
 
     pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        self.inner.error.source()
+        self.inner.error().source()
     }
 
     /// Returns a reference to the stored inner error.
     pub fn inner(&self) -> &dyn SendSyncError {
-        &self.inner.error
+        self.inner.error()
     }
 
     /// Returns a mutable reference to the stored inner error.
     pub fn inner_mut(&mut self) -> &mut dyn SendSyncError {
-        &mut self.inner.error
+        self.inner.error_mut()
     }
 
     /// Extracts the boxed inner error, discarding context, location, and backtrace.
     ///
     /// Reuses the existing allocation when all three features are disabled.
+    /// Requires the `alloc` feature.
+    #[cfg(feature = "alloc")]
     pub fn into_inner(self) -> Box<dyn SendSyncError> {
         let raw = Box::into_raw(self.inner);
         #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
@@ -669,9 +717,12 @@ where
     /// To fall back to the inner error when no context error exists:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// let error = eros::error!("permission denied").context("read configuration");
     /// let latest = error.latest_context_error().unwrap_or_else(|| error.inner());
     /// assert_eq!(latest.to_string(), "permission denied");
+    /// # }
     /// ```
     pub fn latest_context_error(&self) -> Option<&dyn SendSyncError> {
         #[cfg(feature = "context")]
@@ -778,8 +829,8 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
 
     /// Maps the single concrete inner error, preserving context, location, and backtrace.
     ///
-    /// For unions with any number of variants, use [`Self::map_inner`] to map
-    /// the boxed inner error instead.
+    /// With the `alloc` feature, `map_inner` maps the boxed inner error for
+    /// unions with any number of variants. Without `alloc`, `U` must be zero-sized.
     pub fn map_single<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
@@ -826,6 +877,8 @@ where
     /// always retains its diagnostics. Specify the target explicitly.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, MsgError, ReshapeUnion};
     ///
     /// let result: eros::Result<u8, (MsgError, std::fmt::Error)> =
@@ -835,6 +888,7 @@ where
     ///     Err(Ok(value)) => println!("success: {value}"),
     ///     Err(Err(remainder)) => eprintln!("unhandled: {remainder}"),
     /// }
+    /// # }
     /// ```
     #[allow(clippy::type_complexity)]
     fn narrow<Target, Index>(
@@ -858,6 +912,8 @@ where
     /// `|error: ErrorUnion<(FirstError, SecondError)>| ...`.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, ReshapeUnion};
     /// use std::{io, num::ParseIntError};
     ///
@@ -869,11 +925,14 @@ where
     ///         8080
     ///     });
     /// assert_eq!(result.unwrap(), 8080);
+    /// # }
     /// ```
     ///
     /// Handle all errors in a group with one callback:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, ReshapeUnion};
     /// use std::{io, num::ParseIntError};
     ///
@@ -886,6 +945,7 @@ where
     ///     })
     ///     .into_value();
     /// assert_eq!(port, 8080);
+    /// # }
     /// ```
     #[allow(clippy::type_complexity)]
     fn recover<Target, Index>(
@@ -913,6 +973,8 @@ where
     /// error type, and groups use tuples of 2–26 types. The index parameters are inferred.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
     /// use std::{io, num::ParseIntError};
     ///
@@ -924,6 +986,7 @@ where
     ///         "8080".parse::<u16>().union()
     ///     });
     /// assert_eq!(result.unwrap(), 8080);
+    /// # }
     /// ```
     fn try_recover<Target, Other, Index, OtherIndex>(
         self,
@@ -940,12 +1003,15 @@ where
     /// calling this method does not compile if an unhandled error type remains in the result's set.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, MsgError, ReshapeUnion};
     ///
     /// let result: eros::Result<u16, (MsgError,)> =
     ///     Err(ErrorUnion::new(MsgError::from("missing port")));
     /// let port = result.recover::<MsgError, _>(|_| 8080).into_value();
     /// assert_eq!(port, 8080);
+    /// # }
     /// ```
     fn into_value(self) -> S
     where
@@ -1238,7 +1304,7 @@ impl From<ErrorUnion> for anyhow::Error {
 
 //************************************************************************//
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
     use std::fmt;
@@ -1519,7 +1585,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod latest_context_error_tests {
     use super::*;
     use std::fmt;
@@ -1658,7 +1724,7 @@ mod latest_context_error_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod downcast_inner_tests {
     use super::*;
     use std::fmt;

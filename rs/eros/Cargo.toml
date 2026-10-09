@@ -33,12 +33,15 @@ serde_json = "1"
 [features]
 # Libraries should consider disabling these defaults, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
-default = ["context", "backtrace"]
+# Keep alloc enabled separately if errors contain payloads.
+default = ["alloc", "context", "backtrace"]
+# Enables heap-backed errors and owned messages. Without it, errors must be zero-sized.
+alloc = []
 # Enables the `std` library. Required for `backtrace` and `anyhow` features. When disabled,
-# `eros` is `no_std` (but still requires `alloc` for `Box`/`Vec`/`String` etc.).
-std = []
+# `eros` is `no_std`. Enable `alloc` separately to store non-zero-sized errors.
+std = ["alloc"]
 # Enables context
-context = ["eros-macros/context"]
+context = ["alloc", "eros-macros/context"]
 # Enables backtrace
 backtrace = ["std"]
 # Parses and removes the unnecessary noise from the backtrace before printing
@@ -50,4 +53,4 @@ anyhow = ["std", "dep:anyhow"]
 # Adds context methods that are user facing. Useful for applications reporting error messages to users.
 user_context = ["context"]
 # Exposes to_display_json()/to_debug_json() as structured JSON values.
-diagnostic = ["dep:serde_json"]
+diagnostic = ["alloc", "dep:serde_json"]

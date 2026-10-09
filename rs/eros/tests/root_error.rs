@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use core::error::Error;
 use core::fmt;
 use std::sync::{
