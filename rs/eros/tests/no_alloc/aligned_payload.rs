@@ -1,12 +1,13 @@
 #[derive(Debug)]
-struct Payload([usize; 2]);
+#[repr(align(256))]
+struct Payload(u8);
 impl core::fmt::Display for Payload {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "payload {:?}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 impl core::error::Error for Payload {}
 
 fn main() {
-    let _: eros::ErrorUnion = Payload([1, 2]).into();
+    let _: eros::ErrorUnion = eros::ErrorUnion::new(Payload(1));
 }

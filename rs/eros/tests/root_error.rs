@@ -1,5 +1,7 @@
 #![cfg(feature = "alloc")]
 
+mod common;
+
 use core::error::Error;
 use core::fmt;
 use std::sync::{
@@ -7,7 +9,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use eros::{ErrorUnion, SendSyncError, MsgError};
+use eros::{ErrorUnion, MsgError, SendSyncError};
 
 #[derive(Debug)]
 struct ConfigError {
@@ -311,13 +313,10 @@ fn wrong_type_owned_downcast_retains_root_and_context_until_drop() {
     #[cfg(feature = "context")]
     let error = error.context(Box::new(DropError(context_drops.clone())) as Box<dyn SendSyncError>);
 
-    let original = error.inner() as *const dyn SendSyncError as *const ();
+    let original = common::identity(error.inner());
     let report = format!("{error:?}");
     let error = error.downcast_inner::<ConfigError>().unwrap_err();
-    assert_eq!(
-        error.inner() as *const dyn SendSyncError as *const (),
-        original
-    );
+    assert_eq!(common::identity(error.inner()), original);
     assert_eq!(format!("{error:?}"), report);
     assert_eq!(drops.load(Ordering::SeqCst), 0);
     #[cfg(feature = "context")]

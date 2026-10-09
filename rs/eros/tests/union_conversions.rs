@@ -1,6 +1,8 @@
 #![cfg(feature = "alloc")]
 
-use eros::{AnyError, ErrorUnion, MsgError, SendSyncError, prelude::*};
+mod common;
+
+use eros::{AnyError, ErrorUnion, MsgError, prelude::*};
 use std::{fmt, io, num::ParseIntError};
 
 #[eros::error_enum(InputError)]
@@ -65,7 +67,7 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
             let error = error.context("inner operation").context("outer operation");
             #[cfg(feature = "user_context")]
             let error = error.user_context("user message");
-            let original = error.inner() as *const dyn SendSyncError as *const ();
+            let original = common::identity(error.inner());
             let report = format!("{error:?}");
             #[cfg(feature = "diagnostic")]
             let diagnostic = error.to_debug_json();
@@ -97,10 +99,7 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
                 let error: ErrorUnion = error.into();
                 error.widen()
             };
-            assert_eq!(
-                error.inner() as *const dyn SendSyncError as *const (),
-                original
-            );
+            assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);

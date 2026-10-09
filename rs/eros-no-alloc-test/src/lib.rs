@@ -9,6 +9,10 @@ use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
 
 #[path = "../../eros/tests/no_alloc/composition.rs"]
 mod composition;
+#[path = "../../eros/tests/no_alloc/inline.rs"]
+mod inline;
+#[path = "../../eros/tests/no_alloc/messages.rs"]
+mod messages;
 
 static DROPS: AtomicUsize = AtomicUsize::new(0);
 
@@ -63,7 +67,10 @@ impl Write for Buffer {
 
 /// Exercised both by the host tests and by a binary with no global allocator.
 pub fn run_checks() {
+    messages::run_checks();
     composition::run_checks();
+    #[cfg(not(test))]
+    inline::run_checks();
     let mut union: ErrorUnion<Failures> = ErrorUnion::new(Failure);
     #[cfg(feature = "location")]
     let location = union.location();

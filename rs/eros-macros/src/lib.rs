@@ -196,7 +196,7 @@ pub fn format_error(input: TokenStream) -> TokenStream {
             // Preserve the original literal's span for implicit captures. Let
             // Rust's formatter parse placeholders and report invalid formats.
             return quote! {
-                #crate_path::MsgError::from_owned(#crate_path::__private::format!(#message))
+                #crate_path::__private::formatted_message!(#message)
             }
             .into();
         }
@@ -205,7 +205,7 @@ pub fn format_error(input: TokenStream) -> TokenStream {
 
     // All braces were escaped pairs; unescape them in the static message.
     let literal = LitStr::new(&literal, message.span());
-    quote! { #crate_path::MsgError::from_static(#literal) }.into()
+    quote! { #crate_path::MsgError::from_static_ref(&#literal) }.into()
 }
 
 /// Arguments parsed from `#[context("format string", arg1, arg2, ...)]`

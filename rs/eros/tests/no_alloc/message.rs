@@ -1,3 +1,4 @@
 fn main() {
-    let _ = eros::error!("message");
+    let value = 7;
+    let _ = eros::error!("message {}", value);
 }

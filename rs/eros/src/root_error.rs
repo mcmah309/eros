@@ -1,25 +1,21 @@
-use alloc::boxed::Box;
-#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-use core::{mem, ptr};
-
-#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-use crate::error_union::ErrorUnionInner;
+use crate::storage::ErrorUnionInner;
 use crate::{ErrorUnion, SendSyncError, TypeSet};
+use alloc::boxed::Box;
 
 impl<E: TypeSet> ErrorUnion<E> {
     /// Replaces the inner error, passing ownership of the old boxed error to a closure.
     ///
     /// The closure runs once, receives the previous inner error, and returns the new
-    /// concrete error value. Eros handles boxing the replacement. Preserve the
-    /// original failure by storing the old inner error in the new error and returning
-    /// it from `Error::source()`. Eros uses the new error's source chain without
-    /// automatically adding the old inner error.
+    /// concrete error value. Eros selects inline or boxed storage for the replacement.
+    /// Preserve the original failure by storing the old inner error in the new
+    /// error and returning it from `Error::source()`. Eros uses the new error's
+    /// source chain without automatically adding the old inner error.
     ///
     /// Context, the original Eros capture location, and the saved Eros backtrace
     /// are preserved. No new backtrace or location is captured.
     ///
-    /// When all three features are disabled, the closure receives the existing
-    /// error allocation. The replacement is still boxed separately.
+    /// Heap-stored roots retain their allocation when passed to the closure.
+    /// Inline non-zero-sized roots are boxed to satisfy the closure's argument.
     ///
     /// The returned union has the replacement type as its single variant.
     /// For a union with a single variant, [`Self::map_single`] passes the concrete
@@ -60,40 +56,18 @@ impl<E: TypeSet> ErrorUnion<E> {
         T: SendSyncError,
         F: FnOnce(Box<dyn SendSyncError>) -> T,
     {
-        #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
-        {
-            ErrorUnion::new_from_parts(f(self.into_inner()))
-        }
-        #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-        unsafe {
-            let raw = Box::into_raw(self.inner);
-            // SAFETY: the function was selected for this error's concrete type,
-            // and we own the live error field. The container is freed below using
-            // ManuallyDrop, so the original error is not used or dropped again.
-            let root = ((*raw).into_box_fn)(ptr::addr_of_mut!((*raw).error));
-            #[cfg(feature = "backtrace")]
-            let backtrace = ptr::read(ptr::addr_of!((*raw).backtrace));
-            #[cfg(feature = "context")]
-            let context = ptr::read(ptr::addr_of!((*raw).context));
-            #[cfg(feature = "location")]
-            let location = ptr::read(ptr::addr_of!((*raw).location));
-
-            // Every owned field has been moved. Free the container without
-            // dropping those values, following downcast_error_unchecked.
-            // The root and metadata now have normal owners if f panics.
-            drop(Box::from_raw(
-                raw as *mut mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>,
-            ));
-
-            ErrorUnion::new_from_parts(
-                f(root),
+        let parts = self.inner.into_boxed_parts();
+        ErrorUnion {
+            inner: ErrorUnionInner::new_from_parts(
+                f(parts.error),
                 #[cfg(feature = "backtrace")]
-                backtrace,
+                parts.backtrace,
                 #[cfg(feature = "context")]
-                context,
+                parts.context,
                 #[cfg(feature = "location")]
-                location,
-            )
+                parts.location,
+            ),
+            _pd: core::marker::PhantomData,
         }
     }
 }

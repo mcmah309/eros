@@ -1,5 +1,7 @@
 #![cfg(feature = "alloc")]
 
+mod common;
+
 use eros::{AnyError, ErrorUnion, MsgError, TypeSet};
 use std::{
     fmt, io,
@@ -20,15 +22,12 @@ where
     for<'a> AppKind: From<&'a ErrorUnion<S>> + From<&'a mut ErrorUnion<S>>,
 {
     union = union.context("retained diagnostics");
-    let original = union.inner() as *const dyn eros::SendSyncError as *const ();
+    let original = common::identity(union.inner());
     let report = format!("{union:?}");
     assert_eq!(AppKind::from(&union), expected);
     assert_eq!(AppKind::from(&mut union), expected);
     assert_eq!(format!("{union:?}"), report);
-    assert_eq!(
-        union.inner() as *const dyn eros::SendSyncError as *const (),
-        original
-    );
+    assert_eq!(common::identity(union.inner()), original);
     assert_eq!(AppKind::from(union), expected);
 }
 
@@ -99,7 +98,7 @@ impl std::error::Error for UnlistedError {
 fn erased_mismatches_return_original_values_and_ignore_sources_and_contexts() {
     let mut union: ErrorUnion = ErrorUnion::new(UnlistedError(fmt::Error));
     union = union.context(Box::new(fmt::Error) as Box<dyn eros::SendSyncError>);
-    let original = union.inner() as *const dyn eros::SendSyncError as *const ();
+    let original = common::identity(union.inner());
     let report = format!("{union:?}");
     let returned = AppKind::try_from(&union).unwrap_err();
     assert!(std::ptr::eq(returned, &union));
@@ -108,10 +107,7 @@ fn erased_mismatches_return_original_values_and_ignore_sources_and_contexts() {
     assert_eq!(returned as *mut ErrorUnion, original_union);
     let returned = AppKind::try_from(union).unwrap_err();
     assert_eq!(format!("{returned:?}"), report);
-    assert_eq!(
-        returned.inner() as *const dyn eros::SendSyncError as *const (),
-        original
-    );
+    assert_eq!(common::identity(returned.inner()), original);
     assert!(returned.is_inner::<UnlistedError>());
 }
 
