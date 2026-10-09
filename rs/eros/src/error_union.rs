@@ -1,16 +1,11 @@
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
 use core::any::Any;
-#[cfg(not(feature = "std"))]
-use core::any::TypeId;
 use core::fmt;
 use core::marker::PhantomData;
-use core::mem;
 use core::ops::Deref;
-use core::ptr;
-#[cfg(feature = "std")]
-use std::any::TypeId;
 
 #[cfg(feature = "context")]
 use crate::context::ContextFrame;
@@ -21,6 +16,7 @@ use crate::type_set::{
 };
 
 use crate::AnyError;
+use crate::storage::ErrorUnionInner;
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: core::any::Any + core::error::Error + Send + Sync + 'static {
@@ -46,184 +42,10 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl core::error::Error for Box<dyn SendSyncError> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(&**self)
-    }
-}
-
-// Without metadata, into_inner reuses this allocation as a Box of the error.
-#[cfg_attr(
-    not(any(feature = "backtrace", feature = "context", feature = "location")),
-    repr(transparent)
-)]
-pub(crate) struct ErrorUnionInner<T: ?Sized> {
-    #[cfg(feature = "backtrace")]
-    pub(crate) backtrace: std::backtrace::Backtrace,
-    #[cfg(feature = "context")]
-    pub(crate) context: Vec<ContextFrame>,
-    #[cfg(feature = "location")]
-    pub(crate) location: &'static core::panic::Location<'static>,
-    /// Re-boxes the error field into a fresh allocation.
-    /// Stored at construction so the concrete type is still known.
-    ///
-    /// # Safety
-    /// The pointer must refer to the live error field of the concrete type this
-    /// function was selected for. The caller must transfer ownership of the
-    /// value and prevent the original field from being used or dropped again.
-    #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-    pub(crate) into_box_fn: unsafe fn(*mut dyn SendSyncError) -> Box<dyn SendSyncError>,
-    pub(crate) error: T,
-}
-
-/// Moves the pointed-to error into a fresh box.
-///
-/// # Safety
-/// `ptr` must be valid and properly aligned for reading an initialized value of
-/// exactly `T`. The caller must have exclusive access to the value and transfer
-/// its ownership, preventing the original value from being used or dropped again.
-#[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-unsafe fn make_box<T: SendSyncError>(ptr: *mut dyn SendSyncError) -> Box<dyn SendSyncError> {
-    // SAFETY: the caller guarantees a valid, aligned pointer to an initialized T
-    // and transfers ownership so the original value will not be used or dropped.
-    let value: T = unsafe { ptr::read(ptr as *const dyn SendSyncError as *const T) };
-    Box::new(value)
-}
-
-impl ErrorUnionInner<dyn SendSyncError> {
-    #[cfg_attr(feature = "location", track_caller)]
-    pub(crate) fn new<T>(t: T) -> Box<ErrorUnionInner<dyn SendSyncError>>
-    where
-        T: SendSyncError,
-    {
-        Box::new(ErrorUnionInner {
-            #[cfg(feature = "backtrace")]
-            backtrace: std::backtrace::Backtrace::capture(),
-            #[cfg(feature = "context")]
-            context: Vec::new(),
-            #[cfg(feature = "location")]
-            location: core::panic::Location::caller(),
-            #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-            into_box_fn: make_box::<T>,
-            error: t,
-        })
-    }
-
-    pub(crate) fn new_from_parts<T>(
-        t: T,
-        #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "context")] context: Vec<ContextFrame>,
-        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
-    ) -> Box<ErrorUnionInner<dyn SendSyncError>>
-    where
-        T: SendSyncError,
-    {
-        Box::new(ErrorUnionInner {
-            #[cfg(feature = "backtrace")]
-            backtrace,
-            #[cfg(feature = "context")]
-            context,
-            #[cfg(feature = "location")]
-            location,
-            #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-            into_box_fn: make_box::<T>,
-            error: t,
-        })
-    }
-
-    #[inline]
-    pub(crate) fn is_error_type<T: 'static>(&self) -> bool {
-        Any::type_id(&self.error) == TypeId::of::<T>()
-    }
-
-    #[inline]
-    pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self: Box<Self>) -> T {
-        debug_assert!(self.is_error_type::<T>());
-
-        let error;
-        {
-            // SAFETY: the caller guarantees the stored error is T, restoring
-            // the allocation's original concrete type.
-            let inner = unsafe { Box::from_raw(Box::into_raw(self) as *mut ErrorUnionInner<T>) };
-            error = inner.error;
-            // Drop the remaining fields and free the allocation while error is
-            // still a local, so it is also dropped if a field destructor panics.
-        }
-        error
-    }
-
-    #[inline]
-    pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(
-        self: Box<Self>,
-    ) -> ErrorUnionInner<T> {
-        debug_assert!(self.is_error_type::<T>());
-
-        // Note: this prevents the Box from automatically dropping at the end of the function.
-        let raw_container: *mut Self = Box::into_raw(self);
-
-        unsafe {
-            // Thin the fat pointer directly — no intermediate dyn Any cast needed.
-            // addr_of! gives *const dyn SendSyncError (fat), casting to *const T thins it.
-            let thin_ptr = ptr::addr_of!((*raw_container).error) as *const T;
-            // Copy to the stack
-            let downcasted_value: T = ptr::read(thin_ptr);
-
-            // Read the additional parts before dropping
-            #[cfg(feature = "backtrace")]
-            let backtrace = ptr::read(ptr::addr_of!((*raw_container).backtrace));
-            #[cfg(feature = "context")]
-            let context = ptr::read(ptr::addr_of!((*raw_container).context));
-            #[cfg(feature = "location")]
-            let location = ptr::read(ptr::addr_of!((*raw_container).location));
-
-            #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-            let into_box_fn = ptr::read(ptr::addr_of!((*raw_container).into_box_fn));
-
-            // Deallocate the Box allocation itself.
-            // We reconstruct a Box containing uninitialized/dead data, but wrapped in
-            // ManuallyDrop so its fields aren't dropped. When this `dead_box` goes out of scope,
-            // it frees the underlying heap memory without touching the fields.
-            let _dead_box: Box<mem::ManuallyDrop<Self>> =
-                Box::from_raw(raw_container as *mut mem::ManuallyDrop<Self>);
-
-            ErrorUnionInner {
-                #[cfg(feature = "backtrace")]
-                backtrace,
-                #[cfg(feature = "context")]
-                context,
-                #[cfg(feature = "location")]
-                location,
-                #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-                into_box_fn,
-                error: downcasted_value,
-            }
-        }
-    }
-
-    #[inline]
-    pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
-        (&self.error as &dyn Any).downcast_ref::<T>()
-    }
-
-    #[inline]
-    pub(crate) unsafe fn downcast_error_ref_unchecked<T: Any>(&self) -> &T {
-        let error = &self.error as &dyn Any;
-        debug_assert!(error.is::<T>());
-        // SAFETY: The caller guarantees that T is the error's concrete type.
-        unsafe { &*(error as *const dyn Any as *const T) }
-    }
-
-    #[inline]
-    pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        (&mut self.error as &mut dyn Any).downcast_mut::<T>()
-    }
-
-    #[inline]
-    pub(crate) unsafe fn downcast_error_mut_unchecked<T: Any>(&mut self) -> &mut T {
-        let error = &mut self.error as &mut dyn Any;
-        debug_assert!(error.is::<T>());
-        // SAFETY: The caller guarantees that T is the error's concrete type.
-        unsafe { &mut *(error as *mut dyn Any as *mut T) }
     }
 }
 
@@ -253,7 +75,7 @@ impl ErrorUnionInner<dyn SendSyncError> {
 /// flags enabled. This may include `Backtrace` and/or `Location`. Context can be added throughout
 /// the call stack.
 pub struct ErrorUnion<E: TypeSet = AnyError> {
-    pub(crate) inner: Box<ErrorUnionInner<dyn SendSyncError>>,
+    pub(crate) inner: ErrorUnionInner,
     // TypeId checks require exact variant types. A subtype coercion of E could
     // change a variant's TypeId and select the wrong unchecked enum downcast.
     pub(crate) _pd: PhantomData<fn(E) -> E>,
@@ -267,7 +89,7 @@ where
 
     #[inline]
     fn deref(&self) -> &T {
-        (&self.inner.error as &dyn Any).downcast_ref::<T>().unwrap()
+        self.inner.downcast_error_ref::<T>().unwrap()
     }
 }
 
@@ -308,6 +130,12 @@ unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
 
 impl ErrorUnion {
     /// Create a new `ErrorUnion`.
+    ///
+    /// Errors fitting one pointer-sized word with suitable alignment are stored
+    /// inline; other errors are boxed when `alloc` is enabled. Without `alloc`,
+    /// errors exceeding the inline size or alignment are rejected at compile
+    /// time when the constructor is instantiated. Zero-sized errors support
+    /// arbitrary alignment. Diagnostics may allocate independently of the root.
     #[cfg_attr(feature = "location", track_caller)]
     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
     where
@@ -366,6 +194,8 @@ impl ErrorUnion {
 /// context, location, or backtrace.
 ///
 /// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// fn load() -> Result<(), eros::StdError> {
 ///     let result: eros::Result<()> = Err(eros::error!("missing configuration"));
 ///     result.map_err(eros::ErrorUnion::into_std_error)
@@ -373,6 +203,7 @@ impl ErrorUnion {
 ///
 /// fn accepts_error(_: impl core::error::Error + Send + Sync + 'static) {}
 /// accepts_error(load().unwrap_err());
+/// # }
 /// ```
 pub struct StdError<E = AnyError>(ErrorUnion<E>)
 where
@@ -436,8 +267,11 @@ where
     ///
     /// Returns the original boxed error unchanged if it is not an Eros adapter
     /// for the same error set `E`.
+    /// Requires the `alloc` feature.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, SendSyncError};
     /// # extern crate alloc;
     /// use alloc::boxed::Box;
@@ -446,7 +280,9 @@ where
     /// let boxed: Box<dyn SendSyncError> = Box::new(error.into_std_error());
     /// let error: ErrorUnion = ErrorUnion::try_from_boxed_error(boxed).unwrap();
     /// assert_eq!(error.to_string(), "missing configuration");
+    /// # }
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn try_from_boxed_error(
         error: Box<dyn SendSyncError>,
     ) -> Result<Self, Box<dyn SendSyncError>> {
@@ -481,6 +317,8 @@ where
     /// original union without extracting the marker as a concrete error.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, MsgError};
     /// use std::{fmt, io};
     ///
@@ -493,6 +331,7 @@ where
     /// // Extract the concrete error when its diagnostics are no longer needed.
     /// let message = selected.narrow::<MsgError, _>().unwrap();
     /// assert_eq!(message.as_str(), "permission denied");
+    /// # }
     /// ```
     #[allow(clippy::type_complexity)]
     pub fn narrow<Target, Index>(
@@ -525,10 +364,13 @@ where
     /// This checks only the inner error, not its sources or contexts.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// let error = eros::error!("failure").context("read configuration");
     /// let error = error.downcast_inner::<std::fmt::Error>().unwrap_err();
     /// let message = error.downcast_inner::<eros::MsgError>().unwrap();
     /// assert_eq!(message.as_str(), "failure");
+    /// # }
     /// ```
     #[inline]
     pub fn downcast_inner<T: 'static>(self) -> Result<T, Self> {
@@ -563,7 +405,7 @@ where
 
     /// Returns where the error was first wrapped in an Eros union.
     ///
-    /// Reshaping and mapping retain this original location. 
+    /// Reshaping and mapping retain this original location.
     /// With the `context` feature, each context frame also
     /// exposes its attachment location.
     #[cfg(feature = "location")]
@@ -578,17 +420,22 @@ where
     /// Use [`ContextFrame::value`] to borrow each frame's message or error.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// let error = eros::error!("permission denied").context("read configuration");
     /// for frame in error.contexts() {
     ///     println!("{}", frame.value());
     ///     #[cfg(feature = "location")]
     ///     println!("  at {}", frame.location());
     /// }
+    /// # }
     /// ```
     ///
     /// With the `user_context` feature, filter for user-facing frames:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// # #[cfg(feature = "user_context")]
     /// # {
     /// let error = eros::error!("permission denied")
@@ -597,6 +444,7 @@ where
     /// for frame in error.contexts().filter(|frame| frame.is_user_facing()) {
     ///     println!("{frame}");
     /// }
+    /// # }
     /// # }
     /// ```
     #[cfg(feature = "context")]
@@ -607,57 +455,31 @@ where
     }
 
     pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        self.inner.error.source()
+        self.inner.error().source()
     }
 
     /// Returns a reference to the stored inner error.
     pub fn inner(&self) -> &dyn SendSyncError {
-        &self.inner.error
+        self.inner.error()
     }
 
     /// Returns a mutable reference to the stored inner error.
     pub fn inner_mut(&mut self) -> &mut dyn SendSyncError {
-        &mut self.inner.error
+        self.inner.error_mut()
     }
 
     /// Extracts the boxed inner error, discarding context, location, and backtrace.
     ///
-    /// Reuses the existing allocation when all three features are disabled.
+    /// Reuses the root allocation for heap-stored errors. Inline non-zero-sized
+    /// errors are moved into a new box. Requires the `alloc` feature.
+    #[cfg(feature = "alloc")]
     pub fn into_inner(self) -> Box<dyn SendSyncError> {
-        let raw = Box::into_raw(self.inner);
-        #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
-        // SAFETY: ErrorUnionInner is repr(transparent) without metadata, so the
-        // error has the same address, size, and alignment as the allocation.
-        // Projecting the field preserves its trait-object metadata. Ownership
-        // transfers to the returned Box, including for zero-sized errors.
-        unsafe {
-            Box::from_raw(ptr::addr_of_mut!((*raw).error))
+        let error;
+        {
+            let parts = self.inner.into_boxed_parts();
+            error = parts.error;
         }
-        #[cfg(any(feature = "backtrace", feature = "context", feature = "location"))]
-        unsafe {
-            // Free the allocation even if a context destructor panics.
-            let mut allocation: Box<mem::ManuallyDrop<ErrorUnionInner<dyn SendSyncError>>> =
-                Box::from_raw(raw as *mut _);
-            let raw = &raw mut **allocation;
-
-            let into_box_fn = (*raw).into_box_fn;
-            let error_ptr = ptr::addr_of_mut!((*raw).error);
-
-            // SAFETY: the function was selected for this error's concrete type,
-            // and we own the live error field. ManuallyDrop prevents the original
-            // field from being dropped after its ownership moves into the box.
-            let boxed = (into_box_fn)(error_ptr);
-
-            // Drop remaining fields, free the allocation (same pattern as downcast_error_unchecked)
-            #[cfg(feature = "backtrace")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw).backtrace));
-            #[cfg(feature = "context")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw).context));
-            #[cfg(feature = "location")]
-            ptr::drop_in_place(ptr::addr_of_mut!((*raw).location));
-
-            boxed
-        }
+        error
     }
 
     /// Returns the most recently attached error-valued context.
@@ -669,9 +491,12 @@ where
     /// To fall back to the inner error when no context error exists:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// let error = eros::error!("permission denied").context("read configuration");
     /// let latest = error.latest_context_error().unwrap_or_else(|| error.inner());
     /// assert_eq!(latest.to_string(), "permission denied");
+    /// # }
     /// ```
     pub fn latest_context_error(&self) -> Option<&dyn SendSyncError> {
         #[cfg(feature = "context")]
@@ -704,7 +529,9 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ContextFrame::new_user_facing(context.into()));
+            .push(crate::context::ContextFrame::new_user_facing(
+                context.into(),
+            ));
         self
     }
 
@@ -778,8 +605,9 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
 
     /// Maps the single concrete inner error, preserving context, location, and backtrace.
     ///
-    /// For unions with any number of variants, use [`Self::map_inner`] to map
-    /// the boxed inner error instead.
+    /// With the `alloc` feature, `map_inner` maps the boxed inner error for
+    /// unions with any number of variants. Without `alloc`, `U` must fit the inline
+    /// size and alignment limits, as with [`ErrorUnion::new`].
     pub fn map_single<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
@@ -826,6 +654,8 @@ where
     /// always retains its diagnostics. Specify the target explicitly.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, MsgError, ReshapeUnion};
     ///
     /// let result: eros::Result<u8, (MsgError, std::fmt::Error)> =
@@ -835,14 +665,12 @@ where
     ///     Err(Ok(value)) => println!("success: {value}"),
     ///     Err(Err(remainder)) => eprintln!("unhandled: {remainder}"),
     /// }
+    /// # }
     /// ```
     #[allow(clippy::type_complexity)]
     fn narrow<Target, Index>(
         self,
-    ) -> Result<
-        Target::Output,
-        Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>,
-    >
+    ) -> Result<Target::Output, Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>>
     where
         Target: NarrowTarget<E, Index>;
 
@@ -858,6 +686,8 @@ where
     /// `|error: ErrorUnion<(FirstError, SecondError)>| ...`.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, ReshapeUnion};
     /// use std::{io, num::ParseIntError};
     ///
@@ -869,11 +699,14 @@ where
     ///         8080
     ///     });
     /// assert_eq!(result.unwrap(), 8080);
+    /// # }
     /// ```
     ///
     /// Handle all errors in a group with one callback:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, ReshapeUnion};
     /// use std::{io, num::ParseIntError};
     ///
@@ -886,6 +719,7 @@ where
     ///     })
     ///     .into_value();
     /// assert_eq!(port, 8080);
+    /// # }
     /// ```
     #[allow(clippy::type_complexity)]
     fn recover<Target, Index>(
@@ -913,6 +747,8 @@ where
     /// error type, and groups use tuples of 2–26 types. The index parameters are inferred.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
     /// use std::{io, num::ParseIntError};
     ///
@@ -924,6 +760,7 @@ where
     ///         "8080".parse::<u16>().union()
     ///     });
     /// assert_eq!(result.unwrap(), 8080);
+    /// # }
     /// ```
     fn try_recover<Target, Other, Index, OtherIndex>(
         self,
@@ -940,12 +777,15 @@ where
     /// calling this method does not compile if an unhandled error type remains in the result's set.
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, MsgError, ReshapeUnion};
     ///
     /// let result: eros::Result<u16, (MsgError,)> =
     ///     Err(ErrorUnion::new(MsgError::from("missing port")));
     /// let port = result.recover::<MsgError, _>(|_| 8080).into_value();
     /// assert_eq!(port, 8080);
+    /// # }
     /// ```
     fn into_value(self) -> S
     where
@@ -966,10 +806,7 @@ where
 
     fn narrow<Target, Index>(
         self,
-    ) -> Result<
-        Target::Output,
-        Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>,
-    >
+    ) -> Result<Target::Output, Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>>
     where
         Target: NarrowTarget<E, Index>,
     {
@@ -1012,7 +849,7 @@ where
             Err(error) => match Target::split(error) {
                 Ok(selected) => f(selected),
                 // Other contains every unhandled type. Retain the remainder's
-                // allocation and diagnostics, changing only its type marker.
+                // storage and diagnostics, changing only its type marker.
                 Err(remainder) => Err(ErrorUnion {
                     inner: remainder.inner,
                     _pd: PhantomData,
@@ -1238,7 +1075,7 @@ impl From<ErrorUnion> for anyhow::Error {
 
 //************************************************************************//
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
     use std::fmt;
@@ -1269,22 +1106,13 @@ mod tests {
 
     #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
     #[test]
-    fn inner_without_metadata_has_the_error_layout() {
-        fn check<T: SendSyncError>(error: T) {
-            assert_eq!(
-                core::alloc::Layout::new::<ErrorUnionInner<T>>(),
-                core::alloc::Layout::new::<T>()
-            );
-            let inner = ErrorUnionInner::new(error);
-            assert_eq!(
-                core::alloc::Layout::for_value(&*inner),
-                core::alloc::Layout::for_value(&inner.error)
-            );
-        }
-
-        check(FooError("owned".into()));
-        check(BarError(42));
-        check(fmt::Error);
+    fn inner_without_metadata_uses_two_words_for_every_error_type() {
+        assert_eq!(size_of::<ErrorUnionInner>(), 2 * size_of::<usize>());
+        assert_eq!(align_of::<ErrorUnionInner>(), align_of::<usize>());
+        assert_eq!(
+            ErrorUnionInner::new(BarError(42)).error().to_string(),
+            "BarError(42)"
+        );
     }
 
     #[test]
@@ -1334,7 +1162,7 @@ mod tests {
                 .push(ContextFrame::new("step two".into()));
         }
 
-        let parts: ErrorUnionInner<FooError> =
+        let parts: crate::storage::ErrorParts<FooError> =
             unsafe { union.inner.downcast_error_unchecked_with_parts() };
 
         assert_eq!(parts.error, FooError("ctx".into()));
@@ -1346,7 +1174,7 @@ mod tests {
     #[test]
     fn downcast_error_unchecked_with_parts_correct_error_value() {
         let inner = ErrorUnionInner::new(BarError(42));
-        let parts: ErrorUnionInner<BarError> =
+        let parts: crate::storage::ErrorParts<BarError> =
             unsafe { inner.downcast_error_unchecked_with_parts() };
         assert_eq!(parts.error, BarError(42));
     }
@@ -1519,7 +1347,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod latest_context_error_tests {
     use super::*;
     use std::fmt;
@@ -1658,7 +1486,7 @@ mod latest_context_error_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod downcast_inner_tests {
     use super::*;
     use std::fmt;

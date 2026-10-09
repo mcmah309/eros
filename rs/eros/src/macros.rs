@@ -22,7 +22,7 @@ macro_rules! bail {
     }};
     ($fmt:expr, $($arg:tt)*) => {
         return $crate::Result::Err($crate::ErrorUnion::new(
-            $crate::MsgError::from_owned($crate::__private::format!($fmt, $($arg)*))
+            $crate::__private::formatted_message!($fmt, $($arg)*)
         ))
     };
 }
@@ -32,24 +32,33 @@ macro_rules! bail {
 /// The returned union uses [`AnyError`](crate::AnyError). [`bail!`](crate::bail!)
 /// and [`ensure!`](crate::ensure!) instead infer the error set from the return type.
 ///
-/// String literals work like `format!`:
+/// Plain string literals work without `alloc`:
 /// ```
+/// let error = eros::error!("User not found");
+/// assert_eq!(error.downcast_inner::<eros::MsgError>().unwrap().as_str(), "User not found");
+/// ```
+/// With `alloc`, string literals also support runtime formatting:
+/// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
 /// let id = 7;
 /// eros::error!("User not found");
 /// eros::error!("User {} not found", id);
 /// let error = eros::error!("User {id} not found");
 /// assert_eq!(error.to_string(), "User 7 not found");
+/// # }
 /// ```
 /// `error!` optimizes allocations unlike `format!`.
-/// Plain literals use [`MsgError::from_static`](crate::MsgError::from_static); formatted
-/// messages use [`MsgError::from_owned`](crate::MsgError::from_owned). Storage is selected
-/// at compile time. Escape literal braces as `{{` and `}}`, just like `format!`.
+/// Plain literals use [`MsgError::from_static_ref`](crate::MsgError::from_static_ref)
+/// and work without `alloc`. Formatted messages use `MsgError::from_owned` and
+/// require `alloc`. Storage is selected at compile time. Escape literal braces
+/// as `{{` and `}}`, just like `format!`.
 ///
 /// Wrap string constants and variables explicitly in [`MsgError`](crate::MsgError).
 /// Static messages borrow the text and keep it unchanged:
 /// ```
 /// static NOT_FOUND: &str = "User {id} not found";
-/// let error = eros::error!(eros::MsgError::from_static(NOT_FOUND));
+/// let error = eros::error!(eros::MsgError::from_static_ref(&NOT_FOUND));
 /// assert_eq!(error.to_string(), "User {id} not found");
 /// ```
 ///
@@ -66,7 +75,7 @@ macro_rules! error {
         $crate::ErrorUnion::new::<_, $crate::AnyError, _>(error)
     }};
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::ErrorUnion::new::<_, $crate::AnyError, _>($crate::MsgError::from_owned($crate::__private::format!($fmt, $($arg)*)))
+        $crate::ErrorUnion::new::<_, $crate::AnyError, _>($crate::__private::formatted_message!($fmt, $($arg)*))
     };
 }
 
@@ -100,5 +109,23 @@ macro_rules! ensure {
         if !($test) {
             $crate::bail!($fmt, $($arg)*);
         }
+    };
+}
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+#[macro_export]
+macro_rules! __eros_format_message {
+    ($($argument:tt)*) => {
+        $crate::MsgError::from_owned($crate::__private::format!($($argument)*))
+    };
+}
+
+#[doc(hidden)]
+#[cfg(not(feature = "alloc"))]
+#[macro_export]
+macro_rules! __eros_format_message {
+    ($($argument:tt)*) => {
+        compile_error!("formatted error messages require the eros alloc feature")
     };
 }

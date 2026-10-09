@@ -1,3 +1,7 @@
+#![cfg(feature = "alloc")]
+
+mod common;
+
 use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::{fmt, io, net::AddrParseError, num::ParseIntError};
 
@@ -23,7 +27,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
         let error = error.context("inner").context("outer");
         #[cfg(feature = "user_context")]
         let error = error.user_context("user message");
-        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let original = common::identity(error.inner());
         let report = format!("{error:?}");
         #[cfg(feature = "diagnostic")]
         let diagnostic = error.to_debug_json();
@@ -31,10 +35,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
         let mut calls = 0;
         let result: eros::Result<u8, Remaining> = result.recover(|error: ErrorUnion<Selected>| {
             calls += 1;
-            assert_eq!(
-                error.inner() as *const dyn SendSyncError as *const (),
-                original
-            );
+            assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
@@ -51,10 +52,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             assert_eq!(result.unwrap(), 7);
         } else {
             let error = result.unwrap_err();
-            assert_eq!(
-                error.inner() as *const dyn SendSyncError as *const (),
-                original
-            );
+            assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);
@@ -72,21 +70,18 @@ fn try_recover_groups_keep_original_and_fallback_diagnostics() {
     type Output = (ParseIntError, AddrParseError, io::Error);
     for (index, error) in input_errors().into_iter().enumerate() {
         let error = error.context("original operation");
-        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let original = common::identity(error.inner());
         let original_report = format!("{error:?}");
         let fallback: ErrorUnion<(AddrParseError,)> =
             ErrorUnion::new("invalid".parse::<std::net::IpAddr>().unwrap_err());
         let fallback = fallback.context("fallback operation");
-        let fallback_ptr = fallback.inner() as *const dyn SendSyncError as *const ();
+        let fallback_ptr = common::identity(fallback.inner());
         let fallback_report = format!("{fallback:?}");
         let result: eros::Result<u8, Input> = Err(error);
         let mut calls = 0;
         let result: eros::Result<u8, Output> = result.try_recover(|error: ErrorUnion<Selected>| {
             calls += 1;
-            assert_eq!(
-                error.inner() as *const dyn SendSyncError as *const (),
-                original
-            );
+            assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), original_report);
             // The handler owns the fallback, and widening infers Output from
             // the enclosing result. This exercises an FnOnce group handler.
@@ -100,10 +95,7 @@ fn try_recover_groups_keep_original_and_fallback_diagnostics() {
         } else {
             (original, original_report)
         };
-        assert_eq!(
-            error.inner() as *const dyn SendSyncError as *const (),
-            expected_ptr
-        );
+        assert_eq!(common::identity(error.inner()), expected_ptr);
         assert_eq!(format!("{error:?}"), expected_report);
         match (index, OutputError::from(error)) {
             (0 | 2, OutputError::AddrParse(_))
@@ -135,7 +127,7 @@ fn successes_pass_through_group_handlers_without_calling_them() {
 fn fallible_group_handler_can_reintroduce_handled_types() {
     let error: ErrorUnion<(io::Error, MsgError, fmt::Error)> = ErrorUnion::new(fmt::Error);
     let error = error.context("retained");
-    let original = error.inner() as *const dyn SendSyncError as *const ();
+    let original = common::identity(error.inner());
     let report = format!("{error:?}");
     let result: eros::Result<(), (io::Error, MsgError, fmt::Error)> = Err(error);
     let result: eros::Result<(), (MsgError, fmt::Error, io::Error)> = result
@@ -147,10 +139,7 @@ fn fallible_group_handler_can_reintroduce_handled_types() {
             Err(error.widen())
         });
     let error = result.unwrap_err();
-    assert_eq!(
-        error.inner() as *const dyn SendSyncError as *const (),
-        original
-    );
+    assert_eq!(common::identity(error.inner()), original);
     assert_eq!(format!("{error:?}"), report);
 }
 

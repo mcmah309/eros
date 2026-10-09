@@ -66,7 +66,7 @@ where
     fn split(
         error: ErrorUnion<E>,
     ) -> Result<Self::Output, ErrorUnion<<Self::Remainder as TupleForm>::Tuple>> {
-        if Target::Variants::is_fold(&error.inner.error as &dyn Any) {
+        if Target::Variants::is_fold(error.inner.error() as &dyn Any) {
             Ok(ErrorUnion {
                 inner: error.inner,
                 _pd: PhantomData,

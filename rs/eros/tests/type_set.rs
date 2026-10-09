@@ -64,7 +64,6 @@ fn error_sets_support_generic_and_empty_unions() {
 
 #[test]
 fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
-    use eros::MsgError;
     use eros::type_set::{Contains, GroupNarrow, Narrow, SingleNarrow, SupersetOf, TupleForm};
 
     fn wrap<T: SendSyncError, E: TypeSet, I>(error: T) -> ErrorUnion<E>
@@ -104,14 +103,15 @@ fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
         error.narrow::<Other, GroupNarrow<I>>()
     }
 
-    let error: ErrorUnion<(MsgError,)> = wrap(MsgError::from_static("root"));
-    let error: ErrorUnion<(fmt::Error, MsgError)> = widen(error);
+    let error: ErrorUnion<(TestError<0>,)> = wrap(TestError::<0>);
+    let error: ErrorUnion<(fmt::Error, TestError<0>)> = widen(error);
     let error = narrow::<fmt::Error, _, _>(error).unwrap_err();
-    let error = narrow_group::<(MsgError,), _, _>(error).unwrap();
-    assert_eq!(error.into_single().as_str(), "root");
+    let error = narrow_group::<(TestError<0>,), _, _>(error).unwrap();
+    assert_eq!(error.into_single().to_string(), "error 0");
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
     fn roundtrip<E: TypeSet>(error: ErrorUnion<E>) -> ErrorUnion<E> {
         let display = format!("{error}");

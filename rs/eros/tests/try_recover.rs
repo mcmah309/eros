@@ -1,3 +1,7 @@
+#![cfg(feature = "alloc")]
+
+mod common;
+
 use eros::{ErrorUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::{fmt, io, num::ParseIntError};
 
@@ -17,13 +21,13 @@ fn matching_handler_and_fallback_keep_their_own_metadata_and_identity() {
         let error: ErrorUnion<(io::Error, MsgError)> =
             ErrorUnion::new(io::Error::other("original"));
         let error = error.context("original operation");
-        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let original = common::identity(error.inner());
         let original_report = format!("{error:?}");
         let fallback: ErrorUnion<(MsgError,)> = ErrorUnion::new(MsgError::from("fallback"));
         let fallback = fallback.context("fallback operation");
         #[cfg(feature = "user_context")]
         let fallback = fallback.user_context("fallback user message");
-        let fallback_ptr = fallback.inner() as *const dyn SendSyncError as *const ();
+        let fallback_ptr = common::identity(fallback.inner());
         let fallback_report = format!("{fallback:?}");
         #[cfg(feature = "diagnostic")]
         let fallback_json = fallback.to_debug_json();
@@ -34,10 +38,7 @@ fn matching_handler_and_fallback_keep_their_own_metadata_and_identity() {
         // Moving fallback/replacement also exercises an FnOnce closure.
         let result = result.try_recover(|error: ErrorUnion<(io::Error,)>| {
             calls += 1;
-            assert_eq!(
-                error.inner() as *const dyn SendSyncError as *const (),
-                original
-            );
+            assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), original_report);
             if succeeds {
                 Ok(replacement)
@@ -50,10 +51,7 @@ fn matching_handler_and_fallback_keep_their_own_metadata_and_identity() {
             assert_eq!(result.unwrap(), "recovered");
         } else {
             let error = result.unwrap_err();
-            assert_eq!(
-                error.inner() as *const dyn SendSyncError as *const (),
-                fallback_ptr
-            );
+            assert_eq!(common::identity(error.inner()), fallback_ptr);
             assert_eq!(format!("{error:?}"), fallback_report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), fallback_json);
@@ -72,7 +70,7 @@ fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
     ];
     for (index, error) in errors.into_iter().enumerate() {
         let error = error.context("retained operation");
-        let original = error.inner() as *const dyn SendSyncError as *const ();
+        let original = common::identity(error.inner());
         let report = format!("{error:?}");
         #[cfg(feature = "diagnostic")]
         let diagnostic = error.to_debug_json();
@@ -80,10 +78,7 @@ fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
         let result: eros::Result<(), Output> =
             result.try_recover::<io::Error, _, _, _>(|_| panic!("must not handle other types"));
         let error = result.unwrap_err();
-        assert_eq!(
-            error.inner() as *const dyn SendSyncError as *const (),
-            original
-        );
+        assert_eq!(common::identity(error.inner()), original);
         assert_eq!(format!("{error:?}"), report);
         #[cfg(feature = "diagnostic")]
         assert_eq!(error.to_debug_json(), diagnostic);
@@ -121,16 +116,13 @@ fn destination_inference_supports_plain_and_union_fallbacks_with_new_error_types
 fn handler_can_reintroduce_the_handled_type_and_preserve_its_diagnostics() {
     let error: ErrorUnion<(io::Error, MsgError)> = ErrorUnion::new(io::Error::other("original"));
     let error = error.context("original operation");
-    let original = error.inner() as *const dyn SendSyncError as *const ();
+    let original = common::identity(error.inner());
     let report = format!("{error:?}");
     let result: eros::Result<(), (io::Error, MsgError)> = Err(error);
     let result: eros::Result<(), (MsgError, io::Error)> =
         result.try_recover(|error: ErrorUnion<(io::Error,)>| Err(error.widen()));
     let error = result.unwrap_err();
-    assert_eq!(
-        error.inner() as *const dyn SendSyncError as *const (),
-        original
-    );
+    assert_eq!(common::identity(error.inner()), original);
     assert_eq!(format!("{error:?}"), report);
     assert!(error.is_inner::<io::Error>());
 }

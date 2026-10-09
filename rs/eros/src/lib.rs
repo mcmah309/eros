@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../README.src.md")]
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
 // Lets procedural macros use the public crate path within Eros as well.
@@ -16,6 +17,8 @@ extern crate std;
 pub mod __private {
     use crate::{ErrorUnion, TypeSet};
 
+    pub use crate::__eros_format_message as formatted_message;
+    #[cfg(feature = "alloc")]
     pub use alloc::format;
     pub use eros_macros::format_error;
 
@@ -65,7 +68,9 @@ mod msg_error;
 mod narrowing;
 pub mod prelude;
 mod recovery;
+#[cfg(feature = "alloc")]
 mod root_error;
+mod storage;
 pub mod type_set;
 #[cfg(all(test, feature = "user_context"))]
 mod user_context;
