@@ -1,5 +1,3 @@
-<!-- Generated from rs/eros/README.src.md by scripts/update-readme.sh. Edit the source, then run the script. -->
-
 # eros
 
 [<img alt="github" src="https://img.shields.io/badge/github-mcmah309/eros-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/mcmah309/eros)
@@ -13,11 +11,21 @@
 Choose the signature that fits your API:
 
 ```rust
+# struct Config;
+# use std::{io, num::ParseIntError as ParseError};
+# {
 // Propagate errors without their types.
 fn load_config() -> eros::Result<Config>
+# { Ok(Config) }
+# assert!(load_config().is_ok());
+# }
 
+# {
 // Propagate errors with their types.
 fn load_config() -> eros::Result<Config, (io::Error, ParseError)>
+# { Ok(Config) }
+# assert!(load_config().is_ok());
+# }
 ```
 
 Built on the following philosophy:
@@ -34,6 +42,8 @@ Built on the following philosophy:
 Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. Thus, it should be easy for the developer to make the type opaque for developing fast composable APIs. This is where [ErrorUnion](#errorunion) helps.
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::bail;
 
 // Error type is untracked
@@ -57,6 +67,10 @@ fn main() {
         println!("{error:#?}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 ### No Boilerplate
@@ -65,6 +79,8 @@ There should be no boilerplate needed when handling any number of errors (typed 
 
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::IntoUnion;
 use std::{io, num::ParseIntError};
 
@@ -81,6 +97,10 @@ fn main() {
         println!("{error:#?}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 The above code is precisely typed for what we care about and there was no need to create an error enum for each case. One can also use a type alias like `type MyError = (io::Error, ParseIntError);` for reuse. See the [ErrorUnion](#errorunion) section for more details how it works.
 
@@ -89,6 +109,8 @@ The above code is precisely typed for what we care about and there was no need t
 Users should be able to seamlessly transition to and from fully typed errors and handle any cases they care about.
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::{IntoUnion, ReshapeUnion};
 use std::{io, num::ParseIntError};
 
@@ -114,6 +136,10 @@ fn main() {
         eprintln!("Invalid server port: {error}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 `recover` removes handled error types from the result's error set. Handle a group
@@ -128,6 +154,8 @@ Untyped APIs can still support typed recovery. For example, use a default when
 a configuration file is missing, while propagating permission and parse errors:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::{ErrorUnion, ReshapeUnion};
 use std::io;
 
@@ -145,6 +173,9 @@ fn port_or_default(path: &str) -> eros::Result<u16> {
         }
     })
 }
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 The handler receives a typed error with its diagnostics. Other errors remain
@@ -154,6 +185,8 @@ from an untyped union or result.
 Use `widen` to add possible error types:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::{IntoUnion, ReshapeUnion};
 use std::{io, net::{AddrParseError, IpAddr, TcpListener}, num::ParseIntError};
 
@@ -178,6 +211,10 @@ fn main() {
         eprintln!("Could not start server: {error}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 ### Errors Have Context
@@ -185,6 +222,8 @@ fn main() {
 Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::Context;
 
 fn parse_port(value: &str) -> eros::Result<u16> {
@@ -200,6 +239,10 @@ fn main() {
         println!("{error:?}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 With `RUST_BACKTRACE=1`:
@@ -246,6 +289,8 @@ See the [Use In Libraries](#use-in-libraries) section as well.
 For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either a `io::Error` or a `fmt::Error`. The benefit of this over creating specific enums for each function becomes apparent in larger codebases where error handling needs to occur in different places for different errors. As such, `ErrorUnion` allows you to quickly specify a function's return value as involving a precise subset of errors that the caller can clearly reason about. This Provides maximum composability with no boilerplate. E.g.
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::ErrorUnion;
 use std::{fmt, io};
 
@@ -255,9 +300,15 @@ fn main() {
 }
 
 type MyError = (fmt::Error, io::Error); // A type alias can be used to make statements more concise
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 vs
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use std::{fmt, io};
 
 fn main() {
@@ -300,6 +351,10 @@ impl From<io::Error> for MyError {
         MyError::IoError(error)
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 Additionally, the complexity of the second option grows exponentially the more error enums have to be combined from different functions. That is why a lot of crates opt for not precisely defining errors for APIs and instead choose a single error enum or struct for the entire crate. See the [Why Traditional Enum Errors Scale Poorly](#why-traditional-enum-errors-scale-poorly) section for a deeper dive into this.
 
@@ -316,6 +371,8 @@ When the error union should encompass the full set of possible errors, use `AnyE
 For some functions, one may want to attach the same context to every error that can be returned from that function. Writing `.with_context(...)` on each fallible call quickly becomes repetitive and can obscure the intent of the function. For example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::Context;
 
 fn load_port(path: &str) -> eros::Result<u16> {
@@ -331,11 +388,17 @@ fn main() {
         println!("{error:#?}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 To help with this, `eros` provides the `context` attribute macro. The macro wraps the function and automatically adds the supplied context to any error returned from it:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::{Context, context};
 
 // Use #[eager_context(...)] to format owned parameters before the body runs, even on success.
@@ -351,6 +414,10 @@ fn main() {
         println!("{error:#?}");
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 Whether reading the file or parsing its contents fails, the error includes `Failed to load server port from config/port.txt` alongside the original I/O or parse error. The macro attaches this context once, while keeping the function body focused on the actual logic.
@@ -362,6 +429,8 @@ When the context simply consists of "which arguments was this function called wi
 Instead of providing an explicit format string, use `#[context]` and annotate the parameters that should appear in the generated context with `#[fmt(...)]` where `...` is the desired formatting:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::{context, Context};
 
 #[derive(Debug)]
@@ -391,16 +460,25 @@ fn main() {
         &Flags { enabled: true },
     );
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 The generated context is equivalent to:
 
 ```rust
+# let name = "example";
+# let flags = true;
+# let message =
 format!(
     "name: {}\nflags: {:?}\n",
     name,
     flags,
 )
+# ;
+# assert_eq!(message, "name: example\nflags: true\n");
 ```
 
 Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
@@ -430,6 +508,8 @@ If one wants to add a custom error type for public APIs without exposing constru
 <summary>Example Implementation</summary>
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use std::io;
 
 use eros::{ErrorUnion, SendSyncError, TypeSet, bail};
@@ -462,6 +542,9 @@ fn internal_api() -> eros::Result<()> {
 pub fn public_api() -> Result<(), CrateError> {
     internal_api().map_err(Into::into)
 }
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 </details>
@@ -475,6 +558,8 @@ For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete
 <summary>Example Implementation</summary>
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::IntoUnion;
 use std::{fmt, io};
 
@@ -506,6 +591,10 @@ fn main() {
         Err(CrateError::Fmt(e)) => println!("Format error: {}", e),
     }
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 </details>
@@ -521,6 +610,8 @@ There are two reasonable philosophies for *where* in the call stack context shou
 Under this approach, a function attaches context describing itself and its own parameters via `#[context]`. The function "owns" its own description, so every caller gets the same context for free, with no risk of forgetting it or duplicating it slightly differently at each call-site.
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::{Context, context};
 
 #[context("Failed to do some action. param was {}", param)]
@@ -542,6 +633,10 @@ fn main() {
     func1();
     func2();
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 **Why:** it removes ambiguity about whose job it is to attach context. If every function attaches context describing its own operation and inputs, nothing needs to be re-derived or duplicated by callers, and nothing is silently dropped because every caller assumed some other layer would handle it.
@@ -555,6 +650,8 @@ A function should only attach context that the caller doesn't already have. If a
 Responsibility for attaching a given piece of context passes transitively up the stack to whichever function is the last one that still has access to the information, even if that's several layers above where the error actually originated. In the example below, `func2` attaches nothing — it leaves that to its callers — and the context only gets attached at `func1` and `func1b`, the two places where `param` would otherwise be lost:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::Context;
 
 fn do_some_action(param: &str) -> eros::Result<()> {
@@ -574,6 +671,9 @@ fn func1b() -> eros::Result<()> {
     let param = "abc";
     func2(param).with_context(|| format!("Some action failed with param {}", param))
 }
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 **Why:** it keeps individual error messages lean, avoids restating the same value at every layer, and sidesteps the classic `connection failed: connection failed: connection failed: no route to host` style of redundant, nested context.
@@ -600,6 +700,8 @@ For logging, [`err_trail`](https://github.com/mcmah309/err_trail) is recommended
 The `ErrContext` trait in `err_trail` also provides methods like `.warn(())`, which logs an `Err` using `Display` and returns the result unchanged:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::bail;
 use err_trail::ErrContext;
 
@@ -620,6 +722,10 @@ fn main() {
 
     let _result = eros_result().warn(());
 }
+# main();
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 The `error!` call emits:
@@ -645,6 +751,8 @@ Other backtrace examples in this README use `[N frames hidden for brevity]` to m
 `#[eros::error_enum(Name)]` keeps a tuple alias and generates an owned enum with `Debug`, `Display`, and `Error` implementations, useful for matching errors or [exposing a concrete public error](#approach-b-replacing-errorunion-with-concrete-crate-errors). Add `error_enum_ref` and `error_enum_mut` for borrowed views, or `error_enum_kind` for unit variants without payloads:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::ErrorUnion;
 use std::{fmt, io};
 
@@ -663,6 +771,9 @@ match Error::from(union) {
     Error::Io(error) => eprintln!("I/O error: {error}"),
     Error::Fmt(error) => eprintln!("Formatting error: {error}"),
 }
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 Each macro works independently. Attributes below it apply to that enum until the next enum macro or the alias. Variant names join path segments in PascalCase and strip a trailing `Error` unless that would leave an empty name. The kind enum implements `Debug`; attach other derives explicitly.
@@ -676,6 +787,8 @@ Conversions accept subsets and reordered tuples. Borrowing preserves diagnostics
 Use `map_inner` to change the main error while keeping the original failure as its source. The closure receives the boxed inner error; return an error that stores it and exposes it through `Error::source()`:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
 use eros::SendSyncError;
 use std::{error::Error, fmt};
 
@@ -700,6 +813,9 @@ let error = eros::error!("TLS certificate has expired")
     .map_inner(|source| UpdateError { source });
 
 println!("{error}");
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 ```text
@@ -713,6 +829,36 @@ For a union with a single possible error type, `as_single` and `as_single_mut` b
 The optional `diagnostic` feature adds `.to_display_json()` and `.to_debug_json()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
 
 ```rust
+# #[cfg(feature = "diagnostic")]
+# fn main() {
+# use eros::Context;
+# #[derive(Debug)]
+# struct ConfigError { source: Box<dyn eros::SendSyncError> }
+# impl std::fmt::Display for ConfigError {
+#     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#         f.write_str("cannot open configuration")
+#     }
+# }
+# impl std::error::Error for ConfigError {
+#     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+#         Some(self.source.as_ref())
+#     }
+# }
+# #[derive(Debug)]
+# struct StartupError { source: Box<dyn eros::SendSyncError> }
+# impl std::fmt::Display for StartupError {
+#     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#         f.write_str("startup failed")
+#     }
+# }
+# impl std::error::Error for StartupError {
+#     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+#         Some(self.source.as_ref())
+#     }
+# }
+# let _subscriber = tracing::subscriber::set_default(
+#     tracing_subscriber::fmt().without_time().with_target(false).with_ansi(false).finish()
+# );
 // ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
 // Both expose their boxed `source` through Error::source().
 
@@ -725,10 +871,18 @@ tracing::error!(error = %error, "startup failed");
 tracing::error!(error = ?error, "startup failed");
 println!("to_display_json: {}", error.to_display_json());
 println!("to_debug_json: {}", error.to_debug_json());
+# assert_eq!(error.to_display_json(), serde_json::json!({
+#     "root": "cannot open configuration", "sources": ["permission denied"],
+# }));
+# assert_eq!(error.to_debug_json()["root"], "cannot open configuration");
 
 // Wrap again, preserving the full source chain.
 let error = error.map_inner(|source| StartupError { source });
 println!("replacement: {error}");
+# assert_eq!(error.to_string(), "startup failed <- cannot open configuration <- permission denied");
+# }
+# #[cfg(not(feature = "diagnostic"))]
+# fn main() {}
 ```
 
 With default Eros features, `diagnostic`, `RUST_LIB_BACKTRACE=0`, and a text subscriber configured without timestamps, targets, or ANSI colors, the output is:
@@ -772,6 +926,8 @@ Instead, construct a user-facing message from two sources:
 <summary>Example Implementation</summary>
 
 ```rust
+# #[cfg(feature = "user_context")]
+# fn main() {
 use eros::{Context, ErrorUnion, IntoAnyUnion, SendSyncError, TypeSet};
 
 #[derive(Debug)]
@@ -838,12 +994,18 @@ fn load_configuration() -> eros::Result<()> {
 }
 fn main() {
     let password_error = validate_password("123").unwrap_err();
+#     assert_eq!(build_user_error_message(&password_error), "Your password must be at least 8 characters long.\nPlease choose a stronger password.");
     println!("User message:");
     println!("{}", build_user_error_message(&password_error));
     let system_error = load_configuration().unwrap_err();
+#     assert_eq!(build_user_error_message(&system_error), "An internal error occurred.");
     println!("\nUser message:");
     println!("{}", build_user_error_message(&system_error));
 }
+# main();
+# }
+# #[cfg(not(feature = "user_context"))]
+# fn main() {}
 ```
 
 ```text
@@ -870,11 +1032,18 @@ This approach keeps internal diagnostics while making the user-facing experience
 `anyhow` and `eros` give context different roles. In `anyhow`, each `.context(...)` call adds an outer layer to the error chain. The latest context becomes the main message, while earlier contexts and the original error remain as causes. As an error travels through its callers, this presents the outermost operation first.
 
 ```rust
+# #[cfg(feature = "anyhow")]
+# fn main() {
 let error = anyhow::anyhow!("TLS certificate has expired")
     .context("fetch https://updates.example.com/manifest.json")
     .context("prepare application update to v2.4.0");
 
 println!("{error:?}"); // Debug shows the main message and its causes.
+# assert_eq!(error.to_string(), "prepare application update to v2.4.0");
+# assert_eq!(error.chain().last().unwrap().to_string(), "TLS certificate has expired");
+# }
+# #[cfg(not(feature = "anyhow"))]
+# fn main() {}
 ```
 
 ```text
@@ -888,11 +1057,18 @@ Caused by:
 `eros` keeps the original error as the main message and presents context separately, in the order it was added. As the error travels up the call stack, context follows stack trace order: nearest the failure first, then outward through its callers:
 
 ```rust
+# #[cfg(feature = "context")]
+# fn main() {
+# use eros::Context;
 let error = eros::error!("TLS certificate has expired")
     .context("fetch https://updates.example.com/manifest.json")
     .context("prepare application update to v2.4.0");
 
 println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
+# assert_eq!(format!("{error:#?}"), "TLS certificate has expired\n\n  Context (innermost first):\n    1. fetch https://updates.example.com/manifest.json\n    2. prepare application update to v2.4.0");
+# }
+# #[cfg(not(feature = "context"))]
+# fn main() {}
 ```
 
 With the `context` feature enabled (the default):
@@ -917,6 +1093,8 @@ Suppose three low-level functions each return a precise error enum. The function
 bodies below are placeholders; the example is compiled but not executed:
 
 ```rust,no_run
+# #[cfg(feature = "alloc")]
+# fn main() {
 use std::io;
 use std::num::ParseIntError;
 use std::net::AddrParseError;
@@ -941,11 +1119,38 @@ pub enum NetworkError {
     Io(io::Error),
 }
 fn open_socket(_port: u16) -> Result<(), NetworkError> { todo!() }
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 To chain them in `initialize_system`, a precise return type requires a *fourth* enum wrapping the other three — plus a `From` impl for each, just to make `?` work:
 
 ```rust
+# use std::io;
+# use std::num::ParseIntError;
+# use std::net::AddrParseError;
+#
+# #[derive(Debug)]
+# pub enum ReadError {
+#     Io(io::Error),
+#     Format(String),
+# }
+# fn read_file() -> Result<String, ReadError> { Ok("8080".to_owned()) }
+#
+# #[derive(Debug)]
+# pub enum ParseError {
+#     InvalidInt(ParseIntError),
+#     MissingKey(String),
+# }
+# fn parse_config(data: &str) -> Result<u16, ParseError> { data.parse().map_err(ParseError::InvalidInt) }
+#
+# #[derive(Debug)]
+# pub enum NetworkError {
+#     BadAddr(AddrParseError),
+#     Io(io::Error),
+# }
+# fn open_socket(_port: u16) -> Result<(), NetworkError> { Ok(()) }
 #[derive(Debug)]
 pub enum InitError {
     Read(ReadError),
@@ -969,11 +1174,59 @@ fn initialize_system() -> Result<(), InitError> {
     open_socket(port)?;
     Ok(())
 }
+# assert!(initialize_system().is_ok());
 ```
 
 Note that `io::Error` is now buried two levels deep in two different places (`InitError::Read(ReadError::Io(_))` and `InitError::Net(NetworkError::Io(_))`), so callers who just want to handle IO errors have to match both paths:
 
 ```rust
+# use std::io;
+# use std::num::ParseIntError;
+# use std::net::AddrParseError;
+#
+# #[derive(Debug)]
+# pub enum ReadError {
+#     Io(io::Error),
+#     Format(String),
+# }
+# fn read_file() -> Result<String, ReadError> { Ok("8080".to_owned()) }
+#
+# #[derive(Debug)]
+# pub enum ParseError {
+#     InvalidInt(ParseIntError),
+#     MissingKey(String),
+# }
+# fn parse_config(data: &str) -> Result<u16, ParseError> { data.parse().map_err(ParseError::InvalidInt) }
+#
+# #[derive(Debug)]
+# pub enum NetworkError {
+#     BadAddr(AddrParseError),
+#     Io(io::Error),
+# }
+# fn open_socket(_port: u16) -> Result<(), NetworkError> { Ok(()) }
+# #[derive(Debug)]
+# pub enum InitError {
+#     Read(ReadError),
+#     Parse(ParseError),
+#     Net(NetworkError),
+# }
+#
+# impl From<ReadError> for InitError {
+#     fn from(e: ReadError) -> Self { InitError::Read(e) }
+# }
+# impl From<ParseError> for InitError {
+#     fn from(e: ParseError) -> Self { InitError::Parse(e) }
+# }
+# impl From<NetworkError> for InitError {
+#     fn from(e: NetworkError) -> Self { InitError::Net(e) }
+# }
+#
+# fn initialize_system() -> Result<(), InitError> {
+#     let data = read_file()?;
+#     let port = parse_config(&data)?;
+#     open_socket(port)?;
+#     Ok(())
+# }
 match initialize_system() {
     Ok(()) => println!("Success!"),
     Err(InitError::Read(ReadError::Io(_))) => { /* handle */ }
@@ -989,6 +1242,7 @@ Add a fourth step that returns a `DatabaseError` and the cycle repeats: a new en
 Faced with this growth, most crates abandon precision entirely and adopt one monolithic, crate-wide error enum:
 
 ```rust
+# use std::{io, num::ParseIntError, net::AddrParseError};
 #[derive(Debug, thiserror::Error)]
 pub enum CrateError {
     #[error("IO error: {0}")]
@@ -1000,6 +1254,9 @@ pub enum CrateError {
     #[error("Custom error: {0}")]
     General(String),
 }
+# let error = CrateError::from(io::Error::from(io::ErrorKind::PermissionDenied));
+# assert!(matches!(error, CrateError::Io(_)));
+# assert_eq!(CrateError::General("failed".to_owned()).to_string(), "Custom error: failed");
 ```
 
 This kills the boilerplate, but it also kills accuracy: every function now claims it can return *any* crate error, even when most are impossible for that particular call path. `parse_config`'s caller has to account for a `NetworkError` that can never actually occur.
@@ -1009,6 +1266,13 @@ This kills the boilerplate, but it also kills accuracy: every function now claim
 `ErrorUnion` sidesteps the dilemma entirely. No new enum is needed to combine errors, so precision and ergonomics stop being a trade-off.
 
 ```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
+# use eros::IntoUnion;
+# use std::{io, num::ParseIntError, net::AddrParseError};
+# fn read_file() -> Result<String, io::Error> { Ok("8080".to_owned()) }
+# fn parse_config(data: &str) -> Result<u16, ParseIntError> { data.parse() }
+# fn open_socket(_port: u16) -> Result<(), AddrParseError> { Ok(()) }
 type MyError = (io::Error, ParseIntError, AddrParseError);
 
 fn initialize_system() -> eros::Result<(), MyError> {
@@ -1017,6 +1281,10 @@ fn initialize_system() -> eros::Result<(), MyError> {
     open_socket(port).union()?;
     Ok(())
 }
+# assert!(initialize_system().is_ok());
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 The signature stays exact — only the errors that can actually occur are listed — and adding a fourth fallible step just means adding one type to the tuple, not a new enum and a new set of `From` impls, or a rewritten `match`.
@@ -1137,6 +1405,14 @@ reference to it. The stored type becomes `&'static Message`, which occupies one
 word even though `Message` itself occupies two:
 
 ```rust
+# #[derive(Debug)]
+# struct Message(&'static str);
+# impl core::fmt::Display for Message {
+#     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+#         f.write_str(self.0)
+#     }
+# }
+# impl core::error::Error for Message {}
 static MESSAGE: Message = Message("message");
 let error: eros::ErrorUnion<(&'static Message,)> = eros::ErrorUnion::new(&MESSAGE);
 assert!(core::ptr::eq(error.into_single(), &MESSAGE));

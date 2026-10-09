@@ -36,6 +36,10 @@ jobs:
           rustup toolchain install --no-self-update
           rustc --version
 
+      - name: Check generated README
+        if: matrix.args == ''
+        run: scripts/update-readme.sh --check
+
       - name: Run tests
         env:
           RUST_BACKTRACE: "0"
@@ -82,7 +86,7 @@ jobs:
           cargo +nightly miri test -p eros
           cargo +nightly miri test -p eros --no-default-features
           cargo +nightly miri test -p eros --no-default-features --features alloc
-          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition
+          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition --test inline_storage --test static_messages
           cargo +nightly miri test -p eros --release
           cargo +nightly miri test -p eros --release --no-default-features
           cargo +nightly miri test -p eros --release --no-default-features --features alloc
