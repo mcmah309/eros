@@ -1,7 +1,7 @@
 use core::{any::Any, marker::PhantomData};
 
-use crate::type_set::{IsFold, Narrow, SupersetOf, TupleForm};
-use crate::{ErrorUnion, TypeSet};
+use crate::type_set::{IsFold, Narrow, Open, SupersetOf, TupleForm};
+use crate::{ErrorUnion, OtherError, TypeSet};
 
 mod sealed {
     pub struct Token;
@@ -11,6 +11,8 @@ mod sealed {
 pub struct SingleNarrow<Index>(PhantomData<Index>);
 /// Inferred proof marker for selecting an error set with its diagnostics.
 pub struct GroupNarrow<Index>(PhantomData<Index>);
+/// Inferred proof marker for selecting unnamed errors from an open set.
+pub struct OtherNarrow;
 
 /// Sealed selection of a narrowing result and its remaining error set.
 ///
@@ -73,6 +75,31 @@ where
             })
         } else {
             Err(ErrorUnion {
+                inner: error.inner,
+                _pd: PhantomData,
+            })
+        }
+    }
+
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<E, Types> NarrowTarget<E, OtherNarrow> for OtherError
+where
+    E: TypeSet<Variants = Open<Types>>,
+    Types: TupleForm + IsFold,
+{
+    type Output = ErrorUnion;
+    type Remainder = Types;
+
+    fn split(error: ErrorUnion<E>) -> Result<ErrorUnion, ErrorUnion<Types::Tuple>> {
+        if Types::is_fold(error.inner.error() as &dyn Any) {
+            Err(ErrorUnion {
+                inner: error.inner,
+                _pd: PhantomData,
+            })
+        } else {
+            Ok(ErrorUnion {
                 inner: error.inner,
                 _pd: PhantomData,
             })

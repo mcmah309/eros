@@ -1,0 +1,64 @@
+error[E0277]: the trait bound `OtherError: NarrowTarget<(std::fmt::Error,), _>` is not satisfied
+ --> tests/trybuild/cannot_narrow_other_error_from_closed.rs:5:19
+  |
+5 |     let _ = error.narrow::<OtherError, _>();
+  |                   ^^^^^^ the trait `NarrowTarget<(std::fmt::Error,), _>` is not implemented for `OtherError`
+  |
+help: the trait `NarrowTarget<E, OtherNarrow>` is implemented for `OtherError`
+ --> src/narrowing.rs
+  |
+  | / impl<E, Types> NarrowTarget<E, OtherNarrow> for OtherError
+  | | where
+  | |     E: TypeSet<Variants = Open<Types>>,
+  | |     Types: TupleForm + IsFold,
+  | |______________________________^
+
+error[E0271]: type mismatch resolving `<(Error,) as TypeSet>::Variants == Open<_>`
+ --> tests/trybuild/cannot_narrow_other_error_from_closed.rs:8:30
+  |
+8 |     let _ = result.recover::<OtherError, _>(|_| ());
+  |                    -------   ^^^^^^^^^^ expected `Open<_>`, found `Cons<Error, End>`
+  |                    |
+  |                    required by a bound introduced by this call
+  |
+  = note: expected struct `eros::type_set::Open<_>`
+             found struct `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>`
+  = note: required for `OtherError` to implement `RecoveryTarget<(std::fmt::Error,), OtherRecovery>`
+note: required by a bound in `recover`
+ --> src/error_union.rs
+  |
+  |     fn recover<Target, Index>(
+  |        ------- required by a bound in this associated function
+...
+  |         Target: RecoveryTarget<E, Index>;
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::recover`
+
+error[E0271]: type mismatch resolving `<(Error,) as TypeSet>::Variants == Open<_>`
+ --> tests/trybuild/cannot_narrow_other_error_from_closed.rs:8:20
+  |
+8 |     let _ = result.recover::<OtherError, _>(|_| ());
+  |                    ^^^^^^^ expected `Open<_>`, found `Cons<Error, End>`
+  |
+  = note: expected struct `eros::type_set::Open<_>`
+             found struct `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>`
+  = note: required for `OtherError` to implement `RecoveryTarget<(std::fmt::Error,), OtherRecovery>`
+
+error[E0271]: type mismatch resolving `<(Error,) as TypeSet>::Variants == Open<_>`
+ --> tests/trybuild/cannot_narrow_other_error_from_closed.rs:8:45
+  |
+8 |     let _ = result.recover::<OtherError, _>(|_| ());
+  |                    -------                  ^^^^^^ expected `Open<_>`, found `Cons<Error, End>`
+  |                    |
+  |                    required by a bound introduced by this call
+  |
+  = note: expected struct `eros::type_set::Open<_>`
+             found struct `eros::type_set::Cons<std::fmt::Error, eros::type_set::End>`
+  = note: required for `{closure@$DIR/tests/trybuild/cannot_narrow_other_error_from_closed.rs:8:45: 8:48}` to implement `RecoveryHandler<OtherError, (std::fmt::Error,), OtherRecovery, ()>`
+note: required by a bound in `recover`
+ --> src/error_union.rs
+  |
+  |     fn recover<Target, Index>(
+  |        ------- required by a bound in this associated function
+  |         self,
+  |         f: impl RecoveryHandler<Target, E, Index, S>,
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::recover`

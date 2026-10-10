@@ -1,4 +1,4 @@
-error[E0277]: the trait bound `eros::type_set::End: SupersetOf<AnyError, _>` is not satisfied
+error[E0277]: the trait bound `eros::type_set::End: WidenFrom<AnyError, _>` is not satisfied
  --> tests/trybuild/cannot_try_recover_erased_omit_remainder.rs:5:66
   |
 5 |     let _: eros::Result<(), ()> = result.try_recover::<MsgError, _, _, _>(|_| Ok(()));
@@ -10,16 +10,20 @@ help: `AnyError` implements trait `SupersetOf<Other, Index>`
   |   impl SupersetOf<AnyError, End> for AnyError {
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SupersetOf<AnyError, eros::type_set::End>`
 ...
+  |   impl<Types> SupersetOf<Open<Types>, End> for AnyError {
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SupersetOf<eros::type_set::Open<Types>, eros::type_set::End>`
+...
   | / impl<Head, Tail, TailIndex> SupersetOf<Cons<Head, Tail>, Cons<End, TailIndex>> for AnyError
   | | where
   | |     Head: SendSyncError,
   | |     AnyError: SupersetOf<Tail, TailIndex>,
   | |__________________________________________^ `SupersetOf<eros::type_set::Cons<Head, Tail>, eros::type_set::Cons<eros::type_set::End, TailIndex>>`
+  = note: required for `eros::type_set::End` to implement `WidenFrom<AnyError, _>`
 note: required by a bound in `try_recover`
  --> src/error_union.rs
   |
   |     fn try_recover<Target, Other, Index, OtherIndex>(
   |        ----------- required by a bound in this associated function
 ...
-  |         Other::Variants: SupersetOf<Target::Remainder, OtherIndex>;
-  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`
+  |         Other::Variants: WidenFrom<Target::Remainder, OtherIndex>;
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`

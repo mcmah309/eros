@@ -1,11 +1,13 @@
 use core::any::Any;
 
-use crate::{AnyError, SendSyncError};
+use crate::{AnyError, ErrorUnion, OtherError, SendSyncError};
 
 #[doc(hidden)]
-pub use crate::narrowing::{GroupNarrow, NarrowTarget, SingleNarrow};
+pub use crate::narrowing::{GroupNarrow, NarrowTarget, OtherNarrow, SingleNarrow};
 #[doc(hidden)]
-pub use crate::recovery::{GroupRecovery, RecoveryHandler, RecoveryTarget, SingleRecovery};
+pub use crate::recovery::{
+    GroupRecovery, OtherRecovery, RecoveryHandler, RecoveryTarget, SingleRecovery,
+};
 
 mod sealed {
     pub trait Sealed {}
@@ -24,17 +26,22 @@ pub enum End {}
 pub struct Cons<Head, Tail>(core::marker::PhantomData<Head>, Tail);
 #[doc(hidden)]
 pub struct Recurse<Tail>(Tail);
+/// An open error set, with a list of explicitly named error types.
+#[doc(hidden)]
+pub struct Open<Types>(core::marker::PhantomData<Types>);
 
 impl sealed::Sealed for End {}
 impl<Head, Tail> sealed::Sealed for Cons<Head, Tail> {}
+impl<Types> sealed::Sealed for Open<Types> {}
 
 /// A set of possible errors for an [`ErrorUnion`](crate::ErrorUnion).
 ///
 /// Implemented for tuples of up to 26 [`SendSyncError`] types, the empty tuple
-/// `()`, and [`AnyError`].
+/// `()`, and [`AnyError`]. A tuple may end with [`OtherError`] in place of
+/// its last concrete error type to accept additional, unnamed errors.
 /// This trait is sealed and cannot be implemented outside Eros.
 pub trait TypeSet: sealed::Sealed + Send + Sync + 'static {
-    /// The type list used by [`Contains`], [`Narrow`], and [`SupersetOf`].
+    /// The type list used by [`Contains`], [`Narrow`], [`SupersetOf`], and [`WidenFrom`].
     type Variants: TupleForm + IsFold;
 }
 
@@ -53,6 +60,80 @@ impl sealed::Sealed for () {}
 impl TypeSet for () {
     type Variants = End;
 }
+
+// Keeping the marker at the end gives each open tuple a unique representation
+// and avoids overlapping membership proofs for named and unnamed errors.
+macro_rules! open_set {
+    (@list) => { End };
+    (@list $head:ident $(, $tail:ident)*) => { Cons<$head, open_set!(@list $($tail),*)> };
+    ($($member:ident),*) => {
+        impl<$($member: SendSyncError),*> sealed::Sealed for ($($member,)* OtherError,) {}
+
+        impl<$($member: SendSyncError),*> TypeSet for ($($member,)* OtherError,) {
+            type Variants = Open<open_set!(@list $($member),*)>;
+        }
+
+        impl<$($member: SendSyncError),*> TupleForm for Open<open_set!(@list $($member),*)> {
+            type Tuple = ($($member,)* OtherError,);
+        }
+
+        impl<Root: SendSyncError, $($member: SendSyncError),*> From<Root> for ErrorUnion<($($member,)* OtherError,)> {
+            #[cfg_attr(feature = "location", track_caller)]
+            fn from(value: Root) -> Self {
+                ErrorUnion::new(value)
+            }
+        }
+
+        impl<$($member: SendSyncError),*> From<ErrorUnion<AnyError>> for ErrorUnion<($($member,)* OtherError,)> {
+            fn from(value: ErrorUnion<AnyError>) -> Self {
+                value.widen()
+            }
+        }
+
+        impl<$($member: SendSyncError),*> From<ErrorUnion<($($member,)* OtherError,)>> for ErrorUnion<AnyError> {
+            fn from(value: ErrorUnion<($($member,)* OtherError,)>) -> Self {
+                ErrorUnion::erase(value)
+            }
+        }
+    };
+}
+
+open_set!();
+open_set!(A);
+open_set!(A, B);
+open_set!(A, B, C);
+open_set!(A, B, C, D);
+open_set!(A, B, C, D, E);
+open_set!(A, B, C, D, E, F);
+open_set!(A, B, C, D, E, F, G);
+open_set!(A, B, C, D, E, F, G, H);
+open_set!(A, B, C, D, E, F, G, H, I);
+open_set!(A, B, C, D, E, F, G, H, I, J);
+open_set!(A, B, C, D, E, F, G, H, I, J, K);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+open_set!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+open_set!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U
+);
+open_set!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V
+);
+open_set!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
+);
+open_set!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
+);
+open_set!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
+);
 
 #[rustfmt::skip]
 impl<A: SendSyncError> sealed::Sealed for (A,) {}
@@ -516,6 +597,12 @@ impl IsFold for AnyError {
     }
 }
 
+impl<Types> IsFold for Open<Types> {
+    fn is_fold(_: &dyn Any) -> bool {
+        true
+    }
+}
+
 //************************************************************************//
 
 /// A type list that contains `T`.
@@ -541,6 +628,10 @@ where
 }
 
 impl<T> Contains<T, End> for AnyError {
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<T, Types> Contains<T, End> for Open<Types> {
     fn __seal(_: sealed::Token) {}
 }
 
@@ -582,6 +673,17 @@ where
     fn __seal(_: sealed::Token) {}
 }
 
+impl<Types, Target, Index> Narrow<Target, Index> for Open<Types>
+where
+    Types: Narrow<Target, Index>,
+    Open<Types>: TupleForm,
+    Open<Types::Remainder>: TupleForm,
+{
+    type Remainder = Open<Types::Remainder>;
+
+    fn __seal(_: sealed::Token) {}
+}
+
 fn _narrow_test() {
     use core::{fmt::Error, num::ParseIntError};
     fn can_narrow<Types, Target, Remainder, Index>()
@@ -600,8 +702,7 @@ fn _narrow_test() {
 
 /// A type list containing every member of `Other`.
 ///
-/// Applied to [`TypeSet::Variants`] by [`ErrorUnion::widen`](crate::ErrorUnion::widen)
-/// and [`ErrorUnion::narrow`](crate::ErrorUnion::narrow).
+/// Applied to [`TypeSet::Variants`] by [`ErrorUnion::narrow`](crate::ErrorUnion::narrow).
 /// `Index` is inferred at call sites. This trait is sealed.
 pub trait SupersetOf<Other, Index> {
     /// The type list remaining after removing the members of `Other`.
@@ -609,6 +710,40 @@ pub trait SupersetOf<Other, Index> {
 
     #[doc(hidden)]
     fn __seal(_: sealed::Token);
+}
+
+/// A type list accepting every error permitted by `Other`.
+///
+/// Applied to [`TypeSet::Variants`] by [`ErrorUnion::widen`](crate::ErrorUnion::widen)
+/// and [`ReshapeUnion::try_recover`](crate::ReshapeUnion::try_recover).
+/// Unlike [`SupersetOf`], this relation does not compute a narrowing remainder.
+/// Open sets accept any source set without requiring its concrete types to be
+/// named in the destination. `Index` is inferred at call sites. This trait is sealed.
+pub trait WidenFrom<Other, Index> {
+    #[doc(hidden)]
+    fn __seal(_: sealed::Token);
+}
+
+impl<Other, Index> WidenFrom<Other, Index> for End
+where
+    End: SupersetOf<Other, Index>,
+{
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<Head, Tail, Other, Index> WidenFrom<Other, Index> for Cons<Head, Tail>
+where
+    Cons<Head, Tail>: SupersetOf<Other, Index>,
+{
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<Other: TupleForm> WidenFrom<Other, End> for AnyError {
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<Types, Other: TupleForm> WidenFrom<Other, End> for Open<Types> {
+    fn __seal(_: sealed::Token) {}
 }
 
 /// Base case
@@ -637,6 +772,38 @@ where
 }
 
 impl SupersetOf<AnyError, End> for AnyError {
+    type Remainder = AnyError;
+
+    fn __seal(_: sealed::Token) {}
+}
+
+// Selecting named members of an open set removes those names but retains
+// OtherError. Its exclusion check then uses the names that remain.
+impl<Types, Head, Tail, Index> SupersetOf<Cons<Head, Tail>, Index> for Open<Types>
+where
+    Types: SupersetOf<Cons<Head, Tail>, Index>,
+    Open<Types::Remainder>: TupleForm,
+{
+    type Remainder = Open<Types::Remainder>;
+
+    fn __seal(_: sealed::Token) {}
+}
+
+// Every open set accepts all errors. Selecting an open target takes the whole
+// union; unlike selecting the bare OtherError marker, it excludes no types.
+impl<Types, Other> SupersetOf<Open<Other>, End> for Open<Types> {
+    type Remainder = End;
+
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<Types> SupersetOf<AnyError, End> for Open<Types> {
+    type Remainder = End;
+
+    fn __seal(_: sealed::Token) {}
+}
+
+impl<Types> SupersetOf<Open<Types>, End> for AnyError {
     type Remainder = AnyError;
 
     fn __seal(_: sealed::Token) {}

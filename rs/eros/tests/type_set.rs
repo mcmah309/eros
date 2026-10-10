@@ -64,7 +64,9 @@ fn error_sets_support_generic_and_empty_unions() {
 
 #[test]
 fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
-    use eros::type_set::{Contains, GroupNarrow, Narrow, SingleNarrow, SupersetOf, TupleForm};
+    use eros::type_set::{
+        Contains, GroupNarrow, Narrow, SingleNarrow, SupersetOf, TupleForm, WidenFrom,
+    };
 
     fn wrap<T: SendSyncError, E: TypeSet, I>(error: T) -> ErrorUnion<E>
     where
@@ -75,7 +77,7 @@ fn generic_code_can_construct_and_reshape_sets_with_public_bounds() {
 
     fn widen<E: TypeSet, Other: TypeSet, I>(error: ErrorUnion<E>) -> ErrorUnion<Other>
     where
-        Other::Variants: SupersetOf<E::Variants, I>,
+        Other::Variants: WidenFrom<E::Variants, I>,
     {
         error.widen()
     }
@@ -117,7 +119,8 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
         let display = format!("{error}");
         let debug = format!("{error:?}");
         let original = error.inner() as *const dyn SendSyncError as *const ();
-        let error = ErrorUnion::<E>::try_from_boxed_error(Box::new(error.into_std_error())).unwrap();
+        let error =
+            ErrorUnion::<E>::try_from_boxed_error(Box::new(error.into_std_error())).unwrap();
         assert_eq!(
             error.inner() as *const dyn SendSyncError as *const (),
             original

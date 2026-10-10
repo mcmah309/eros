@@ -6,20 +6,22 @@ error[E0046]: not all trait items implemented, missing: `__seal`
    |
    = help: implement the missing item: `fn __seal(_: type_set::sealed::Token) { todo!() }`
 
-error[E0119]: conflicting implementations of trait `Narrow<MsgError, Index>` for type `<(std::fmt::Error,) as TypeSet>::Variants`
-  --> tests/trybuild/cannot_forge_type_set_relations.rs:22:1
+error[E0119]: conflicting implementations of trait `Narrow<MsgError, Index>` for type `eros::type_set::Open<_>`
+  --> tests/trybuild/cannot_forge_type_set_relations.rs:13:1
    |
 13 | impl Narrow<MsgError, Index> for Variants {
-   | ----------------------------------------- first implementation here
-...
-22 | impl Narrow<MsgError, Index> for AnyError {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `<(std::fmt::Error,) as TypeSet>::Variants`
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: conflicting implementation in crate `eros`:
+           - impl<Types, Target, Index> Narrow<Target, Index> for eros::type_set::Open<Types>
+             where Types: Narrow<Target, Index>, eros::type_set::Open<Types>: TupleForm, eros::type_set::Open<<Types as Narrow<Target, Index>>::Remainder>: TupleForm, eros::type_set::Open<Types>: ?Sized, eros::type_set::Open<<Types as Narrow<Target, Index>>::Remainder>: ?Sized;
 
-error[E0119]: conflicting implementations of trait `SupersetOf<<(MsgError,) as TypeSet>::Variants, Index>` for type `<(std::fmt::Error,) as TypeSet>::Variants`
-  --> tests/trybuild/cannot_forge_type_set_relations.rs:26:1
+error[E0119]: conflicting implementations of trait `SupersetOf<eros::type_set::Cons<_, _>, Index>` for type `eros::type_set::Open<_>`
+  --> tests/trybuild/cannot_forge_type_set_relations.rs:17:1
    |
 17 | impl SupersetOf<<(MsgError,) as TypeSet>::Variants, Index> for Variants {
-   | ----------------------------------------------------------------------- first implementation here
-...
-26 | impl SupersetOf<AnyError, Index> for Variants {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `<(std::fmt::Error,) as TypeSet>::Variants`
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: conflicting implementation in crate `eros`:
+           - impl<Types, Head, Tail, Index> SupersetOf<eros::type_set::Cons<Head, Tail>, Index> for eros::type_set::Open<Types>
+             where Types: SupersetOf<eros::type_set::Cons<Head, Tail>, Index>, eros::type_set::Open<<Types as SupersetOf<eros::type_set::Cons<Head, Tail>, Index>>::Remainder>: TupleForm, eros::type_set::Open<<Types as SupersetOf<eros::type_set::Cons<Head, Tail>, Index>>::Remainder>: ?Sized;

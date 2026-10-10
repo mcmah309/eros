@@ -66,6 +66,7 @@ mod formatting;
 mod macros;
 mod msg_error;
 mod narrowing;
+mod other_error;
 pub mod prelude;
 mod recovery;
 #[cfg(feature = "alloc")]
@@ -93,6 +94,7 @@ pub use error_union::ErrorUnion;
 pub use error_union::SendSyncError;
 pub use error_union::StdError;
 pub use msg_error::MsgError;
+pub use other_error::OtherError;
 pub use type_set::TypeSet;
 
 // traits

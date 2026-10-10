@@ -6,6 +6,14 @@ error[E0277]: the trait bound `(MsgError, std::io::Error): NarrowTarget<(MsgErro
   |                    |
   |                    required by a bound introduced by this call
   |
+help: the trait `NarrowTarget<E, OtherNarrow>` is implemented for `OtherError`
+ --> src/narrowing.rs
+  |
+  | / impl<E, Types> NarrowTarget<E, OtherNarrow> for OtherError
+  | | where
+  | |     E: TypeSet<Variants = Open<Types>>,
+  | |     Types: TupleForm + IsFold,
+  | |______________________________^
 note: required by a bound in `narrow`
  --> src/error_union.rs
   |

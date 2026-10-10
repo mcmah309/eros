@@ -1,0 +1,25 @@
+error[E0308]: mismatched types
+ --> tests/trybuild/other_error_cannot_be_extracted_as_marker.rs:4:5
+  |
+3 | fn extract(error: ErrorUnion<(OtherError,)>) -> OtherError {
+  |                                                 ---------- expected `OtherError` because of return type
+4 |     error.narrow::<OtherError, _>().unwrap()
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `OtherError`, found `ErrorUnion`
+  |
+  = note: expected enum `OtherError`
+           found struct `ErrorUnion`
+
+error[E0599]: the method `into_single` exists for struct `ErrorUnion<(OtherError,)>`, but its trait bounds were not satisfied
+ --> tests/trybuild/other_error_cannot_be_extracted_as_marker.rs:8:11
+  |
+8 |     error.into_single()
+  |           ^^^^^^^^^^^ method cannot be called on `ErrorUnion<(OtherError,)>` due to unsatisfied trait bounds
+  |
+ ::: src/other_error.rs
+  |
+  | pub enum OtherError {}
+  | ------------------- doesn't satisfy `OtherError: SendSyncError` or `OtherError: std::error::Error`
+  |
+  = note: the following trait bounds were not satisfied:
+          `OtherError: std::error::Error`
+          which is required by `OtherError: SendSyncError`

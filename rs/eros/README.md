@@ -307,6 +307,53 @@ When the error union should encompass the full set of possible errors, use `AnyE
 
 `eros::Result<()>` is shorthand for `eros::Result<(), AnyError>`, which in turn is shorthand for `Result<(), ErrorUnion<AnyError>>`.
 
+### Named Errors Alongside Other Errors
+
+End a tuple with `OtherError` when callers care about a few error types but
+should also accept errors whose types do not matter:
+
+```rust
+use eros::{ErrorUnion, OtherError, ReshapeUnion};
+use std::{io, num::ParseIntError};
+
+type LoadErrors = (io::Error, ParseIntError, OtherError);
+
+// Any error can enter this set, including one not explicitly listed.
+let result: eros::Result<u16, LoadErrors> =
+    Err(ErrorUnion::new(std::fmt::Error));
+
+// Handles only errors other than io::Error and ParseIntError.
+let result: eros::Result<u16, (io::Error, ParseIntError)> =
+    result.recover::<OtherError, _>(|error| {
+        eprintln!("{error:?}; using the default port");
+        8080
+    });
+assert_eq!(result.unwrap(), 8080);
+```
+
+`narrow::<OtherError, _>()` returns an erased `ErrorUnion<AnyError>` on a match,
+preserving context, location, and backtrace. Its remainder contains only the
+concrete entries. The check compares the inner error's exact type against the
+remaining entries; it does not inspect sources or contexts. The erased branch
+does not carry a type-level record of the excluded types.
+
+Named types can also be handled first. They are removed from the tuple, and
+later `OtherError` checks exclude only the names that remain. `try_recover`
+supports the same marker and can introduce new errors through a fallible handler.
+
+Use `.union()` to construct an open result or `.widen()` to adapt an existing
+typed or erased result without changing its stored error or diagnostics.
+Raw errors and erased unions can also propagate into an open result with `?`.
+`OtherError` must be last and counts toward the tuple's 26-entry limit.
+`(OtherError,)` accepts every error. Selecting a tuple containing the marker
+selects the whole open set; selecting the bare marker handles only the other
+errors. Concrete errors must still implement `SendSyncError`, and the marker
+itself cannot be constructed or extracted as a concrete error.
+
+For generic adapters, widening and fallible recovery use the sealed
+`type_set::WidenFrom` bound. `type_set::SupersetOf` computes the remainder for
+typed group narrowing.
+
 ### Tracing
 
 `ErrorUnion` also allows adding context to an error throughout the callstack with the `context` or `with_context` methods. This context may be information such as variable values or ongoing operations while the error occurred. If the error is handled higher in the stack, then this can be disregarded (no log pollution). Otherwise you can log it (or panic), capturing all the relevant information in one log. A backtrace is captured and included with the error when `RUST_BACKTRACE` is set.

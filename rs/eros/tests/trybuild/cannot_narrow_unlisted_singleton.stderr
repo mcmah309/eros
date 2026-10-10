@@ -3,3 +3,12 @@ error[E0277]: the trait bound `(MsgError,): NarrowTarget<(std::fmt::Error,), _>`
   |
 5 |     let _ = error.narrow::<(MsgError,), _>();
   |                   ^^^^^^ the trait `NarrowTarget<(std::fmt::Error,), _>` is not implemented for `(MsgError,)`
+  |
+help: the trait `NarrowTarget<E, OtherNarrow>` is implemented for `OtherError`
+ --> src/narrowing.rs
+  |
+  | / impl<E, Types> NarrowTarget<E, OtherNarrow> for OtherError
+  | | where
+  | |     E: TypeSet<Variants = Open<Types>>,
+  | |     Types: TupleForm + IsFold,
+  | |______________________________^

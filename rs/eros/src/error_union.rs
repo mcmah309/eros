@@ -12,7 +12,7 @@ use crate::context::ContextFrame;
 use crate::context::ContextValue;
 use crate::formatting::Report;
 use crate::type_set::{
-    Contains, NarrowTarget, RecoveryHandler, RecoveryTarget, SupersetOf, TupleForm, TypeSet,
+    Contains, NarrowTarget, RecoveryHandler, RecoveryTarget, TupleForm, TypeSet, WidenFrom,
 };
 
 use crate::AnyError;
@@ -56,7 +56,8 @@ impl core::error::Error for Box<dyn SendSyncError> {
 /// one value out of several specific possibilities,
 /// defined by using a tuple of those possible variants
 /// as the generic parameter for the `ErrorUnion`.
-/// Every tuple member must implement [`SendSyncError`].
+/// Every concrete tuple member must implement [`SendSyncError`]. A tuple ending
+/// in [`OtherError`](crate::OtherError) also accepts unnamed error types.
 ///
 /// For example, a `ErrorUnion<(io::Error, fmt::Error)>` contains either
 /// a `io::Error` or a `fmt::Error`. The benefit of this over creating
@@ -315,6 +316,10 @@ where
     /// Tuple targets support 0–26 types. An empty target `()` always returns
     /// the original union in `Err`. On an erased union, `AnyError` selects the
     /// original union without extracting the marker as a concrete error.
+    /// On a tuple ending in [`OtherError`](crate::OtherError), the bare
+    /// `OtherError` target selects errors whose inner type is absent from the
+    /// remaining concrete entries. It returns an erased union with diagnostics,
+    /// leaving only the concrete entries in the remainder.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -349,7 +354,7 @@ where
     pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<E::Variants, Index>,
+        Other::Variants: WidenFrom<E::Variants, Index>,
     {
         ErrorUnion {
             inner: self.inner,
@@ -643,7 +648,7 @@ where
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<E::Variants, Index>;
+        Other::Variants: WidenFrom<E::Variants, Index>;
 
     /// Selects a matching error or group, returning the original success value
     /// or the remaining error union in the outer `Err` branch otherwise.
@@ -684,6 +689,9 @@ where
     /// `recover::<(FirstError, SecondError), _>(...)` for a group of 2–26 types.
     /// Alternatively, infer the target from an annotated handler argument such as
     /// `|error: ErrorUnion<(FirstError, SecondError)>| ...`.
+    /// For an open tuple, `recover::<OtherError, _>(...)` handles errors other
+    /// than its remaining concrete entries. The handler receives an erased
+    /// `ErrorUnion`, and the result retains only the concrete entries.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -769,7 +777,7 @@ where
     where
         Target: RecoveryTarget<E, Index>,
         Other: TypeSet,
-        Other::Variants: SupersetOf<Target::Remainder, OtherIndex>;
+        Other::Variants: WidenFrom<Target::Remainder, OtherIndex>;
 
     /// Extracts the success value once no possible error types remain.
     ///
@@ -799,7 +807,7 @@ where
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
-        Other::Variants: SupersetOf<E::Variants, Index>,
+        Other::Variants: WidenFrom<E::Variants, Index>,
     {
         self.map_err(|e| e.widen())
     }
@@ -842,7 +850,7 @@ where
     where
         Target: RecoveryTarget<E, Index>,
         Other: TypeSet,
-        Other::Variants: SupersetOf<Target::Remainder, OtherIndex>,
+        Other::Variants: WidenFrom<Target::Remainder, OtherIndex>,
     {
         match self {
             Ok(value) => Ok(value),

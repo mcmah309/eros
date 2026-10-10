@@ -1,0 +1,16 @@
+error[E0271]: type mismatch resolving `<(OtherError,) as TypeSet>::Variants == End`
+ --> tests/trybuild/cannot_into_value_with_other_error.rs:6:50
+  |
+6 |     result.recover::<std::fmt::Error, _>(|_| ()).into_value();
+  |                                                  ^^^^^^^^^^ expected `End`, found `Open<End>`
+  |
+  = note: expected enum `eros::type_set::End`
+           found struct `eros::type_set::Open<eros::type_set::End>`
+note: required by a bound in `into_value`
+ --> src/error_union.rs
+  |
+  |     fn into_value(self) -> S
+  |        ---------- required by a bound in this associated function
+  |     where
+  |         E: TypeSet<Variants = crate::type_set::End>;
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::into_value`

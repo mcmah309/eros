@@ -1,0 +1,7 @@
+error[E0046]: not all trait items implemented, missing: `__seal`
+ --> tests/trybuild/cannot_forge_widen_from.rs:7:1
+  |
+7 | impl WidenFrom<AnyError, Index> for <(std::fmt::Error,) as TypeSet>::Variants {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `__seal` in implementation
+  |
+  = help: implement the missing item: `fn __seal(_: type_set::sealed::Token) { todo!() }`

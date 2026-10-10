@@ -1,5 +1,5 @@
 use core::{error::Error, fmt, fmt::Write};
-use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion, SendSyncError, TypeSet};
+use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, OtherError, ReshapeUnion, SendSyncError, TypeSet};
 
 macro_rules! unit_error {
     ($name:ident, $message:literal) => {
@@ -437,6 +437,50 @@ pub fn erased_try_recover_keeps_unknown_errors_and_replacement_types() {
 }
 
 #[cfg_attr(test, test)]
+pub fn other_error_partitions_and_recovers_without_an_allocator() {
+    type Open = (Connect, OtherError);
+    for (index, error) in errors().into_iter().enumerate() {
+        let snapshot = Snapshot::new(&error);
+        let error: ErrorUnion<Open> = error.widen();
+        let split: Result<ErrorUnion, ErrorUnion<(Connect,)>> = error.narrow::<OtherError, _>();
+        assert_eq!(split.is_ok(), index != 0);
+        match split {
+            Ok(other) => {
+                snapshot.assert_preserved(&other);
+                assert_variant(&other, index);
+            }
+            Err(named) => {
+                snapshot.assert_preserved(&named);
+                assert_eq!(named.into_single(), Connect);
+            }
+        }
+    }
+    for mode in 0..=4 {
+        let result: eros::Result<u8, Open> = pipeline(mode).widen();
+        let result: eros::Result<u8, (Connect,)> = result.recover::<OtherError, _>(|other| {
+            assert_variant(&other, mode);
+            42
+        });
+        let value = result.recover::<Connect, _>(|_| 20).into_value();
+        assert_eq!(
+            value,
+            if mode == 0 {
+                20
+            } else if mode == 4 {
+                13
+            } else {
+                42
+            }
+        );
+    }
+    let result: eros::Result<u8, Open> = Err(Read).union();
+    let result: eros::Result<u8, (Fallback, Connect)> =
+        result.try_recover::<OtherError, _, _, _>(|_| Err(Fallback).union());
+    let error = result.unwrap_err().narrow::<Fallback, _>().unwrap();
+    assert_eq!(error, Fallback);
+}
+
+#[cfg_attr(test, test)]
 pub fn unit_errors_can_display_static_text_without_a_string_payload() {
     struct Buffer {
         bytes: [u8; 64],
@@ -479,5 +523,6 @@ pub fn run_checks() {
     erased_narrow_can_recover_a_typed_set_then_erase_again();
     erased_result_narrow_and_recovery_route_every_variant();
     erased_try_recover_keeps_unknown_errors_and_replacement_types();
+    other_error_partitions_and_recovers_without_an_allocator();
     unit_errors_can_display_static_text_without_a_string_payload();
 }

@@ -68,7 +68,7 @@ error[E0277]: the trait bound `u16: SendSyncError` is not satisfied
   = note: required for `u16` to implement `SendSyncError`
   = note: required for `(std::io::Error, u16)` to implement `TypeSet`
 
-error[E0277]: the trait bound `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>: SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>` is not satisfied
+error[E0277]: the trait bound `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>: WidenFrom<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>` is not satisfied
  --> tests/trybuild/error_union_cannot_add_non_error.rs:7:19
   |
 7 |     let _ = error.widen::<(std::io::Error, u16), _>();
@@ -92,16 +92,17 @@ help: the following other types implement trait `Narrow<T, Index>`
   | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
   | |______________________________________________________________________^ `eros::type_set::Cons<Head, Tail>` implements `Narrow<Target, eros::type_set::Recurse<Index>>`
   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>` to implement `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>`
+  = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>` to implement `WidenFrom<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>`
 note: required by a bound in `ErrorUnion::<E>::widen`
  --> src/error_union.rs
   |
   |     pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
   |            ----- required by a bound in this associated function
 ...
-  |         Other::Variants: SupersetOf<E::Variants, Index>,
-  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::widen`
+  |         Other::Variants: WidenFrom<E::Variants, Index>,
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorUnion::<E>::widen`
 
-error[E0277]: the trait bound `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>: SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>` is not satisfied
+error[E0277]: the trait bound `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>: WidenFrom<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>` is not satisfied
   --> tests/trybuild/error_union_cannot_add_non_error.rs:13:28
    |
 13 |     let _ = result.widen::<(std::io::Error, u16), _>();
@@ -125,11 +126,12 @@ help: the following other types implement trait `Narrow<T, Index>`
    | |     Cons<Head, <Tail as Narrow<Target, Index>>::Remainder>: TupleForm,
    | |______________________________________________________________________^ `eros::type_set::Cons<Head, Tail>` implements `Narrow<Target, eros::type_set::Recurse<Index>>`
    = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>` to implement `SupersetOf<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>`
+   = note: required for `eros::type_set::Cons<std::io::Error, eros::type_set::Cons<u16, eros::type_set::End>>` to implement `WidenFrom<eros::type_set::Cons<std::io::Error, eros::type_set::End>, eros::type_set::Cons<_, _>>`
 note: required by a bound in `widen`
   --> src/error_union.rs
    |
    |     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
    |        ----- required by a bound in this associated function
 ...
-   |         Other::Variants: SupersetOf<E::Variants, Index>;
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::widen`
+   |         Other::Variants: WidenFrom<E::Variants, Index>;
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::widen`

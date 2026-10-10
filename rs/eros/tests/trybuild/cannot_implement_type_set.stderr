@@ -28,12 +28,12 @@ note: required by a bound in `TypeSet`
   = help: the following types implement the trait:
             eros::type_set::End
             eros::type_set::Cons<Head, Tail>
+            eros::type_set::Open<Types>
             eros::AnyError
             ()
+            (eros::OtherError,)
             (A,)
-            (A, B)
-            (A, B, C)
-            (A, B, C, D)
+            (A, eros::OtherError)
           and $N others
 
 error[E0277]: the trait bound `CustomSet: type_set::sealed::Sealed` is not satisfied
@@ -66,10 +66,10 @@ note: required by a bound in `TupleForm`
    = help: the following types implement the trait:
              eros::type_set::End
              eros::type_set::Cons<Head, Tail>
+             eros::type_set::Open<Types>
              eros::AnyError
              ()
+             (eros::OtherError,)
              (A,)
-             (A, B)
-             (A, B, C)
-             (A, B, C, D)
+             (A, eros::OtherError)
            and $N others

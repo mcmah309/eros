@@ -11,11 +11,12 @@ help: the trait `Narrow<Target, eros::type_set::End>` is implemented for `AnyErr
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `Narrow<std::fmt::Error, eros::type_set::Recurse<_>>`
   = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `SupersetOf<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
+  = note: required for `eros::type_set::Cons<MsgError, eros::type_set::End>` to implement `WidenFrom<eros::type_set::Cons<std::fmt::Error, eros::type_set::End>, eros::type_set::Cons<eros::type_set::Recurse<_>, eros::type_set::End>>`
 note: required by a bound in `try_recover`
  --> src/error_union.rs
   |
   |     fn try_recover<Target, Other, Index, OtherIndex>(
   |        ----------- required by a bound in this associated function
 ...
-  |         Other::Variants: SupersetOf<Target::Remainder, OtherIndex>;
-  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`
+  |         Other::Variants: WidenFrom<Target::Remainder, OtherIndex>;
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ReshapeUnion::try_recover`
