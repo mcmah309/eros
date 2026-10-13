@@ -5,13 +5,22 @@ use alloc::boxed::Box;
 use core::{any::Any, marker::PhantomData};
 
 impl<E: TypeSet> ErrorUnion<E> {
-    /// Classifies the inner error, wrapping unmatched errors in a named catch-all.
+    /// Classifies implementation errors under an error type meaningful to callers.
     ///
-    /// `Other` must contain `CatchAll`. Matching concrete inner types retain
-    /// their storage. Otherwise, `wrap` receives the boxed inner error exactly
-    /// once and returns the catch-all variant. Only the inner error is checked,
-    /// not its sources or contexts. Context, location, and backtrace are preserved.
-    /// Requires `alloc`.
+    /// `Other` must contain `ClassifiedError`. Concrete types already represented
+    /// in `Other` retain their storage. For other types, `classifier` receives the
+    /// boxed inner error once and produces `ClassifiedError`. This lets an API
+    /// expose selected errors while hiding other implementation error types
+    /// behind a category its callers understand.
+    ///
+    /// Classification also preserves domain identity: an `io::Error` from
+    /// configuration loading can become `ConfigError`, while an `io::Error`
+    /// from a database operation becomes `DatabaseError`. Combining those paths
+    /// retains two distinct categories instead of a shared `io::Error` variant.
+    /// A wrapper can retain the original failure as its source for diagnostics.
+    ///
+    /// Only the inner error is checked, not its sources or contexts. Context,
+    /// location, and backtrace are preserved. Requires `alloc`.
     /// Heap roots reuse their allocation inside the wrapper; inline roots are
     /// boxed. Eros selects inline or boxed storage for the wrapper itself.
     ///
@@ -23,25 +32,25 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// use std::{error::Error, fmt};
     ///
     /// #[derive(Debug)]
-    /// struct DomainError(Box<dyn SendSyncError>);
-    /// impl fmt::Display for DomainError {
+    /// struct ConfigError(Box<dyn SendSyncError>);
+    /// impl fmt::Display for ConfigError {
     ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///         write!(f, "domain operation failed: {}", self.0)
+    ///         write!(f, "configuration failed: {}", self.0)
     ///     }
     /// }
-    /// impl Error for DomainError {
+    /// impl Error for ConfigError {
     ///     fn source(&self) -> Option<&(dyn Error + 'static)> {
     ///         Some(&*self.0)
     ///     }
     /// }
     ///
     /// let error: ErrorUnion = ErrorUnion::new(eros::MsgError::from("failure"));
-    /// let error: ErrorUnion<(fmt::Error, DomainError)> =
-    ///     error.into_typed(DomainError);
-    /// let error: ErrorUnion<(DomainError, std::io::Error, fmt::Error)> = error.widen();
-    /// assert!(error.is_inner::<DomainError>());
+    /// let error: ErrorUnion<(fmt::Error, ConfigError)> =
+    ///     error.classify(ConfigError);
+    /// let error: ErrorUnion<(ConfigError, std::io::Error, fmt::Error)> = error.widen();
+    /// assert!(error.is_inner::<ConfigError>());
     /// // Erasing the set keeps the domain wrapper as the concrete root.
-    /// assert!(error.into_untyped().is_inner::<DomainError>());
+    /// assert!(error.into_untyped().is_inner::<ConfigError>());
     /// ```
     ///
     /// A wrapper constructor is required:
@@ -49,28 +58,28 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// ```compile_fail
     /// let error: eros::ErrorUnion = eros::ErrorUnion::new(std::fmt::Error);
     /// let _: eros::ErrorUnion<(std::fmt::Error, Box<dyn eros::SendSyncError>)> =
-    ///     error.into_typed();
+    ///     error.classify();
     /// ```
     ///
     /// The destination must include the wrapper type:
     ///
     /// ```compile_fail
     /// let error: eros::ErrorUnion = eros::ErrorUnion::new(std::fmt::Error);
-    /// let _: eros::ErrorUnion<(std::fmt::Error,)> = error.into_typed(|_| std::io::Error::other("failure"));
+    /// let _: eros::ErrorUnion<(std::fmt::Error,)> = error.classify(|_| std::io::Error::other("failure"));
     /// ```
-    pub fn into_typed<Other, CatchAll, Index>(
+    pub fn classify<Other, ClassifiedError, Index>(
         self,
-        wrap: impl FnOnce(Box<dyn SendSyncError>) -> CatchAll,
+        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
     ) -> ErrorUnion<Other>
     where
         Other: TypeSet,
-        CatchAll: SendSyncError,
-        Other::Variants: Contains<CatchAll, Index>,
+        ClassifiedError: SendSyncError,
+        Other::Variants: Contains<ClassifiedError, Index>,
     {
         let inner = if Other::Variants::is_fold(self.inner() as &dyn Any) {
             self.inner
         } else {
-            self.map_inner(wrap).inner
+            self.map_inner(classifier).inner
         };
         ErrorUnion {
             inner,
@@ -78,15 +87,15 @@ impl<E: TypeSet> ErrorUnion<E> {
         }
     }
 
-    /// Returns an untyped union, unwrapping a boxed catch-all root if present.
+    /// Returns an untyped union, unwrapping a boxed inner error if present.
     ///
     /// Removes one `Box<dyn SendSyncError>` layer so subsequent downcasts,
     /// narrowing, and recovery see its underlying concrete type. Other roots
     /// are simply erased. Context, location, and backtrace are preserved.
-    /// Unlike `into()` or `any_union()`, this unwraps the catch-all rather than
+    /// Unlike `into()` or `any_union()`, this unwraps a boxed inner error rather than
     /// only erasing the error set. Requires `alloc`.
     /// The underlying error retains its box, even if it could fit inline.
-    /// Named catch-all newtypes from [`Self::into_typed`] remain intact.
+    /// Classified error types from [`Self::classify`] remain intact.
     pub fn into_untyped(self) -> ErrorUnion {
         if self.is_inner::<Box<dyn SendSyncError>>() {
             // SAFETY: the concrete root type was checked above.

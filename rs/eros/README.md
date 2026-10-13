@@ -8,7 +8,7 @@
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
 [<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std)
 
-**Typed or untyped errors, with ergonomic propagation and no enum boilerplate.** Eros lets each API specify its possible error types or use a catch-all result. Callers can handle specific error types and attach context as errors move through the call stack. Both approaches work in libraries and applications.
+**Typed or untyped errors, with ergonomic propagation and no enum boilerplate.** Eros lets each API specify its possible error types or leave them untyped. Callers can handle specific error types and attach context as errors move through the call stack. Both approaches work in libraries and applications.
 
 Choose the signature that fits your API:
 
@@ -199,8 +199,10 @@ To convert the whole result directly, use `.any_union()`.
 ### Handling A Type Along An Otherwise Untyped Path
 
 In a mostly untyped codebase, keep returning `eros::Result<T>` until a path
-needs to explicitly track an error type. Use `into_typed(PortConfigError)` to
-classify the inner error.
+needs to explicitly track an error type. Use `classify(PortConfigError)` to
+keep the types callers handle explicitly and classify implementation errors
+as `PortConfigError`. Downstream signatures describe the categories callers
+care about without exposing every error type used inside the implementation.
 
 Here the service uses port 8080 when no port is configured or port 0 would let
 the OS choose one. Malformed numbers still fail. The untyped loader can produce
@@ -231,7 +233,7 @@ fn load_port(contents: &str) -> eros::Result<u16> {
 fn checked_port(contents: &str)
     -> eros::Result<u16, (MissingPort, DynamicPortNotAllowed, PortConfigError)>
 {
-    let port = load_port(contents).into_typed(PortConfigError)?;
+    let port = load_port(contents).classify(PortConfigError)?;
     eros::ensure!(port != 0, DynamicPortNotAllowed);
     Ok(port)
 }
@@ -245,24 +247,25 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
     remaining.into_untyped()
 }
 
-assert_eq!(port_or_default("9000").unwrap(), 9000);
-assert_eq!(port_or_default("").unwrap(), 8080);
-assert_eq!(port_or_default("0").unwrap(), 8080);
-assert!(port_or_default("invalid").unwrap_err().is_inner::<PortConfigError>());
 ```
 
-`into_typed` checks only the concrete inner error, not its sources or contexts.
+`classify` checks only the concrete inner error, not its sources or contexts.
 Matching types, including an existing `PortConfigError`, retain their storage and
 pass through without invoking the constructor. Otherwise, the constructor
 receives the boxed inner error once. Heap roots reuse their allocation inside
 the wrapper; inline roots are boxed. Eros selects storage for the wrapper
 according to its size and alignment. All diagnostics are preserved.
 
-Use `widen` to merge paths into a combined set such as
-`(MissingPort, DynamicPortNotAllowed, PortConfigError, DatabaseError)`.
-The named wrappers remain distinct, so callers can recover each domain separately. Paths using the same
-wrapper type can share one variant. Use `recover`, `try_recover`, or `narrow`
-where the explicit types are handled.
+Classification also keeps errors from different domains distinct. An
+`io::Error` while reading configuration and an `io::Error` while connecting to
+a database have the same concrete type, but callers may need to handle them
+differently. Classify them at their respective boundaries as `PortConfigError`
+and `DatabaseError` before combining the paths with `widen`. The combined set
+can be `(MissingPort, DynamicPortNotAllowed, PortConfigError, DatabaseError)`:
+recovering a configuration failure then leaves database failures untouched.
+The original errors can remain inside the wrappers as sources for diagnostics.
+Paths intentionally using the same category can share one variant. Use
+`recover`, `try_recover`, or `narrow` where those categories are handled.
 
 `into_untyped` returns to `eros::Result<T>` while preserving the named wrapper
 as the concrete root. Later callers can still downcast or recover

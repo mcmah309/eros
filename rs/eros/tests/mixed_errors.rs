@@ -12,21 +12,21 @@ use std::{
 };
 
 #[derive(Debug, thiserror::Error)]
-#[error("domain failed: {0}")]
-struct DomainError(#[source] Box<dyn SendSyncError>);
+#[error("configuration failed: {0}")]
+struct ConfigError(#[source] Box<dyn SendSyncError>);
 
 #[derive(Debug, thiserror::Error)]
-#[error("other domain failed: {0}")]
-struct OtherDomainError(#[source] Box<dyn SendSyncError>);
+#[error("database failed: {0}")]
+struct DatabaseError(#[source] Box<dyn SendSyncError>);
 
 #[test]
-fn custom_catch_all_runs_once_only_for_unmatched_errors() {
-    type Domain = (fmt::Error, DomainError);
+fn classifier_runs_once_only_for_implementation_errors() {
+    type Domain = (fmt::Error, ConfigError);
     let inputs: [eros::Result<String>; 4] = [
         Ok(String::from("success")),
         Err(ErrorUnion::new(fmt::Error)),
         Err(ErrorUnion::new(MsgError::from("failure"))),
-        Err(ErrorUnion::new(DomainError(Box::new(MsgError::from(
+        Err(ErrorUnion::new(ConfigError(Box::new(MsgError::from(
             "already wrapped",
         ))))),
     ];
@@ -38,10 +38,10 @@ fn custom_catch_all_runs_once_only_for_unmatched_errors() {
         let mut calls = 0;
         // Moving a captured String makes this wrapper FnOnce, not FnMut.
         let capture = String::from("captured");
-        let mixed: eros::Result<String, Domain> = result.into_typed(|boxed| {
+        let mixed: eros::Result<String, Domain> = result.classify(|boxed| {
             drop(capture);
             calls += 1;
-            DomainError(boxed)
+            ConfigError(boxed)
         });
         assert_eq!(calls, usize::from(index == 2));
         match index {
@@ -53,7 +53,7 @@ fn custom_catch_all_runs_once_only_for_unmatched_errors() {
             2 => assert_eq!(
                 mixed
                     .unwrap_err()
-                    .narrow::<DomainError, _>()
+                    .narrow::<ConfigError, _>()
                     .unwrap()
                     .0
                     .to_string(),
@@ -66,7 +66,7 @@ fn custom_catch_all_runs_once_only_for_unmatched_errors() {
 
 #[test]
 fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
-    type Combined = (fmt::Error, DomainError, OtherDomainError);
+    type Combined = (fmt::Error, ConfigError, DatabaseError);
     let inputs: [ErrorUnion; 2] = [
         ErrorUnion::new(io::Error::other("first path")),
         ErrorUnion::new(io::Error::other("second path")),
@@ -82,10 +82,10 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
         let root = common::identity(error.inner());
         let error: ErrorUnion<Combined> = match index {
             0 => error
-                .into_typed::<(fmt::Error, DomainError), _, _>(DomainError)
+                .classify::<(fmt::Error, ConfigError), _, _>(ConfigError)
                 .widen(),
             1 => error
-                .into_typed::<(OtherDomainError, fmt::Error), _, _>(OtherDomainError)
+                .classify::<(DatabaseError, fmt::Error), _, _>(DatabaseError)
                 .widen(),
             _ => unreachable!(),
         };
@@ -104,14 +104,14 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
         let error = error.into_untyped();
         match index {
             0 => {
-                let error = error.narrow::<DomainError, _>().unwrap();
+                let error = error.narrow::<ConfigError, _>().unwrap();
                 assert_eq!(common::identity(&*error.0), root);
                 assert_eq!(error.0.to_string(), "first path");
             }
             1 => {
-                assert!(error.is_inner::<OtherDomainError>());
-                let error = error.narrow::<DomainError, _>().unwrap_err();
-                let error = error.narrow::<OtherDomainError, _>().unwrap();
+                assert!(error.is_inner::<DatabaseError>());
+                let error = error.narrow::<ConfigError, _>().unwrap_err();
+                let error = error.narrow::<DatabaseError, _>().unwrap();
                 assert_eq!(common::identity(&*error.0), root);
                 assert_eq!(error.0.to_string(), "second path");
             }
@@ -121,8 +121,67 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
 }
 
 #[test]
+fn identical_io_errors_recover_separately_after_classification_and_merging() {
+    type Errors = (ConfigError, DatabaseError);
+    for configuration in [true, false] {
+        // Both operations fail with exactly the same implementation error.
+        let error: ErrorUnion = ErrorUnion::new(io::Error::from(io::ErrorKind::PermissionDenied));
+        let classified: ErrorUnion<Errors> = if configuration {
+            error.classify::<(ConfigError,), _, _>(ConfigError).widen()
+        } else {
+            error
+                .classify::<(DatabaseError,), _, _>(DatabaseError)
+                .widen()
+        };
+        let result: eros::Result<&str, Errors> = Err(classified);
+        let mut configuration_calls = 0;
+        let mut database_calls = 0;
+        let operation = result
+            .recover::<ConfigError, _>(|error| {
+                configuration_calls += 1;
+                assert_eq!(
+                    error
+                        .0
+                        .as_ref()
+                        .as_any()
+                        .downcast_ref::<io::Error>()
+                        .unwrap()
+                        .kind(),
+                    io::ErrorKind::PermissionDenied
+                );
+                "configuration"
+            })
+            .recover::<DatabaseError, _>(|error| {
+                database_calls += 1;
+                assert_eq!(
+                    error
+                        .0
+                        .as_ref()
+                        .as_any()
+                        .downcast_ref::<io::Error>()
+                        .unwrap()
+                        .kind(),
+                    io::ErrorKind::PermissionDenied
+                );
+                "database"
+            })
+            .into_value();
+        assert_eq!(configuration_calls, usize::from(configuration));
+        assert_eq!(database_calls, usize::from(!configuration));
+        assert_eq!(
+            operation,
+            if configuration {
+                "configuration"
+            } else {
+                "database"
+            }
+        );
+    }
+}
+
+#[test]
 fn result_recovery_handles_only_the_explicit_type() {
-    type Errors = (fmt::Error, DomainError);
+    type Errors = (fmt::Error, ConfigError);
     let inputs: [eros::Result<String>; 3] = [
         Ok(String::from("success")),
         Err(ErrorUnion::new(fmt::Error)),
@@ -130,9 +189,9 @@ fn result_recovery_handles_only_the_explicit_type() {
     ];
     for (index, result) in inputs.into_iter().enumerate() {
         let success = result.as_ref().ok().map(|value| value.as_ptr());
-        let mixed: eros::Result<String, Errors> = result.into_typed(DomainError);
+        let mixed: eros::Result<String, Errors> = result.classify(ConfigError);
         let mut calls = 0;
-        let remainder: eros::Result<String, (DomainError,)> =
+        let remainder: eros::Result<String, (ConfigError,)> =
             mixed.recover::<fmt::Error, _>(|_| {
                 calls += 1;
                 String::from("recovered")
@@ -149,7 +208,7 @@ fn result_recovery_handles_only_the_explicit_type() {
             2 => assert_eq!(
                 result
                     .unwrap_err()
-                    .narrow::<DomainError, _>()
+                    .narrow::<ConfigError, _>()
                     .unwrap()
                     .0
                     .to_string(),
@@ -269,17 +328,17 @@ fn source_chains_and_subsequent_classification_still_work() {
     }
     let error = restored(SourceError(MsgError::from("source")));
     assert_eq!(error.source().unwrap().to_string(), "source");
-    let error: ErrorUnion<(SourceError, DomainError)> = error.into_typed(DomainError);
+    let error: ErrorUnion<(SourceError, ConfigError)> = error.classify(ConfigError);
     assert!(error.is_inner::<SourceError>());
     let error = error.narrow::<(SourceError,), _>().unwrap();
     assert_eq!(error.into_single().to_string(), "root");
 
     let error: ErrorUnion = ErrorUnion::new(SourceError(MsgError::from("source")));
-    let error = error.into_typed::<(MsgError, DomainError), _, _>(DomainError);
-    assert!(error.is_inner::<DomainError>());
+    let error = error.classify::<(MsgError, ConfigError), _, _>(ConfigError);
+    assert!(error.is_inner::<ConfigError>());
     let context: Box<dyn SendSyncError> = Box::new(fmt::Error);
     let error: ErrorUnion = ErrorUnion::new(MsgError::from("root"));
     let error = error.context(context);
-    let error = error.into_typed::<(fmt::Error, DomainError), _, _>(DomainError);
-    assert!(error.is_inner::<DomainError>());
+    let error = error.classify::<(fmt::Error, ConfigError), _, _>(ConfigError);
+    assert!(error.is_inner::<ConfigError>());
 }

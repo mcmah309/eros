@@ -637,21 +637,21 @@ pub trait ReshapeUnion<S, E>
 where
     E: TypeSet,
 {
-    /// Classifies errors using a constructor or closure for a named catch-all.
+    /// Classifies implementation errors into a category meaningful to callers.
     ///
     /// Successful values and matching error types pass through without calling
-    /// the wrapper. See [`ErrorUnion::into_typed`]. Requires `alloc`.
+    /// the classifier. See [`ErrorUnion::classify`]. Requires `alloc`.
     #[cfg(feature = "alloc")]
-    fn into_typed<Other, CatchAll, Index>(
+    fn classify<Other, ClassifiedError, Index>(
         self,
-        wrap: impl FnOnce(Box<dyn SendSyncError>) -> CatchAll,
+        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
-        CatchAll: SendSyncError,
-        Other::Variants: Contains<CatchAll, Index>;
+        ClassifiedError: SendSyncError,
+        Other::Variants: Contains<ClassifiedError, Index>;
 
-    /// Erases the error set and unwraps a boxed catch-all root if present.
+    /// Erases the error set and unwraps a boxed inner error if present.
     ///
     /// Successful values pass through unchanged. See [`ErrorUnion::into_untyped`].
     /// Requires `alloc`.
@@ -818,16 +818,16 @@ where
     E: TypeSet,
 {
     #[cfg(feature = "alloc")]
-    fn into_typed<Other, CatchAll, Index>(
+    fn classify<Other, ClassifiedError, Index>(
         self,
-        wrap: impl FnOnce(Box<dyn SendSyncError>) -> CatchAll,
+        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
-        CatchAll: SendSyncError,
-        Other::Variants: Contains<CatchAll, Index>,
+        ClassifiedError: SendSyncError,
+        Other::Variants: Contains<ClassifiedError, Index>,
     {
-        self.map_err(|error| error.into_typed::<Other, CatchAll, Index>(wrap))
+        self.map_err(|error| error.classify::<Other, ClassifiedError, Index>(classifier))
     }
 
     #[cfg(feature = "alloc")]
