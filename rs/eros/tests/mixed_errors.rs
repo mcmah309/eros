@@ -2,7 +2,7 @@
 
 mod common;
 
-use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{Erase, ErrorUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::{
     fmt, io,
     sync::{
@@ -101,7 +101,7 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
                 .collect::<Vec<_>>(),
             contexts
         );
-        let error = error.into_untyped();
+        let error = error.erase();
         match index {
             0 => {
                 let error = error.narrow::<ConfigError, _>().unwrap();
@@ -197,7 +197,7 @@ fn result_recovery_handles_only_the_explicit_type() {
                 String::from("recovered")
             });
         assert_eq!(calls, usize::from(index == 1));
-        let result: eros::Result<String> = remainder.into_untyped();
+        let result: eros::Result<String> = remainder.erase();
         match index {
             0 => {
                 let value = result.unwrap();
@@ -220,27 +220,47 @@ fn result_recovery_handles_only_the_explicit_type() {
 }
 
 #[test]
-fn untyped_conversion_unwraps_one_box_layer() {
+fn erasure_preserves_boxes_and_diagnostics_without_unwrapping() {
+    type Boxed = (Box<dyn SendSyncError>,);
+    for as_result in [false, true] {
+        for nested in [false, true] {
+            let boxed: Box<dyn SendSyncError> = Box::new(fmt::Error);
+            let boxed: Box<dyn SendSyncError> = if nested { Box::new(boxed) } else { boxed };
+            let error: ErrorUnion<Boxed> = ErrorUnion::new(boxed);
+            let error = error.context("operation");
+            let root = common::identity(error.inner());
+            let contents = common::identity(error.as_single().as_ref());
+            let report = format!("{error:?}");
+            #[cfg(feature = "diagnostic")]
+            let diagnostic = error.to_debug_json();
+            let error = if as_result {
+                let result: eros::Result<(), Boxed> = Err(error);
+                result.erase().erase().unwrap_err()
+            } else {
+                error.erase().erase()
+            };
+            assert_eq!(common::identity(error.inner()), root);
+            assert_eq!(format!("{error:?}"), report);
+            #[cfg(feature = "diagnostic")]
+            assert_eq!(error.to_debug_json(), diagnostic);
+            // Erasing cannot expose the contained error for direct recovery.
+            let error = error.narrow::<fmt::Error, _>().unwrap_err();
+            let boxed = error.downcast_inner::<Box<dyn SendSyncError>>().unwrap();
+            assert_eq!(common::identity(boxed.as_ref()), contents);
+            assert_eq!(
+                boxed.as_ref().as_any().is::<Box<dyn SendSyncError>>(),
+                nested
+            );
+        }
+    }
     let boxed: Box<dyn SendSyncError> = Box::new(fmt::Error);
-    let error: ErrorUnion = ErrorUnion::new(boxed);
-    let error = error.into_untyped();
-    assert_eq!(error.downcast_inner::<fmt::Error>().unwrap(), fmt::Error);
-
-    let inner: Box<dyn SendSyncError> = Box::new(fmt::Error);
-    let outer: Box<dyn SendSyncError> = Box::new(inner);
-    let error: ErrorUnion<(Box<dyn SendSyncError>,)> = ErrorUnion::new(outer);
-    let error = error.into_untyped();
+    let error = Err::<(), _>(boxed).erase().unwrap_err();
     assert!(error.is_inner::<Box<dyn SendSyncError>>());
-    assert_eq!(
-        error.into_untyped().downcast_inner::<fmt::Error>().unwrap(),
-        fmt::Error
-    );
 }
 
-fn restored<T: SendSyncError>(value: T) -> ErrorUnion {
-    let boxed: Box<dyn SendSyncError> = Box::new(value);
-    let error: ErrorUnion = ErrorUnion::new(boxed);
-    error.into_untyped()
+fn erased<T: SendSyncError>(value: T) -> ErrorUnion {
+    let error: ErrorUnion<(T,)> = ErrorUnion::new(value);
+    error.erase()
 }
 
 #[derive(Debug)]
@@ -259,11 +279,11 @@ impl Drop for Tracked {
 }
 
 #[test]
-fn dynamic_roots_support_borrows_mutation_extraction_and_drop() {
-    // Exercise dynamic extraction for zero-sized, inline-sized, and aligned
+fn erased_roots_support_borrows_mutation_extraction_and_drop() {
+    // Exercise erased roots for zero-sized, inline-sized, and aligned
     // heap roots, including unchecked extraction after a typed group selection.
     assert_eq!(
-        restored(fmt::Error)
+        erased(fmt::Error)
             .narrow::<(fmt::Error,), _>()
             .unwrap()
             .into_single(),
@@ -277,10 +297,10 @@ fn dynamic_roots_support_borrows_mutation_extraction_and_drop() {
         }
     }
     impl std::error::Error for Status {}
-    let mut status = restored(Status(7));
+    let mut status = erased(Status(7));
     status.downcast_inner_mut::<Status>().unwrap().0 = 8;
     assert_eq!(status.downcast_inner::<Status>().unwrap().0, 8);
-    let mut error = restored(MsgError::from("before"));
+    let mut error = erased(MsgError::from("before"));
     let first = error.downcast_inner_ref::<MsgError>().unwrap();
     let second = error.downcast_inner_ref::<MsgError>().unwrap();
     assert!(std::ptr::eq(first, second));
@@ -289,7 +309,7 @@ fn dynamic_roots_support_borrows_mutation_extraction_and_drop() {
 
     for operation in 0..4 {
         let drops = Arc::new(AtomicUsize::new(0));
-        let error = restored(Tracked(drops.clone()));
+        let error = erased(Tracked(drops.clone()));
         assert_eq!(drops.load(Ordering::SeqCst), 0);
         match operation {
             0 => drop(error),
@@ -326,7 +346,7 @@ fn source_chains_and_subsequent_classification_still_work() {
             Some(&self.0)
         }
     }
-    let error = restored(SourceError(MsgError::from("source")));
+    let error = erased(SourceError(MsgError::from("source")));
     assert_eq!(error.source().unwrap().to_string(), "source");
     let error: ErrorUnion<(SourceError, ConfigError)> = error.classify(ConfigError);
     assert!(error.is_inner::<SourceError>());

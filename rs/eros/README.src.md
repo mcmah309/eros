@@ -232,7 +232,7 @@ fn untyped_operation() -> eros::Result<()> {
 # assert!(untyped_operation().unwrap_err().is_inner::<std::fmt::Error>());
 ```
 
-To convert the whole result directly, use `.any_union()`.
+To convert the whole result directly, use `.erase()` with `use eros::Erase;`.
 
 ### Handling A Type Along An Otherwise Untyped Path
 
@@ -249,7 +249,7 @@ the OS choose one. Malformed numbers still fail. The untyped loader can produce
 ```rust
 # #[cfg(feature = "alloc")]
 # fn main() {
-use eros::{ReshapeUnion, SendSyncError};
+use eros::{Erase, ReshapeUnion, SendSyncError};
 
 #[derive(Debug, thiserror::Error)]
 #[error("no port configured")]
@@ -284,7 +284,7 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
             eprintln!("No fixed port configured: {error:?}; using 8080");
             8080
         });
-    remaining.into_untyped()
+    remaining.erase()
 }
 
 # assert_eq!(port_or_default("9000").unwrap(), 9000);
@@ -314,11 +314,12 @@ The original errors can remain inside the wrappers as sources for diagnostics.
 Paths intentionally using the same category can share one variant. Use
 `recover`, `try_recover`, or `narrow` where those categories are handled.
 
-`into_untyped` returns to `eros::Result<T>` while preserving the named wrapper
-as the concrete root. Later callers can still downcast or recover
-`PortConfigError`. Plain `into()` and `any_union()` also erase the tuple and retain
-the wrapper. These conversions preserve context, location, and backtrace, and
-are also available directly on `ErrorUnion`.
+`erase()` returns to `eros::Result<T>` while preserving the concrete root,
+including its boxes and domain wrappers. Later callers can still downcast or
+recover `PortConfigError`. Only the static error set changes; context, location,
+and backtrace remain intact. The method is also available directly on
+`ErrorUnion`. Plain `into()` and `?` perform the same type erasure when converting
+a typed union into an untyped one.
 
 ### Adding Context As Errors Propagate
 
@@ -1031,7 +1032,7 @@ Instead, construct a user-facing message from two sources:
 ```rust
 # #[cfg(feature = "user_context")]
 # fn main() {
-use eros::{Context, ErrorUnion, IntoAnyUnion, SendSyncError, TypeSet};
+use eros::{Context, ErrorUnion, Erase, SendSyncError, TypeSet};
 
 #[derive(Debug)]
 struct SystemDiskError;
@@ -1086,14 +1087,14 @@ fn validate_password(password: &str) -> eros::Result<()> {
             .context("Password validation failed")
             // This context is marked as "user facing" meaning it is safe to expose to the user
             .user_context("Please choose a stronger password.")
-            .any_union();
+            .erase();
     }
     Ok(())
 }
 fn load_configuration() -> eros::Result<()> {
     Err(SystemDiskError)
         .context("Failed to read configuration from /etc/my-app/config.toml")
-        .any_union()
+        .erase()
 }
 fn main() {
     let password_error = validate_password("123").unwrap_err();
@@ -1409,7 +1410,7 @@ size_of::<T>() == 0 || align_of::<T>() <= align_of::<usize>()
 Example:
 ```rust
 use core::{error::Error, fmt};
-use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion};
+use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
 
 #[derive(Debug)]
 struct Timeout;
@@ -1444,7 +1445,7 @@ fn read(ready: bool, status: u8) -> eros::Result<(), (Timeout, Status)> {
     Ok(())
 }
 
-let error = read(true, 7).any_union().unwrap_err();
+let error = read(true, 7).erase().unwrap_err();
 assert_eq!(error.narrow::<Status, _>().unwrap().0, 7);
 
 let recovered = read(false, 0).recover::<Timeout, _>(|_| ());

@@ -233,9 +233,9 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_eq(user_ctxs.len(), 1)?;
     assert_eq_str(&user_ctxs[0], "Please choose a stronger password.")?;
 
-    let r: Result<(), ErrorUnion<AnyError>> = Err(NotEnoughMemory).any_union();
+    let r: Result<(), ErrorUnion<AnyError>> = Err(NotEnoughMemory).erase();
     let union = r.unwrap_err();
-    assert_type::<NotEnoughMemory>(union.inner(), "any_union preserves type")?;
+    assert_type::<NotEnoughMemory>(union.inner(), "erase preserves type")?;
 
     let u: ErrorUnion<(NotEnoughMemory,)> = ErrorUnion::new(NotEnoughMemory);
     let mapped: ErrorUnion<(Timeout,)> = u.map_single(|NotEnoughMemory| Timeout);

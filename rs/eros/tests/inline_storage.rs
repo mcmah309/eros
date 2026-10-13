@@ -105,7 +105,7 @@ fn inline_mutable_references_remain_valid_after_moves_and_downcasts() {
 mod allocation_checks {
     #[cfg(feature = "alloc")]
     use eros::SendSyncError;
-    use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion};
+    use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
     use std::{
         alloc::{GlobalAlloc, Layout, System},
         cell::Cell,
@@ -167,7 +167,7 @@ mod allocation_checks {
     fn small_roots_and_composing_operations_do_not_allocate() {
         let counts = measured(|| {
             let input: eros::Result<(), (Small, fmt::Error)> = Err(Small(usize::MAX)).union();
-            let erased = input.any_union().unwrap_err();
+            let erased = input.erase().unwrap_err();
             let narrowed = erased.narrow::<(Small,), _>().unwrap();
             assert_eq!(narrowed.as_single().0, usize::MAX);
             let widened: ErrorUnion<(fmt::Error, Small)> = narrowed.widen();
@@ -189,7 +189,7 @@ mod allocation_checks {
                     eros::bail!("message {{text}}");
                 }
                 let result: eros::Result<(), (fmt::Error, eros::MsgError)> = operation().widen();
-                let erased = result.any_union().unwrap_err();
+                let erased = result.erase().unwrap_err();
                 let error = erased.narrow::<(eros::MsgError,), _>().unwrap();
                 assert_eq!(error.as_single().as_str(), "message {text}");
                 drop(error.into_std_error());

@@ -50,7 +50,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// let error: ErrorUnion<(ConfigError, std::io::Error, fmt::Error)> = error.widen();
     /// assert!(error.is_inner::<ConfigError>());
     /// // Erasing the set keeps the domain wrapper as the concrete root.
-    /// assert!(error.into_untyped().is_inner::<ConfigError>());
+    /// assert!(error.erase().is_inner::<ConfigError>());
     /// ```
     ///
     /// A wrapper constructor is required:
@@ -84,31 +84,6 @@ impl<E: TypeSet> ErrorUnion<E> {
         ErrorUnion {
             inner,
             _pd: PhantomData,
-        }
-    }
-
-    /// Returns an untyped union, unwrapping a boxed inner error if present.
-    ///
-    /// Removes one `Box<dyn SendSyncError>` layer so subsequent downcasts,
-    /// narrowing, and recovery see its underlying concrete type. Other roots
-    /// are simply erased. Context, location, and backtrace are preserved.
-    /// Unlike `into()` or `any_union()`, this unwraps a boxed inner error rather than
-    /// only erasing the error set. Requires `alloc`.
-    /// The underlying error retains its box, even if it could fit inline.
-    /// Classified error types from [`Self::classify`] remain intact.
-    pub fn into_untyped(self) -> ErrorUnion {
-        if self.is_inner::<Box<dyn SendSyncError>>() {
-            // SAFETY: the concrete root type was checked above.
-            let parts = unsafe {
-                self.inner
-                    .downcast_error_unchecked_with_parts::<Box<dyn SendSyncError>>()
-            };
-            ErrorUnion {
-                inner: ErrorUnionInner::from_boxed_parts(parts),
-                _pd: PhantomData,
-            }
-        } else {
-            ErrorUnion::erase(self)
         }
     }
 

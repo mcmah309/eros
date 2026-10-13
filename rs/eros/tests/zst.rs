@@ -3,7 +3,7 @@ use core::{any::Any, error::Error, fmt};
 use eros::AnyError;
 #[cfg(not(feature = "context"))]
 use eros::Context;
-use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion};
+use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -81,7 +81,7 @@ fn typed_erased_and_enum_apis_work_with_zero_sized_errors() {
             .into_value(),
         7
     );
-    let erased = Err::<(), _>(Timeout).any_union().unwrap_err();
+    let erased = Err::<(), _>(Timeout).erase().unwrap_err();
     assert_eq!(erased.downcast_inner::<Timeout>().unwrap(), Timeout);
 
     fn validate(valid: bool) -> eros::Result<(), (Timeout,)> {

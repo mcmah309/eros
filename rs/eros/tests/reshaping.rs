@@ -2,7 +2,7 @@
 
 mod common;
 
-use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{ErrorUnion, Erase, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::fmt;
 
 #[eros::error_enum(PairError)]
@@ -369,10 +369,10 @@ fn result_conversions_preserve_success_values_and_error_metadata() {
     let success: Result<String, MsgError> = Ok("typed".into());
     let success: eros::Result<_, Pair> = success.union();
     let success: eros::Result<_, Triple> = success.widen();
-    assert_eq!(success.any_union().unwrap(), "typed");
+    assert_eq!(success.erase().unwrap(), "typed");
 
     let success: Result<String, MsgError> = Ok("erased".into());
-    assert_eq!(success.any_union().unwrap(), "erased");
+    assert_eq!(success.erase().unwrap(), "erased");
 
     let error: eros::Result<(), Pair> = Err(MsgError::from("typed")).union();
     assert!(error.as_ref().unwrap_err().is_inner::<MsgError>());
@@ -380,12 +380,12 @@ fn result_conversions_preserve_success_values_and_error_metadata() {
     let report = format!("{error:?}");
     let result: eros::Result<(), Pair> = Err(error);
     let widened: eros::Result<(), Triple> = result.widen();
-    let erased = widened.any_union().unwrap_err();
+    let erased = widened.erase().unwrap_err();
     assert_eq!(format!("{erased:?}"), report);
     let result: eros::Result<()> = Err(erased);
-    assert_eq!(format!("{:?}", result.any_union().unwrap_err()), report);
+    assert_eq!(format!("{:?}", result.erase().unwrap_err()), report);
 
-    let erased: eros::Result<()> = Err(MsgError::from("erased")).any_union();
+    let erased: eros::Result<()> = Err(MsgError::from("erased")).erase();
     assert_eq!(
         erased
             .unwrap_err()
