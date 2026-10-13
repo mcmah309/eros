@@ -637,6 +637,27 @@ pub trait ReshapeUnion<S, E>
 where
     E: TypeSet,
 {
+    /// Classifies errors using a constructor or closure for a named catch-all.
+    ///
+    /// Successful values and matching error types pass through without calling
+    /// the wrapper. See [`ErrorUnion::into_typed`]. Requires `alloc`.
+    #[cfg(feature = "alloc")]
+    fn into_typed<Other, CatchAll, Index>(
+        self,
+        wrap: impl FnOnce(Box<dyn SendSyncError>) -> CatchAll,
+    ) -> crate::Result<S, Other>
+    where
+        Other: TypeSet,
+        CatchAll: SendSyncError,
+        Other::Variants: Contains<CatchAll, Index>;
+
+    /// Erases the error set and unwraps a boxed catch-all root if present.
+    ///
+    /// Successful values pass through unchanged. See [`ErrorUnion::into_untyped`].
+    /// Requires `alloc`.
+    #[cfg(feature = "alloc")]
+    fn into_untyped(self) -> crate::Result<S>;
+
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
@@ -796,6 +817,24 @@ impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
+    #[cfg(feature = "alloc")]
+    fn into_typed<Other, CatchAll, Index>(
+        self,
+        wrap: impl FnOnce(Box<dyn SendSyncError>) -> CatchAll,
+    ) -> crate::Result<S, Other>
+    where
+        Other: TypeSet,
+        CatchAll: SendSyncError,
+        Other::Variants: Contains<CatchAll, Index>,
+    {
+        self.map_err(|error| error.into_typed::<Other, CatchAll, Index>(wrap))
+    }
+
+    #[cfg(feature = "alloc")]
+    fn into_untyped(self) -> crate::Result<S> {
+        self.map_err(ErrorUnion::into_untyped)
+    }
+
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,

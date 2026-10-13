@@ -32,6 +32,8 @@ struct ErrorOps {
     drop: unsafe fn(*mut MaybeUninit<usize>),
     #[cfg(feature = "alloc")]
     into_box: unsafe fn(*mut MaybeUninit<usize>) -> Box<dyn SendSyncError>,
+    #[cfg(feature = "alloc")]
+    dynamic_box: bool,
 }
 
 struct OpsFor<T>(core::marker::PhantomData<T>);
@@ -41,7 +43,37 @@ impl<T: SendSyncError> OpsFor<T> {
         drop: drop_error::<T>,
         #[cfg(feature = "alloc")]
         into_box: box_error::<T>,
+        #[cfg(feature = "alloc")]
+        dynamic_box: false,
     };
+}
+
+// A dynamically typed root retains its Box, but borrows and downcasts expose
+// the boxed value rather than Box<dyn SendSyncError> as a concrete wrapper.
+#[cfg(feature = "alloc")]
+const DYNAMIC_BOX_OPS: ErrorOps = ErrorOps {
+    pointer: dynamic_box_pointer,
+    drop: drop_error::<Box<dyn SendSyncError>>,
+    into_box: take_dynamic_box,
+    dynamic_box: true,
+};
+
+/// # Safety
+/// The word must own a live Box<dyn SendSyncError> stored by StoredError::new.
+#[cfg(feature = "alloc")]
+unsafe fn dynamic_box_pointer(data: *mut MaybeUninit<usize>) -> *mut dyn SendSyncError {
+    let pointer = unsafe { concrete_pointer::<Box<dyn SendSyncError>>(data) };
+    // SAFETY: the outer box is live and access follows the owner's borrow.
+    unsafe { &raw mut **pointer }
+}
+
+/// # Safety
+/// The caller must exclusively own the live boxed root and suppress its drop.
+#[cfg(feature = "alloc")]
+unsafe fn take_dynamic_box(data: *mut MaybeUninit<usize>) -> Box<dyn SendSyncError> {
+    let pointer = unsafe { concrete_pointer::<Box<dyn SendSyncError>>(data) };
+    // SAFETY: transfer the inner box and free its outer allocation.
+    unsafe { *Box::from_raw(pointer) }
 }
 
 /// # Safety
@@ -167,6 +199,12 @@ impl StoredError {
     #[inline]
     unsafe fn take<T: 'static>(self) -> T {
         debug_assert!((self.error() as &dyn Any).is::<T>());
+        #[cfg(feature = "alloc")]
+        if self.ops.dynamic_box {
+            let pointer = Box::into_raw(self.into_box()).cast::<T>();
+            // SAFETY: the caller guarantees the boxed value is exactly T.
+            return unsafe { *Box::from_raw(pointer) };
+        }
         let owner = ManuallyDrop::new(self);
         let pointer = unsafe { (owner.ops.pointer)(owner.data.get()).cast::<T>() };
         if fits_inline::<T>() {
@@ -230,6 +268,21 @@ pub(crate) struct ErrorParts<T> {
 }
 
 impl ErrorUnionInner {
+    #[cfg(feature = "alloc")]
+    pub(crate) fn from_boxed_parts(parts: ErrorParts<Box<dyn SendSyncError>>) -> Self {
+        let mut error = StoredError::new(parts.error);
+        error.ops = &DYNAMIC_BOX_OPS;
+        Self {
+            error,
+            #[cfg(feature = "backtrace")]
+            backtrace: parts.backtrace,
+            #[cfg(feature = "context")]
+            context: parts.context,
+            #[cfg(feature = "location")]
+            location: parts.location,
+        }
+    }
+
     #[cfg_attr(feature = "location", track_caller)]
     pub(crate) fn new<T: SendSyncError>(value: T) -> Self {
         Self::new_from_parts(

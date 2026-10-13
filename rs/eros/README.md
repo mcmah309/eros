@@ -86,7 +86,9 @@ The above code is precisely typed for what we care about and there was no need t
 
 ### Seamless Transitions Between Error Types
 
-Users should be able to seamlessly transition to and from fully typed errors and handle any cases they care about.
+Users should be able to seamlessly transition to and from fully typed errors and handle any cases they care about. One does not have to make the trade off or decide between untyped or typed code. Choose one or use each where it makes sense, either way eros composes perfectly.
+
+#### Fully Typed
 
 ```rust
 use eros::{IntoUnion, ReshapeUnion};
@@ -116,16 +118,13 @@ fn main() {
 }
 ```
 
-`recover` removes handled error types from the result's error set. Handle a group
-with `.recover::<(io::Error, ParseIntError), _>(|_| 8080)`.
-Successful values and unhandled errors pass through unchanged.
+`recover` removes handled error types from the result's error set. Handle a group with `.recover::<(io::Error, ParseIntError), _>(|_| 8080)`. Successful values and unhandled errors pass through unchanged.
 
-For manual branching, `narrow::<E, _>()` extracts `E` and discards its diagnostics.
-Use `narrow::<(E,), _>()` or `narrow::<(A, B), _>()` to retain diagnostics in a
-smaller union. The unmatched remainder always retains its diagnostics.
+For manual branching, `narrow::<E, _>()` extracts `E` and discards its diagnostics. Use `narrow::<(E,), _>()` or `narrow::<(A, B), _>()` to retain diagnostics in a smaller union. The unmatched remainder always retains its diagnostics.
 
-Untyped APIs can still support typed recovery. For example, use a default when
-a configuration file is missing, while propagating permission and parse errors:
+#### Untyped
+
+Untyped APIs can still support typed recovery. For example, use a default when a configuration file is missing, while propagating permission and parse errors:
 
 ```rust
 use eros::{ErrorUnion, ReshapeUnion};
@@ -147,9 +146,7 @@ fn port_or_default(path: &str) -> eros::Result<u16> {
 }
 ```
 
-The handler receives a typed error with its diagnostics. Other errors remain
-`AnyError`. You can also use `narrow` to select a concrete error or typed group
-from an untyped union or result.
+The handler receives a typed error with its diagnostics. Other errors remain `AnyError`. You can also use `narrow` to select a concrete error or typed group from an untyped union or result.
 
 Use `widen` to add possible error types:
 
@@ -180,7 +177,100 @@ fn main() {
 }
 ```
 
-### Errors Have Context
+### Propagating Typed Errors Through An Untyped API
+
+When callers no longer need the error set, `?` converts it automatically when propagating into `eros::Result<T>`. The concrete error (including any named wrapper) and all diagnostics are preserved.
+
+```rust
+use eros::ErrorUnion;
+
+fn typed_operation() -> eros::Result<(), (std::fmt::Error,)> {
+    Err(ErrorUnion::new(std::fmt::Error))
+}
+
+fn untyped_operation() -> eros::Result<()> {
+    typed_operation()?;
+    Ok(())
+}
+```
+
+To convert the whole result directly, use `.any_union()`.
+
+### Handling A Type Along An Otherwise Untyped Path
+
+In a mostly untyped codebase, keep returning `eros::Result<T>` until a path
+needs to explicitly track an error type. Use `into_typed(PortConfigError)` to
+classify the inner error.
+
+Here the service uses port 8080 when no port is configured or port 0 would let
+the OS choose one. Malformed numbers still fail. The untyped loader can produce
+`MissingPort`, while the typed path introduces `DynamicPortNotAllowed`:
+
+```rust
+use eros::{ReshapeUnion, SendSyncError};
+
+#[derive(Debug, thiserror::Error)]
+#[error("no port configured")]
+struct MissingPort;
+
+#[derive(Debug, thiserror::Error)]
+#[error("port 0 would let the OS choose a port")]
+struct DynamicPortNotAllowed;
+
+#[derive(Debug, thiserror::Error)]
+#[error("configuration failed: {0}")]
+struct PortConfigError(#[source] Box<dyn SendSyncError>);
+
+fn load_port(contents: &str) -> eros::Result<u16> {
+    if contents.trim().is_empty() {
+        eros::bail!(MissingPort);
+    }
+    Ok(contents.trim().parse()?)
+}
+
+fn checked_port(contents: &str)
+    -> eros::Result<u16, (MissingPort, DynamicPortNotAllowed, PortConfigError)>
+{
+    let port = load_port(contents).into_typed(PortConfigError)?;
+    eros::ensure!(port != 0, DynamicPortNotAllowed);
+    Ok(port)
+}
+
+fn port_or_default(contents: &str) -> eros::Result<u16> {
+    let remaining: eros::Result<u16, (PortConfigError,)> =
+        checked_port(contents).recover::<(MissingPort, DynamicPortNotAllowed), _>(|error| {
+            eprintln!("No fixed port configured: {error:?}; using 8080");
+            8080
+        });
+    remaining.into_untyped()
+}
+
+assert_eq!(port_or_default("9000").unwrap(), 9000);
+assert_eq!(port_or_default("").unwrap(), 8080);
+assert_eq!(port_or_default("0").unwrap(), 8080);
+assert!(port_or_default("invalid").unwrap_err().is_inner::<PortConfigError>());
+```
+
+`into_typed` checks only the concrete inner error, not its sources or contexts.
+Matching types, including an existing `PortConfigError`, retain their storage and
+pass through without invoking the constructor. Otherwise, the constructor
+receives the boxed inner error once. Heap roots reuse their allocation inside
+the wrapper; inline roots are boxed. Eros selects storage for the wrapper
+according to its size and alignment. All diagnostics are preserved.
+
+Use `widen` to merge paths into a combined set such as
+`(MissingPort, DynamicPortNotAllowed, PortConfigError, DatabaseError)`.
+The named wrappers remain distinct, so callers can recover each domain separately. Paths using the same
+wrapper type can share one variant. Use `recover`, `try_recover`, or `narrow`
+where the explicit types are handled.
+
+`into_untyped` returns to `eros::Result<T>` while preserving the named wrapper
+as the concrete root. Later callers can still downcast or recover
+`PortConfigError`. Plain `into()` and `any_union()` also erase the tuple and retain
+the wrapper. These conversions preserve context, location, and backtrace, and
+are also available directly on `ErrorUnion`.
+
+### Adding Context As Errors Propagate
 
 Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
@@ -227,7 +317,7 @@ Backtrace (captured):
 
 The `location` feature flag adds a location at compile time for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments) and no_std environments.
 
-### Optimizations
+### Reducing Error Handling Overhead
 
 Eros comes with the `context` and `backtrace` feature flags enabled by default. Disabling them removes backtrace and context tracking from `ErrorUnion<T>`, and all context methods become a no-op. Thus, it may be optimized away by the compiler.
 
@@ -1168,7 +1258,7 @@ messages in a `no_std` environment with a global allocator:
 
 Small roots still use inline storage; larger or more aligned roots automatically
 use a `Box`. Allocation behavior and diagnostic costs are described in
-[Optimizations](#optimizations).
+[Reducing Error Handling Overhead](#reducing-error-handling-overhead).
 
 The `location` feature works with or without `alloc` and adds a location reference
 without allocating. The `std`, `context`, and `diagnostic` features enable
