@@ -29,16 +29,21 @@ trybuild = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 serde_json = "1"
+err_trail = { version = "0.11", features = ["tracing"] }
+thiserror = "2"
 
 [features]
 # Libraries should consider disabling these defaults, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
-default = ["context", "backtrace"]
+# Keep alloc enabled separately if errors exceed the inline capacity.
+default = ["alloc", "context", "backtrace"]
+# Enables heap fallback for errors exceeding one word, and owned messages.
+alloc = []
 # Enables the `std` library. Required for `backtrace` and `anyhow` features. When disabled,
-# `eros` is `no_std` (but still requires `alloc` for `Box`/`Vec`/`String` etc.).
-std = []
+# `eros` is `no_std`. Without alloc, errors must fit the inline size/alignment.
+std = ["alloc"]
 # Enables context
-context = ["eros-macros/context"]
+context = ["alloc", "eros-macros/context"]
 # Enables backtrace
 backtrace = ["std"]
 # Parses and removes the unnecessary noise from the backtrace before printing
@@ -50,4 +55,4 @@ anyhow = ["std", "dep:anyhow"]
 # Adds context methods that are user facing. Useful for applications reporting error messages to users.
 user_context = ["context"]
 # Exposes to_display_json()/to_debug_json() as structured JSON values.
-diagnostic = ["dep:serde_json"]
+diagnostic = ["alloc", "dep:serde_json"]

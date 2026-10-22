@@ -1,6 +1,7 @@
+#[cfg(any(feature = "backtrace", feature = "diagnostic"))]
+use alloc::string::String;
 #[cfg(feature = "backtrace")]
 use alloc::string::ToString;
-use alloc::{format, string::String};
 use core::{error::Error, fmt};
 
 use crate::SendSyncError;
@@ -80,22 +81,27 @@ impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
 
     pub(crate) fn debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let detailed = !f.alternate();
-        write_lines(f, "", "", &format!("{}", self.root))?;
+        write_lines(f, format_args!(""), 0, self.root)?;
         #[cfg(feature = "location")]
         if detailed {
             write!(f, "\n  [{}]", self.location)?;
         }
         for source in self.sources() {
-            write_lines(f, "\n  caused by: ", "             ", &format!("{source}"))?;
+            write_lines(f, format_args!("\n  caused by: "), 13, source)?;
         }
         #[cfg(feature = "context")]
         if !self.contexts.is_empty() {
             f.write_str("\n\n  Context (innermost first):")?;
             for (index, context) in self.contexts.iter().enumerate() {
-                let prefix = format!("    {}. ", index + 1);
-                let continuation = " ".repeat(prefix.len());
                 f.write_str("\n")?;
-                write_lines(f, &prefix, &continuation, &format!("{}", context.context))?;
+                let number = index + 1;
+                let continuation = 6 + number.ilog10() as usize + 1;
+                write_lines(
+                    f,
+                    format_args!("    {number}. "),
+                    continuation,
+                    &context.context,
+                )?;
                 #[cfg(feature = "location")]
                 if detailed {
                     write!(f, "\n    [{}]", context.location)?;
@@ -110,6 +116,7 @@ impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
                 status
             };
             write!(f, "\n\nBacktrace ({label}):")?;
+            #[cfg(feature = "backtrace")]
             if let Some(text) = self.backtrace_text() {
                 write!(f, "\n{text}")?;
             }
@@ -132,6 +139,7 @@ impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
         "feature_disabled"
     }
 
+    #[cfg(any(feature = "backtrace", feature = "diagnostic"))]
     pub(crate) fn backtrace_text(&self) -> Option<String> {
         #[cfg(feature = "backtrace")]
         if self.backtrace_status() == "captured" {
@@ -147,16 +155,88 @@ impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
 
 fn write_lines(
     f: &mut fmt::Formatter<'_>,
-    prefix: &str,
-    continuation: &str,
-    text: &str,
+    prefix: fmt::Arguments<'_>,
+    continuation: usize,
+    value: &(impl fmt::Display + ?Sized),
 ) -> fmt::Result {
-    let mut lines = text.lines();
-    write!(f, "{prefix}{}", lines.next().unwrap_or_default())?;
-    for line in lines {
-        write!(f, "\n{continuation}{line}")?;
+    f.write_fmt(prefix)?;
+    let mut writer = LineWriter {
+        formatter: f,
+        continuation,
+        pending_newline: false,
+        pending_cr: false,
+    };
+    fmt::write(&mut writer, format_args!("{value}"))?;
+    // A lone final CR is content. A trailing LF (including CRLF) is discarded,
+    // matching str::lines(), even when the error writes in separate chunks.
+    if writer.pending_cr {
+        writer.write_content("\r")?;
     }
     Ok(())
+}
+
+struct LineWriter<'a, 'b> {
+    formatter: &'a mut fmt::Formatter<'b>,
+    continuation: usize,
+    pending_newline: bool,
+    pending_cr: bool,
+}
+
+impl LineWriter<'_, '_> {
+    fn write_content(&mut self, text: &str) -> fmt::Result {
+        if self.pending_newline {
+            self.formatter.write_str("\n")?;
+            for _ in 0..self.continuation {
+                self.formatter.write_str(" ")?;
+            }
+            self.pending_newline = false;
+        }
+        self.formatter.write_str(text)
+    }
+}
+
+impl fmt::Write for LineWriter<'_, '_> {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        let mut start = 0;
+        for (index, character) in text
+            .char_indices()
+            .filter(|(_, ch)| matches!(ch, '\r' | '\n'))
+        {
+            if start < index {
+                if self.pending_cr {
+                    self.pending_cr = false;
+                    self.write_content("\r")?;
+                }
+                self.write_content(&text[start..index])?;
+            }
+            if self.pending_cr {
+                self.pending_cr = false;
+                if character != '\n' {
+                    self.write_content("\r")?;
+                }
+            }
+            match character {
+                '\r' => self.pending_cr = true,
+                '\n' => {
+                    // Consecutive newlines preserve intermediate empty lines.
+                    if self.pending_newline {
+                        self.write_content("")?;
+                    }
+                    self.pending_newline = true;
+                }
+                _ => unreachable!(),
+            }
+            start = index + 1;
+        }
+        if start < text.len() {
+            if self.pending_cr {
+                self.pending_cr = false;
+                self.write_content("\r")?;
+            }
+            self.write_content(&text[start..])?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(feature = "better_backtrace")]
@@ -214,5 +294,58 @@ mod tests {
                 .contains("formatting::tests::better_backtrace_removes_color_backtrace_banner"),
             "the application frame must remain: {formatted}"
         );
+    }
+}
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+
+    struct Fragmented<'a> {
+        text: &'a str,
+        split: usize,
+    }
+    impl fmt::Display for Fragmented<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(&self.text[..self.split])?;
+            f.write_str("")?;
+            f.write_str(&self.text[self.split..])
+        }
+    }
+    struct Indented<'a>(Fragmented<'a>);
+    impl fmt::Display for Indented<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write_lines(f, format_args!("prefix: "), 8, &self.0)
+        }
+    }
+
+    #[test]
+    fn multiline_output_matches_lines_for_every_chunk_boundary() {
+        for text in [
+            "",
+            "\n",
+            "\r",
+            "\r\n",
+            "\n\n",
+            "a\n",
+            "a\r\n",
+            "a\rb\r",
+            "a\n\nb",
+            "\nfirst\nlast\n",
+            "é\r\n🦀\nend",
+        ] {
+            let mut lines = text.lines();
+            let mut expected = std::format!("prefix: {}", lines.next().unwrap_or_default());
+            for line in lines {
+                expected.push_str("\n        ");
+                expected.push_str(line);
+            }
+            for split in 0..=text.len() {
+                if text.is_char_boundary(split) {
+                    let actual = std::format!("{}", Indented(Fragmented { text, split }));
+                    assert_eq!(actual, expected, "text={text:?}, split={split}");
+                }
+            }
+        }
     }
 }
