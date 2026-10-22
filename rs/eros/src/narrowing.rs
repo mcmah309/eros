@@ -40,7 +40,7 @@ where
     fn split(
         error: ErrorUnion<E>,
     ) -> Result<Self::Output, ErrorUnion<<Self::Remainder as TupleForm>::Tuple>> {
-        if error.inner.is_error::<Target>() {
+        if error.inner.is_error_type::<Target>() {
             // SAFETY: The stored error's concrete type was checked above.
             Ok(unsafe { error.inner.downcast_error_unchecked::<Target>() })
         } else {

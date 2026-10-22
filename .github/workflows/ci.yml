@@ -69,7 +69,7 @@ jobs:
           components: miri
           override: true
 
-      - name: Run Miri tests
+      - name: Run full Miri suites in debug and release
         env:
           RUSTFLAGS: "--cfg test_in_ci"
           # Formatting a captured std backtrace reads the working directory.
@@ -79,6 +79,8 @@ jobs:
         run: |
           cargo +nightly miri test -p eros
           cargo +nightly miri test -p eros --no-default-features
+          cargo +nightly miri test -p eros --release
+          cargo +nightly miri test -p eros --release --no-default-features
 
   no-std:
     runs-on: ubuntu-latest

@@ -26,6 +26,9 @@ impl Drop for Tracked {
     }
 }
 
+#[eros::error_enum(TrackedError)]
+type TrackedSet = (Tracked,);
+
 fn tracked(drops: &Arc<AtomicUsize>) -> Tracked {
     Tracked {
         payload: vec![1, 2, 3],
@@ -33,7 +36,7 @@ fn tracked(drops: &Arc<AtomicUsize>) -> Tracked {
     }
 }
 
-fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<(Tracked,)> {
+fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<TrackedSet> {
     let error: ErrorUnion<(Tracked,)> = ErrorUnion::new(tracked(root));
     let context: Box<dyn SendSyncError> = Box::new(tracked(context));
     error.context(ContextValue::from(context))
@@ -94,7 +97,7 @@ fn owned_extraction_moves_the_root_and_drops_metadata_exactly_once() {
         |error: ErrorUnion<(Tracked,)>| error.narrow::<Tracked, _>().unwrap(),
         |error: ErrorUnion<(Tracked,)>| error.downcast_inner::<Tracked>().unwrap(),
         |error: ErrorUnion<(Tracked,)>| {
-            let eros::E1::A(value) = error.into_enum();
+            let TrackedError::Tracked(value) = TrackedError::from(error);
             value
         },
     ] {
@@ -133,6 +136,47 @@ fn recover_keeps_the_error_alive_in_the_handler_and_drops_it_once_on_unwind() {
     assert_eq!(context.load(Ordering::SeqCst), 1);
 }
 
+#[cfg(feature = "context")]
+#[test]
+fn extraction_frees_the_container_when_context_drop_panics() {
+    #[derive(Debug)]
+    struct PanickingContext;
+
+    impl fmt::Display for PanickingContext {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("panicking context")
+        }
+    }
+
+    impl std::error::Error for PanickingContext {}
+
+    impl Drop for PanickingContext {
+        fn drop(&mut self) {
+            panic!("context drop");
+        }
+    }
+
+    for extract in [
+        |error: ErrorUnion<(Tracked,)>| drop(error.into_single()),
+        |error: ErrorUnion<(Tracked,)>| drop(error.into_inner()),
+    ] {
+        let root = Arc::new(AtomicUsize::new(0));
+        let context = Arc::new(AtomicUsize::new(0));
+        let panicking: Box<dyn SendSyncError> = Box::new(PanickingContext);
+        let trailing: Box<dyn SendSyncError> = Box::new(tracked(&context));
+        let error: ErrorUnion<(Tracked,)> = ErrorUnion::new(tracked(&root));
+        let error = error.context(panicking).context(trailing);
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract(error)));
+        assert_eq!(
+            outcome.unwrap_err().downcast_ref::<&str>(),
+            Some(&"context drop")
+        );
+        assert_eq!(root.load(Ordering::SeqCst), 1);
+        assert_eq!(context.load(Ordering::SeqCst), 1);
+        // Miri additionally checks that the outer allocation is freed.
+    }
+}
+
 #[test]
 fn union_and_widen_move_the_error_without_dropping_it() {
     let root = Arc::new(AtomicUsize::new(0));
@@ -143,7 +187,11 @@ fn union_and_widen_move_the_error_without_dropping_it() {
     let error: ErrorUnion<(Tracked, fmt::Error)> = result.unwrap_err().widen();
     assert_eq!(root.load(Ordering::SeqCst), 0);
     assert_eq!(
-        error.downcast_inner_ref::<Tracked>().unwrap().payload.as_ptr(),
+        error
+            .downcast_inner_ref::<Tracked>()
+            .unwrap()
+            .payload
+            .as_ptr(),
         original
     );
     drop(error);
@@ -196,8 +244,8 @@ fn try_recover_drops_original_metadata_and_transfers_fallback_ownership() {
         let fallback = union(&fallback_root, &fallback_context);
         let result: eros::Result<Tracked, (fmt::Error, Tracked)> =
             Err(union(&root, &context).widen());
-        let result: eros::Result<Tracked, (Tracked, fmt::Error)> =
-            result.try_recover::<Tracked, _, _, _>(|error| {
+        let result: eros::Result<Tracked, (Tracked, fmt::Error)> = result
+            .try_recover::<Tracked, _, _, _>(|error| {
                 assert_eq!(error.payload, [1, 2, 3]);
                 assert_eq!(root.load(Ordering::SeqCst), 0);
                 if succeeds {
@@ -413,14 +461,14 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
     let adapter_address = &*adapter as *const dyn SendSyncError as *const ();
 
     // Even a matching payload cannot change the adapter's original set parameter.
-    let adapter = ErrorUnion::<(Tracked,)>::try_from_dyn_error(adapter).unwrap_err();
-    let adapter = ErrorUnion::<(fmt::Error,)>::try_from_dyn_error(adapter).unwrap_err();
-    let adapter = ErrorUnion::<()>::try_from_dyn_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<(Tracked,)>::try_from_boxed_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<(fmt::Error,)>::try_from_boxed_error(adapter).unwrap_err();
+    let adapter = ErrorUnion::<()>::try_from_boxed_error(adapter).unwrap_err();
     assert_eq!(
         &*adapter as *const dyn SendSyncError as *const (),
         adapter_address
     );
-    let error = ErrorUnion::<AnyError>::try_from_dyn_error(adapter).unwrap();
+    let error = ErrorUnion::<AnyError>::try_from_boxed_error(adapter).unwrap();
     assert_eq!(
         error.inner() as *const dyn SendSyncError as *const (),
         original
@@ -439,8 +487,8 @@ fn typed_adapter_recovery_requires_its_original_set() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
     let adapter = Box::new(union(&root, &context).into_std_error());
-    let adapter = ErrorUnion::<AnyError>::try_from_dyn_error(adapter).unwrap_err();
-    let error = ErrorUnion::<(Tracked,)>::try_from_dyn_error(adapter).unwrap();
+    let adapter = ErrorUnion::<AnyError>::try_from_boxed_error(adapter).unwrap_err();
+    let error = ErrorUnion::<(Tracked,)>::try_from_boxed_error(adapter).unwrap();
     // This path uses the singleton's unchecked extraction, so the set must be exact.
     let value = error.into_single();
     assert_eq!(value.payload, [1, 2, 3]);

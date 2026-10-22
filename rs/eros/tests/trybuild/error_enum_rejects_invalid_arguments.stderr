@@ -1,0 +1,29 @@
+error: expected string literal
+ --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:1:33
+  |
+1 | #[eros::error_enum(CustomError, 123)]
+  |                                 ^^^
+
+error: expected `,`
+ --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:4:32
+  |
+4 | #[eros::error_enum(CustomError "message")]
+  |                                ^^^^^^^^^
+
+error: expected identifier
+ --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:7:20
+  |
+7 | #[eros::error_enum("message", CustomError)]
+  |                    ^^^^^^^^^
+
+error: unexpected token
+  --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:10:44
+   |
+10 | #[eros::error_enum(CustomError, "message", "extra")]
+   |                                            ^^^^^^^
+
+error: generated enum name must differ from the tuple alias name
+  --> tests/trybuild/error_enum_rejects_invalid_arguments.rs:13:20
+   |
+13 | #[eros::error_enum(SameName)]
+   |                    ^^^^^^^^

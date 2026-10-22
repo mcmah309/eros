@@ -19,7 +19,7 @@ impl<T> std::error::Error for Callback<T> {}
 
 // A function accepting any lifetime can normally coerce to one accepting only
 // 'static, but that changes its TypeId. ErrorUnion must forbid that coercion:
-// into_enum() would miss the stored Callback and read it as FromUtf8Error.
+// An enum conversion could miss the stored Callback and read it as FromUtf8Error.
 fn coerce(
     error: ErrorUnion<(Callback<fn(&())>, FromUtf8Error)>,
 ) -> ErrorUnion<(Callback<fn(&'static ())>, FromUtf8Error)> {

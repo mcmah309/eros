@@ -107,7 +107,7 @@ macro_rules! check_target {
                         assert_eq!(calls, usize::from(index == $matches));
                         if index == $matches {
                             if fails {
-                                assert!(matches!(result.unwrap_err().into_enum(), eros::E3::A(_)));
+                                assert!(result.unwrap_err().is_inner::<ParseIntError>());
                             } else {
                                 let value = result.unwrap();
                                 assert_eq!(value, "recovered");

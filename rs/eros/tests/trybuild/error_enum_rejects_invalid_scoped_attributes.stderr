@@ -1,0 +1,35 @@
+error: expected string literal
+ --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:2:33
+  |
+2 | #[eros::error_enum_ref(BareRef, derive(Clone))]
+  |                                 ^^^^^^
+
+error: expected an enum macro with a name in parentheses
+ --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:6:1
+  |
+6 | #[eros::error_enum_mut = "non_exhaustive"]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected string literal
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:10:39
+   |
+10 | #[eros::error_enum_mut(UnexpectedMut, non_exhaustive)]
+   |                                       ^^^^^^^^^^^^^^
+
+error: error_enum_ref overlaps an enum already requested on this tuple alias
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:14:1
+   |
+14 | #[eros::error_enum_ref(SecondRef)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: error_enum_mut overlaps an enum already requested on this tuple alias
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:18:1
+   |
+18 | #[eros::error_enum_mut(SecondMut)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: error_enum overlaps an enum already requested on this tuple alias
+  --> tests/trybuild/error_enum_rejects_invalid_scoped_attributes.rs:22:1
+   |
+22 | #[eros::error_enum(SecondOwned)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

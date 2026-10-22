@@ -102,13 +102,11 @@ fn generic_context_error_to_traced_error_union() {
     fn yeet_regular_into_union_multiple_explicit()
     -> Result<(), eros::ErrorUnion<(std::sync::mpsc::RecvError, std::io::Error, std::fmt::Error)>>
     {
-        // yeet_a_regular()?; // todo ideally this should work
         yeet_a_regular().union()?;
         Ok(())
     }
 
     fn yeet_widen_union() -> Result<(), eros::ErrorUnion<(std::fmt::Error, std::io::Error)>> {
-        // yeet_regular_into_union_explicit()?; // todo ideally this should work
         yeet_regular_into_union_explicit().widen()?;
         Ok(())
     }
@@ -166,7 +164,6 @@ fn ensure() {
 #[test]
 fn absent_value_error() {
     fn func1() -> eros::Result<()> {
-        // None.context("This value should be some").into() // todo ideally this should work
         None.context("This value should be some").any_union()
     }
 

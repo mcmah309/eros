@@ -212,7 +212,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert_eq!(format!("{native:?}"), expected_debug);
     assert_eq!(format!("{native:#?}"), expected_alternate_debug);
 
-    let recovered = ErrorUnion::<(NativeError,)>::try_from_dyn_error(native).unwrap();
+    let recovered = ErrorUnion::<(NativeError,)>::try_from_boxed_error(native).unwrap();
     assert!(recovered.is_inner::<NativeError>());
     assert_eq!(recovered.to_string(), expected_display);
     assert_eq!(format!("{recovered:?}"), expected_debug);
