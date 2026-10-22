@@ -1,0 +1,20 @@
+[package]
+name = "eros-no-alloc-test"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Verifies Eros in a freestanding executable without an allocator."
+
+[dependencies]
+eros = { path = "../eros", default-features = false }
+
+[features]
+location = ["eros/location"]
+freestanding = []
+
+[[bin]]
+name = "no-allocator"
+path = "src/main.rs"
+test = false
+bench = false
+required-features = ["freestanding"]

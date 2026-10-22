@@ -1,4 +1,8 @@
-use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError};
+#![cfg(feature = "alloc")]
+
+mod common;
+
+use eros::{ErrorUnion, MsgError, ReshapeUnion};
 use std::{fmt, io, num::ParseIntError};
 
 type Input = (MsgError, fmt::Error, io::Error);
@@ -12,8 +16,8 @@ fn inputs() -> [eros::Result<String, Input>; 4] {
     ]
 }
 
-fn address<E: eros::TypeSet>(error: &ErrorUnion<E>) -> *const () {
-    error.inner() as *const dyn SendSyncError as *const ()
+fn address<E: eros::TypeSet>(error: &ErrorUnion<E>) -> common::Identity {
+    common::identity(error.inner())
 }
 
 // Check each possible input against a target at the beginning, middle, and end.

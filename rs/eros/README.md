@@ -1,16 +1,18 @@
+<!-- Generated from rs/eros/README.src.md by scripts/update-readme.sh. Edit the source, then run the script. -->
+
 # eros
 
 [<img alt="github" src="https://img.shields.io/badge/github-mcmah309/eros-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/mcmah309/eros)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/eros.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/eros)
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
 [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
-[<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std-support)
+[<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std)
 
 **Typed or untyped errors, with ergonomic propagation and no enum boilerplate.** Eros lets each API specify its possible error types or use a catch-all result. Callers can handle specific error types and attach context as errors move through the call stack. Both approaches work in libraries and applications.
 
 Choose the signature that fits your API:
 
-```rust,ignore
+```rust
 // Propagate errors without their types.
 fn load_config() -> eros::Result<Config>
 
@@ -229,7 +231,9 @@ The `location` feature flag adds a location at compile time for error creation a
 
 Eros comes with the `context` and `backtrace` feature flags enabled by default. Disabling them removes backtrace and context tracking from `ErrorUnion<T>`, and all context methods become a no-op. Thus, it may be optimized away by the compiler.
 
-`ErrorUnion`'s stack size is pointer size (uses a `Box`). Boxing errors is a common trick to increase performance and decrease stack memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
+Eros stores each root error in two pointer-sized words: one word holds the payload or a thin heap pointer, and the other points to static, type-specific operations for borrowing, dropping, and boxed extraction. The size of tuple of possible error types adds no storage. Widening, narrowing, and erasing a union's type set reuse its existing storage.
+
+Errors fitting one word with at most `usize` alignment are stored inline, with no allocation. Zero-sized errors, including unit structs, also need no allocation and support arbitrary alignment. With `alloc` enabled, larger or more aligned errors automatically use a `Box`; these optimizations happen at compile time and without `alloc`, constructing them fails at compile time. The storage choice depends on the concrete type's size and alignment, so the compiler can eliminate this branch for each type. Boxing errors is a common trick to increase performance and decrease stack memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
 
 See the [Use In Libraries](#use-in-libraries) section as well.
 
@@ -391,7 +395,7 @@ fn main() {
 
 The generated context is equivalent to:
 
-```rust,ignore
+```rust
 format!(
     "name: {}\nflags: {:?}\n",
     name,
@@ -407,7 +411,7 @@ Only annotated parameters are included in the generated context. Parameters with
 
 `eros`'s flexibility and optimizations make it the perfect option for both libraries and binaries.
 
-*Libraries should consider setting `default-features = false` on their `eros` dependency* and allowing downstream crates to enable the features they need. The library can enable these features for its own tests.
+*Libraries should consider setting `default-features = false` on their `eros` dependency* and allowing downstream crates to enable the diagnostic features they need. Keep `features = ["alloc"]` enabled if the library stores errors exceeding one pointer-sized word or its alignment; smaller errors use inline storage in either mode. The library can enable diagnostic features for its own tests.
 
 #### Public APIs
 
@@ -462,7 +466,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is effectively just a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the existing allocation (no-op) so there is no cost to use `eros` in a library for any downstreams.
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
 
 For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
@@ -595,7 +599,7 @@ For logging, [`err_trail`](https://github.com/mcmah309/err_trail) is recommended
 
 The `ErrContext` trait in `err_trail` also provides methods like `.warn(())`, which logs an `Err` using `Display` and returns the result unchanged:
 
-```rust,ignore
+```rust
 use eros::bail;
 use err_trail::ErrContext;
 
@@ -708,7 +712,7 @@ For a union with a single possible error type, `as_single` and `as_single_mut` b
 
 The optional `diagnostic` feature adds `.to_display_json()` and `.to_debug_json()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
 
-```rust,ignore
+```rust
 // ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
 // Both expose their boxed `source` through Error::source().
 
@@ -767,7 +771,7 @@ Instead, construct a user-facing message from two sources:
 
 <summary>Example Implementation</summary>
 
-```rust,ignore
+```rust
 use eros::{Context, ErrorUnion, IntoAnyUnion, SendSyncError, TypeSet};
 
 #[derive(Debug)]
@@ -832,7 +836,6 @@ fn load_configuration() -> eros::Result<()> {
         .context("Failed to read configuration from /etc/my-app/config.toml")
         .any_union()
 }
-#[test]
 fn main() {
     let password_error = validate_password("123").unwrap_err();
     println!("User message:");
@@ -866,7 +869,7 @@ This approach keeps internal diagnostics while making the user-facing experience
 
 `anyhow` and `eros` give context different roles. In `anyhow`, each `.context(...)` call adds an outer layer to the error chain. The latest context becomes the main message, while earlier contexts and the original error remain as causes. As an error travels through its callers, this presents the outermost operation first.
 
-```rust,ignore
+```rust
 let error = anyhow::anyhow!("TLS certificate has expired")
     .context("fetch https://updates.example.com/manifest.json")
     .context("prepare application update to v2.4.0");
@@ -884,7 +887,7 @@ Caused by:
 
 `eros` keeps the original error as the main message and presents context separately, in the order it was added. As the error travels up the call stack, context follows stack trace order: nearest the failure first, then outward through its callers:
 
-```rust,ignore
+```rust
 let error = eros::error!("TLS certificate has expired")
     .context("fetch https://updates.example.com/manifest.json")
     .context("prepare application update to v2.4.0");
@@ -910,9 +913,10 @@ Traditional enum-based error handling breaks down as soon as you compose functio
 
 ### The Problem
 
-Suppose three low-level functions each return a precise error enum:
+Suppose three low-level functions each return a precise error enum. The function
+bodies below are placeholders; the example is compiled but not executed:
 
-```rust
+```rust,no_run
 use std::io;
 use std::num::ParseIntError;
 use std::net::AddrParseError;
@@ -941,7 +945,7 @@ fn open_socket(_port: u16) -> Result<(), NetworkError> { todo!() }
 
 To chain them in `initialize_system`, a precise return type requires a *fourth* enum wrapping the other three — plus a `From` impl for each, just to make `?` work:
 
-```rust,ignore
+```rust
 #[derive(Debug)]
 pub enum InitError {
     Read(ReadError),
@@ -969,7 +973,7 @@ fn initialize_system() -> Result<(), InitError> {
 
 Note that `io::Error` is now buried two levels deep in two different places (`InitError::Read(ReadError::Io(_))` and `InitError::Net(NetworkError::Io(_))`), so callers who just want to handle IO errors have to match both paths:
 
-```rust,ignore
+```rust
 match initialize_system() {
     Ok(()) => println!("Success!"),
     Err(InitError::Read(ReadError::Io(_))) => { /* handle */ }
@@ -984,7 +988,7 @@ Add a fourth step that returns a `DatabaseError` and the cycle repeats: a new en
 
 Faced with this growth, most crates abandon precision entirely and adopt one monolithic, crate-wide error enum:
 
-```rust,ignore
+```rust
 #[derive(Debug, thiserror::Error)]
 pub enum CrateError {
     #[error("IO error: {0}")]
@@ -1004,7 +1008,7 @@ This kills the boilerplate, but it also kills accuracy: every function now claim
 
 `ErrorUnion` sidesteps the dilemma entirely. No new enum is needed to combine errors, so precision and ergonomics stop being a trade-off.
 
-```rust,ignore
+```rust
 type MyError = (io::Error, ParseIntError, AddrParseError);
 
 fn initialize_system() -> eros::Result<(), MyError> {
@@ -1019,9 +1023,159 @@ The signature stays exact — only the errors that can actually occur are listed
 
 ## no_std
 
-This crate supports `#![no_std]`, but requires `alloc`.
+Eros supports `#![no_std]` with or without a global allocator. Disable default
+features to use and enable the other features such as `alloc` as needed.
 
-Default features also must be disabled and a global allocator available. The `backtrace` feature does not work with no std, but backtrace can be replaced with the `location` feature which does.
+### Without an allocator
+
+Each concrete error must implement `core::error::Error + Send + Sync + 'static`
+and fit the inline storage:
+
+```text
+size_of::<T>() <= size_of::<usize>()
+size_of::<T>() == 0 || align_of::<T>() <= align_of::<usize>()
+```
+Example:
+```rust
+use core::{error::Error, fmt};
+use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion};
+
+#[derive(Debug)]
+struct Timeout;
+impl fmt::Display for Timeout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("operation timed out")
+    }
+}
+impl Error for Timeout {}
+
+#[derive(Debug)]
+struct Status(u8);
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "device status {}", self.0)
+    }
+}
+impl Error for Status {}
+
+fn poll(ready: bool) -> eros::Result<(), (Timeout,)> {
+    if !ready {
+        eros::bail!(Timeout);
+    }
+    Ok(())
+}
+
+fn read(ready: bool, status: u8) -> eros::Result<(), (Timeout, Status)> {
+    poll(ready).widen()?;
+    if status != 0 {
+        return Err(Status(status)).union();
+    }
+    Ok(())
+}
+
+let error = read(true, 7).any_union().unwrap_err();
+assert_eq!(error.narrow::<Status, _>().unwrap().0, 7);
+
+let recovered = read(false, 0).recover::<Timeout, _>(|_| ());
+assert!(recovered.is_ok()); // Status is still a possible error.
+```
+
+### Static message errors
+
+Literal messages in `error!`, `bail!`, and `ensure!` work without `alloc`. The
+macro creates a static string descriptor, and the no-`alloc` `MsgError` stores
+a thin `&'static &'static str` pointing to it:
+
+```rust
+use eros::{ErrorUnion, MsgError};
+
+fn validate(ready: bool) -> eros::Result<(), (MsgError,)> {
+    eros::ensure!(ready, "device is not ready");
+    eros::bail!("operation failed");
+}
+
+assert_eq!(validate(false).unwrap_err().into_single().as_str(), "device is not ready");
+assert_eq!(validate(true).unwrap_err().into_single().as_str(), "operation failed");
+
+let message = eros::error!("unexpected {{status}}");
+assert_eq!(message.downcast_inner::<MsgError>().unwrap().as_str(), "unexpected {status}");
+
+static MESSAGE: &str = "device disconnected";
+let error: ErrorUnion<(MsgError,)> =
+    ErrorUnion::new(MsgError::from_static_ref(&MESSAGE));
+assert_eq!(error.into_single().as_str(), MESSAGE);
+```
+
+Escape literal braces as `{{` and `}}`, as with formatting macros.
+`MsgError::from_static_ref` accepts a reference to a **static descriptor**; a
+local variable holding a static string is insufficient.
+
+### What requires `alloc`
+
+A `&'static str` itself occupies two words: a data pointer and a length. An error
+containing that field exceeds the inline capacity even though its text is
+static. This example is rejected with `alloc` disabled:
+
+```rust,ignore
+#[derive(Debug)]
+struct Message(&'static str);
+impl core::fmt::Display for Message {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+impl core::error::Error for Message {}
+
+// Compile-time error: T must fit in one pointer-sized word.
+let _: eros::ErrorUnion<(Message,)> = eros::ErrorUnion::new(Message("failed"));
+```
+
+Use the literal macros, `MsgError::from_static_ref`, a unit error whose `Display`
+writes static text, or a thin reference to a static error struct instead.
+For the `Message` type above, store the whole error in a `static` and pass a
+reference to it. The stored type becomes `&'static Message`, which occupies one
+word even though `Message` itself occupies two:
+
+```rust
+static MESSAGE: Message = Message("message");
+let error: eros::ErrorUnion<(&'static Message,)> = eros::ErrorUnion::new(&MESSAGE);
+assert!(core::ptr::eq(error.into_single(), &MESSAGE));
+```
+
+Declaring a static does not change the size of `Message`; passing its reference
+is what makes it fit. For this type, `ErrorUnion::new(&Message("message"))` also
+works because Rust promotes the borrowed constant expression to static storage.
+
+Payloads such as `[usize; 2]` and non-zero-sized types aligned beyond `usize`
+also exceed the capacity. Eros checks size and alignment at compile time when
+the constructor is instantiated.
+
+Runtime formatting requires `alloc`, including implicit format captures. These
+examples are rejected with `alloc` disabled:
+
+```rust,ignore
+fn operation(code: u8) -> eros::Result<()> {
+    eros::bail!("device status {code}"); // Implicit capture needs formatting.
+}
+
+let _ = eros::error!("device status {}", 7); // Explicit arguments need formatting.
+```
+
+### With an allocator
+
+Enable `alloc` to use arbitrary-sized errors and owned or runtime-formatted
+messages in a `no_std` environment with a global allocator:
+
+Small roots still use inline storage; larger or more aligned roots automatically
+use a `Box`. Allocation behavior and diagnostic costs are described in
+[Optimizations](#optimizations).
+
+The `location` feature works with or without `alloc` and adds a location reference
+without allocating. The `std`, `context`, and `diagnostic` features enable
+`alloc` automatically. `backtrace` requires `std`. With `context` disabled,
+static string contexts remain accepted as no-ops and lazy context closures are
+not evaluated. Default features enable `alloc`, context, and backtraces, so keep
+them disabled for an environment without an allocator.
 
 ## Special Thanks
 
