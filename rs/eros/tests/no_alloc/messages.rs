@@ -4,7 +4,7 @@ use core::{
     fmt::{self, Write},
     hash::{Hash, Hasher},
 };
-use eros::{ErrorUnion, IntoAnyUnion, MsgError, ReshapeUnion};
+use eros::{ErrorUnion, Erase, MsgError, ReshapeUnion};
 
 #[eros::error_enum(Owned)]
 #[eros::error_enum_ref(Shared)]
@@ -111,7 +111,7 @@ pub fn message_errors_compose_with_other_errors_and_generated_enums() {
         eros::bail!("original");
     }
     let result: eros::Result<(), Messages> = operation().widen();
-    let erased = result.any_union().unwrap_err();
+    let erased = result.erase().unwrap_err();
     let mut error = erased.narrow::<Messages, _>().unwrap();
     assert!(matches!(Shared::from(&error), Shared::Msg(message) if message.as_str() == "original"));
     static REPLACEMENT: &str = "replacement";

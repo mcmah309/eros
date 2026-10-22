@@ -1,8 +1,92 @@
 use crate::storage::ErrorUnionInner;
+use crate::type_set::{Contains, IsFold};
 use crate::{ErrorUnion, SendSyncError, TypeSet};
 use alloc::boxed::Box;
+use core::{any::Any, marker::PhantomData};
 
 impl<E: TypeSet> ErrorUnion<E> {
+    /// Classifies implementation errors under an error type meaningful to callers.
+    ///
+    /// `Other` must contain `ClassifiedError`. Concrete types already represented
+    /// in `Other` retain their storage. For other types, `classifier` receives the
+    /// boxed inner error once and produces `ClassifiedError`. This lets an API
+    /// expose selected errors while hiding other implementation error types
+    /// behind a category its callers understand.
+    ///
+    /// Classification also preserves domain identity: an `io::Error` from
+    /// configuration loading can become `ConfigError`, while an `io::Error`
+    /// from a database operation becomes `DatabaseError`. Combining those paths
+    /// retains two distinct categories instead of a shared `io::Error` variant.
+    /// A wrapper can retain the original failure as its source for diagnostics.
+    ///
+    /// Only the inner error is checked, not its sources or contexts. Context,
+    /// location, and backtrace are preserved. Requires `alloc`.
+    /// Heap roots reuse their allocation inside the wrapper; inline roots are
+    /// boxed. Eros selects inline or boxed storage for the wrapper itself.
+    ///
+    /// Pass a tuple struct constructor to distinguish errors from one domain
+    /// when combining paths. No `From` implementation is required:
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, SendSyncError};
+    /// use std::{error::Error, fmt};
+    ///
+    /// #[derive(Debug)]
+    /// struct ConfigError(Box<dyn SendSyncError>);
+    /// impl fmt::Display for ConfigError {
+    ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///         write!(f, "configuration failed: {}", self.0)
+    ///     }
+    /// }
+    /// impl Error for ConfigError {
+    ///     fn source(&self) -> Option<&(dyn Error + 'static)> {
+    ///         Some(&*self.0)
+    ///     }
+    /// }
+    ///
+    /// let error: ErrorUnion = ErrorUnion::new(eros::MsgError::from("failure"));
+    /// let error: ErrorUnion<(fmt::Error, ConfigError)> =
+    ///     error.classify(ConfigError);
+    /// let error: ErrorUnion<(ConfigError, std::io::Error, fmt::Error)> = error.widen();
+    /// assert!(error.is_inner::<ConfigError>());
+    /// // Erasing the set keeps the domain wrapper as the concrete root.
+    /// assert!(error.erase().is_inner::<ConfigError>());
+    /// ```
+    ///
+    /// A wrapper constructor is required:
+    ///
+    /// ```compile_fail
+    /// let error: eros::ErrorUnion = eros::ErrorUnion::new(std::fmt::Error);
+    /// let _: eros::ErrorUnion<(std::fmt::Error, Box<dyn eros::SendSyncError>)> =
+    ///     error.classify();
+    /// ```
+    ///
+    /// The destination must include the wrapper type:
+    ///
+    /// ```compile_fail
+    /// let error: eros::ErrorUnion = eros::ErrorUnion::new(std::fmt::Error);
+    /// let _: eros::ErrorUnion<(std::fmt::Error,)> = error.classify(|_| std::io::Error::other("failure"));
+    /// ```
+    pub fn classify<Other, ClassifiedError, Index>(
+        self,
+        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+    ) -> ErrorUnion<Other>
+    where
+        Other: TypeSet,
+        ClassifiedError: SendSyncError,
+        Other::Variants: Contains<ClassifiedError, Index>,
+    {
+        let inner = if Other::Variants::is_fold(self.inner() as &dyn Any) {
+            self.inner
+        } else {
+            self.map_inner(classifier).inner
+        };
+        ErrorUnion {
+            inner,
+            _pd: PhantomData,
+        }
+    }
+
     /// Replaces the inner error, passing ownership of the old boxed error to a closure.
     ///
     /// The closure runs once, receives the previous inner error, and returns the new

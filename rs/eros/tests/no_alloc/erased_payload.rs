@@ -1,4 +1,4 @@
-use eros::IntoAnyUnion;
+use eros::Erase;
 
 #[derive(Debug)]
 struct Payload([usize; 2]);
@@ -10,5 +10,5 @@ impl core::fmt::Display for Payload {
 impl core::error::Error for Payload {}
 
 fn main() {
-    let _: eros::Result<()> = Err(Payload([1, 2])).any_union();
+    let _: eros::Result<()> = Err(Payload([1, 2])).erase();
 }

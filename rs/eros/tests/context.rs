@@ -3,7 +3,7 @@
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
 use eros::{
-    AbsentValueError, AnyError, Context, ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion, error,
+    AbsentValueError, AnyError, Context, ErrorUnion, Erase, IntoUnion, ReshapeUnion, error,
 };
 
 #[test]
@@ -166,7 +166,7 @@ fn ensure() {
 #[test]
 fn absent_value_error() {
     fn func1() -> eros::Result<()> {
-        None.context("This value should be some").any_union()
+        None.context("This value should be some").erase()
     }
 
     let result = func1().context("Some context");
@@ -185,9 +185,9 @@ fn nesting_traced_dyn_calls() {
     fn func2() -> eros::Result<()> {
         func1()
             .context("One") // creates union
-            .any_union() // should not nest it
+            .erase() // should not nest it
             .context("Two")
-            .any_union() // should not nest it
+            .erase() // should not nest it
             .context("Three")
     }
 

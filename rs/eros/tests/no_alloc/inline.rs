@@ -3,7 +3,7 @@ use core::{
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion};
+use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
 
 #[derive(Debug, PartialEq, Eq)]
 struct Code(u32);
@@ -40,7 +40,7 @@ pub fn inline_values_survive_mutation_moving_reshaping_and_enum_extraction() {
         Mutable::Code(code) => code.0 += 1,
         _ => panic!("wrong variant"),
     }
-    let erased = Err::<(), _>(code).any_union().any_union().unwrap_err();
+    let erased = Err::<(), _>(code).erase().erase().unwrap_err();
     let erased = erased.downcast_inner::<u64>().unwrap_err();
     let selected = erased.narrow::<(Padded, Code), _>().unwrap();
     assert_eq!(selected.downcast_inner_ref::<Code>().unwrap().0, 18);

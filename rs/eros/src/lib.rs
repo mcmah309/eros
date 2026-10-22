@@ -97,6 +97,6 @@ pub use type_set::TypeSet;
 
 // traits
 pub use context::Context;
-pub use error_union::IntoAnyUnion;
+pub use error_union::Erase;
 pub use error_union::IntoUnion;
 pub use error_union::ReshapeUnion;

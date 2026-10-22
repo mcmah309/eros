@@ -1,5 +1,5 @@
 use core::{error::Error, fmt, fmt::Write};
-use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, ReshapeUnion, SendSyncError, TypeSet};
+use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion, SendSyncError, TypeSet};
 
 macro_rules! unit_error {
     ($name:ident, $message:literal) => {
@@ -306,12 +306,12 @@ pub fn fallible_chain_replaces_reintroduces_maps_and_recovers() {
 }
 
 #[cfg_attr(test, test)]
-pub fn any_union_handles_plain_typed_and_already_erased_results() {
+pub fn erase_handles_plain_typed_and_already_erased_results() {
     let plain = [
-        Err::<u8, _>(Connect).any_union(),
-        Err::<u8, _>(Read).any_union(),
-        Err::<u8, _>(Decode).any_union(),
-        Err::<u8, _>(Validate).any_union(),
+        Err::<u8, _>(Connect).erase(),
+        Err::<u8, _>(Read).erase(),
+        Err::<u8, _>(Decode).erase(),
+        Err::<u8, _>(Validate).erase(),
     ];
     for (index, result) in plain.into_iter().enumerate() {
         assert_variant(&result.unwrap_err(), index);
@@ -319,15 +319,15 @@ pub fn any_union_handles_plain_typed_and_already_erased_results() {
     for (index, error) in errors().into_iter().enumerate() {
         let snapshot = Snapshot::new(&error);
         let typed: eros::Result<u8, All> = Err(error);
-        let error = typed.any_union().any_union().unwrap_err();
+        let error = typed.erase().erase().unwrap_err();
         snapshot.assert_preserved(&error);
         assert_variant(&error, index);
         // Erasing a union must preserve its root rather than wrap an adapter.
         assert!(error.inner().source().is_none());
     }
-    assert_eq!(Ok::<u8, Connect>(13).any_union().unwrap(), 13);
+    assert_eq!(Ok::<u8, Connect>(13).erase().unwrap(), 13);
     let success: eros::Result<u8, All> = Ok(13);
-    assert_eq!(success.any_union().any_union().unwrap(), 13);
+    assert_eq!(success.erase().erase().unwrap(), 13);
 }
 
 #[cfg_attr(test, test)]
@@ -361,7 +361,7 @@ pub fn erased_narrow_can_recover_a_typed_set_then_erase_again() {
 #[cfg_attr(test, test)]
 pub fn erased_result_narrow_and_recovery_route_every_variant() {
     for mode in 0..=4 {
-        let result = pipeline(mode).any_union();
+        let result = pipeline(mode).erase();
         let split: Result<ErrorUnion<Selected>, eros::Result<u8>> = result.narrow::<Selected, _>();
         assert_eq!(split.is_ok(), matches!(mode, 0 | 2));
         match split {
@@ -374,7 +374,7 @@ pub fn erased_result_narrow_and_recovery_route_every_variant() {
         }
         let mut calls = [0; 2];
         let value = pipeline(mode)
-            .any_union()
+            .erase()
             .recover(|error: ErrorUnion<Selected>| {
                 calls[0] += 1;
                 assert_variant(&error, mode);
@@ -404,14 +404,14 @@ pub fn erased_try_recover_keeps_unknown_errors_and_replacement_types() {
             let mut calls = 0;
             let result: eros::Result<u8> =
                 pipeline(mode)
-                    .any_union()
+                    .erase()
                     .try_recover(|error: ErrorUnion<Selected>| {
                         calls += 1;
                         assert_variant(&error, mode);
                         if succeeds {
                             Ok(42)
                         } else {
-                            Err(Fallback).any_union()
+                            Err(Fallback).erase()
                         }
                     });
             let selected = matches!(mode, 0 | 2);
@@ -475,7 +475,7 @@ pub fn run_checks() {
     recover_chains_remove_multiple_errors_and_finish_with_into_value();
     try_recover_groups_replace_errors_or_keep_reordered_remainders();
     fallible_chain_replaces_reintroduces_maps_and_recovers();
-    any_union_handles_plain_typed_and_already_erased_results();
+    erase_handles_plain_typed_and_already_erased_results();
     erased_narrow_can_recover_a_typed_set_then_erase_again();
     erased_result_narrow_and_recovery_route_every_variant();
     erased_try_recover_keeps_unknown_errors_and_replacement_types();

@@ -174,16 +174,6 @@ impl ErrorUnion {
             _pd: PhantomData,
         }
     }
-
-    pub(crate) fn erase<E>(t: ErrorUnion<E>) -> ErrorUnion
-    where
-        E: TypeSet,
-    {
-        ErrorUnion {
-            inner: t.inner,
-            _pd: PhantomData,
-        }
-    }
 }
 
 //************************************************************************//
@@ -302,6 +292,26 @@ impl<E> ErrorUnion<E>
 where
     E: TypeSet,
 {
+    /// Erases the static error set, preserving the concrete root and diagnostics.
+    ///
+    /// Reuses the existing storage without allocating or capturing new
+    /// diagnostics. Boxed errors and domain wrappers remain intact, so later
+    /// downcasts and recovery still see the same concrete root type.
+    ///
+    /// ```
+    /// use eros::ErrorUnion;
+    ///
+    /// let typed: ErrorUnion<(std::fmt::Error,)> = ErrorUnion::new(std::fmt::Error);
+    /// let erased: ErrorUnion = typed.erase();
+    /// assert!(erased.is_inner::<std::fmt::Error>());
+    /// ```
+    pub fn erase(self) -> ErrorUnion {
+        ErrorUnion {
+            inner: self.inner,
+            _pd: PhantomData,
+        }
+    }
+
     /// Selects one error type or a group, returning the remaining error union
     /// when the stored error does not match.
     ///
@@ -637,6 +647,20 @@ pub trait ReshapeUnion<S, E>
 where
     E: TypeSet,
 {
+    /// Classifies implementation errors into a category meaningful to callers.
+    ///
+    /// Successful values and matching error types pass through without calling
+    /// the classifier. See [`ErrorUnion::classify`]. Requires `alloc`.
+    #[cfg(feature = "alloc")]
+    fn classify<Other, ClassifiedError, Index>(
+        self,
+        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+    ) -> crate::Result<S, Other>
+    where
+        Other: TypeSet,
+        ClassifiedError: SendSyncError,
+        Other::Variants: Contains<ClassifiedError, Index>;
+
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
@@ -796,6 +820,19 @@ impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
+    #[cfg(feature = "alloc")]
+    fn classify<Other, ClassifiedError, Index>(
+        self,
+        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+    ) -> crate::Result<S, Other>
+    where
+        Other: TypeSet,
+        ClassifiedError: SendSyncError,
+        Other::Variants: Contains<ClassifiedError, Index>,
+    {
+        self.map_err(|error| error.classify::<Other, ClassifiedError, Index>(classifier))
+    }
+
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
@@ -896,16 +933,27 @@ impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
     }
 }
 
-pub trait IntoAnyUnion<S> {
-    /// Converts the result's error into an [`ErrorUnion<AnyError>`].
+/// Erases a result's static error type into an [`ErrorUnion<AnyError>`].
+pub trait Erase<S> {
+    /// Preserves the concrete error, including boxes and domain wrappers.
     ///
-    /// Existing unions retain their context, location, and backtrace.
-    fn any_union(self) -> Result<S, ErrorUnion>;
+    /// Existing unions retain their storage, context, location, and backtrace.
+    /// Plain errors are wrapped in a new union. Successful values pass through
+    /// unchanged. This works with or without `alloc`.
+    ///
+    /// ```
+    /// use eros::Erase;
+    ///
+    /// let result = Err::<(), _>(std::fmt::Error);
+    /// let erased: eros::Result<()> = result.erase();
+    /// assert!(erased.unwrap_err().is_inner::<std::fmt::Error>());
+    /// ```
+    fn erase(self) -> Result<S, ErrorUnion>;
 }
 
-impl<S, F: SendSyncError> IntoAnyUnion<S> for Result<S, F> {
+impl<S, F: SendSyncError> Erase<S> for Result<S, F> {
     #[cfg_attr(feature = "location", track_caller)]
-    fn any_union(self) -> Result<S, ErrorUnion> {
+    fn erase(self) -> Result<S, ErrorUnion> {
         match self {
             Ok(value) => Ok(value),
             Err(err) => Err(ErrorUnion::new(err)),
@@ -913,9 +961,9 @@ impl<S, F: SendSyncError> IntoAnyUnion<S> for Result<S, F> {
     }
 }
 
-impl<S, E: TypeSet> IntoAnyUnion<S> for Result<S, ErrorUnion<E>> {
-    fn any_union(self) -> Result<S, ErrorUnion> {
-        self.map_err(|e| ErrorUnion::erase(e))
+impl<S, E: TypeSet> Erase<S> for Result<S, ErrorUnion<E>> {
+    fn erase(self) -> Result<S, ErrorUnion> {
+        self.map_err(ErrorUnion::erase)
     }
 }
 

@@ -9,4 +9,4 @@
 //! result.recover::<std::fmt::Error, _>(|_| ()).into_value();
 //! ```
 
-pub use crate::{Context, IntoAnyUnion, IntoUnion, ReshapeUnion};
+pub use crate::{Context, Erase, IntoUnion, ReshapeUnion};

@@ -2,17 +2,17 @@ error[E0599]: the method `union` exists for enum `Result<(), ErrorUnion>`, but i
  --> tests/trybuild/cannot_call_union_on_traced_union_result.rs:8:25
   |
 8 |     let _error = result.union();
-  |                         ^^^^^
-  |
- ::: $RUST/core/src/result.rs
-  |
-  | pub enum Result<T, E> {
-  | --------------------- doesn't satisfy `Result<(), ErrorUnion>: IntoUnion<(), ErrorUnion>`
+  |                         ^^^^^ method cannot be called on `Result<(), ErrorUnion>` due to unsatisfied trait bounds
   |
  ::: src/error_union.rs
   |
   | pub struct ErrorUnion<E: TypeSet = AnyError> {
   | -------------------------------------------- doesn't satisfy `ErrorUnion: SendSyncError`
+  |
+ ::: $RUST/core/src/result.rs
+  |
+  | pub enum Result<T, E> {
+  | --------------------- doesn't satisfy `Result<(), ErrorUnion>: IntoUnion<(), ErrorUnion>`
   |
   = note: the following trait bounds were not satisfied:
           `ErrorUnion: SendSyncError`

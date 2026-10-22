@@ -93,7 +93,7 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
             }
             let error: ErrorUnion<AnyError> = if as_result {
                 let result: eros::Result<(), Expanded> = Err(error);
-                let result: eros::Result<()> = result.any_union();
+                let result: eros::Result<()> = result.erase();
                 result.widen::<AnyError, _>().unwrap_err()
             } else {
                 let error: ErrorUnion = error.into();
@@ -117,7 +117,7 @@ fn successful_conversions_accept_owned_and_borrowed_values_without_extra_bounds(
     let result: eros::Result<_, Input> = result.union();
     let result: eros::Result<_, Reordered> = result.widen();
     let result: eros::Result<_, Expanded> = result.widen();
-    let result: eros::Result<_> = result.any_union();
+    let result: eros::Result<_> = result.erase();
     let value = result.unwrap();
     assert!(std::rc::Rc::ptr_eq(&value.1, &token));
     value.0.push_str(" success");
