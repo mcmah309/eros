@@ -164,21 +164,30 @@ impl ErrorUnion {
 /// Created by [`ErrorUnion::into_std_error`] without allocating or discarding
 /// context, location, or backtrace.
 ///
+/// Unions with the same error set also convert automatically through `?`.
+/// Use [`.union()`](IntoUnion::union) for plain errors or
+/// [`.widen()`](ReshapeUnion::widen) to adapt an existing union's error set.
+///
 /// ```
-/// # #[cfg(feature = "alloc")]
-/// # {
+/// use eros::IntoUnion;
+///
 /// fn load() -> Result<(), eros::StdError> {
-///     let result: eros::Result<()> = Err(eros::error!("missing configuration"));
-///     result.map_err(eros::ErrorUnion::into_std_error)
+///     Err::<(), _>(core::fmt::Error).union()?;
+///     Ok(())
 /// }
 ///
 /// fn accepts_error(_: impl core::error::Error + Send + Sync + 'static) {}
 /// accepts_error(load().unwrap_err());
-/// # }
 /// ```
 pub struct StdError<E = AnyError>(ErrorUnion<E>)
 where
     E: TypeSet;
+
+impl<E: TypeSet> From<ErrorUnion<E>> for StdError<E> {
+    fn from(error: ErrorUnion<E>) -> Self {
+        error.into_std_error()
+    }
+}
 
 impl<E: TypeSet> StdError<E> {
     /// Borrows the original union, including its diagnostics.
