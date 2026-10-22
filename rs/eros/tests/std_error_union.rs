@@ -1,13 +1,15 @@
 use core::{fmt, num::ParseIntError};
-use eros::{ErrorUnion, IntoUnion, ReshapeUnion, StdError, TypeSet};
+use eros::{ErrorUnion, IntoUnion, ReshapeUnion, StdErrorUnion, TypeSet};
 
 #[test]
 fn union_question_mark_infers_typed_and_erased_error_sets() {
-    fn typed<T>(result: Result<T, fmt::Error>) -> Result<T, StdError<(fmt::Error, ParseIntError)>> {
+    fn typed<T>(
+        result: Result<T, fmt::Error>,
+    ) -> Result<T, StdErrorUnion<(fmt::Error, ParseIntError)>> {
         Ok(result.union()?)
     }
 
-    fn erased<T>(result: Result<T, fmt::Error>) -> Result<T, StdError> {
+    fn erased<T>(result: Result<T, fmt::Error>) -> Result<T, StdErrorUnion> {
         Ok(result.union()?)
     }
 
@@ -26,11 +28,11 @@ fn union_question_mark_infers_typed_and_erased_error_sets() {
 fn widen_question_mark_infers_larger_and_erased_error_sets() {
     fn typed<T>(
         result: eros::Result<T, (fmt::Error,)>,
-    ) -> Result<T, StdError<(ParseIntError, fmt::Error)>> {
+    ) -> Result<T, StdErrorUnion<(ParseIntError, fmt::Error)>> {
         Ok(result.widen()?)
     }
 
-    fn erased<T>(result: eros::Result<T, (fmt::Error,)>) -> Result<T, StdError> {
+    fn erased<T>(result: eros::Result<T, (fmt::Error,)>) -> Result<T, StdErrorUnion> {
         Ok(result.widen()?)
     }
 
@@ -46,16 +48,16 @@ fn widen_question_mark_infers_larger_and_erased_error_sets() {
 
 #[test]
 fn question_mark_converts_matching_unions_without_reshaping() {
-    fn propagate<T, E: TypeSet>(result: eros::Result<T, E>) -> Result<T, StdError<E>> {
+    fn propagate<T, E: TypeSet>(result: eros::Result<T, E>) -> Result<T, StdErrorUnion<E>> {
         Ok(result?)
     }
 
     let typed: eros::Result<(), (fmt::Error,)> = Err(ErrorUnion::new(fmt::Error));
-    let error: StdError<(fmt::Error,)> = propagate(typed).unwrap_err();
+    let error: StdErrorUnion<(fmt::Error,)> = propagate(typed).unwrap_err();
     let _: fmt::Error = error.into_union().into_single();
 
     let erased: eros::Result<()> = Err(ErrorUnion::new(fmt::Error));
-    let error: StdError = propagate(erased).unwrap_err();
+    let error: StdErrorUnion = propagate(erased).unwrap_err();
     assert!(error.into_union().is_inner::<fmt::Error>());
 
     let empty: eros::Result<_, ()> = Ok(7);

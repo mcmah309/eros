@@ -92,7 +92,7 @@ pub use context::ContextValue;
 pub use context::SendSyncDebugDisplay;
 pub use error_union::ErrorUnion;
 pub use error_union::SendSyncError;
-pub use error_union::StdError;
+pub use error_union::StdErrorUnion;
 pub use msg_error::MsgError;
 pub use type_set::TypeSet;
 

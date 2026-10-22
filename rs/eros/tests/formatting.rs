@@ -183,7 +183,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     fn accepts_error<E: Error + Send + Sync + 'static>(error: E) -> E {
         error
     }
-    let native: eros::StdError<(NativeError,)> = accepts_error(error.into());
+    let native: eros::StdErrorUnion<(NativeError,)> = accepts_error(error.into());
     assert_eq!(
         native.as_union().inner() as *const dyn eros::SendSyncError as *const (),
         original_root
@@ -201,7 +201,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert!(core::ptr::eq(error.location(), original_location));
     let native: Box<dyn eros::SendSyncError> = Box::new(error.into_std_error());
 
-    assert!((native.as_ref() as &dyn core::any::Any).is::<eros::StdError<(NativeError,)>>());
+    assert!((native.as_ref() as &dyn core::any::Any).is::<eros::StdErrorUnion<(NativeError,)>>());
 
     // A native Error reporter visits source() itself. Its root must therefore
     // format only the root message, or it would print each cause twice.

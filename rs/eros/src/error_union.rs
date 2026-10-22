@@ -171,7 +171,7 @@ impl ErrorUnion {
 /// ```
 /// use eros::IntoUnion;
 ///
-/// fn load() -> Result<(), eros::StdError> {
+/// fn load() -> Result<(), eros::StdErrorUnion> {
 ///     Err::<(), _>(core::fmt::Error).union()?;
 ///     Ok(())
 /// }
@@ -179,17 +179,17 @@ impl ErrorUnion {
 /// fn accepts_error(_: impl core::error::Error + Send + Sync + 'static) {}
 /// accepts_error(load().unwrap_err());
 /// ```
-pub struct StdError<E = AnyError>(ErrorUnion<E>)
+pub struct StdErrorUnion<E = AnyError>(ErrorUnion<E>)
 where
     E: TypeSet;
 
-impl<E: TypeSet> From<ErrorUnion<E>> for StdError<E> {
+impl<E: TypeSet> From<ErrorUnion<E>> for StdErrorUnion<E> {
     fn from(error: ErrorUnion<E>) -> Self {
         error.into_std_error()
     }
 }
 
-impl<E: TypeSet> StdError<E> {
+impl<E: TypeSet> StdErrorUnion<E> {
     /// Borrows the original union, including its diagnostics.
     pub fn as_union(&self) -> &ErrorUnion<E> {
         &self.0
@@ -201,7 +201,7 @@ impl<E: TypeSet> StdError<E> {
     }
 }
 
-impl<E> core::error::Error for StdError<E>
+impl<E> core::error::Error for StdErrorUnion<E>
 where
     E: TypeSet,
 {
@@ -210,7 +210,7 @@ where
     }
 }
 
-impl<E> fmt::Display for StdError<E>
+impl<E> fmt::Display for StdErrorUnion<E>
 where
     E: TypeSet,
 {
@@ -220,7 +220,7 @@ where
     }
 }
 
-impl<E> fmt::Debug for StdError<E>
+impl<E> fmt::Debug for StdErrorUnion<E>
 where
     E: TypeSet,
 {
@@ -236,14 +236,14 @@ where
     /// Adapts this union to [`core::error::Error`] without allocating.
     ///
     /// Preserves the error set, context, location, and backtrace. Use
-    /// [`StdError::into_union`] to recover the original union.
+    /// [`StdErrorUnion::into_union`] to recover the original union.
     /// `ErrorUnion` cannot implement `Error` directly because its blanket
     /// conversion implementations would conflict.
-    pub fn into_std_error(self) -> StdError<E> {
-        StdError(self)
+    pub fn into_std_error(self) -> StdErrorUnion<E> {
+        StdErrorUnion(self)
     }
 
-    /// Recovers a union from a boxed [`StdError`] adapter.
+    /// Recovers a union from a boxed [`StdErrorUnion`] adapter.
     ///
     /// Returns the original boxed error unchanged if it is not an Eros adapter
     /// for the same error set `E`.
@@ -267,11 +267,11 @@ where
         error: Box<dyn SendSyncError>,
     ) -> Result<Self, Box<dyn SendSyncError>> {
         let error_ref = &*error as &dyn Any;
-        if !error_ref.is::<StdError<E>>() {
+        if !error_ref.is::<StdErrorUnion<E>>() {
             return Err(error);
         }
         let error = error as Box<dyn Any>;
-        let adapter = error.downcast::<StdError<E>>().unwrap();
+        let adapter = error.downcast::<StdErrorUnion<E>>().unwrap();
         Ok(adapter.into_union())
     }
 }
@@ -1195,7 +1195,7 @@ mod tests {
     fn boxed_std_error_and_back_roundtrips() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("roundtrip".into()));
         let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
-        assert!((&*dyn_err as &dyn Any).is::<StdError<(FooError,)>>());
+        assert!((&*dyn_err as &dyn Any).is::<StdErrorUnion<(FooError,)>>());
         let recovered: ErrorUnion<(FooError,)> =
             ErrorUnion::try_from_boxed_error(dyn_err).expect("round-trip should succeed");
 
@@ -1298,7 +1298,7 @@ mod tests {
 
         assert!((&*inner_dyn as &dyn Any).is::<FooError>());
         assert!(!(&*wrapper_dyn as &dyn Any).is::<FooError>());
-        assert!((&*wrapper_dyn as &dyn Any).is::<StdError<(FooError,)>>());
+        assert!((&*wrapper_dyn as &dyn Any).is::<StdErrorUnion<(FooError,)>>());
     }
 
     #[test]
@@ -1347,14 +1347,14 @@ mod tests {
     #[test]
     fn into_inner_dyn_error_not_roundtrippable_via_try_from_boxed_error() {
         // Confirm that try_from_boxed_error correctly rejects a bare inner error
-        // (since it's not wrapped in StdError).
+        // (since it's not wrapped in StdErrorUnion).
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
         let bare_dyn = union_a.into_inner();
 
         let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_boxed_error(bare_dyn);
         assert!(
             result.is_err(),
-            "try_from_boxed_error should reject a bare inner error, not a StdError"
+            "try_from_boxed_error should reject a bare inner error, not a StdErrorUnion"
         );
     }
 }
