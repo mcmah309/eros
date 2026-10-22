@@ -15,17 +15,17 @@ use crate::type_set::{
     Contains, NarrowTarget, RecoveryHandler, RecoveryTarget, SupersetOf, TupleForm, TypeSet,
 };
 
-use crate::AnyError;
 use crate::storage::ErrorUnionInner;
+use crate::{AnyError, SendSyncDebugDisplay};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
-pub trait SendSyncError: core::any::Any + core::error::Error + Send + Sync + 'static {
-    /// Converts this `SendSynError` to `Any`.
+pub trait SendSyncError: core::error::Error + SendSyncDebugDisplay {
+    /// Converts this `SendSyncError` to `Any`.
     ///
-    /// Warning: Use carefully since `Any` is this type,
-    /// not the underlying type. e.g. For `x: Box<dyn SendSyncError>` with `x.as_any()`,
-    /// the type yielded is `Box<dyn SendSyncError>` so functions like `x.is::<T>()` will not work as expected.
-    /// While one would probably want `(&*x as &dyn Any)` which is the underlying and `x.is::<T>()`
+    /// Call this on the borrowed value (`boxed.as_ref().as_any()`) to inspect
+    /// the boxed error rather than the box itself. e.g. For `x: Box<dyn SendSyncError>` with `x.as_any()`,
+    /// the type yielded is `Box<dyn SendSyncError>` so functions like `x.as_any().is::<T>()` will not work as expected.
+    /// While one would probably want `(&*x as &dyn Any).is::<T>()`
     /// will work as expected.
     ///
     /// The main use case for this function is when `x: &dyn SendSyncError`.
@@ -427,7 +427,7 @@ where
     ///
     /// Includes both ordinary and user-facing contexts, with their available
     /// metadata. Does not allocate or format values. Requires the `context` feature.
-    /// Use [`ContextFrame::value`] to borrow each frame's message or error.
+    /// Use [`ContextFrame::value`] to borrow each frame's message or boxed value.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -490,32 +490,6 @@ where
             error = parts.error;
         }
         error
-    }
-
-    /// Returns the most recently attached error-valued context.
-    ///
-    /// String contexts are ignored. Returns `None` if no error-valued context
-    /// has been attached, or if the `context` feature is disabled. This does not
-    /// search the inner error's source chain.
-    ///
-    /// To fall back to the inner error when no context error exists:
-    ///
-    /// ```
-    /// # #[cfg(feature = "alloc")]
-    /// # {
-    /// let error = eros::error!("permission denied").context("read configuration");
-    /// let latest = error.latest_context_error().unwrap_or_else(|| error.inner());
-    /// assert_eq!(latest.to_string(), "permission denied");
-    /// # }
-    /// ```
-    pub fn latest_context_error(&self) -> Option<&dyn SendSyncError> {
-        #[cfg(feature = "context")]
-        for context in self.inner.context.iter().rev() {
-            if let Some(err) = context.context.as_error() {
-                return Some(err);
-            }
-        }
-        None
     }
 
     /// Adds additional context. This becomes a no-op if the `context` feature is disabled.
@@ -1391,145 +1365,6 @@ mod tests {
         assert!(
             result.is_err(),
             "try_from_boxed_error should reject a bare inner error, not a StdError"
-        );
-    }
-}
-
-#[cfg(all(test, feature = "alloc"))]
-mod latest_context_error_tests {
-    use super::*;
-    use std::fmt;
-    #[cfg(not(feature = "std"))]
-    use std::prelude::v1::*;
-
-    #[derive(Debug, PartialEq)]
-    struct PrimaryError(String);
-    impl fmt::Display for PrimaryError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "PrimaryError({})", self.0)
-        }
-    }
-    impl std::error::Error for PrimaryError {}
-
-    #[derive(Debug, PartialEq)]
-    struct ContextError(String);
-    impl fmt::Display for ContextError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "ContextError({})", self.0)
-        }
-    }
-    impl std::error::Error for ContextError {}
-
-    fn box_err(e: impl SendSyncError) -> Box<dyn SendSyncError> {
-        Box::new(e)
-    }
-
-    #[test]
-    fn latest_context_error_with_no_context_returns_none() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-
-        assert!(union.latest_context_error().is_none());
-    }
-
-    #[test]
-    fn latest_context_error_fallback_returns_inner() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-
-        let error = union
-            .latest_context_error()
-            .unwrap_or_else(|| union.inner());
-        assert_eq!(error.to_string(), "PrimaryError(base)");
-        assert!(error.as_any().is::<PrimaryError>());
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_with_string_context_only_returns_none() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-        let union = union.context("just a string message");
-
-        assert!(union.latest_context_error().is_none());
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_with_error_context_returns_context_error() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-        let union = union.context(box_err(ContextError("ctx-1".into())));
-
-        assert_eq!(
-            union.latest_context_error().unwrap().to_string(),
-            "ContextError(ctx-1)"
-        );
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_returns_most_recently_added_error_context() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-        let union = union
-            .context(box_err(ContextError("ctx-1".into())))
-            .context(box_err(ContextError("ctx-2".into())))
-            .context(box_err(ContextError("ctx-3".into())));
-
-        assert_eq!(
-            union.latest_context_error().unwrap().to_string(),
-            "ContextError(ctx-3)"
-        );
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_skips_trailing_string_contexts_to_find_error_context() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-        let union = union
-            .context(box_err(ContextError("ctx-1".into())))
-            .context("a string note added after");
-
-        assert_eq!(
-            union.latest_context_error().unwrap().to_string(),
-            "ContextError(ctx-1)"
-        );
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_with_only_string_contexts_can_fall_back_to_inner() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-        let union = union.context("note one").context("note two");
-
-        assert!(union.latest_context_error().is_none());
-        let error = union
-            .latest_context_error()
-            .unwrap_or_else(|| union.inner());
-        assert_eq!(error.to_string(), "PrimaryError(base)");
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_error_context_correct_concrete_type() {
-        let union: ErrorUnion<(PrimaryError,)> = ErrorUnion::new(PrimaryError("base".into()));
-        let union = union.context(box_err(ContextError("typed".into())));
-
-        assert!(
-            union
-                .latest_context_error()
-                .unwrap()
-                .as_any()
-                .is::<ContextError>()
-        );
-    }
-
-    #[cfg(feature = "context")]
-    #[test]
-    fn latest_context_error_multi_variant_union_with_error_context() {
-        let union: ErrorUnion<(PrimaryError, ContextError)> =
-            ErrorUnion::new(PrimaryError("base".into()));
-        let union = union.context(box_err(ContextError("ctx-1".into())));
-
-        assert_eq!(
-            union.latest_context_error().unwrap().to_string(),
-            "ContextError(ctx-1)"
         );
     }
 }

@@ -1,6 +1,6 @@
 #![cfg(feature = "alloc")]
 
-use eros::{ContextValue, MsgError};
+use eros::MsgError;
 use std::{borrow::Cow, cell::Cell, error::Error};
 
 #[test]
@@ -460,22 +460,4 @@ fn auto_context_attribute_uses_only_annotated_parameters() {
     let report = format!("{error:#?}");
     assert_eq!(report.contains("value: 0007"), cfg!(feature = "context"));
     assert!(!report.contains("ignored"));
-}
-
-#[test]
-fn latest_context_error_respects_the_context_feature() {
-    let context = ContextValue::from(Box::new(std::fmt::Error) as Box<dyn eros::SendSyncError>);
-    let error = eros::error!("root").context(context).context("last string");
-    let latest = error.latest_context_error();
-    if cfg!(feature = "context") {
-        assert!(latest.unwrap().as_any().is::<std::fmt::Error>());
-    } else {
-        assert!(latest.is_none());
-        assert!(
-            latest
-                .unwrap_or_else(|| error.inner())
-                .as_any()
-                .is::<MsgError>()
-        );
-    }
 }

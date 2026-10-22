@@ -1,9 +1,25 @@
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, boxed::Box, string::String};
-use core::fmt::Display;
+use core::any::Any;
+use core::fmt::{Debug, Display};
 use core::result::Result;
 
 use crate::{ErrorUnion, SendSyncError, type_set::TypeSet};
+
+/// A value that can be shared between threads and formatted as context.
+pub trait SendSyncDebugDisplay: Any + Debug + Display + Send + Sync + 'static {}
+
+impl<T: Any + Debug + Display + Send + Sync + 'static> SendSyncDebugDisplay for T {}
+
+impl dyn SendSyncDebugDisplay {
+    /// Returns this value as `Any` for downcasting.
+    ///
+    /// Call this on the borrowed value (`boxed.as_ref().as_any()`) to inspect
+    /// the boxed value rather than the box itself.
+    pub fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 /// An attached context value and its captured metadata.
 #[cfg(feature = "context")]
@@ -43,7 +59,7 @@ impl ContextFrame {
 
 #[cfg(feature = "context")]
 impl ContextFrame {
-    /// Returns the attached message or error without formatting or cloning it.
+    /// Returns the attached message or boxed value without formatting or cloning it.
     pub fn value(&self) -> &ContextValue {
         &self.context
     }
@@ -69,7 +85,7 @@ impl core::fmt::Display for ContextFrame {
     }
 }
 
-/// A context value containing a message or an error.
+/// A context value containing a message or a boxed value.
 pub struct ContextValue(ContextValueInner);
 
 enum ContextValueInner {
@@ -77,29 +93,29 @@ enum ContextValueInner {
     OwnedMessage(String),
     StaticMessage(&'static str),
     #[cfg(feature = "alloc")]
-    Error(Box<dyn SendSyncError>),
+    Boxed(Box<dyn SendSyncDebugDisplay>),
 }
 
 impl ContextValue {
-    /// Returns the message text, or `None` for error-valued context.
+    /// Returns the message text, or `None` for boxed context.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             #[cfg(feature = "alloc")]
             ContextValueInner::OwnedMessage(message) => Some(message),
             ContextValueInner::StaticMessage(message) => Some(message),
             #[cfg(feature = "alloc")]
-            ContextValueInner::Error(_) => None,
+            ContextValueInner::Boxed(_) => None,
         }
     }
 
-    /// Returns the original error, or `None` for message-valued context.
-    pub fn as_error(&self) -> Option<&dyn SendSyncError> {
+    /// Returns the boxed value, or `None` for message-valued context.
+    pub fn as_boxed(&self) -> Option<&dyn SendSyncDebugDisplay> {
         match &self.0 {
             ContextValueInner::StaticMessage(_) => None,
             #[cfg(feature = "alloc")]
             ContextValueInner::OwnedMessage(_) => None,
             #[cfg(feature = "alloc")]
-            ContextValueInner::Error(error) => Some(error.as_ref()),
+            ContextValueInner::Boxed(value) => Some(value.as_ref()),
         }
     }
 }
@@ -115,7 +131,7 @@ impl core::fmt::Debug for ContextValue {
                 f.debug_tuple("Message").field(message).finish()
             }
             #[cfg(feature = "alloc")]
-            ContextValueInner::Error(error) => f.debug_tuple("Error").field(error).finish(),
+            ContextValueInner::Boxed(value) => f.debug_tuple("Boxed").field(value).finish(),
         }
     }
 }
@@ -127,7 +143,7 @@ impl core::fmt::Display for ContextValue {
             ContextValueInner::OwnedMessage(message) => f.write_str(message),
             ContextValueInner::StaticMessage(message) => f.write_str(message),
             #[cfg(feature = "alloc")]
-            ContextValueInner::Error(error) => write!(f, "{}", error),
+            ContextValueInner::Boxed(value) => Display::fmt(value, f),
         }
     }
 }
@@ -156,9 +172,16 @@ impl From<Cow<'static, str>> for ContextValue {
 }
 
 #[cfg(feature = "alloc")]
+impl From<Box<dyn SendSyncDebugDisplay>> for ContextValue {
+    fn from(value: Box<dyn SendSyncDebugDisplay>) -> Self {
+        Self(ContextValueInner::Boxed(value))
+    }
+}
+
+#[cfg(feature = "alloc")]
 impl From<Box<dyn SendSyncError>> for ContextValue {
     fn from(e: Box<dyn SendSyncError>) -> Self {
-        Self(ContextValueInner::Error(e))
+        Self::from(e as Box<dyn SendSyncDebugDisplay>)
     }
 }
 

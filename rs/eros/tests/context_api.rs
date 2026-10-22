@@ -1,6 +1,6 @@
 #![cfg(feature = "alloc")]
 
-use eros::{Context, ContextValue, ErrorUnion, MsgError, SendSyncError};
+use eros::{Context, ContextValue, ErrorUnion, MsgError, SendSyncDebugDisplay, SendSyncError};
 use std::{borrow::Cow, cell::Cell};
 
 #[test]
@@ -18,9 +18,9 @@ fn contexts_borrow_frames_in_attachment_order() {
     let frames: Vec<&eros::ContextFrame> = error.contexts().collect();
     assert_eq!(frames[0].value().as_str(), Some("static"));
     assert_eq!(frames[1].value().as_str(), Some("owned"));
-    let error_value = frames[2].value().as_error().unwrap();
+    let error_value = frames[2].value().as_boxed().unwrap();
     assert_eq!(
-        error_value as *const dyn SendSyncError as *const (),
+        error_value as *const dyn SendSyncDebugDisplay as *const (),
         original
     );
     assert!(error_value.as_any().is::<MsgError>());
@@ -100,10 +100,10 @@ fn contexts_include_user_facing_flags_and_locations() {
 }
 
 #[test]
-fn context_values_expose_messages_and_preserve_error_identity() {
+fn context_values_expose_messages_and_preserve_boxed_identity() {
     for source in [ContextValue::from("static"), Cow::Borrowed("static").into()] {
         assert_eq!(source.as_str(), Some("static"));
-        assert!(source.as_error().is_none());
+        assert!(source.as_boxed().is_none());
         assert_eq!(source.to_string(), "static");
         assert_eq!(format!("{source:?}"), "Message(\"static\")");
     }
@@ -112,7 +112,7 @@ fn context_values_expose_messages_and_preserve_error_identity() {
         Cow::<str>::Owned(String::from("owned")).into(),
     ] {
         assert_eq!(source.as_str(), Some("owned"));
-        assert!(source.as_error().is_none());
+        assert!(source.as_boxed().is_none());
         assert_eq!(source.to_string(), "owned");
     }
     let boxed: Box<dyn SendSyncError> = Box::new(MsgError::from("error"));
@@ -120,9 +120,22 @@ fn context_values_expose_messages_and_preserve_error_identity() {
     let source = ContextValue::from(boxed);
     assert_eq!(source.to_string(), "error");
     assert!(source.as_str().is_none());
-    let error = source.as_error().unwrap();
-    assert_eq!(error as *const dyn SendSyncError as *const (), ptr);
+    let error = source.as_boxed().unwrap();
+    assert_eq!(error as *const dyn SendSyncDebugDisplay as *const (), ptr);
     assert!(error.as_any().is::<MsgError>());
+
+    let boxed: Box<dyn SendSyncDebugDisplay> = Box::new(String::from("boxed value"));
+    let ptr = boxed.as_ref() as *const dyn SendSyncDebugDisplay as *const ();
+    let source = ContextValue::from(boxed);
+    assert!(source.as_str().is_none());
+    assert_eq!(source.to_string(), "boxed value");
+    assert_eq!(format!("{source:?}"), "Boxed(\"boxed value\")");
+    let value = source.as_boxed().unwrap();
+    assert_eq!(value as *const dyn SendSyncDebugDisplay as *const (), ptr);
+    assert_eq!(
+        value.as_any().downcast_ref::<String>().unwrap(),
+        "boxed value"
+    );
 }
 
 // Conversion must be deferred too: even eager context values should only be
@@ -315,7 +328,7 @@ mod user_context {
             0
         );
         let calls = Cell::new(0);
-        let boxed: Box<dyn SendSyncError> = Box::new(MsgError::from("public error"));
+        let boxed: Box<dyn SendSyncDebugDisplay> = Box::new(String::from("public error"));
         let error = error
             .context("internal before")
             .user_context("public first")
@@ -327,10 +340,6 @@ mod user_context {
             .user_context(boxed)
             .context("internal after");
         assert_eq!(calls.get(), 1);
-        assert_eq!(
-            error.latest_context_error().unwrap().to_string(),
-            "public error"
-        );
         let error = error
             .map_single(|error| error)
             .map_inner(|_| MsgError::from("replacement"));
@@ -350,7 +359,7 @@ mod user_context {
                 .last()
                 .unwrap()
                 .value()
-                .as_error()
+                .as_boxed()
                 .is_some()
         );
     }

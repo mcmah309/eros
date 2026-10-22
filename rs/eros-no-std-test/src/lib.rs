@@ -215,13 +215,6 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
         assert!(frame.value().as_str().is_some());
     }
     assert_type::<NotEnoughMemory>(u.inner(), "with_context preserves type")?;
-    if u.latest_context_error().is_some() {
-        return Err(CheckOutcome::Fail("string contexts have no context error"));
-    }
-    assert_type::<NotEnoughMemory>(
-        u.latest_context_error().unwrap_or_else(|| u.inner()),
-        "context error fallback preserves inner error",
-    )?;
 
     let u: ErrorUnion<(InvalidPassword,)> = ErrorUnion::new(InvalidPassword);
     let u = u.user_context("Please choose a stronger password.");

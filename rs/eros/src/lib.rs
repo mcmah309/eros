@@ -89,6 +89,7 @@ pub use context::AbsentValueError;
 #[cfg(feature = "context")]
 pub use context::ContextFrame;
 pub use context::ContextValue;
+pub use context::SendSyncDebugDisplay;
 pub use error_union::ErrorUnion;
 pub use error_union::SendSyncError;
 pub use error_union::StdError;
