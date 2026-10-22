@@ -70,18 +70,12 @@ impl core::fmt::Display for ContextFrame {
 }
 
 /// A context value containing a message or an error.
-///
-/// Convert static text, a `String`, a `Cow<'static, str>`, or a boxed
-/// [`SendSyncError`] into context. Static messages do not allocate.
-/// Without the `alloc` feature, only static text is accepted, and attaching it
-/// is a no-op because storing context requires the `context` feature.
 pub struct ContextValue(ContextValueInner);
 
 enum ContextValueInner {
     #[cfg(feature = "alloc")]
-    Message(Cow<'static, str>),
-    #[cfg(not(feature = "alloc"))]
-    Message(&'static str),
+    OwnedMessage(String),
+    StaticMessage(&'static str),
     #[cfg(feature = "alloc")]
     Error(Box<dyn SendSyncError>),
 }
@@ -90,7 +84,9 @@ impl ContextValue {
     /// Returns the message text, or `None` for error-valued context.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
-            ContextValueInner::Message(message) => Some(message),
+            #[cfg(feature = "alloc")]
+            ContextValueInner::OwnedMessage(message) => Some(message),
+            ContextValueInner::StaticMessage(message) => Some(message),
             #[cfg(feature = "alloc")]
             ContextValueInner::Error(_) => None,
         }
@@ -99,7 +95,9 @@ impl ContextValue {
     /// Returns the original error, or `None` for message-valued context.
     pub fn as_error(&self) -> Option<&dyn SendSyncError> {
         match &self.0 {
-            ContextValueInner::Message(_) => None,
+            ContextValueInner::StaticMessage(_) => None,
+            #[cfg(feature = "alloc")]
+            ContextValueInner::OwnedMessage(_) => None,
             #[cfg(feature = "alloc")]
             ContextValueInner::Error(error) => Some(error.as_ref()),
         }
@@ -109,7 +107,13 @@ impl ContextValue {
 impl core::fmt::Debug for ContextValue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
-            ContextValueInner::Message(message) => f.debug_tuple("Message").field(message).finish(),
+            #[cfg(feature = "alloc")]
+            ContextValueInner::OwnedMessage(message) => {
+                f.debug_tuple("Message").field(message).finish()
+            }
+            ContextValueInner::StaticMessage(message) => {
+                f.debug_tuple("Message").field(message).finish()
+            }
             #[cfg(feature = "alloc")]
             ContextValueInner::Error(error) => f.debug_tuple("Error").field(error).finish(),
         }
@@ -119,7 +123,9 @@ impl core::fmt::Debug for ContextValue {
 impl core::fmt::Display for ContextValue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
-            ContextValueInner::Message(message) => f.write_str(message),
+            #[cfg(feature = "alloc")]
+            ContextValueInner::OwnedMessage(message) => f.write_str(message),
+            ContextValueInner::StaticMessage(message) => f.write_str(message),
             #[cfg(feature = "alloc")]
             ContextValueInner::Error(error) => write!(f, "{}", error),
         }
@@ -128,28 +134,24 @@ impl core::fmt::Display for ContextValue {
 
 impl From<&'static str> for ContextValue {
     fn from(s: &'static str) -> ContextValue {
-        #[cfg(feature = "alloc")]
-        {
-            Self(ContextValueInner::Message(Cow::Borrowed(s)))
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self(ContextValueInner::Message(s))
-        }
+        Self(ContextValueInner::StaticMessage(s))
     }
 }
 
 #[cfg(feature = "alloc")]
 impl From<String> for ContextValue {
     fn from(s: String) -> ContextValue {
-        Self(ContextValueInner::Message(Cow::Owned(s)))
+        Self(ContextValueInner::OwnedMessage(s))
     }
 }
 
 #[cfg(feature = "alloc")]
 impl From<Cow<'static, str>> for ContextValue {
     fn from(s: Cow<'static, str>) -> ContextValue {
-        Self(ContextValueInner::Message(s))
+        match s {
+            Cow::Borrowed(s) => s.into(),
+            Cow::Owned(s) => s.into(),
+        }
     }
 }
 
