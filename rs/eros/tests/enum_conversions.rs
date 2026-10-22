@@ -1,5 +1,3 @@
-#![cfg(feature = "alloc")]
-
 //! Exercise every variant of every supported arity. The conversions use
 //! unchecked downcasts, so exercise every named variant at each tuple arity.
 use eros::ErrorUnion;

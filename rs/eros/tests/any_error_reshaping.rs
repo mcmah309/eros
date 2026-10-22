@@ -1,7 +1,3 @@
-#![cfg(feature = "alloc")]
-
-mod common;
-
 use eros::{ErrorUnion, MsgError, ReshapeUnion, SendSyncError, TypeSet};
 use std::{fmt, io};
 
@@ -9,7 +5,7 @@ use std::{fmt, io};
 type Selected = (fmt::Error, MsgError);
 
 struct Snapshot {
-    address: common::Identity,
+    address: *const (),
     report: String,
     #[cfg(feature = "diagnostic")]
     diagnostic: serde_json::Value,
@@ -18,7 +14,7 @@ struct Snapshot {
 impl Snapshot {
     fn new(error: &ErrorUnion) -> Self {
         Self {
-            address: common::identity(error.inner()),
+            address: error.inner() as *const dyn SendSyncError as *const (),
             report: format!("{error:?}"),
             #[cfg(feature = "diagnostic")]
             diagnostic: error.to_debug_json(),
@@ -26,7 +22,10 @@ impl Snapshot {
     }
 
     fn assert_preserved<E: TypeSet>(&self, error: &ErrorUnion<E>) {
-        assert_eq!(common::identity(error.inner()), self.address);
+        assert_eq!(
+            error.inner() as *const dyn SendSyncError as *const (),
+            self.address
+        );
         assert_eq!(format!("{error:?}"), self.report);
         #[cfg(feature = "diagnostic")]
         assert_eq!(error.to_debug_json(), self.diagnostic);

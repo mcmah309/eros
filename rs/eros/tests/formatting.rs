@@ -1,5 +1,3 @@
-#![cfg(feature = "alloc")]
-
 //! The public formatting contract, including the values received by tracing.
 //!
 //! Run this target with `RUST_LIB_BACKTRACE=0` and `RUST_LIB_BACKTRACE=1` in

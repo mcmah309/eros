@@ -1,5 +1,3 @@
-#![cfg(feature = "alloc")]
-
 #![cfg(all(feature = "context", feature = "backtrace"))]
 
 use eros::{

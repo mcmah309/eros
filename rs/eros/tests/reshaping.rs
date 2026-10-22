@@ -1,7 +1,3 @@
-#![cfg(feature = "alloc")]
-
-mod common;
-
 use eros::{ErrorUnion, IntoAnyUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::fmt;
 
@@ -86,7 +82,7 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
         let error = error.context("inner operation").context("outer operation");
         #[cfg(feature = "user_context")]
         let error = error.user_context("user message");
-        let original_inner = common::identity(error.inner());
+        let original_inner = error.inner() as *const dyn SendSyncError as *const ();
         let original_report = format!("{error:?}");
         #[cfg(feature = "diagnostic")]
         let original_json = error.to_debug_json();
@@ -123,7 +119,10 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
             }
         };
 
-        assert_eq!(common::identity(error.inner()), original_inner);
+        assert_eq!(
+            error.inner() as *const dyn SendSyncError as *const (),
+            original_inner
+        );
         assert_eq!(format!("{error:?}"), original_report);
         #[cfg(feature = "diagnostic")]
         assert_eq!(error.to_debug_json(), original_json);
@@ -198,7 +197,7 @@ fn result_group_narrow_preserves_successes_and_both_error_branches() {
         let error = error.context("retained context");
         #[cfg(feature = "user_context")]
         let error = error.user_context("user message");
-        let original = common::identity(error.inner());
+        let original = error.inner() as *const dyn SendSyncError as *const ();
         let report = format!("{error:?}");
         #[cfg(feature = "diagnostic")]
         let json = error.to_debug_json();
@@ -221,7 +220,10 @@ fn result_group_narrow_preserves_successes_and_both_error_branches() {
             }
             Err(Ok(_)) => panic!("narrow converted an error into a success"),
         };
-        assert_eq!(common::identity(error.inner()), original);
+        assert_eq!(
+            error.inner() as *const dyn SendSyncError as *const (),
+            original
+        );
         assert_eq!(format!("{error:?}"), report);
         #[cfg(feature = "diagnostic")]
         assert_eq!(error.to_debug_json(), json);
@@ -292,7 +294,7 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
         let error = error.context("inner").context("outer");
         #[cfg(feature = "user_context")]
         let error = error.user_context("user message");
-        let original = common::identity(error.inner());
+        let original = error.inner() as *const dyn SendSyncError as *const ();
         let report = format!("{error:?}");
         #[cfg(feature = "diagnostic")]
         let diagnostic = error.to_debug_json();
@@ -302,7 +304,10 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
         let result: eros::Result<(), (MsgError, std::io::Error)> =
             result.recover::<fmt::Error, _>(|error| {
                 calls += 1;
-                assert_eq!(common::identity(error.inner()), original);
+                assert_eq!(
+                    error.inner() as *const dyn SendSyncError as *const (),
+                    original
+                );
                 assert_eq!(format!("{error:?}"), report);
                 #[cfg(feature = "diagnostic")]
                 assert_eq!(error.to_debug_json(), diagnostic);
@@ -313,7 +318,10 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
             result.unwrap();
         } else {
             let error = result.unwrap_err();
-            assert_eq!(common::identity(error.inner()), original);
+            assert_eq!(
+                error.inner() as *const dyn SendSyncError as *const (),
+                original
+            );
             assert_eq!(format!("{error:?}"), report);
             #[cfg(feature = "diagnostic")]
             assert_eq!(error.to_debug_json(), diagnostic);

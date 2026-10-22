@@ -1,7 +1,3 @@
-#![cfg(feature = "alloc")]
-
-mod common;
-
 use eros::{AnyError, ErrorUnion, MsgError};
 use std::{
     fmt, io,
@@ -347,7 +343,7 @@ fn failed_try_from_returns_original_union_and_borrows_with_diagnostics() {
     // Matching context types must not be mistaken for the inner error.
     let context: Box<dyn eros::SendSyncError> = Box::new(fmt::Error);
     let mut union = union.context(context);
-    let original = common::identity(union.inner());
+    let original = union.inner() as *const dyn eros::SendSyncError as *const ();
     let report = format!("{union:?}");
 
     let shared = NameErrorRef::try_from(&union).unwrap_err();
@@ -356,7 +352,10 @@ fn failed_try_from_returns_original_union_and_borrows_with_diagnostics() {
     let mutable = NameErrorMut::try_from(&mut union).unwrap_err();
     assert_eq!(mutable as *mut ErrorUnion<AnyError>, union_address);
     let union = NameError::try_from(union).unwrap_err();
-    assert_eq!(common::identity(union.inner()), original);
+    assert_eq!(
+        union.inner() as *const dyn eros::SendSyncError as *const (),
+        original
+    );
     assert_eq!(format!("{union:?}"), report);
     assert_eq!(payload_drops.load(Ordering::SeqCst), 0);
 
