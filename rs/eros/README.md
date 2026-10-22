@@ -24,7 +24,7 @@ Built on the following philosophy:
 1. Error types only matter when the caller cares about the type, otherwise this just hinders ergonomics and creates unnecessary noise. [Link](#optional-typed-errors)
 2. There should be no boilerplate needed when handling any number of errors - no need to create an error enum for each case. [Link](#no-boilerplate)
 3. Users should be able to seamlessly transition to and from fully typed errors and handle any cases they care about. [Link](#seamless-transitions-between-error-types)
-4. Errors should always provided context of the operations in the call stack that lead to the error. [Link](#errors-have-context)
+4. Errors should always provide context of the operations in the call stack that lead to the error. [Link](#errors-have-context)
 5. Error constructs should be performant. [Link](#optimizations)
 
 ## Philosophy In Action
@@ -892,7 +892,7 @@ impl std::error::Error for InvalidPasswordError {}
 
 // Add valid errors to display to the user here
 fn root_error_message(error: &dyn SendSyncError) -> String {
-    if let Some(error) = error.as_any().downcast_ref::<InvalidPasswordError>() {
+    if let Some(error) = (error as &dyn core::any::Any).downcast_ref::<InvalidPasswordError>() {
         error.to_string()
     } else {
         "An internal error occurred.".to_owned()
