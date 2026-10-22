@@ -2,7 +2,7 @@
 
 mod common;
 
-use eros::{ErrorUnion, Erase, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
+use eros::{Erase, ErrorUnion, IntoUnion, MsgError, ReshapeUnion, SendSyncError};
 use std::fmt;
 
 #[eros::error_enum(PairError)]
@@ -442,9 +442,7 @@ fn mutable_erased_root_and_boxed_error_trait_refer_to_the_actual_error() {
     let root: &mut dyn std::any::Any = error.inner_mut();
     *root.downcast_mut::<MsgError>().unwrap() = MsgError::from("after");
     assert_eq!(
-        error
-            .inner()
-            .as_any()
+        (error.inner() as &dyn core::any::Any)
             .downcast_ref::<MsgError>()
             .unwrap()
             .as_str(),
@@ -453,8 +451,8 @@ fn mutable_erased_root_and_boxed_error_trait_refer_to_the_actual_error() {
     assert!(error.source().is_none());
 
     let boxed = error.into_inner();
-    assert!(boxed.as_any().is::<Box<dyn eros::SendSyncError>>());
-    assert!(boxed.as_ref().as_any().is::<MsgError>());
+    assert!((&boxed as &dyn core::any::Any).is::<Box<dyn eros::SendSyncError>>());
+    assert!((boxed.as_ref() as &dyn core::any::Any).is::<MsgError>());
     let source = std::error::Error::source(&boxed).unwrap();
     assert_eq!(source.downcast_ref::<MsgError>().unwrap().as_str(), "after");
 }

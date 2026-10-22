@@ -8,8 +8,8 @@ use crate::SendSyncError;
 use crate::{ErrorUnion, TypeSet};
 
 /// One view of the saved data, shared by human formatting and JSON diagnostics.
-pub(crate) struct Report<'a, T: SendSyncError + ?Sized = dyn SendSyncError> {
-    pub(crate) root: &'a T,
+pub(crate) struct Report<'a> {
+    pub(crate) root: &'a dyn SendSyncError,
     #[cfg(feature = "context")]
     pub(crate) contexts: &'a [crate::context::ContextFrame],
     #[cfg(feature = "location")]
@@ -30,11 +30,9 @@ impl<'a> Report<'a> {
             &error.inner.backtrace,
         )
     }
-}
 
-impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
     pub(crate) fn from_parts(
-        root: &'a T,
+        root: &'a dyn SendSyncError,
         #[cfg(feature = "context")] contexts: &'a [crate::context::ContextFrame],
         #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
         #[cfg(feature = "backtrace")] backtrace: &'a std::backtrace::Backtrace,
@@ -43,11 +41,11 @@ impl<'a, T: SendSyncError + ?Sized> Report<'a, T> {
         #[cfg(all(feature = "anyhow", feature = "backtrace"))]
         let backtrace = {
             use crate::error_union::{AnyhowError, AnyhowErrorArc};
-            let original = if let Some(error) = root.as_any().downcast_ref::<AnyhowError>() {
+            let root = root as &dyn core::any::Any;
+            let original = if let Some(error) = root.downcast_ref::<AnyhowError>() {
                 Some(error.0.backtrace())
             } else {
-                root.as_any()
-                    .downcast_ref::<AnyhowErrorArc>()
+                root.downcast_ref::<AnyhowErrorArc>()
                     .map(|error| error.0.backtrace())
             };
             original

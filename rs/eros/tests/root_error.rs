@@ -59,7 +59,7 @@ fn closure_owns_the_typed_root_and_can_explicitly_retain_it_as_source() {
     let mut calls = 0;
     let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
         calls += 1;
-        assert!(old.as_ref().as_any().is::<ConfigError>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<ConfigError>());
         StartupError {
             message,
             source: old,
@@ -128,14 +128,14 @@ fn identity_and_repeated_replacements_receive_the_actual_root() {
     assert_eq!(format!("{error:?}"), report);
 
     let error = error.map_inner(|old| {
-        assert!(old.as_ref().as_any().is::<ConfigError>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<ConfigError>());
         StartupError {
             message: "startup failed".into(),
             source: old,
         }
     });
     let error = error.map_inner(|old| {
-        assert!(old.as_ref().as_any().is::<StartupError>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<StartupError>());
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<StartupError>().unwrap()
     });
@@ -146,7 +146,7 @@ fn identity_and_repeated_replacements_receive_the_actual_root() {
     );
 
     let error = error.map_inner(|old| {
-        assert!(old.as_ref().as_any().is::<StartupError>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<StartupError>());
         MsgError::from("replacement leaf")
     });
     assert!(error.is_inner::<MsgError>());
@@ -174,7 +174,7 @@ fn closure_can_downcast_and_consume_the_old_error() {
 fn extracted_box_has_the_actual_returned_root_type() {
     let error = eros::error!("original failure").map_inner(|_| config_error());
     let boxed = error.into_inner();
-    assert!(boxed.as_ref().as_any().is::<ConfigError>());
+    assert!((boxed.as_ref() as &dyn core::any::Any).is::<ConfigError>());
     let boxed: Box<dyn core::any::Any> = boxed;
     let root = boxed.downcast::<ConfigError>().unwrap();
     assert_eq!(root.cause.as_str(), "permission denied");
@@ -189,7 +189,7 @@ fn intentionally_boxed_root_keeps_its_type_and_owned_allocation() {
     assert!(!error.is_inner::<ConfigError>());
 
     let error = error.map_inner(|old| {
-        assert!(old.as_ref().as_any().is::<Box<ConfigError>>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<Box<ConfigError>>());
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<Box<ConfigError>>().unwrap()
     });
@@ -264,9 +264,7 @@ fn aligned_anyerror_root_can_be_retained_as_source_then_replaced() {
     let error = error.context(Box::new(DropError(context_drops.clone())) as Box<dyn SendSyncError>);
 
     let error = error.map_inner(|old| {
-        let root = old
-            .as_ref()
-            .as_any()
+        let root = (old.as_ref() as &dyn core::any::Any)
             .downcast_ref::<AlignedError>()
             .unwrap();
         assert_eq!((root as *const AlignedError).addr() % 256, 0);
@@ -359,7 +357,7 @@ fn zero_sized_root_moves_through_identity_extraction_and_drop_once() {
     assert_eq!(ZERO_SIZED_DROPS.load(Ordering::SeqCst), before);
 
     let error = error.map_inner(|old| {
-        assert!(old.as_ref().as_any().is::<ZeroSizedError>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<ZeroSizedError>());
         let old: Box<dyn core::any::Any> = old;
         *old.downcast::<ZeroSizedError>().unwrap()
     });

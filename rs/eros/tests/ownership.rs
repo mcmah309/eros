@@ -56,7 +56,9 @@ fn boxed_extraction_reuses_the_original_allocation() {
         boxed.as_ref() as *const dyn SendSyncError as *const (),
         original
     );
-    let root = boxed.as_ref().as_any().downcast_ref::<Tracked>().unwrap();
+    let root = (boxed.as_ref() as &dyn core::any::Any)
+        .downcast_ref::<Tracked>()
+        .unwrap();
     assert_eq!(root.payload, [1, 2, 3]);
     assert_eq!(drops.load(Ordering::SeqCst), 0);
     drop(boxed);
@@ -79,9 +81,7 @@ fn boxed_mapping_reuses_the_original_allocation() {
     });
     let boxed = error.into_single();
     assert_eq!(
-        boxed
-            .as_ref()
-            .as_any()
+        (boxed.as_ref() as &dyn core::any::Any)
             .downcast_ref::<Tracked>()
             .unwrap()
             .payload,
@@ -326,7 +326,7 @@ fn mapping_preserves_metadata_until_the_new_union_is_dropped() {
     let inner = error.into_inner();
     assert_eq!(context.load(Ordering::SeqCst), 1);
     assert_eq!(root.load(Ordering::SeqCst), 0);
-    assert!(inner.as_ref().as_any().is::<Tracked>());
+    assert!((inner.as_ref() as &dyn core::any::Any).is::<Tracked>());
     drop(inner);
     assert_eq!(root.load(Ordering::SeqCst), 1);
 }

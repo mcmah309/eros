@@ -11,16 +11,6 @@ pub trait SendSyncDebugDisplay: Any + Debug + Display + Send + Sync + 'static {}
 
 impl<T: Any + Debug + Display + Send + Sync + 'static> SendSyncDebugDisplay for T {}
 
-impl dyn SendSyncDebugDisplay {
-    /// Returns this value as `Any` for downcasting.
-    ///
-    /// Call this on the borrowed value (`boxed.as_ref().as_any()`) to inspect
-    /// the boxed value rather than the box itself.
-    pub fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
 /// An attached context value and its captured metadata.
 #[cfg(feature = "context")]
 #[derive(Debug)]

@@ -201,7 +201,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert!(core::ptr::eq(error.location(), original_location));
     let native: Box<dyn eros::SendSyncError> = Box::new(error.into_std_error());
 
-    assert!(native.as_ref().as_any().is::<eros::StdError<(NativeError,)>>());
+    assert!((native.as_ref() as &dyn core::any::Any).is::<eros::StdError<(NativeError,)>>());
 
     // A native Error reporter visits source() itself. Its root must therefore
     // format only the root message, or it would print each cause twice.
@@ -257,7 +257,7 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     let mut expected_diagnostic = error.to_debug_json();
 
     let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
-        assert!(old.as_ref().as_any().is::<NativeError>());
+        assert!((old.as_ref() as &dyn core::any::Any).is::<NativeError>());
         StartupError(old)
     });
     // The new root keeps the old root as a cause. All saved metadata stays in

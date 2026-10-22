@@ -24,7 +24,9 @@ mod tests {
 
     fn create_user_error_message(error: &dyn SendSyncError) -> Option<String> {
         #[allow(clippy::manual_map)]
-        if let Some(user_error) = error.as_any().downcast_ref::<InvalidPasswordError>() {
+        if let Some(user_error) =
+            (error as &dyn core::any::Any).downcast_ref::<InvalidPasswordError>()
+        {
             Some(user_error.to_string())
         } else {
             None

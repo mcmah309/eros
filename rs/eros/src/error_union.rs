@@ -19,28 +19,9 @@ use crate::storage::ErrorUnionInner;
 use crate::{AnyError, SendSyncDebugDisplay};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
-pub trait SendSyncError: core::error::Error + SendSyncDebugDisplay {
-    /// Converts this `SendSyncError` to `Any`.
-    ///
-    /// Call this on the borrowed value (`boxed.as_ref().as_any()`) to inspect
-    /// the boxed error rather than the box itself. e.g. For `x: Box<dyn SendSyncError>` with `x.as_any()`,
-    /// the type yielded is `Box<dyn SendSyncError>` so functions like `x.as_any().is::<T>()` will not work as expected.
-    /// While one would probably want `(&*x as &dyn Any).is::<T>()`
-    /// will work as expected.
-    ///
-    /// The main use case for this function is when `x: &dyn SendSyncError`.
-    /// In such case `x.is::<T>()` will likely work as intended.
-    fn as_any(&self) -> &dyn Any;
-}
+pub trait SendSyncError: core::error::Error + SendSyncDebugDisplay {}
 
-impl<T> SendSyncError for T
-where
-    T: core::error::Error + core::any::Any + Send + Sync + 'static,
-{
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
+impl<T> SendSyncError for T where T: core::error::Error + core::any::Any + Send + Sync + 'static {}
 
 #[cfg(feature = "alloc")]
 impl core::error::Error for Box<dyn SendSyncError> {

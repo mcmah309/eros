@@ -140,10 +140,7 @@ fn identical_io_errors_recover_separately_after_classification_and_merging() {
             .recover::<ConfigError, _>(|error| {
                 configuration_calls += 1;
                 assert_eq!(
-                    error
-                        .0
-                        .as_ref()
-                        .as_any()
+                    (error.0.as_ref() as &dyn core::any::Any)
                         .downcast_ref::<io::Error>()
                         .unwrap()
                         .kind(),
@@ -154,10 +151,7 @@ fn identical_io_errors_recover_separately_after_classification_and_merging() {
             .recover::<DatabaseError, _>(|error| {
                 database_calls += 1;
                 assert_eq!(
-                    error
-                        .0
-                        .as_ref()
-                        .as_any()
+                    (error.0.as_ref() as &dyn core::any::Any)
                         .downcast_ref::<io::Error>()
                         .unwrap()
                         .kind(),
@@ -248,7 +242,7 @@ fn erasure_preserves_boxes_and_diagnostics_without_unwrapping() {
             let boxed = error.downcast_inner::<Box<dyn SendSyncError>>().unwrap();
             assert_eq!(common::identity(boxed.as_ref()), contents);
             assert_eq!(
-                boxed.as_ref().as_any().is::<Box<dyn SendSyncError>>(),
+                (boxed.as_ref() as &dyn core::any::Any).is::<Box<dyn SendSyncError>>(),
                 nested
             );
         }

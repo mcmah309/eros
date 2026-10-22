@@ -23,7 +23,7 @@ fn contexts_borrow_frames_in_attachment_order() {
         error_value as *const dyn SendSyncDebugDisplay as *const (),
         original
     );
-    assert!(error_value.as_any().is::<MsgError>());
+    assert!((error_value as &dyn core::any::Any).is::<MsgError>());
     #[cfg(feature = "user_context")]
     assert!(frames.iter().all(|frame| !frame.is_user_facing()));
     assert_eq!(
@@ -122,7 +122,7 @@ fn context_values_expose_messages_and_preserve_boxed_identity() {
     assert!(source.as_str().is_none());
     let error = source.as_boxed().unwrap();
     assert_eq!(error as *const dyn SendSyncDebugDisplay as *const (), ptr);
-    assert!(error.as_any().is::<MsgError>());
+    assert!((error as &dyn core::any::Any).is::<MsgError>());
 
     let boxed: Box<dyn SendSyncDebugDisplay> = Box::new(String::from("boxed value"));
     let ptr = boxed.as_ref() as *const dyn SendSyncDebugDisplay as *const ();
@@ -133,7 +133,9 @@ fn context_values_expose_messages_and_preserve_boxed_identity() {
     let value = source.as_boxed().unwrap();
     assert_eq!(value as *const dyn SendSyncDebugDisplay as *const (), ptr);
     assert_eq!(
-        value.as_any().downcast_ref::<String>().unwrap(),
+        (value as &dyn core::any::Any)
+            .downcast_ref::<String>()
+            .unwrap(),
         "boxed value"
     );
 }

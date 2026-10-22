@@ -327,7 +327,7 @@ fn assert_type<T: SendSyncError>(
     error: &dyn SendSyncError,
     label: &'static str,
 ) -> Result<(), CheckOutcome> {
-    if error.as_any().is::<T>() {
+    if (error as &dyn core::any::Any).is::<T>() {
         Ok(())
     } else {
         let _ = label;
@@ -416,7 +416,7 @@ mod tests {
         let r: Result<u8, ErrorUnion<(eros::AbsentValueError,)>> = none.context("expected a value");
         assert!(r.is_err());
         let u = r.unwrap_err();
-        assert!(u.inner().as_any().is::<eros::AbsentValueError>());
+        assert!((u.inner() as &dyn core::any::Any).is::<eros::AbsentValueError>());
     }
 
     #[test]
