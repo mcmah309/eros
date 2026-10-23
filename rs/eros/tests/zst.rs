@@ -63,9 +63,9 @@ fn typed_erased_and_enum_apis_work_with_zero_sized_errors() {
     let singleton: ErrorUnion<(Timeout,)> = Timeout.into();
     assert_eq!(*singleton, Timeout);
     assert_eq!(singleton.as_single(), &Timeout);
-    let adapter = singleton.into_std_error();
+    let adapter = eros::ErrorUnionAdapter::from(singleton);
     assert_eq!(adapter.to_string(), "timeout");
-    assert_eq!(adapter.into_union().into_single(), Timeout);
+    assert_eq!(adapter.into_unadapted().into_single(), Timeout);
 
     let result: eros::Result<(), Failures> = Err::<(), _>(Timeout).union();
     result
@@ -214,7 +214,7 @@ fn aligned_zsts_preserve_ownership_through_borrowing_extraction_and_panics() {
     assert_eq!(size_of_val(b), 0);
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
     let first = first.downcast_inner::<std::io::Error>().unwrap_err();
-    let extracted = first.into_std_error().into_union().into_single();
+    let extracted = eros::ErrorUnionAdapter::from(first).into_unadapted().into_single();
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
     drop(extracted);
     drop(second);

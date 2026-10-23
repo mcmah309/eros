@@ -171,10 +171,10 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
 
     let u: ErrorUnion<(Timeout,)> = ErrorUnion::new(Timeout);
     let u = Err::<(), _>(u).context("waiting for response").unwrap_err();
-    let native = u.into_std_error();
+    let native = eros::ErrorUnionAdapter::from(u);
     assert_display(&native, "Timeout")?;
-    assert_eq(native.as_union().contexts().len(), 1)?;
-    let u = native.into_union();
+    assert_eq(native.as_ref().contexts().len(), 1)?;
+    let u = native.into_unadapted();
     assert_eq(u.as_ref(), &Timeout)?;
     assert_eq(u.into_single(), Timeout)?;
 

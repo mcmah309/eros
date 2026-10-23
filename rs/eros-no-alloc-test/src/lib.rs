@@ -92,10 +92,10 @@ pub fn run_checks() {
             .ends_with(b"Backtrace (feature disabled):")
     );
     let union = union.narrow::<(Failure,), _>().unwrap();
-    let adapter = union.into_std_error();
+    let adapter = eros::ErrorUnionAdapter::from(union);
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{adapter}").unwrap();
-    let union = adapter.into_union();
+    let union = adapter.into_unadapted();
     #[cfg(feature = "location")]
     assert!(core::ptr::eq(location, union.location()));
     let before = DROPS.load(Ordering::SeqCst);

@@ -2,6 +2,7 @@
 use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
+#[cfg(all(test, feature = "alloc"))]
 use core::any::Any;
 use core::fmt;
 use core::marker::PhantomData;
@@ -101,7 +102,7 @@ fn _send_sync_error_assert() {
     is_send(&error_union);
     is_sync(&error_union);
     // is_error(&error_union); // todo when specialization is stabilized
-    is_error(&error_union.into_std_error());
+    is_error(&ErrorUnionAdapter::from(error_union));
 }
 
 unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
@@ -161,8 +162,34 @@ impl ErrorUnion {
 
 /// An [`ErrorUnion`] adapter implementing [`core::error::Error`].
 ///
-/// Created by [`ErrorUnion::into_std_error`] without allocating or discarding
-/// context, location, or backtrace.
+/// Created using [`ErrorUnion::into_adapter`] or [`From`] without allocating or
+/// discarding context, location, or backtrace.
+///
+/// Use [`AsRef`] or [`AsMut`] to borrow the union, and
+/// [`into_unadapted`](Self::into_unadapted) to recover it by value.
+///
+/// For a boxed trait object, use its native `downcast` method with the adapter's
+/// exact error set, then call [`into_unadapted`](Self::into_unadapted).
+/// A failed downcast returns the original box.
+///
+/// ```
+/// # #[cfg(feature = "alloc")]
+/// # {
+/// # extern crate alloc;
+/// use alloc::boxed::Box;
+/// use eros::ErrorUnionAdapter;
+///
+/// let error = eros::error!("missing configuration");
+/// let boxed: Box<dyn core::error::Error + Send + Sync> = Box::new(error.into_adapter());
+/// let error = boxed.downcast::<ErrorUnionAdapter>()
+///     .map(|adapter| adapter.into_unadapted())
+///     .unwrap();
+/// assert_eq!(error.to_string(), "missing configuration");
+/// # }
+/// ```
+///
+/// `ErrorUnion` cannot implement `Error` directly because its blanket
+/// conversion implementations would conflict.
 ///
 /// Unions with the same error set also convert automatically through `?`.
 /// Use [`.union()`](IntoUnion::union) for plain errors or
@@ -171,7 +198,7 @@ impl ErrorUnion {
 /// ```
 /// use eros::IntoUnion;
 ///
-/// fn load() -> Result<(), eros::StdErrorUnion> {
+/// fn load() -> Result<(), eros::ErrorUnionAdapter> {
 ///     Err::<(), _>(core::fmt::Error).union()?;
 ///     Ok(())
 /// }
@@ -179,29 +206,48 @@ impl ErrorUnion {
 /// fn accepts_error(_: impl core::error::Error + Send + Sync + 'static) {}
 /// accepts_error(load().unwrap_err());
 /// ```
-pub struct StdErrorUnion<E = AnyError>(ErrorUnion<E>)
+pub struct ErrorUnionAdapter<E = AnyError>(ErrorUnion<E>)
 where
     E: TypeSet;
 
-impl<E: TypeSet> From<ErrorUnion<E>> for StdErrorUnion<E> {
+impl<E: TypeSet> From<ErrorUnion<E>> for ErrorUnionAdapter<E> {
     fn from(error: ErrorUnion<E>) -> Self {
-        error.into_std_error()
+        Self(error)
     }
 }
 
-impl<E: TypeSet> StdErrorUnion<E> {
-    /// Borrows the original union, including its diagnostics.
-    pub fn as_union(&self) -> &ErrorUnion<E> {
+impl<E: TypeSet> AsRef<ErrorUnion<E>> for ErrorUnionAdapter<E> {
+    fn as_ref(&self) -> &ErrorUnion<E> {
         &self.0
     }
+}
 
-    /// Recovers the original union without allocating or discarding diagnostics.
-    pub fn into_union(self) -> ErrorUnion<E> {
+impl<E: TypeSet> AsMut<ErrorUnion<E>> for ErrorUnionAdapter<E> {
+    fn as_mut(&mut self) -> &mut ErrorUnion<E> {
+        &mut self.0
+    }
+}
+
+impl<E: TypeSet> ErrorUnionAdapter<E> {
+    /// Removes the adapter, returning the original union.
+    ///
+    /// This operation is infallible and does not allocate or discard diagnostics.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, ErrorUnionAdapter};
+    ///
+    /// let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
+    /// let adapter = ErrorUnionAdapter::from(error);
+    /// assert!(adapter.as_ref().is_inner::<core::fmt::Error>());
+    /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.into_unadapted();
+    /// let _: core::fmt::Error = error.into_single();
+    /// ```
+    pub fn into_unadapted(self) -> ErrorUnion<E> {
         self.0
     }
 }
 
-impl<E> core::error::Error for StdErrorUnion<E>
+impl<E> core::error::Error for ErrorUnionAdapter<E>
 where
     E: TypeSet,
 {
@@ -210,7 +256,7 @@ where
     }
 }
 
-impl<E> fmt::Display for StdErrorUnion<E>
+impl<E> fmt::Display for ErrorUnionAdapter<E>
 where
     E: TypeSet,
 {
@@ -220,7 +266,7 @@ where
     }
 }
 
-impl<E> fmt::Debug for StdErrorUnion<E>
+impl<E> fmt::Debug for ErrorUnionAdapter<E>
 where
     E: TypeSet,
 {
@@ -236,43 +282,18 @@ where
     /// Adapts this union to [`core::error::Error`] without allocating.
     ///
     /// Preserves the error set, context, location, and backtrace. Use
-    /// [`StdErrorUnion::into_union`] to recover the original union.
-    /// `ErrorUnion` cannot implement `Error` directly because its blanket
-    /// conversion implementations would conflict.
-    pub fn into_std_error(self) -> StdErrorUnion<E> {
-        StdErrorUnion(self)
-    }
-
-    /// Recovers a union from a boxed [`StdErrorUnion`] adapter.
-    ///
-    /// Returns the original boxed error unchanged if it is not an Eros adapter
-    /// for the same error set `E`.
-    /// Requires the `alloc` feature.
+    /// [`ErrorUnionAdapter::into_unadapted`] to recover the original union.
     ///
     /// ```
-    /// # #[cfg(feature = "alloc")]
-    /// # {
-    /// use eros::{ErrorUnion, SendSyncError};
-    /// # extern crate alloc;
-    /// use alloc::boxed::Box;
+    /// use eros::ErrorUnion;
     ///
-    /// let error = eros::error!("missing configuration");
-    /// let boxed: Box<dyn SendSyncError> = Box::new(error.into_std_error());
-    /// let error: ErrorUnion = ErrorUnion::try_from_boxed_error(boxed).unwrap();
-    /// assert_eq!(error.to_string(), "missing configuration");
-    /// # }
+    /// let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
+    /// let adapter = error.into_adapter();
+    /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.into_unadapted();
+    /// let _: core::fmt::Error = error.into_single();
     /// ```
-    #[cfg(feature = "alloc")]
-    pub fn try_from_boxed_error(
-        error: Box<dyn SendSyncError>,
-    ) -> Result<Self, Box<dyn SendSyncError>> {
-        let error_ref = &*error as &dyn Any;
-        if !error_ref.is::<StdErrorUnion<E>>() {
-            return Err(error);
-        }
-        let error = error as Box<dyn Any>;
-        let adapter = error.downcast::<StdErrorUnion<E>>().unwrap();
-        Ok(adapter.into_union())
+    pub fn into_adapter(self) -> ErrorUnionAdapter<E> {
+        self.into()
     }
 }
 
@@ -1194,27 +1215,30 @@ mod tests {
     #[test]
     fn boxed_std_error_and_back_roundtrips() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("roundtrip".into()));
-        let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
-        assert!((&*dyn_err as &dyn Any).is::<StdErrorUnion<(FooError,)>>());
-        let recovered: ErrorUnion<(FooError,)> =
-            ErrorUnion::try_from_boxed_error(dyn_err).expect("round-trip should succeed");
+        let dyn_err: Box<dyn core::error::Error + Send + Sync> =
+            Box::new(ErrorUnionAdapter::from(union));
+        let recovered = dyn_err
+            .downcast::<ErrorUnionAdapter<(FooError,)>>()
+            .expect("round-trip should succeed")
+            .into_unadapted();
 
         assert_eq!(recovered.as_ref(), &FooError("roundtrip".into()));
     }
 
     #[test]
-    fn try_from_boxed_error_wrong_type_returns_err() {
+    fn boxed_adapter_downcast_wrong_type_returns_err() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("mismatch".into()));
-        let dyn_err: Box<dyn SendSyncError> = Box::new(union.into_std_error());
+        let dyn_err: Box<dyn core::error::Error + Send + Sync> =
+            Box::new(ErrorUnionAdapter::from(union));
 
-        let result: Result<ErrorUnion<(BarError,)>, _> = ErrorUnion::try_from_boxed_error(dyn_err);
+        let result = dyn_err.downcast::<ErrorUnionAdapter<(BarError,)>>();
         assert!(result.is_err(), "mismatched type should be returned as Err");
     }
 
     #[test]
     fn std_error_display_delegates_to_inner() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("display".into()));
-        let adapter = union.into_std_error();
+        let adapter = ErrorUnionAdapter::from(union);
         assert!(adapter.to_string().contains("FooError(display)"));
     }
 
@@ -1222,18 +1246,22 @@ mod tests {
     fn std_error_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>(_: T) {}
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("traits".into()));
-        assert_send_sync(union.into_std_error());
+        assert_send_sync(ErrorUnionAdapter::from(union));
     }
 
     #[test]
-    fn try_from_boxed_error_preserves_context() {
+    fn boxed_adapter_downcast_preserves_context() {
         let mut union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("ctx".into()));
         #[cfg(feature = "context")]
         {
             union = union.context("some context");
         }
-        let dyn_err = Box::new(union.into_std_error());
-        let recovered: ErrorUnion<(FooError,)> = ErrorUnion::try_from_boxed_error(dyn_err).unwrap();
+        let dyn_err: Box<dyn core::error::Error + Send + Sync> =
+            Box::new(ErrorUnionAdapter::from(union));
+        let recovered = dyn_err
+            .downcast::<ErrorUnionAdapter<(FooError,)>>()
+            .unwrap()
+            .into_unadapted();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -1244,10 +1272,13 @@ mod tests {
     #[test]
     fn multi_variant_union_boxed_std_error_roundtrips() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(99));
-        let dyn_err = Box::new(union.into_std_error());
+        let dyn_err: Box<dyn core::error::Error + Send + Sync> =
+            Box::new(ErrorUnionAdapter::from(union));
 
-        let recovered: ErrorUnion<(FooError, BarError)> =
-            ErrorUnion::try_from_boxed_error(dyn_err).unwrap();
+        let recovered = dyn_err
+            .downcast::<ErrorUnionAdapter<(FooError, BarError)>>()
+            .unwrap()
+            .into_unadapted();
 
         let bar: BarError = recovered.narrow::<BarError, _>().unwrap();
         assert_eq!(bar, BarError(99));
@@ -1294,11 +1325,11 @@ mod tests {
         let union_b: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("b".into()));
 
         let inner_dyn = union_a.into_inner();
-        let wrapper_dyn = Box::new(union_b.into_std_error());
+        let wrapper_dyn = Box::new(ErrorUnionAdapter::from(union_b));
 
         assert!((&*inner_dyn as &dyn Any).is::<FooError>());
         assert!(!(&*wrapper_dyn as &dyn Any).is::<FooError>());
-        assert!((&*wrapper_dyn as &dyn Any).is::<StdErrorUnion<(FooError,)>>());
+        assert!((&*wrapper_dyn as &dyn Any).is::<ErrorUnionAdapter<(FooError,)>>());
     }
 
     #[test]
@@ -1345,16 +1376,14 @@ mod tests {
     }
 
     #[test]
-    fn into_inner_dyn_error_not_roundtrippable_via_try_from_boxed_error() {
-        // Confirm that try_from_boxed_error correctly rejects a bare inner error
-        // (since it's not wrapped in StdErrorUnion).
+    fn into_inner_dyn_error_is_not_an_adapter() {
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
-        let bare_dyn = union_a.into_inner();
+        let bare_dyn: Box<dyn core::error::Error + Send + Sync> = union_a.into_inner();
 
-        let result: Result<ErrorUnion<(FooError,)>, _> = ErrorUnion::try_from_boxed_error(bare_dyn);
+        let result = bare_dyn.downcast::<ErrorUnionAdapter<(FooError,)>>();
         assert!(
             result.is_err(),
-            "try_from_boxed_error should reject a bare inner error, not a StdErrorUnion"
+            "a bare inner error should not downcast to an ErrorUnionAdapter"
         );
     }
 }

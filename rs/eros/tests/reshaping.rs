@@ -462,14 +462,16 @@ fn failed_native_adapter_downcast_retains_the_original_adapter() {
     let error: ErrorUnion<Pair> = ErrorUnion::new(MsgError::from("original"));
     let error = error.context("retained context");
     let report = format!("{error:?}");
-    let adapter = Box::new(error.into_std_error());
-    let original = &*adapter as *const dyn eros::SendSyncError as *const ();
-    let adapter = ErrorUnion::<(MsgError,)>::try_from_boxed_error(adapter).unwrap_err();
-    assert_eq!(
-        &*adapter as *const dyn eros::SendSyncError as *const (),
-        original
-    );
-    let recovered = ErrorUnion::<Pair>::try_from_boxed_error(adapter).unwrap();
+    let adapter: Box<dyn std::error::Error + Send + Sync> = Box::new(error.into_adapter());
+    let original = core::ptr::from_ref(&*adapter).cast::<()>();
+    let adapter = adapter
+        .downcast::<eros::ErrorUnionAdapter<(MsgError,)>>()
+        .unwrap_err();
+    assert_eq!(core::ptr::from_ref(&*adapter).cast::<()>(), original);
+    let recovered = adapter
+        .downcast::<eros::ErrorUnionAdapter<Pair>>()
+        .unwrap()
+        .into_unadapted();
     assert_eq!(format!("{recovered:?}"), report);
 }
 

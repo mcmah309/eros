@@ -183,9 +183,9 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     fn accepts_error<E: Error + Send + Sync + 'static>(error: E) -> E {
         error
     }
-    let native: eros::StdErrorUnion<(NativeError,)> = accepts_error(error.into());
+    let native: eros::ErrorUnionAdapter<(NativeError,)> = accepts_error(error.into_adapter());
     assert_eq!(
-        native.as_union().inner() as *const dyn eros::SendSyncError as *const (),
+        native.as_ref().inner() as *const dyn eros::SendSyncError as *const (),
         original_root
     );
     assert_eq!(native.to_string(), "cannot open configuration");
@@ -196,12 +196,12 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     );
     assert_eq!(format!("{native:?}"), expected_debug);
     assert_eq!(format!("{native:#?}"), expected_alternate_debug);
-    let error: ErrorUnion<(NativeError,)> = native.into_union();
+    let error: ErrorUnion<(NativeError,)> = native.into_unadapted();
     #[cfg(feature = "location")]
     assert!(core::ptr::eq(error.location(), original_location));
-    let native: Box<dyn eros::SendSyncError> = Box::new(error.into_std_error());
+    let native: Box<dyn Error + Send + Sync> = Box::new(error.into_adapter());
 
-    assert!((native.as_ref() as &dyn core::any::Any).is::<eros::StdErrorUnion<(NativeError,)>>());
+    assert!(native.is::<eros::ErrorUnionAdapter<(NativeError,)>>());
 
     // A native Error reporter visits source() itself. Its root must therefore
     // format only the root message, or it would print each cause twice.
@@ -214,7 +214,10 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert_eq!(format!("{native:?}"), expected_debug);
     assert_eq!(format!("{native:#?}"), expected_alternate_debug);
 
-    let recovered = ErrorUnion::<(NativeError,)>::try_from_boxed_error(native).unwrap();
+    let recovered = native
+        .downcast::<eros::ErrorUnionAdapter<(NativeError,)>>()
+        .unwrap()
+        .into_unadapted();
     assert!(recovered.is_inner::<NativeError>());
     assert_eq!(recovered.to_string(), expected_display);
     assert_eq!(format!("{recovered:?}"), expected_debug);

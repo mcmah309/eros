@@ -90,7 +90,7 @@ fn inline_mutable_references_remain_valid_after_moves_and_downcasts() {
     let reference = Box::leak(Box::new(41));
     let mut error: ErrorUnion<(Reference,)> = ErrorUnion::new(Reference(reference));
     *error.as_single_mut().0 += 1;
-    let mut erased: ErrorUnion = error.into_std_error().into_union().into();
+    let mut erased: ErrorUnion = eros::ErrorUnionAdapter::from(error).into_unadapted().into();
     *erased.downcast_inner_mut::<Reference>().unwrap().0 += 1;
     let error = erased.narrow::<(Reference,), _>().unwrap().into_single();
     assert_eq!(*error.0, 43);
@@ -192,7 +192,7 @@ mod allocation_checks {
                 let erased = result.erase().unwrap_err();
                 let error = erased.narrow::<(eros::MsgError,), _>().unwrap();
                 assert_eq!(error.as_single().as_str(), "message {text}");
-                drop(error.into_std_error());
+                drop(eros::ErrorUnionAdapter::from(error));
                 let error = eros::error!("another message");
                 assert_eq!(
                     error.downcast_inner::<eros::MsgError>().unwrap().as_str(),

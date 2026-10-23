@@ -459,18 +459,24 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
     let error: ErrorUnion = union(&root, &context).into();
     let original = error.inner() as *const dyn SendSyncError as *const ();
     let report = format!("{error:?}");
-    let adapter = Box::new(error.into_std_error());
-    let adapter_address = &*adapter as *const dyn SendSyncError as *const ();
+    let adapter: Box<dyn core::error::Error + Send + Sync> = Box::new(error.into_adapter());
+    let adapter_address = core::ptr::from_ref(&*adapter).cast::<()>();
 
     // Even a matching payload cannot change the adapter's original set parameter.
-    let adapter = ErrorUnion::<(Tracked,)>::try_from_boxed_error(adapter).unwrap_err();
-    let adapter = ErrorUnion::<(fmt::Error,)>::try_from_boxed_error(adapter).unwrap_err();
-    let adapter = ErrorUnion::<()>::try_from_boxed_error(adapter).unwrap_err();
-    assert_eq!(
-        &*adapter as *const dyn SendSyncError as *const (),
-        adapter_address
-    );
-    let error = ErrorUnion::<AnyError>::try_from_boxed_error(adapter).unwrap();
+    let adapter = adapter
+        .downcast::<eros::ErrorUnionAdapter<(Tracked,)>>()
+        .unwrap_err();
+    let adapter = adapter
+        .downcast::<eros::ErrorUnionAdapter<(fmt::Error,)>>()
+        .unwrap_err();
+    let adapter = adapter
+        .downcast::<eros::ErrorUnionAdapter<()>>()
+        .unwrap_err();
+    assert_eq!(core::ptr::from_ref(&*adapter).cast::<()>(), adapter_address);
+    let error = adapter
+        .downcast::<eros::ErrorUnionAdapter<AnyError>>()
+        .unwrap()
+        .into_unadapted();
     assert_eq!(
         error.inner() as *const dyn SendSyncError as *const (),
         original
@@ -488,9 +494,15 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
 fn typed_adapter_recovery_requires_its_original_set() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
-    let adapter = Box::new(union(&root, &context).into_std_error());
-    let adapter = ErrorUnion::<AnyError>::try_from_boxed_error(adapter).unwrap_err();
-    let error = ErrorUnion::<(Tracked,)>::try_from_boxed_error(adapter).unwrap();
+    let adapter: Box<dyn core::error::Error + Send + Sync> =
+        Box::new(union(&root, &context).into_adapter());
+    let adapter = adapter
+        .downcast::<eros::ErrorUnionAdapter<AnyError>>()
+        .unwrap_err();
+    let error = adapter
+        .downcast::<eros::ErrorUnionAdapter<(Tracked,)>>()
+        .unwrap()
+        .into_unadapted();
     // This path uses the singleton's unchecked extraction, so the set must be exact.
     let value = error.into_single();
     assert_eq!(value.payload, [1, 2, 3]);
