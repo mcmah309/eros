@@ -279,11 +279,23 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     {
         use tracing_error::SpanTraceStatus;
         let trace = report.span_trace();
-        let text = (trace.status() == SpanTraceStatus::CAPTURED)
-            .then(|| trace.to_string().trim_end_matches('\n').to_owned());
-        assert_eq!(value.get("span_trace"), Some(&serde_json::json!(text)));
-        if let Some(text) = text {
-            value["span_trace"] = normalize_span_locations(report, text).into();
+        if trace.status() == SpanTraceStatus::CAPTURED {
+            let text = value["span_trace"]
+                .as_str()
+                .expect("captured span trace text");
+            trace.with_spans(|metadata, fields| {
+                assert!(text.contains(&format!("- {}::{}", metadata.target(), metadata.name())));
+                if !fields.is_empty() {
+                    assert!(text.contains(&format!("  with {fields}")));
+                }
+                if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
+                    assert!(text.contains(&format!("  at {file}:{line}")));
+                }
+                true
+            });
+            value["span_trace"] = normalize_span_locations(report, text.to_owned()).into();
+        } else {
+            assert_eq!(value.get("span_trace"), Some(&serde_json::Value::Null));
         }
     }
     #[cfg(not(feature = "spantrace"))]

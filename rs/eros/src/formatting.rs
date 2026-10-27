@@ -138,7 +138,43 @@ impl<'a> Report<'a> {
     #[cfg(feature = "spantrace")]
     pub(crate) fn span_trace_text(&self) -> Option<String> {
         (self.span_trace_status() == "captured")
-            .then(|| self.span_trace.to_string().trim_end_matches('\n').into())
+            .then(|| SpanTraceDisplay(self.span_trace).to_string())
+    }
+}
+
+#[cfg(feature = "spantrace")]
+struct SpanTraceDisplay<'a>(&'a tracing_error::SpanTrace);
+
+#[cfg(feature = "spantrace")]
+impl fmt::Display for SpanTraceDisplay<'_> {
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let renderer = ReportRenderer {
+            indent: 0,
+            detailed: false,
+        };
+        let mut first = true;
+        let mut result = Ok(());
+        self.0.with_spans(|metadata, fields| {
+            result = (|| {
+                let name = format_args!("{}::{}", metadata.target(), metadata.name());
+                if first {
+                    renderer.bullet(out, &name)?;
+                    first = false;
+                } else {
+                    renderer.next_bullet(out, &name)?;
+                }
+                let continued = renderer.continued();
+                if !fields.is_empty() {
+                    continued.next_line(out, &format_args!("with {fields}"))?;
+                }
+                if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
+                    continued.next_line(out, &format_args!("at {file}:{line}"))?;
+                }
+                Ok(())
+            })();
+            result.is_ok()
+        });
+        result
     }
 }
 
@@ -190,6 +226,14 @@ impl ReportRenderer {
         value: &(impl fmt::Display + ?Sized),
     ) -> fmt::Result {
         out.write_char('\n')?;
+        self.bullet(out, value)
+    }
+
+    fn bullet(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        value: &(impl fmt::Display + ?Sized),
+    ) -> fmt::Result {
         let indent = self.indent;
         write_lines(out, format_args!("{:indent$}- ", ""), indent + 2, value)
     }

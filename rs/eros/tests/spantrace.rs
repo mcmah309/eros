@@ -44,15 +44,20 @@ fn captures_at_creation_and_retains_ancestry_after_leaving_the_subscriber() {
     with_traces(|| {
         tracing::info_span!("report_error").in_scope(|| {
             let report = format!("{error:?}");
-            let expected = error
-                .span_trace()
-                .to_string()
-                .trim_end_matches('\n')
-                .lines()
-                .map(|line| format!("    {line}"))
-                .collect::<Vec<_>>()
-                .join("\n");
-            assert!(report.contains(&format!("\nspan trace:\n{expected}")));
+            assert!(
+                report.contains(&format!(
+                    "\nspan trace:\n    - {}::read_configuration\n      at ",
+                    module_path!()
+                )),
+                "{report}"
+            );
+            assert!(
+                report.contains(&format!(
+                    "\n    - {}::request\n      with request_id=42\n      at ",
+                    module_path!()
+                )),
+                "{report}"
+            );
             assert!(!report.contains("::report_error"));
             assert_eq!(format!("{:?}", error.report()), report);
             assert_eq!(format!("{error:#?}"), "error: invalid configuration");
@@ -60,6 +65,53 @@ fn captures_at_creation_and_retains_ancestry_after_leaving_the_subscriber() {
             assert_eq!(format!("{error}"), "invalid configuration");
             assert_eq!(format!("{error:#}"), "invalid configuration");
         });
+    });
+}
+
+#[test]
+fn multiline_span_fields_align_under_the_span_name() {
+    use tracing_subscriber::{
+        field::RecordFields,
+        fmt::format::{FormatFields, Writer},
+    };
+
+    struct MultilineFields;
+    impl<'writer> FormatFields<'writer> for MultilineFields {
+        fn format_fields<R: RecordFields>(
+            &self,
+            mut writer: Writer<'writer>,
+            _fields: R,
+        ) -> fmt::Result {
+            fmt::Write::write_str(&mut writer, "first=1\r\nsecond=2\n")
+        }
+    }
+
+    let subscriber = tracing_subscriber::registry().with(ErrorLayer::new(MultilineFields));
+    tracing::subscriber::with_default(subscriber, || {
+        let error: ErrorUnion<(fmt::Error,)> =
+            tracing::info_span!("multiline").in_scope(|| ErrorUnion::new(fmt::Error));
+        let report = format!("{error:?}");
+        assert!(
+            report.contains(&format!(
+                "\nspan trace:\n    - {}::multiline\n      with first=1\n      second=2\n      at ",
+                module_path!()
+            )),
+            "{report}"
+        );
+        assert!(!report.contains('\r'), "{report}");
+        #[cfg(feature = "diagnostic")]
+        {
+            let diagnostic = error.to_debug_json();
+            let trace = diagnostic["span_trace"].as_str().unwrap();
+            assert!(
+                trace.starts_with(&format!(
+                    "- {}::multiline\n  with first=1\n  second=2\n  at ",
+                    module_path!()
+                )),
+                "{trace}"
+            );
+            assert!(!trace.ends_with('\n'));
+        }
     });
 }
 
@@ -230,6 +282,13 @@ fn batch_grouping_distinguishes_span_fields_only_in_detailed_reports() {
     assert!(detailed.contains("at: [0, 2]"), "{detailed}");
     assert!(detailed.contains("at: [1]"), "{detailed}");
     assert_eq!(detailed.matches("span trace:").count(), 3);
+    assert!(
+        detailed.contains(&format!(
+            "\n          span trace:\n              - {}::read_configuration\n                at ",
+            module_path!()
+        )),
+        "{detailed}"
+    );
     let compact = format!("{error:#?}");
     assert_eq!(compact.matches("- error: invalid configuration").count(), 1);
     assert!(compact.contains("at: [0..3]"), "{compact}");
@@ -256,10 +315,26 @@ fn batch_grouping_distinguishes_span_fields_only_in_detailed_reports() {
 fn debug_json_contains_the_saved_trace_and_display_json_omits_it() {
     let error = captured_error();
     let diagnostic = error.to_debug_json();
-    assert_eq!(
-        diagnostic["span_trace"],
-        error.span_trace().to_string().trim_end_matches('\n')
+    let trace = diagnostic["span_trace"]
+        .as_str()
+        .expect("captured span trace text");
+    assert!(
+        trace.starts_with(&format!("- {}::read_configuration\n  at ", module_path!())),
+        "{trace}"
     );
+    assert!(
+        trace.contains(&format!(
+            "\n- {}::request\n  with request_id=42\n  at ",
+            module_path!()
+        )),
+        "{trace}"
+    );
+    let indented = trace
+        .lines()
+        .map(|line| format!("    {line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(format!("{error:?}").contains(&format!("\nspan trace:\n{indented}")));
     assert_eq!(error.report().to_debug_json(), diagnostic);
     assert!(error.to_display_json().get("span_trace").is_none());
     assert!(error.report().to_display_json().get("span_trace").is_none());
