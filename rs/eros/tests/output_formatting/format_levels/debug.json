@@ -1,0 +1,35 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "contexts": [
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "read /etc/app.toml",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "start service",
+      "user_facing": false
+    }
+  ],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "cannot read configuration",
+  "sources": [
+    "permission denied"
+  ]
+}

@@ -1,7 +1,9 @@
-#[cfg(any(feature = "backtrace", feature = "diagnostic"))]
+#[cfg(feature = "alloc")]
 use alloc::string::String;
 #[cfg(feature = "backtrace")]
 use alloc::string::ToString;
+#[cfg(feature = "alloc")]
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::{error::Error, fmt};
 
 use crate::SendSyncError;
@@ -9,6 +11,8 @@ use crate::{ErrorUnion, TypeSet};
 
 /// One view of the saved data, shared by human formatting and JSON diagnostics.
 pub(crate) struct Report<'a> {
+    #[cfg(feature = "alloc")]
+    inner: &'a crate::storage::ErrorUnionInner,
     pub(crate) root: &'a dyn SendSyncError,
     #[cfg(feature = "context")]
     pub(crate) contexts: &'a [crate::context::ContextFrame],
@@ -20,23 +24,13 @@ pub(crate) struct Report<'a> {
 
 impl<'a> Report<'a> {
     pub(crate) fn new<E: TypeSet>(error: &'a ErrorUnion<E>) -> Self {
-        Self::from_parts(
-            error.inner(),
-            #[cfg(feature = "context")]
-            &error.inner.context,
-            #[cfg(feature = "location")]
-            error.inner.location,
-            #[cfg(feature = "backtrace")]
-            &error.inner.backtrace,
-        )
+        Self::from_inner(&error.inner)
     }
 
-    pub(crate) fn from_parts(
-        root: &'a dyn SendSyncError,
-        #[cfg(feature = "context")] contexts: &'a [crate::context::ContextFrame],
-        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
-        #[cfg(feature = "backtrace")] backtrace: &'a std::backtrace::Backtrace,
-    ) -> Self {
+    pub(crate) fn from_inner(inner: &'a crate::storage::ErrorUnionInner) -> Self {
+        let root = inner.error();
+        #[cfg(feature = "backtrace")]
+        let backtrace = &inner.backtrace;
         // Preserve the formatter's existing preference for an anyhow trace.
         #[cfg(all(feature = "anyhow", feature = "backtrace"))]
         let backtrace = {
@@ -53,11 +47,13 @@ impl<'a> Report<'a> {
                 .unwrap_or(backtrace)
         };
         Self {
+            #[cfg(feature = "alloc")]
+            inner,
             root,
             #[cfg(feature = "context")]
-            contexts,
+            contexts: &inner.context,
             #[cfg(feature = "location")]
-            location,
+            location: inner.location,
             #[cfg(feature = "backtrace")]
             backtrace,
         }
@@ -68,58 +64,32 @@ impl<'a> Report<'a> {
     }
 
     pub(crate) fn display(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.root)?;
+        let renderer = ReportRenderer {
+            indent: 0,
+            detailed: false,
+        };
+        renderer.line(f, self.root)?;
         if !f.alternate() {
-            for source in self.sources() {
-                write!(f, " <- {source}")?;
-            }
+            renderer.sources(f, self)?;
         }
         Ok(())
     }
 
     pub(crate) fn debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let detailed = !f.alternate();
-        write_lines(f, format_args!(""), 0, self.root)?;
-        #[cfg(feature = "location")]
-        if detailed {
-            write!(f, "\n  [{}]", self.location)?;
+        let renderer = ReportRenderer {
+            indent: 0,
+            detailed: !f.alternate(),
+        };
+        #[cfg(feature = "alloc")]
+        {
+            let node = DebugNode::new(self.inner, renderer.detailed)?;
+            renderer.node(f, &node)
         }
-        for source in self.sources() {
-            write_lines(f, format_args!("\n  caused by: "), 13, source)?;
+        #[cfg(not(feature = "alloc"))]
+        {
+            renderer.line(f, self.root)?;
+            renderer.details(f, self)
         }
-        #[cfg(feature = "context")]
-        if !self.contexts.is_empty() {
-            f.write_str("\n\n  Context (innermost first):")?;
-            for (index, context) in self.contexts.iter().enumerate() {
-                f.write_str("\n")?;
-                let number = index + 1;
-                let continuation = 6 + number.ilog10() as usize + 1;
-                write_lines(
-                    f,
-                    format_args!("    {number}. "),
-                    continuation,
-                    &context.context,
-                )?;
-                #[cfg(feature = "location")]
-                if detailed {
-                    write!(f, "\n    [{}]", context.location)?;
-                }
-            }
-        }
-        if detailed {
-            let status = self.backtrace_status();
-            let label = if status == "feature_disabled" {
-                "feature disabled"
-            } else {
-                status
-            };
-            write!(f, "\n\nBacktrace ({label}):")?;
-            #[cfg(feature = "backtrace")]
-            if let Some(text) = self.backtrace_text() {
-                write!(f, "\n{text}")?;
-            }
-        }
-        Ok(())
     }
 
     pub(crate) fn backtrace_status(&self) -> &'static str {
@@ -151,15 +121,355 @@ impl<'a> Report<'a> {
     }
 }
 
-fn write_lines(
+/// Every report uses this layout, at its own nesting level. Nested reports do
+/// not re-enter fmt::Debug or infer their depth from already formatted strings.
+#[derive(Clone, Copy)]
+struct ReportRenderer {
+    indent: usize,
+    detailed: bool,
+}
+
+impl ReportRenderer {
+    fn nested(self) -> Self {
+        Self {
+            indent: self.indent + 4,
+            ..self
+        }
+    }
+
+    fn line(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        value: &(impl fmt::Display + ?Sized),
+    ) -> fmt::Result {
+        let indent = self.indent;
+        write_lines(out, format_args!("{:indent$}", ""), indent, value)
+    }
+
+    fn next_line(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        value: &(impl fmt::Display + ?Sized),
+    ) -> fmt::Result {
+        out.write_char('\n')?;
+        self.line(out, value)
+    }
+
+    fn next_bullet(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        value: &(impl fmt::Display + ?Sized),
+    ) -> fmt::Result {
+        out.write_char('\n')?;
+        let indent = self.indent;
+        write_lines(out, format_args!("{:indent$}- ", ""), indent + 2, value)
+    }
+
+    fn sources(self, out: &mut (impl fmt::Write + ?Sized), report: &Report<'_>) -> fmt::Result {
+        self.nested().source_fields(out, report)
+    }
+
+    fn source_fields(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        report: &Report<'_>,
+    ) -> fmt::Result {
+        let fields = self;
+        let values = fields.nested();
+        let mut sources = report.sources().peekable();
+        if sources.peek().is_some() {
+            fields.next_line(out, &"caused by:")?;
+            for source in sources {
+                values.next_bullet(out, source)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "alloc"))]
+    fn details(self, out: &mut (impl fmt::Write + ?Sized), report: &Report<'_>) -> fmt::Result {
+        self.nested().detail_fields(out, report)
+    }
+
+    fn detail_fields(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        report: &Report<'_>,
+    ) -> fmt::Result {
+        self.source_fields(out, report)?;
+        let fields = self;
+        #[cfg(any(feature = "context", feature = "backtrace"))]
+        let values = fields.nested();
+        #[cfg(feature = "context")]
+        if !report.contexts.is_empty() {
+            fields.next_line(out, &"context:")?;
+            for context in report.contexts {
+                values.next_bullet(out, &context.context)?;
+                #[cfg(feature = "location")]
+                if self.detailed {
+                    values
+                        .nested()
+                        .next_line(out, &format_args!("location: {}", context.location))?;
+                }
+            }
+        }
+        if self.detailed {
+            #[cfg(feature = "location")]
+            fields.next_line(out, &format_args!("location: {}", report.location))?;
+            let status = report.backtrace_status();
+            let status = if status == "feature_disabled" {
+                "feature disabled"
+            } else {
+                status
+            };
+            fields.next_line(out, &format_args!("backtrace ({status}):"))?;
+            #[cfg(feature = "backtrace")]
+            if let Some(text) = report.backtrace_text() {
+                values.next_line(out, &text)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    fn node(self, out: &mut (impl fmt::Write + ?Sized), node: &DebugNode<'_>) -> fmt::Result {
+        if let Some(groups) = &node.children {
+            let count: usize = groups.iter().map(|group| group.positions.len()).sum();
+            self.line(out, &format_args!("errors ({count} total):"))?;
+        } else if let Some(report) = &node.report {
+            self.line(out, report.root)?;
+        }
+        self.nested().body(out, node)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn body(self, out: &mut (impl fmt::Write + ?Sized), node: &DebugNode<'_>) -> fmt::Result {
+        let mut has_groups = false;
+        if let Some(groups) = &node.children {
+            if !groups.is_empty() {
+                has_groups = true;
+                self.next_line(out, &"groups:")?;
+                for group in groups {
+                    out.write_char('\n')?;
+                    self.nested().group(out, group)?;
+                }
+            }
+        }
+        if let Some(report) = &node.report {
+            let has_details = self.detailed || report.sources().next().is_some();
+            #[cfg(feature = "context")]
+            let has_details = has_details || !report.contexts.is_empty();
+            if has_groups && has_details {
+                out.write_char('\n')?;
+            }
+            self.detail_fields(out, report)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    fn group(self, out: &mut (impl fmt::Write + ?Sized), group: &DebugGroup<'_>) -> fmt::Result {
+        let fields = Self {
+            indent: self.indent + 2,
+            ..self
+        };
+        let mut message = String::new();
+        if let Some(children) = &group.node.children {
+            let count: usize = children.iter().map(|child| child.positions.len()).sum();
+            fmt::write(&mut message, format_args!("errors ({count} total)"))?;
+        } else if let Some(report) = &group.node.report {
+            write_lines(&mut message, format_args!(""), 0, report.root)?;
+        }
+        if message.contains('\n') {
+            self.line(out, &"- message: |")?;
+            fields.nested().next_line(out, &message)?;
+        } else {
+            self.line(out, &format_args!("- message: {message}"))?;
+        }
+        fields.next_line(out, &format_args!("at: [{}]", Positions(&group.positions)))?;
+        fields.body(out, &group.node)
+    }
+}
+
+/// Prepared grouping borrows the saved reports. Preparing a child once avoids
+/// recursively rebuilding its groups each time it is rendered at a new depth.
+#[cfg(feature = "alloc")]
+struct DebugNode<'a> {
+    report: Option<Report<'a>>,
+    children: Option<Vec<DebugGroup<'a>>>,
+}
+
+#[cfg(feature = "alloc")]
+struct DebugGroup<'a> {
+    positions: Vec<usize>,
+    node: DebugNode<'a>,
+}
+
+/// Preserve field boundaries even when a message contains report-like text.
+/// Only visible values participate, so alternate Debug still ignores metadata.
+#[cfg(feature = "alloc")]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum GroupKeyPart {
+    Root(String),
+    Source(String),
+    #[cfg(feature = "context")]
+    Context(String),
+    #[cfg(all(feature = "context", feature = "location"))]
+    ContextLocation(String),
+    #[cfg(feature = "location")]
+    Location(String),
+    #[cfg(feature = "backtrace")]
+    Backtrace(&'static str, Option<String>),
+    Children(Vec<(Vec<usize>, Vec<GroupKeyPart>)>),
+}
+
+#[cfg(feature = "alloc")]
+fn message_key(value: &(impl fmt::Display + ?Sized)) -> Result<String, fmt::Error> {
+    let mut message = String::new();
+    write_lines(&mut message, format_args!(""), 0, value)?;
+    Ok(message)
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> DebugNode<'a> {
+    fn new(inner: &'a crate::storage::ErrorUnionInner, detailed: bool) -> Result<Self, fmt::Error> {
+        let children = if inner.is_collection() {
+            Some(group_reports(
+                |visitor| inner.visit_children(visitor),
+                detailed,
+            )?)
+        } else {
+            None
+        };
+        Ok(Self {
+            report: Some(Report::from_inner(inner)),
+            children,
+        })
+    }
+
+    fn grouping_key(&self, detailed: bool) -> Result<Vec<GroupKeyPart>, fmt::Error> {
+        let mut key = Vec::new();
+        if let Some(children) = &self.children {
+            let children = children
+                .iter()
+                .map(|group| Ok((group.positions.clone(), group.node.grouping_key(detailed)?)))
+                .collect::<Result<_, fmt::Error>>()?;
+            key.push(GroupKeyPart::Children(children));
+        }
+        if let Some(report) = &self.report {
+            if self.children.is_none() {
+                key.push(GroupKeyPart::Root(message_key(report.root)?));
+            }
+            for source in report.sources() {
+                key.push(GroupKeyPart::Source(message_key(source)?));
+            }
+            #[cfg(feature = "context")]
+            for context in report.contexts {
+                key.push(GroupKeyPart::Context(message_key(&context.context)?));
+                #[cfg(feature = "location")]
+                if detailed {
+                    key.push(GroupKeyPart::ContextLocation(message_key(
+                        context.location,
+                    )?));
+                }
+            }
+            if detailed {
+                #[cfg(feature = "location")]
+                key.push(GroupKeyPart::Location(message_key(report.location)?));
+                #[cfg(feature = "backtrace")]
+                key.push(GroupKeyPart::Backtrace(
+                    report.backtrace_status(),
+                    report.backtrace_text(),
+                ));
+            }
+        }
+        Ok(key)
+    }
+}
+
+#[cfg(feature = "alloc")]
+fn group_reports<'a>(
+    visit: impl FnOnce(&mut dyn FnMut(crate::ErrorReport<'a>)),
+    detailed: bool,
+) -> Result<Vec<DebugGroup<'a>>, fmt::Error> {
+    let mut groups = Vec::<DebugGroup<'a>>::new();
+    let mut lookup = BTreeMap::<Vec<GroupKeyPart>, usize>::new();
+    let mut result = Ok(());
+    let mut position = 0;
+    visit(&mut |child| {
+        if result.is_ok() {
+            result = (|| {
+                let node = DebugNode::new(child.inner, detailed)?;
+                let key = node.grouping_key(detailed)?;
+                let index = *lookup.entry(key).or_insert(groups.len());
+                if index == groups.len() {
+                    groups.push(DebugGroup {
+                        positions: Vec::new(),
+                        node,
+                    });
+                }
+                groups[index].positions.push(position);
+                position += 1;
+                Ok(())
+            })();
+        }
+    });
+    result?;
+    Ok(groups)
+}
+
+#[cfg(feature = "alloc")]
+pub(crate) fn debug_vector<'a>(
     f: &mut fmt::Formatter<'_>,
+    visit: impl FnOnce(&mut dyn FnMut(crate::ErrorReport<'a>)),
+) -> fmt::Result {
+    let renderer = ReportRenderer {
+        indent: 0,
+        detailed: !f.alternate(),
+    };
+    let node = DebugNode {
+        report: None,
+        children: Some(group_reports(visit, renderer.detailed)?),
+    };
+    renderer.node(f, &node)
+}
+
+/// Zero-based vector positions, compacted into half-open Rust ranges.
+#[cfg(feature = "alloc")]
+struct Positions<'a>(&'a [usize]);
+
+#[cfg(feature = "alloc")]
+impl fmt::Display for Positions<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut positions = self.0.iter().copied().peekable();
+        let mut first = true;
+        while let Some(start) = positions.next() {
+            let mut end = start;
+            while positions.peek() == Some(&(end + 1)) {
+                end = positions.next().unwrap();
+            }
+            if !first {
+                f.write_str(", ")?;
+            }
+            first = false;
+            write!(f, "{start}")?;
+            if end != start {
+                write!(f, "..{}", end + 1)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn write_lines(
+    f: &mut (impl fmt::Write + ?Sized),
     prefix: fmt::Arguments<'_>,
     continuation: usize,
     value: &(impl fmt::Display + ?Sized),
 ) -> fmt::Result {
     f.write_fmt(prefix)?;
     let mut writer = LineWriter {
-        formatter: f,
+        writer: f,
         continuation,
         pending_newline: false,
         pending_cr: false,
@@ -173,27 +483,27 @@ fn write_lines(
     Ok(())
 }
 
-struct LineWriter<'a, 'b> {
-    formatter: &'a mut fmt::Formatter<'b>,
+struct LineWriter<'a, W: fmt::Write + ?Sized> {
+    writer: &'a mut W,
     continuation: usize,
     pending_newline: bool,
     pending_cr: bool,
 }
 
-impl LineWriter<'_, '_> {
+impl<W: fmt::Write + ?Sized> LineWriter<'_, W> {
     fn write_content(&mut self, text: &str) -> fmt::Result {
         if self.pending_newline {
-            self.formatter.write_str("\n")?;
+            self.writer.write_str("\n")?;
             for _ in 0..self.continuation {
-                self.formatter.write_str(" ")?;
+                self.writer.write_str(" ")?;
             }
             self.pending_newline = false;
         }
-        self.formatter.write_str(text)
+        self.writer.write_str(text)
     }
 }
 
-impl fmt::Write for LineWriter<'_, '_> {
+impl<W: fmt::Write + ?Sized> fmt::Write for LineWriter<'_, W> {
     fn write_str(&mut self, text: &str) -> fmt::Result {
         let mut start = 0;
         for (index, character) in text

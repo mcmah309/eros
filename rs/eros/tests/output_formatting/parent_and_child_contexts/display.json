@@ -1,0 +1,14 @@
+{
+  "children": [
+    {
+      "root": "invalid email",
+      "sources": []
+    },
+    {
+      "root": "missing field\ncustomer name",
+      "sources": []
+    }
+  ],
+  "root": "errors (2 total):",
+  "sources": []
+}

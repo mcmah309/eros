@@ -1,0 +1,26 @@
+{
+  "children": [
+    {
+      "children": [
+        {
+          "root": "alpha",
+          "sources": []
+        }
+      ],
+      "root": "errors (1 total):",
+      "sources": []
+    },
+    {
+      "children": [
+        {
+          "root": "beta",
+          "sources": []
+        }
+      ],
+      "root": "errors (1 total):",
+      "sources": []
+    }
+  ],
+  "root": "errors (2 total):",
+  "sources": []
+}

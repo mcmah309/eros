@@ -32,7 +32,12 @@ struct ErrorOps {
     drop: unsafe fn(*mut MaybeUninit<usize>),
     #[cfg(feature = "alloc")]
     into_box: unsafe fn(*mut MaybeUninit<usize>) -> Box<dyn SendSyncError>,
+    #[cfg(feature = "alloc")]
+    children: Option<ChildVisitor>,
 }
+
+#[cfg(feature = "alloc")]
+type ChildVisitor = for<'a> fn(&'a dyn SendSyncError, &mut dyn FnMut(crate::ErrorReport<'a>));
 
 struct OpsFor<T>(core::marker::PhantomData<T>);
 impl<T: SendSyncError> OpsFor<T> {
@@ -41,6 +46,24 @@ impl<T: SendSyncError> OpsFor<T> {
         drop: drop_error::<T>,
         #[cfg(feature = "alloc")]
         into_box: box_error::<T>,
+        #[cfg(feature = "alloc")]
+        children: None,
+    };
+}
+
+#[cfg(feature = "alloc")]
+impl<E: crate::TypeSet> OpsFor<crate::Vec<E>> {
+    const WITH_CHILDREN: ErrorOps = ErrorOps {
+        children: Some(|root, visitor| {
+            // This table is selected only when wrapping an eros::Vec<E>.
+            let batch = (root as &dyn Any)
+                .downcast_ref::<crate::Vec<E>>()
+                .expect("child visitor must match the stored batch");
+            for child in batch {
+                visitor(child.report());
+            }
+        }),
+        ..Self::OPS
     };
 }
 
@@ -230,6 +253,26 @@ pub(crate) struct ErrorParts<T> {
 }
 
 impl ErrorUnionInner {
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(feature = "location", track_caller)]
+    pub(crate) fn new_vec<E: crate::TypeSet>(value: crate::Vec<E>) -> Self {
+        let mut inner = Self::new(value);
+        inner.error.ops = &OpsFor::<crate::Vec<E>>::WITH_CHILDREN;
+        inner
+    }
+
+    pub(crate) fn visit_children<'a>(&'a self, _visitor: &mut dyn FnMut(crate::ErrorReport<'a>)) {
+        #[cfg(feature = "alloc")]
+        if let Some(children) = self.error.ops.children {
+            children(self.error(), _visitor);
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    pub(crate) fn is_collection(&self) -> bool {
+        self.error.ops.children.is_some()
+    }
+
     #[cfg_attr(feature = "location", track_caller)]
     pub(crate) fn new<T: SendSyncError>(value: T) -> Self {
         Self::new_from_parts(

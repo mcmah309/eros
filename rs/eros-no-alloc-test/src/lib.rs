@@ -80,7 +80,7 @@ pub fn run_checks() {
     assert!(matches!(NamedMut::from(&mut union), NamedMut::Failure(_)));
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{union}").unwrap();
-    assert_eq!(buffer.contents(), b"failure\r\ndetail\n");
+    assert_eq!(buffer.contents(), b"failure\ndetail");
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{union:#?}").unwrap();
     assert_eq!(buffer.contents(), b"failure\ndetail");
@@ -89,7 +89,7 @@ pub fn run_checks() {
     assert!(
         buffer
             .contents()
-            .ends_with(b"Backtrace (feature disabled):")
+            .ends_with(b"backtrace (feature disabled):")
     );
     let union = union.narrow::<(Failure,), _>().unwrap();
     let adapter = eros::ErrorUnionAdapter::from(union);

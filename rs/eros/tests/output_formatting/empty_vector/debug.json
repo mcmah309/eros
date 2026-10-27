@@ -1,0 +1,14 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (0 total):",
+  "sources": []
+}

@@ -300,21 +300,19 @@ With `RUST_BACKTRACE=1`:
 
 ```console
 invalid digit found in string
-
-  Context (innermost first):
-    1. Parse server port
-    2. Configure server api
-    3. Start application
-
-Backtrace (captured):
-[3 frames hidden for brevity]
-   3: example::parse_port
-             at ./src/main.rs:4:29
-   4: example::configure_server
-             at ./src/main.rs:8:5
-   5: example::main
-             at ./src/main.rs:12:25
-[17 frames hidden for brevity]
+    context:
+        - Parse server port
+        - Configure server api
+        - Start application
+    backtrace (captured):
+        [3 frames hidden for brevity]
+           3: example::parse_port
+                     at ./src/main.rs:4:29
+           4: example::configure_server
+                     at ./src/main.rs:8:5
+           5: example::main
+                     at ./src/main.rs:12:25
+        [17 frames hidden for brevity]
 ```
 
 #### Location
@@ -499,6 +497,53 @@ format!(
 
 Only annotated parameters are included in the generated context. Parameters without `#[fmt(...)]` are ignored, allowing sensitive values or uninteresting arguments to be omitted.
 
+## Formatting
+
+`ErrorUnion` and `eros::Vec` support four report formats:
+
+| Format | `ErrorUnion` | `eros::Vec` |
+| --- | --- | --- |
+| `{:#}` (`Display`) | Root only | `errors (N total):` heading |
+| `{}` (`Display`) | Root and `Error::source()` chain | Same heading |
+| `{:#?}` (`Debug`) | Root, sources, and contexts | Heading and grouped child reports |
+| `{:?}` (`Debug`) | Same report, plus enabled locations and backtrace | Same grouping, including metadata |
+
+Sources and contexts use bullets; contexts appear innermost first. Empty
+sections are omitted. Alternate Debug omits locations and backtraces at every
+nesting level. Formatting never captures a new backtrace.
+
+Debug groups identical visible child reports in first-occurrence order, with
+zero-based positions and half-open ranges (`0..3` means indices 0, 1, and 2):
+
+```rust
+use eros::ErrorUnion;
+
+let errors: eros::Vec<(std::io::Error,)> = [
+    "invalid input", "invalid input", "invalid input",
+    "permission denied", "invalid input", "invalid input",
+]
+.into_iter()
+.map(|message| ErrorUnion::new(std::io::Error::other(message)))
+.collect();
+
+println!("{errors:#?}");
+```
+
+```text
+errors (6 total):
+    groups:
+        - message: invalid input
+          at: [0..3, 4..6]
+        - message: permission denied
+          at: [3]
+```
+
+Different sources, contexts, or nested children form separate groups; ordinary
+Debug also distinguishes locations and backtraces.
+
+See [Logging](#logging) for tracing fields and
+[Structured Diagnostics](#structured-diagnostics) for JSON reports.
+
 ## Best Practices
 
 ### Use In Libraries
@@ -680,14 +725,16 @@ fn func1b() -> eros::Result<()> {
 
 ### Logging
 
-For `ErrorUnion`, `Display` prints the root error followed by its `Error::source()` chain. `Debug` produces a human-readable report with context, locations, and backtrace information.
+Choose a [formatting mode](#formatting) for the information you want to log:
 
-| Format | Output | Tracing field |
-| --- | --- | --- |
-| `{}` | Root and sources separated by ` <- ` | `error = %error` |
-| `{:#}` | Root only | `error = %format_args!("{error:#}")` |
-| `{:?}` | Root, sources, contexts, locations, and backtrace | `error = ?error` |
-| `{:#?}` | Same report without locations and backtrace | `error = %format_args!("{error:#?}")` |
+| Format | Tracing field |
+| --- | --- |
+| `{}` | `error = %error` |
+| `{:#}` | `error = %format_args!("{error:#}")` |
+| `{:#?}` | `error = %format_args!("{error:#?}")` |
+| `{:?}` | `error = ?error` |
+
+For JSON report values, see [Structured Diagnostics](#structured-diagnostics).
 
 For logging, [`err_trail`](https://github.com/mcmah309/err_trail) is recommended. Libraries can use its constructs like `error!`, `warn!`, `info!`, `debug!`, and `trace!` macros while downstream applications select the `tracing`, `log`, or `defmt` backend. If no backend is selected by a downstream, then the code is optimized away by the compiler.
 
@@ -797,14 +844,17 @@ println!("{error}");
 ```
 
 ```text
-Update preparation failed <- TLS certificate has expired
+Update preparation failed
+    caused by:
+        - TLS certificate has expired
 ```
 
 For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving context, location, and backtrace. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
 
-### Diagnostic Logging
 
-The optional `diagnostic` feature adds `.to_display_json()` and `.to_debug_json()`, returning the same information as ordinary Display and Debug in a `serde_json::Value`. Display diagnostics contain `root` and `sources`; Debug diagnostics add `contexts`, optional `location` objects, and `backtrace` with `status` and `text`.
+### Structured Diagnostics
+
+The optional `diagnostic` feature adds `.to_display_json()` and `.to_debug_json()`, returning `serde_json::Value`. Display JSON contains `root` and `sources`; Debug JSON adds `contexts`, optional `location` objects, and `backtrace` with `status` and `text`. Registered children appear recursively in `children`, omitted when empty. These methods neither log nor serialize to text.
 
 ```rust
 // ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
@@ -815,8 +865,6 @@ let error = eros::error!("permission denied")
     .context("read /etc/app.toml")
     .context("start service");
 
-tracing::error!(error = %error, "startup failed");
-tracing::error!(error = ?error, "startup failed");
 println!("to_display_json: {}", error.to_display_json());
 println!("to_debug_json: {}", error.to_debug_json());
 
@@ -825,21 +873,8 @@ let error = error.map_inner(|source| StartupError { source });
 println!("replacement: {error}");
 ```
 
-With default Eros features, `diagnostic`, `RUST_LIB_BACKTRACE=0`, and a text subscriber configured without timestamps, targets, or ANSI colors, the output is:
+With default Eros features, `diagnostic`, and `RUST_LIB_BACKTRACE=0`, the output is:
 
-```text
-ERROR startup failed error=cannot open configuration <- permission denied
-```
-```text
-ERROR startup failed error=cannot open configuration
-  caused by: permission denied
-
-  Context (innermost first):
-    1. read /etc/app.toml
-    2. start service
-
-Backtrace (disabled):
-```
 ```text
 to_display_json: {"root":"cannot open configuration","sources":["permission denied"]}
 ```
@@ -847,7 +882,10 @@ to_display_json: {"root":"cannot open configuration","sources":["permission deni
 to_debug_json: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
 ```
 ```text
-replacement: startup failed <- cannot open configuration <- permission denied
+replacement: startup failed
+    caused by:
+        - cannot open configuration
+        - permission denied
 ```
 
 ### Exposing Errors To Application Users
@@ -993,10 +1031,9 @@ With the `context` feature enabled (the default):
 
 ```text
 TLS certificate has expired
-
-  Context (innermost first):
-    1. fetch https://updates.example.com/manifest.json
-    2. prepare application update to v2.4.0
+    context:
+        - fetch https://updates.example.com/manifest.json
+        - prepare application update to v2.4.0
 ```
 
 The headline identifies the problem immediately: an expired certificate. The context then identifies the request and the application operation that encountered it.

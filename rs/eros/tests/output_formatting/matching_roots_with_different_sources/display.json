@@ -1,0 +1,18 @@
+{
+  "children": [
+    {
+      "root": "import failed",
+      "sources": [
+        "permission denied"
+      ]
+    },
+    {
+      "root": "import failed",
+      "sources": [
+        "file missing"
+      ]
+    }
+  ],
+  "root": "errors (2 total):",
+  "sources": []
+}

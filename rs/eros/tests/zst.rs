@@ -138,11 +138,11 @@ fn zero_sized_roots_can_borrow_non_zero_sized_static_sources() {
     }
     let union: ErrorUnion<(Root,)> = ErrorUnion::new(Root);
     assert_eq!(union.source().unwrap().to_string(), "source\nmore");
-    assert_eq!(union.to_string(), "root <- source\nmore <- leaf");
+    assert_eq!(union.to_string(), "root\n    caused by:\n        - source\n          more\n        - leaf");
     assert_eq!(std::format!("{union:#}"), "root");
     assert_eq!(
         std::format!("{union:#?}"),
-        "root\n  caused by: source\n             more\n  caused by: leaf"
+        "root\n    caused by:\n        - source\n          more\n        - leaf"
     );
 }
 

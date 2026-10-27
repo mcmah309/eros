@@ -1,0 +1,46 @@
+{
+  "children": [
+    {
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "root": "alpha",
+      "sources": []
+    },
+    {
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "root": "beta",
+      "sources": []
+    },
+    {
+      "root": "beta",
+      "sources": []
+    },
+    {
+      "root": "alpha",
+      "sources": []
+    },
+    {
+      "root": "alpha",
+      "sources": []
+    },
+    {
+      "root": "zebra",
+      "sources": []
+    }
+  ],
+  "root": "errors (10 total):",
+  "sources": []
+}

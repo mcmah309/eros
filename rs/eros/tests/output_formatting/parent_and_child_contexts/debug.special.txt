@@ -1,0 +1,15 @@
+errors (2 total):
+    groups:
+        - message: invalid email
+          at: [0]
+          context:
+              - validate customer 104
+        - message: |
+              missing field
+              customer name
+          at: [1]
+          context:
+              - validate customer 209
+
+    context:
+        - import customers.csv

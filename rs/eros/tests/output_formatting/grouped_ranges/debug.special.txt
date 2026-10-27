@@ -1,0 +1,8 @@
+errors (10 total):
+    groups:
+        - message: zebra
+          at: [0..3, 4, 9]
+        - message: alpha
+          at: [3, 7..9]
+        - message: beta
+          at: [5..7]

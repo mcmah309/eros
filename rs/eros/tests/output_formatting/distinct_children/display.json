@@ -1,0 +1,18 @@
+{
+  "children": [
+    {
+      "root": "invalid input",
+      "sources": []
+    },
+    {
+      "root": "permission denied",
+      "sources": []
+    },
+    {
+      "root": "file missing",
+      "sources": []
+    }
+  ],
+  "root": "errors (3 total):",
+  "sources": []
+}

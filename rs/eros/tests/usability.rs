@@ -250,14 +250,14 @@ fn map_single() {
     let error: ErrorUnion<(IoErrorWrapper,)> = error.map_single(IoErrorWrapper);
     let message = format!("{:?}", error);
     assert!(
-        !message.contains("Context (innermost first):"),
+        !message.contains("context:"),
         "Expected no context in message:\n{}",
         message
     );
     let error: ErrorUnion<(MyErrorType,)> = error.map_single(|e| MyErrorType(Box::new(e.0)));
     let message = format!("{:?}", error);
     assert!(
-        !message.contains("Context (innermost first):"),
+        !message.contains("context:"),
         "Expected no context in message:\n{}",
         message
     );
@@ -265,7 +265,7 @@ fn map_single() {
     let error: ErrorUnion<(MyErrorType,)> = error.map_single(|e| MyErrorType(Box::new(e)));
     let message = format!("{:?}", error);
     assert!(
-        !message.contains("Context (innermost first):"),
+        !message.contains("context:"),
         "Expected no context in message:\n{}",
         message
     );

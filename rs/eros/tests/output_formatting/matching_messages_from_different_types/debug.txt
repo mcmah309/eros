@@ -1,0 +1,13 @@
+errors (2 total):
+    groups:
+        - message: invalid input
+          at: [0]
+          location: <location>
+          backtrace (<status>):
+        - message: invalid input
+          at: [1]
+          location: <location>
+          backtrace (<status>):
+
+    location: <location>
+    backtrace (<status>):

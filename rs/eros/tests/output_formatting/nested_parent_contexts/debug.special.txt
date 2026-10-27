@@ -1,0 +1,15 @@
+errors (1 total):
+    groups:
+        - message: errors (1 total)
+          at: [0]
+          groups:
+              - message: invalid input
+                at: [0]
+                context:
+                    - validate row 17
+
+          context:
+              - import page
+
+    context:
+        - import file

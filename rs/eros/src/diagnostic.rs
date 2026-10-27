@@ -1,16 +1,18 @@
 use alloc::{string::ToString, vec::Vec};
 use serde_json::{Value, json};
 
-use crate::{ErrorUnion, TypeSet, formatting::Report};
+use crate::{ErrorReport, ErrorUnion, TypeSet, formatting::Report};
 
 impl<E: TypeSet> ErrorUnion<E> {
-    /// Returns the information in ordinary Display as structured JSON.
+    /// Returns root/source messages and registered child reports as structured JSON.
     ///
     /// The object contains `root` (a string) and `sources` (an array of strings
-    /// in source-chain order). This creates data, without logging or serializing
-    /// it to text. Requires the `diagnostic` feature; works with `no_std + alloc`.
+    /// in source-chain order). Registered children appear recursively in a
+    /// `children` array, omitted when empty. This creates data, without logging
+    /// or serializing it to text. Requires the `diagnostic` feature; works with
+    /// `no_std + alloc`.
     pub fn to_display_json(&self) -> Value {
-        display_value(&Report::new(self))
+        self.report().to_display_json()
     }
 
     /// Returns the information in ordinary Debug as structured JSON.
@@ -21,8 +23,28 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// backtrace text is null; status is `disabled`, `unsupported`, or
     /// `feature_disabled`. Captured frames use `captured` and a rendered string.
     /// Locations are omitted when the `location` feature is off.
+    /// Registered children appear recursively in `children`, with their own
+    /// metadata. The array is omitted when empty.
     pub fn to_debug_json(&self) -> Value {
-        let report = Report::new(self);
+        self.report().to_debug_json()
+    }
+}
+
+impl ErrorReport<'_> {
+    /// Returns root/source messages and any child reports as structured JSON.
+    ///
+    /// Uses the same schema as [`ErrorUnion::to_display_json`].
+    pub fn to_display_json(&self) -> Value {
+        let mut value = display_value(&Report::from_inner(self.inner));
+        self.add_children(&mut value, |child| child.to_display_json());
+        value
+    }
+
+    /// Returns this report and its children with their saved diagnostic metadata.
+    ///
+    /// Uses the same schema as [`ErrorUnion::to_debug_json`].
+    pub fn to_debug_json(&self) -> Value {
+        let report = Report::from_inner(self.inner);
         let mut value = display_value(&report);
         #[allow(unused_mut)]
         let mut contexts = Vec::<Value>::new();
@@ -52,7 +74,16 @@ impl<E: TypeSet> ErrorUnion<E> {
             "status": report.backtrace_status(),
             "text": report.backtrace_text(),
         });
+        self.add_children(&mut value, |child| child.to_debug_json());
         value
+    }
+
+    fn add_children(&self, value: &mut Value, render: fn(&ErrorReport<'_>) -> Value) {
+        let mut children = Vec::new();
+        self.visit_children(&mut |child| children.push(render(&child)));
+        if !children.is_empty() {
+            value["children"] = children.into();
+        }
     }
 }
 

@@ -1,0 +1,156 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "alpha",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "zebra",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "beta",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "beta",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "alpha",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "alpha",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "zebra",
+      "sources": []
+    }
+  ],
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (10 total):",
+  "sources": []
+}

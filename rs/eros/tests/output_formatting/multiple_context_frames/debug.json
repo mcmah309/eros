@@ -1,0 +1,123 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "contexts": [
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 1\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 2\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 3\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 4\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 5\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 6\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 7\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 8\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 9\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 10\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 11\ncontinuation",
+      "user_facing": false
+    },
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "step 12\ncontinuation",
+      "user_facing": false
+    }
+  ],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "invalid input",
+  "sources": []
+}

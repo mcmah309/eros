@@ -77,9 +77,9 @@ fn start_service() -> Result<(), ErrorUnion<(NativeError,)>> {
 
 fn report_without_metadata() -> &'static str {
     if cfg!(feature = "context") {
-        "cannot open configuration\n  caused by: permission denied\n\n  Context (innermost first):\n    1. read /etc/app.toml\n    2. start service"
+        "cannot open configuration\n    caused by:\n        - permission denied\n    context:\n        - read /etc/app.toml\n        - start service"
     } else {
-        "cannot open configuration\n  caused by: permission denied"
+        "cannot open configuration\n    caused by:\n        - permission denied"
     }
 }
 
@@ -89,7 +89,7 @@ fn display_shows_root_and_native_sources_while_alternate_shows_root_only() {
 
     assert_eq!(
         error.to_string(),
-        "cannot open configuration <- permission denied"
+        "cannot open configuration\n    caused by:\n        - permission denied"
     );
     assert_eq!(format!("{error:#}"), "cannot open configuration");
     assert_eq!(format!("{error:#?}"), report_without_metadata());
@@ -107,11 +107,11 @@ fn display_and_debug_walk_every_native_source_in_order() {
 
     assert_eq!(
         error.to_string(),
-        "cannot open configuration <- permission denied <- access policy rejected"
+        "cannot open configuration\n    caused by:\n        - permission denied\n        - access policy rejected"
     );
     assert_eq!(
         format!("{error:#?}"),
-        "cannot open configuration\n  caused by: permission denied\n  caused by: access policy rejected"
+        "cannot open configuration\n    caused by:\n        - permission denied\n        - access policy rejected"
     );
 }
 
@@ -125,7 +125,7 @@ fn bare_errors_have_no_empty_source_or_context_sections() {
     let report = format!("{error:?}");
     assert!(report.starts_with("configuration missing\n"));
     assert!(!report.contains("caused by:"));
-    assert!(!report.contains("Context"));
+    assert!(!report.contains("context:"));
     assert!(!report.ends_with('\n'));
 }
 
@@ -250,11 +250,8 @@ impl Error for StartupError {
 fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     let error: ErrorUnion<eros::AnyError> = start_service().unwrap_err().into();
     let original_report = format!("{error:?}");
-    let (root_and_location, contexts_and_backtrace) = original_report
-        .split_once("\n  caused by: permission denied")
-        .unwrap();
-    let location = root_and_location
-        .strip_prefix("cannot open configuration")
+    let (_, contexts_and_backtrace) = original_report
+        .split_once("\n    caused by:\n        - permission denied")
         .unwrap();
     #[cfg(feature = "diagnostic")]
     let mut expected_diagnostic = error.to_debug_json();
@@ -266,15 +263,15 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     // The new root keeps the old root as a cause. All saved metadata stays in
     // its original place, including the exact captured frames and locations.
     let expected = [
-        "startup failed <- cannot open configuration <- permission denied".to_owned(),
+        "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied".to_owned(),
         "startup failed".to_owned(),
         format!(
-            "startup failed{location}\n  caused by: cannot open configuration\n  caused by: permission denied{contexts_and_backtrace}"
+            "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied{contexts_and_backtrace}"
         ),
         format!(
-            "startup failed\n  caused by: cannot open configuration\n  caused by: permission denied{}",
+            "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied{}",
             if cfg!(feature = "context") {
-                "\n\n  Context (innermost first):\n    1. read /etc/app.toml\n    2. start service"
+                "\n    context:\n        - read /etc/app.toml\n        - start service"
             } else {
                 ""
             }
@@ -344,19 +341,22 @@ fn anyhow_owned_and_shared_adapters_preserve_source_order_after_new_root() {
             "cannot open configuration",
             "permission denied",
         ];
-        assert_eq!(error.to_string(), expected_sources.join(" <- "));
+        assert_eq!(
+            error.to_string(),
+            "initialize application\n    caused by:\n        - load configuration\n        - cannot open configuration\n        - permission denied"
+        );
         assert_eq!(format!("{error:#}"), "initialize application");
         assert_eq!(native_chain_messages(error.inner()), expected_sources);
-        let mut expected_report = "initialize application\n  caused by: load configuration\n  caused by: cannot open configuration\n  caused by: permission denied".to_owned();
+        let mut expected_report = "initialize application\n    caused by:\n        - load configuration\n        - cannot open configuration\n        - permission denied".to_owned();
         if cfg!(feature = "context") {
-            expected_report.push_str("\n\n  Context (innermost first):\n    1. start service");
+            expected_report.push_str("\n    context:\n        - start service");
         }
         assert_eq!(format!("{error:#?}"), expected_report);
 
         let error = error.map_inner(StartupError);
         assert_eq!(
             error.to_string(),
-            "startup failed <- initialize application <- load configuration <- cannot open configuration <- permission denied"
+            "startup failed\n    caused by:\n        - initialize application\n        - load configuration\n        - cannot open configuration\n        - permission denied"
         );
         assert_eq!(
             native_chain_messages(error.source().unwrap()),
@@ -376,6 +376,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
     for shared in [false, true] {
         let original = anyhow_failure_origin();
         let original_status = original.backtrace().status();
+        #[cfg(not(feature = "better_backtrace"))]
         let original_frames = original.backtrace().to_string();
         let error = if shared {
             ErrorUnion::from_anyhow_arc(Arc::new(original))
@@ -383,7 +384,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
             ErrorUnion::from_anyhow(original)
         };
         let report = format!("{error:?}");
-        let (_, original_section) = report.split_once("\n\nBacktrace (").unwrap();
+        let (_, original_section) = report.split_once("\n    backtrace (").unwrap();
         #[cfg(feature = "diagnostic")]
         if original_status == std::backtrace::BacktraceStatus::Captured {
             assert!(
@@ -399,7 +400,15 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
                 let frames = original_section.strip_prefix("captured):\n").unwrap();
                 assert!(frames.contains("anyhow_failure_origin"), "{report}");
                 #[cfg(not(feature = "better_backtrace"))]
-                assert_eq!(frames, original_frames.trim_end_matches('\n'));
+                assert_eq!(
+                    frames,
+                    original_frames
+                        .trim_end_matches('\n')
+                        .lines()
+                        .map(|line| format!("        {line}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
             }
             std::backtrace::BacktraceStatus::Disabled => {
                 assert_eq!(original_section, "disabled):");
@@ -422,12 +431,12 @@ fn multiline_report_messages_keep_their_continuations_indented() {
 
     assert_eq!(
         error.to_string(),
-        "cannot open configuration\nretry exhausted <- permission denied\naccess policy rejected"
+        "cannot open configuration\nretry exhausted\n    caused by:\n        - permission denied\n          access policy rejected"
     );
-    let mut expected = "cannot open configuration\nretry exhausted\n  caused by: permission denied\n             access policy rejected".to_owned();
+    let mut expected = "cannot open configuration\nretry exhausted\n    caused by:\n        - permission denied\n          access policy rejected".to_owned();
     if cfg!(feature = "context") {
         expected.push_str(
-            "\n\n  Context (innermost first):\n    1. read /etc/app.toml\n       selected by CONFIG_PATH",
+            "\n    context:\n        - read /etc/app.toml\n          selected by CONFIG_PATH",
         );
     }
     assert_eq!(format!("{error:#?}"), expected);
@@ -444,7 +453,7 @@ fn option_context_keeps_the_absent_value_root() {
     if cfg!(feature = "context") {
         assert_eq!(
             report,
-            "An `Option` was unexpectedly `None`\n\n  Context (innermost first):\n    1. configuration path required"
+            "An `Option` was unexpectedly `None`\n    context:\n        - configuration path required"
         );
     } else {
         assert_eq!(report, "An `Option` was unexpectedly `None`");
@@ -476,36 +485,30 @@ fn debug_places_captured_locations_below_the_root_and_each_context() {
     let report = format!("{error:?}");
 
     assert!(
-        report.starts_with(&format!(
-            "configuration missing\n  [{}:{root_line}:",
-            file!()
-        )),
+        report.contains(&format!("\n    location: {}:{root_line}:", file!())),
         "{report}"
     );
     if cfg!(feature = "context") {
         assert!(
             report.contains(&format!(
-                "    1. read /etc/app.toml\n    [{}:{inner_line}:",
+                "        - read /etc/app.toml\n            location: {}:{inner_line}:",
                 file!()
             )),
             "{report}"
         );
         assert!(
             report.contains(&format!(
-                "    2. start service\n    [{}:{outer_line}:",
+                "        - start service\n            location: {}:{outer_line}:",
                 file!()
             )),
             "{report}"
         );
-        assert!(
-            report.find("1. read /etc/app.toml").unwrap()
-                < report.find("2. start service").unwrap()
-        );
+        assert!(report.find("read /etc/app.toml").unwrap() < report.find("start service").unwrap());
     }
 
     let alternate = format!("{error:#?}");
     assert!(!alternate.contains(file!()));
-    assert!(!alternate.contains("Backtrace"));
+    assert!(!alternate.contains("backtrace"));
 }
 
 #[test]
@@ -517,22 +520,25 @@ fn debug_reports_the_actual_backtrace_capture_status() {
     match error.backtrace().status() {
         std::backtrace::BacktraceStatus::Captured => {
             let (_, frames) = report
-                .split_once("\n\nBacktrace (captured):\n")
+                .split_once("\n    backtrace (captured):\n")
                 .expect("captured backtraces must be printed in the human report");
             assert!(!frames.trim().is_empty());
             assert!(frames.contains("open_config_file"), "{report}");
         }
         std::backtrace::BacktraceStatus::Disabled => {
-            assert!(report.ends_with("\n\nBacktrace (disabled):"), "{report}");
+            assert!(report.ends_with("\n    backtrace (disabled):"), "{report}");
         }
         std::backtrace::BacktraceStatus::Unsupported => {
-            assert!(report.ends_with("\n\nBacktrace (unsupported):"), "{report}");
+            assert!(
+                report.ends_with("\n    backtrace (unsupported):"),
+                "{report}"
+            );
         }
         _ => panic!("unexpected backtrace status"),
     }
     #[cfg(not(feature = "backtrace"))]
     assert!(
-        report.ends_with("\n\nBacktrace (feature disabled):"),
+        report.ends_with("\n    backtrace (feature disabled):"),
         "{report}"
     );
 
@@ -581,7 +587,7 @@ fn tracing_percent_and_question_mark_use_the_public_human_formats() {
     assert_eq!(event["fields"]["message"], "startup failed");
     assert_eq!(
         event["fields"]["error_display"],
-        "cannot open configuration <- permission denied"
+        "cannot open configuration\n    caused by:\n        - permission denied"
     );
     assert_eq!(event["fields"]["error_debug"], format!("{error:?}"));
     assert_eq!(event["fields"]["error_short"], "cannot open configuration");
@@ -670,7 +676,12 @@ fn to_debug_json_includes_contexts_locations_and_backtrace_status() {
             assert_eq!(backtrace["status"], "captured");
             let text = backtrace["text"].as_str().unwrap();
             assert!(!text.trim().is_empty());
-            assert!(format!("{error:?}").ends_with(text));
+            let indented = text
+                .lines()
+                .map(|line| format!("        {line}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(format!("{error:?}").ends_with(&indented));
         }
         std::backtrace::BacktraceStatus::Disabled => {
             assert_eq!(

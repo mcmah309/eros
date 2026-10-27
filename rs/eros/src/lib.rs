@@ -68,12 +68,15 @@ mod msg_error;
 mod narrowing;
 pub mod prelude;
 mod recovery;
+mod report;
 #[cfg(feature = "alloc")]
 mod root_error;
 mod storage;
 pub mod type_set;
 #[cfg(all(test, feature = "user_context"))]
 mod user_context;
+#[cfg(feature = "alloc")]
+mod vec;
 
 // re-export macro
 pub use eros_macros::{
@@ -94,7 +97,10 @@ pub use error_union::ErrorUnion;
 pub use error_union::ErrorUnionAdapter;
 pub use error_union::SendSyncError;
 pub use msg_error::MsgError;
+pub use report::ErrorReport;
 pub use type_set::TypeSet;
+#[cfg(feature = "alloc")]
+pub use vec::Vec;
 
 // traits
 pub use context::Context;

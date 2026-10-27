@@ -1,0 +1,10 @@
+errors (1 total):
+    groups:
+        - message: errors (1 total)
+          at: [0]
+          groups:
+              - message: errors (2 total)
+                at: [0]
+                groups:
+                    - message: invalid input
+                      at: [0..2]

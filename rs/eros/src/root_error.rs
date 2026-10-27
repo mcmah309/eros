@@ -131,7 +131,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// let error = eros::error!("permission denied")
     ///     .map_inner(|old| ConfigError { source: old });
     ///
-    /// assert_eq!(error.to_string(), "cannot open configuration <- permission denied");
+    /// assert_eq!(error.to_string(), "cannot open configuration\n    caused by:\n        - permission denied");
     /// assert!(error.is_inner::<ConfigError>());
     /// assert_eq!(error.source().unwrap().to_string(), "permission denied");
     /// ```

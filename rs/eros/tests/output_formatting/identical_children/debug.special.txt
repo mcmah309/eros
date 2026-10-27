@@ -1,0 +1,4 @@
+errors (4 total):
+    groups:
+        - message: invalid input
+          at: [0..4]

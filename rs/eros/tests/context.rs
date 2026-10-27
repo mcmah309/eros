@@ -53,13 +53,13 @@ fn error_union() {
     let error = result.unwrap_err();
     let message = format!("{:?}", error);
     assert!(
-        message.contains("Context (innermost first):"),
+        message.contains("context:"),
         "Expected context in message:\n{}",
         message
     );
     let message = format!("{}", error);
     assert!(
-        !message.contains("Context (innermost first):"),
+        !message.contains("context:"),
         "Expected no context in message:\n{}",
         message
     );
@@ -67,7 +67,7 @@ fn error_union() {
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
-        message.contains("Context (innermost first):"),
+        message.contains("context:"),
         "Expected context in message:\n{}",
         message
     );
@@ -75,7 +75,7 @@ fn error_union() {
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
-        message.contains("Context (innermost first):"),
+        message.contains("context:"),
         "Expected context in message:\n{}",
         message
     );
@@ -135,7 +135,7 @@ fn bail() {
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
-        message.contains("Context (innermost first):"),
+        message.contains("context:"),
         "Expected context in message:\n{}",
         message
     );
@@ -157,7 +157,7 @@ fn ensure() {
     assert!(result.is_err());
     let message = format!("{:?}", result.unwrap_err());
     assert!(
-        message.contains("Context (innermost first):"),
+        message.contains("context:"),
         "Expected context in message:\n{}",
         message
     );
@@ -194,8 +194,11 @@ fn nesting_traced_dyn_calls() {
     let result: eros::Result<()> = func2();
     let message = format!("{:?}", result.unwrap_err());
 
-    let count = message.match_indices("Context (innermost first):").count();
-    assert_eq!(count, 1, "Expected only one 'Context (innermost first):', got:\n{}", message);
+    let count = message
+        .lines()
+        .filter(|line| line.trim() == "context:")
+        .count();
+    assert_eq!(count, 1, "Expected only one 'context:', got:\n{}", message);
     println!("{}", message);
 }
 
@@ -223,10 +226,10 @@ fn integration_with_anyhow() {
 
     assert_eq!(
         error.to_string(),
-        "This is some anyhow context <- This is the root"
+        "This is some anyhow context\n    caused by:\n        - This is the root"
     );
     assert_eq!(
         format!("{error:#?}"),
-        "This is some anyhow context\n  caused by: This is the root\n\n  Context (innermost first):\n    1. eros context"
+        "This is some anyhow context\n    caused by:\n        - This is the root\n    context:\n        - eros context"
     );
 }

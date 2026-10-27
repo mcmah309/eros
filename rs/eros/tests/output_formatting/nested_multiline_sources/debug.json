@@ -1,0 +1,48 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "children": [
+        {
+          "backtrace": {
+            "status": "<status>",
+            "text": null
+          },
+          "contexts": [],
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "root": "invalid record\r\nretry exhausted",
+          "sources": [
+            "permission denied\naccess policy rejected"
+          ]
+        }
+      ],
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "errors (1 total):",
+      "sources": []
+    }
+  ],
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (1 total):",
+  "sources": []
+}

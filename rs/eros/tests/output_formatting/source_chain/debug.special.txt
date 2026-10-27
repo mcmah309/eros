@@ -1,0 +1,4 @@
+startup failed
+    caused by:
+        - cannot open configuration
+        - permission denied

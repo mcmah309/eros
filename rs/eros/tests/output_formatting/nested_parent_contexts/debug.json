@@ -1,0 +1,76 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "children": [
+        {
+          "backtrace": {
+            "status": "<status>",
+            "text": null
+          },
+          "contexts": [
+            {
+              "location": {
+                "column": 0,
+                "file": "<file>",
+                "line": 0
+              },
+              "message": "validate row 17",
+              "user_facing": false
+            }
+          ],
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "root": "invalid input",
+          "sources": []
+        }
+      ],
+      "contexts": [
+        {
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "message": "import page",
+          "user_facing": false
+        }
+      ],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "errors (1 total):",
+      "sources": []
+    }
+  ],
+  "contexts": [
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "import file",
+      "user_facing": false
+    }
+  ],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (1 total):",
+  "sources": []
+}

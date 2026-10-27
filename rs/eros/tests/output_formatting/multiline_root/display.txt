@@ -1,0 +1,2 @@
+invalid record
+retry exhausted

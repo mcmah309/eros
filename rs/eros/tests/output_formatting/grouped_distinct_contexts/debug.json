@@ -1,0 +1,88 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [
+        {
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "message": "row 17",
+          "user_facing": false
+        }
+      ],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "invalid input",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [
+        {
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "message": "row 29",
+          "user_facing": false
+        }
+      ],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "invalid input",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [
+        {
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "message": "row 17",
+          "user_facing": false
+        }
+      ],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "invalid input",
+      "sources": []
+    }
+  ],
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (3 total):",
+  "sources": []
+}

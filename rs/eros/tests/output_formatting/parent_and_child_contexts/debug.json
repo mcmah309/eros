@@ -1,0 +1,74 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [
+        {
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "message": "validate customer 104",
+          "user_facing": false
+        }
+      ],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "invalid email",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [
+        {
+          "location": {
+            "column": 0,
+            "file": "<file>",
+            "line": 0
+          },
+          "message": "validate customer 209",
+          "user_facing": false
+        }
+      ],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "missing field\ncustomer name",
+      "sources": []
+    }
+  ],
+  "contexts": [
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "import customers.csv",
+      "user_facing": false
+    }
+  ],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (2 total):",
+  "sources": []
+}

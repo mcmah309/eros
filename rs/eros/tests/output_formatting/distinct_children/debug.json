@@ -1,0 +1,58 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "invalid input",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "permission denied",
+      "sources": []
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "file missing",
+      "sources": []
+    }
+  ],
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (3 total):",
+  "sources": []
+}

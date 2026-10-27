@@ -1,0 +1,18 @@
+{
+  "children": [
+    {
+      "children": [
+        {
+          "root": "invalid record\r\nretry exhausted",
+          "sources": [
+            "permission denied\naccess policy rejected"
+          ]
+        }
+      ],
+      "root": "errors (1 total):",
+      "sources": []
+    }
+  ],
+  "root": "errors (1 total):",
+  "sources": []
+}

@@ -1,0 +1,24 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "contexts": [
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "validate record\nrow 17",
+      "user_facing": false
+    }
+  ],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "invalid input",
+  "sources": []
+}

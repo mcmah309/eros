@@ -1,0 +1,17 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "startup failed",
+  "sources": [
+    "cannot open configuration",
+    "permission denied"
+  ]
+}

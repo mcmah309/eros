@@ -1,0 +1,48 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "children": [
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "import failed",
+      "sources": [
+        "permission denied"
+      ]
+    },
+    {
+      "backtrace": {
+        "status": "<status>",
+        "text": null
+      },
+      "contexts": [],
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "root": "import failed",
+      "sources": [
+        "file missing"
+      ]
+    }
+  ],
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "errors (2 total):",
+  "sources": []
+}

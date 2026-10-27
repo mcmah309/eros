@@ -1,0 +1,10 @@
+errors (3 total):
+    groups:
+        - message: invalid input
+          at: [0, 2]
+          context:
+              - row 17
+        - message: invalid input
+          at: [1]
+          context:
+              - row 29

@@ -1,0 +1,330 @@
+use eros::ErrorReport;
+
+pub struct Fixtures {
+    pub display: &'static str,
+    pub display_special: &'static str,
+    pub debug: &'static str,
+    pub debug_special: &'static str,
+    pub debug_unlocated: Option<&'static str>,
+    #[cfg(feature = "diagnostic")]
+    pub display_json: &'static str,
+    #[cfg(feature = "diagnostic")]
+    pub debug_json: &'static str,
+}
+
+fn trace_status(report: ErrorReport<'_>) -> &'static str {
+    #[cfg(feature = "backtrace")]
+    {
+        match report.backtrace().status() {
+            std::backtrace::BacktraceStatus::Captured => "captured",
+            std::backtrace::BacktraceStatus::Disabled => "disabled",
+            std::backtrace::BacktraceStatus::Unsupported => "unsupported",
+            _ => "unknown",
+        }
+    }
+    #[cfg(not(feature = "backtrace"))]
+    {
+        let _ = report;
+        "feature_disabled"
+    }
+}
+
+fn visit_reports(report: ErrorReport<'_>, visitor: &mut impl FnMut(ErrorReport<'_>)) {
+    visitor(report);
+    report.visit_children(&mut |child| visit_reports(child, visitor));
+}
+
+#[allow(unused_mut)] // Location replacement is feature-dependent.
+fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
+    let mut statuses = Vec::new();
+    visit_reports(report, &mut |report| {
+        statuses.push(trace_status(report));
+        #[cfg(feature = "location")]
+        {
+            text = text.replace(
+                &format!("location: {}", report.location()),
+                "location: <location>",
+            );
+            #[cfg(feature = "context")]
+            for frame in report.contexts() {
+                text = text.replace(
+                    &format!("location: {}", frame.location()),
+                    "location: <location>",
+                );
+            }
+        }
+    });
+    let lines: Vec<_> = text.split('\n').collect();
+    let mut normalized = Vec::new();
+    let mut index = 0;
+    while index < lines.len() {
+        let line = lines[index];
+        let trimmed = line.trim_start();
+        if let Some(status) = trimmed
+            .strip_prefix("backtrace (")
+            .and_then(|s| s.strip_suffix("):"))
+        {
+            let status = if status == "feature disabled" {
+                "feature_disabled"
+            } else {
+                status
+            };
+            assert!(
+                statuses.contains(&status),
+                "unexpected backtrace status: {status}"
+            );
+            let indent = line.len() - trimmed.len();
+            normalized.push(format!("{}backtrace (<status>):", " ".repeat(indent)));
+            index += 1;
+            // Captured frames are volatile. Only the indented trace body is
+            // omitted; blank separators and subsequent report fields remain.
+            while index < lines.len()
+                && lines[index]
+                    .bytes()
+                    .take_while(|byte| *byte == b' ')
+                    .count()
+                    > indent
+            {
+                index += 1;
+            }
+        } else {
+            normalized.push(line.to_owned());
+            index += 1;
+        }
+    }
+    normalized.join("\n")
+}
+
+fn expected_debug(text: &str) -> String {
+    text.split('\n')
+        .filter(|line| {
+            cfg!(feature = "location") || !line.trim_start().starts_with("location: <location>")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn canonical_text(text: &str) -> String {
+    text.split('\n')
+        .map(|line| {
+            if line.bytes().all(|byte| byte == b' ') {
+                ""
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn record(case: &str, file: &str, actual: &str) -> bool {
+    let update = std::env::var("EROS_UPDATE_OUTPUT_FIXTURES").unwrap_or_default();
+    let should_write = match update.as_str() {
+        "1" => {
+            assert!(
+                cfg!(all(
+                    feature = "diagnostic",
+                    feature = "context",
+                    feature = "location"
+                )),
+                "record fixtures with --all-features"
+            );
+            true
+        }
+        "debug-unlocated" => file == "debug.unlocated.txt",
+        "" => false,
+        _ => panic!("unknown EROS_UPDATE_OUTPUT_FIXTURES value"),
+    };
+    if should_write {
+        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/output_formatting")
+            .join(case);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join(file), actual).unwrap();
+    }
+    should_write
+}
+
+fn assert_text(case: &str, file: &str, actual: &str, expected: &str) {
+    let actual = canonical_text(actual) + "\n";
+    println!("\n--- {case}/{file} ---\n{actual}");
+    if !record(case, file, &actual) {
+        assert!(
+            actual == expected,
+            "Output differs from output_formatting/{case}/{file}\n\n--- expected ---\n{expected}\n--- actual ---\n{actual}"
+        );
+    }
+}
+
+pub fn assert_case(case: &str, report: ErrorReport<'_>, fixtures: Fixtures) {
+    assert_text(case, "display.txt", &format!("{report}"), fixtures.display);
+    assert_text(
+        case,
+        "display.special.txt",
+        &format!("{report:#}"),
+        fixtures.display_special,
+    );
+    assert_text(
+        case,
+        "debug.special.txt",
+        &format!("{report:#?}"),
+        fixtures.debug_special,
+    );
+    let basic = !cfg!(feature = "location") && trace_status(report) != "captured";
+    let (file, expected) = if basic {
+        fixtures
+            .debug_unlocated
+            .map(|text| ("debug.unlocated.txt", text))
+            .unwrap_or(("debug.txt", fixtures.debug))
+    } else {
+        ("debug.txt", fixtures.debug)
+    };
+    assert_text(
+        case,
+        file,
+        &normalize_debug(report, format!("{report:?}")),
+        &expected_debug(expected),
+    );
+    #[cfg(feature = "diagnostic")]
+    assert_json(case, report, fixtures.display_json, fixtures.debug_json);
+}
+
+#[cfg(all(feature = "diagnostic", feature = "location"))]
+fn assert_location(value: &mut serde_json::Value, location: &core::panic::Location<'_>) {
+    assert_eq!(
+        *value,
+        serde_json::json!({
+            "file": location.file(), "line": location.line(), "column": location.column(),
+        })
+    );
+    *value = serde_json::json!({"file": "<file>", "line": 0, "column": 0});
+}
+
+#[cfg(feature = "diagnostic")]
+fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
+    #[cfg(feature = "location")]
+    assert_location(&mut value["location"], report.location());
+    #[cfg(not(feature = "location"))]
+    assert!(value.get("location").is_none());
+    let contexts = value["contexts"]
+        .as_array_mut()
+        .expect("debug contexts array");
+    #[cfg(feature = "context")]
+    {
+        assert_eq!(contexts.len(), report.contexts().len());
+        for (value, frame) in contexts.iter_mut().zip(report.contexts()) {
+            assert_eq!(value["message"], frame.to_string());
+            #[cfg(feature = "user_context")]
+            assert_eq!(value["user_facing"], frame.is_user_facing());
+            #[cfg(not(feature = "user_context"))]
+            assert_eq!(value["user_facing"], false);
+            #[cfg(feature = "location")]
+            assert_location(&mut value["location"], frame.location());
+            #[cfg(not(feature = "location"))]
+            assert!(value.get("location").is_none());
+        }
+    }
+    #[cfg(not(feature = "context"))]
+    assert!(contexts.is_empty());
+    let trace = &mut value["backtrace"];
+    let status = trace_status(report);
+    assert_eq!(trace["status"], status);
+    if status == "captured" {
+        let frames = trace["text"]
+            .as_str()
+            .expect("captured frames must be text");
+        assert!(!frames.trim().is_empty());
+        assert!(
+            !frames.contains('\u{1b}'),
+            "JSON traces must not contain ANSI escapes"
+        );
+        let indented = frames
+            .lines()
+            .map(|line| format!("        {line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            format!("{report:?}").ends_with(&indented),
+            "JSON must retain the same captured frames as ordinary Debug"
+        );
+    } else {
+        assert!(trace["text"].is_null());
+    }
+    trace["status"] = "<status>".into();
+    trace["text"] = serde_json::Value::Null;
+    let mut children = Vec::new();
+    report.visit_children(&mut |child| children.push(child));
+    if children.is_empty() {
+        assert!(value.get("children").is_none());
+    } else {
+        let output = value["children"]
+            .as_array_mut()
+            .expect("JSON children array");
+        assert_eq!(output.len(), children.len());
+        for (child, output) in children.into_iter().zip(output) {
+            normalize_json(child, output);
+        }
+    }
+}
+
+#[cfg(feature = "diagnostic")]
+fn adapt_expected_json(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(object) => {
+            if !cfg!(feature = "location") {
+                object.remove("location");
+            }
+            for value in object.values_mut() {
+                adapt_expected_json(value);
+            }
+        }
+        serde_json::Value::Array(array) => {
+            for value in array {
+                adapt_expected_json(value);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(feature = "diagnostic")]
+fn display_projection(mut value: serde_json::Value) -> serde_json::Value {
+    let object = value.as_object_mut().unwrap();
+    for key in ["contexts", "location", "backtrace"] {
+        object.remove(key);
+    }
+    if let Some(children) = object.get_mut("children") {
+        for child in children.as_array_mut().unwrap() {
+            *child = display_projection(child.take());
+        }
+    }
+    value
+}
+
+#[cfg(feature = "diagnostic")]
+fn assert_json(case: &str, report: ErrorReport<'_>, display_fixture: &str, debug_fixture: &str) {
+    let display = report.to_display_json();
+    let mut debug = report.to_debug_json();
+    assert_eq!(
+        display_projection(debug.clone()),
+        display,
+        "debug JSON must enrich display JSON recursively"
+    );
+    normalize_json(report, &mut debug);
+    for (file, actual, fixture) in [
+        ("display.json", display, display_fixture),
+        ("debug.json", debug, debug_fixture),
+    ] {
+        let rendered = serde_json::to_string_pretty(&actual).unwrap() + "\n";
+        println!("\n--- {case}/{file} ---\n{rendered}");
+        if !record(case, file, &rendered) {
+            let mut expected: serde_json::Value = serde_json::from_str(fixture)
+                .unwrap_or_else(|error| panic!("invalid JSON in {case}/{file}: {error}"));
+            adapt_expected_json(&mut expected);
+            assert_eq!(
+                actual, expected,
+                "JSON differs from output_formatting/{case}/{file}"
+            );
+        }
+    }
+}

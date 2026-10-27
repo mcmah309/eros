@@ -1,0 +1,17 @@
+errors (2 total):
+    groups:
+        - message: import failed
+          at: [0]
+          caused by:
+              - permission denied
+          location: <location>
+          backtrace (<status>):
+        - message: import failed
+          at: [1]
+          caused by:
+              - file missing
+          location: <location>
+          backtrace (<status>):
+
+    location: <location>
+    backtrace (<status>):

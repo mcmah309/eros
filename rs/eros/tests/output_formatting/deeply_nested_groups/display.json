@@ -1,0 +1,26 @@
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "root": "invalid input",
+              "sources": []
+            },
+            {
+              "root": "invalid input",
+              "sources": []
+            }
+          ],
+          "root": "errors (2 total):",
+          "sources": []
+        }
+      ],
+      "root": "errors (1 total):",
+      "sources": []
+    }
+  ],
+  "root": "errors (1 total):",
+  "sources": []
+}

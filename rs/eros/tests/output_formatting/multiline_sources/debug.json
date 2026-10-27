@@ -1,0 +1,16 @@
+{
+  "backtrace": {
+    "status": "<status>",
+    "text": null
+  },
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "cannot open configuration\nretry exhausted",
+  "sources": [
+    "permission denied\naccess policy rejected"
+  ]
+}

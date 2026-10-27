@@ -1,0 +1,63 @@
+use core::fmt;
+
+use crate::{ErrorUnion, SendSyncError, TypeSet, formatting::Report, storage::ErrorUnionInner};
+
+/// A borrowed report independent of an [`ErrorUnion`]'s static error set.
+///
+/// Created by [`ErrorUnion::report`]. Formatting follows the union's Display and
+/// Debug conventions. The view neither owns nor copies the saved diagnostics.
+#[derive(Clone, Copy)]
+pub struct ErrorReport<'a> {
+    pub(crate) inner: &'a ErrorUnionInner,
+}
+
+impl<E: TypeSet> ErrorUnion<E> {
+    /// Borrows this union's report without erasing its owned error set.
+    pub fn report(&self) -> ErrorReport<'_> {
+        ErrorReport { inner: &self.inner }
+    }
+}
+
+impl<'a> ErrorReport<'a> {
+    /// Borrows the concrete root, supporting downcasts by custom reporters.
+    pub fn inner(&self) -> &'a dyn SendSyncError {
+        self.inner.error()
+    }
+
+    /// Borrows the immediate batch children in insertion order.
+    pub fn visit_children(&self, visitor: &mut dyn FnMut(ErrorReport<'a>)) {
+        self.inner.visit_children(visitor);
+    }
+
+    /// Borrows saved contexts in attachment order (innermost first).
+    #[cfg(feature = "context")]
+    pub fn contexts(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &'a crate::ContextFrame> + ExactSizeIterator {
+        self.inner.context.iter()
+    }
+
+    /// Borrows the saved Eros backtrace, without capturing a new one.
+    #[cfg(feature = "backtrace")]
+    pub fn backtrace(&self) -> &'a std::backtrace::Backtrace {
+        &self.inner.backtrace
+    }
+
+    /// Returns the original Eros capture location.
+    #[cfg(feature = "location")]
+    pub fn location(&self) -> &'static core::panic::Location<'static> {
+        self.inner.location
+    }
+}
+
+impl fmt::Display for ErrorReport<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Report::from_inner(self.inner).display(f)
+    }
+}
+
+impl fmt::Debug for ErrorReport<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Report::from_inner(self.inner).debug(f)
+    }
+}

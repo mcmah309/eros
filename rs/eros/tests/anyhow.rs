@@ -37,7 +37,7 @@ fn owned_and_shared_anyhow_adapters_retain_chains_and_shared_ownership() {
     let owned_union =
         ErrorUnion::from_anyhow(anyhow::Error::new(MsgError::from("root")).context("anyhow context"));
     for error in [owned_union, shared_union] {
-        assert_eq!(error.to_string(), "anyhow context <- root");
+        assert_eq!(error.to_string(), "anyhow context\n    caused by:\n        - root");
         assert_eq!(
             error
                 .source()
@@ -47,7 +47,7 @@ fn owned_and_shared_anyhow_adapters_retain_chains_and_shared_ownership() {
                 .as_str(),
             "root"
         );
-        assert_eq!(format!("{error:#?}"), "anyhow context\n  caused by: root");
+        assert_eq!(format!("{error:#?}"), "anyhow context\n    caused by:\n        - root");
         let error: anyhow::Error = error.context("eros context").into();
         assert_eq!(
             error.to_string(),

@@ -59,7 +59,7 @@ jobs:
           RUST_LIB_BACKTRACE: "1"
         run: >-
           cargo test -p eros --all-features
-          --test formatting --test reshaping --test union_conversions
+          --test formatting --test output_formatting --test child_reports --test vec --test reshaping --test union_conversions
           --test single_reshaping --test group_recovery --test try_recover
 
   miri:

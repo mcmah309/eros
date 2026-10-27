@@ -1,0 +1,18 @@
+{
+  "children": [
+    {
+      "root": "invalid record\r\nretry exhausted",
+      "sources": []
+    },
+    {
+      "root": "invalid record\r\nretry exhausted",
+      "sources": []
+    },
+    {
+      "root": "invalid record\r\nretry exhausted",
+      "sources": []
+    }
+  ],
+  "root": "errors (3 total):",
+  "sources": []
+}

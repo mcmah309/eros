@@ -1,0 +1,19 @@
+errors (3 total):
+    groups:
+        - message: invalid input
+          at: [0, 2]
+          context:
+              - row 17
+                  location: <location>
+          location: <location>
+          backtrace (<status>):
+        - message: invalid input
+          at: [1]
+          context:
+              - row 29
+                  location: <location>
+          location: <location>
+          backtrace (<status>):
+
+    location: <location>
+    backtrace (<status>):

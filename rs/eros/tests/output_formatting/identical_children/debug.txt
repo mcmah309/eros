@@ -1,0 +1,9 @@
+errors (4 total):
+    groups:
+        - message: invalid input
+          at: [0..4]
+          location: <location>
+          backtrace (<status>):
+
+    location: <location>
+    backtrace (<status>):

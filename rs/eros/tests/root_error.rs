@@ -74,7 +74,7 @@ fn closure_owns_the_typed_root_and_can_explicitly_retain_it_as_source() {
     );
     assert_eq!(
         error.to_string(),
-        "startup failed <- cannot open configuration <- permission denied"
+        "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied"
     );
     let previous = error
         .source()
@@ -92,7 +92,7 @@ fn closure_can_replace_the_old_root_with_an_unrelated_error_and_chain() {
     assert!(error.is_inner::<ConfigError>());
     assert_eq!(
         error.to_string(),
-        "cannot open configuration <- permission denied"
+        "cannot open configuration\n    caused by:\n        - permission denied"
     );
     assert_eq!(error.source().unwrap().to_string(), "permission denied");
     assert!(!format!("{error:#?}").contains("original failure"));
@@ -142,7 +142,7 @@ fn identity_and_repeated_replacements_receive_the_actual_root() {
     assert!(error.is_inner::<StartupError>());
     assert_eq!(
         error.to_string(),
-        "startup failed <- cannot open configuration <- permission denied"
+        "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied"
     );
 
     let error = error.map_inner(|old| {

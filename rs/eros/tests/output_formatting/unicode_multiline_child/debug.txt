@@ -1,0 +1,11 @@
+errors (1 total):
+    groups:
+        - message: |
+              🦀 invalid café
+              检查输入
+          at: [0]
+          location: <location>
+          backtrace (<status>):
+
+    location: <location>
+    backtrace (<status>):
