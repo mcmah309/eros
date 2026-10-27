@@ -5,6 +5,8 @@ error:
             检查输入
           at: [0]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

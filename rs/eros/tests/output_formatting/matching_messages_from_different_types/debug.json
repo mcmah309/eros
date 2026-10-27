@@ -1,14 +1,8 @@
 {
-  "backtrace": {
-    "status": "<status>",
-    "text": null
-  },
+  "backtrace": null,
   "children": [
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -16,13 +10,11 @@
         "line": 0
       },
       "root": "invalid input",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -30,7 +22,8 @@
         "line": 0
       },
       "root": "invalid input",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     }
   ],
   "contexts": [],
@@ -40,5 +33,6 @@
     "line": 0
   },
   "root": "errors (2 total):",
-  "sources": []
+  "sources": [],
+  "span_trace": null
 }

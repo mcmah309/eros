@@ -7,12 +7,16 @@ error:
                             - error: invalid input
                               at: [0..2]
                               location: <location>
-                              backtrace (<status>):
+                              span trace: not captured
+                              backtrace: <status>
                     at: [0]
                     location: <location>
-                    backtrace (<status>):
+                    span trace: not captured
+                    backtrace: <status>
           at: [0]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

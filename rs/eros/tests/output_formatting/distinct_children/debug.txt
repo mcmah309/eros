@@ -3,14 +3,18 @@ error:
         - error: invalid input
           at: [0]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
         - error: permission denied
           at: [1]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
         - error: file missing
           at: [2]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

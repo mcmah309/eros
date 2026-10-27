@@ -21,6 +21,7 @@ color-backtrace = { version = "0.7", default-features = false, features = [
 ], optional = true }
 btparse = { version = "0.2", optional = true }
 serde_json = { version = "1", default-features = false, features = ["alloc"], optional = true }
+tracing-error = { version = "0.2", default-features = false, optional = true }
 
 
 [dev-dependencies]
@@ -39,13 +40,15 @@ thiserror = "2"
 default = ["alloc", "context", "backtrace"]
 # Enables heap fallback for errors exceeding one word, and owned messages.
 alloc = []
-# Enables the `std` library. Required for `backtrace` and `anyhow` features. When disabled,
+# Enables the `std` library. Required for `backtrace`, `spantrace`, and `anyhow`. When disabled,
 # `eros` is `no_std`. Without alloc, errors must fit the inline size/alignment.
 std = ["alloc"]
 # Enables context
 context = ["alloc", "eros-macros/context"]
 # Enables backtrace
 backtrace = ["std"]
+# Captures the current tracing span and its parents when an error first enters Eros.
+spantrace = ["std", "dep:tracing-error"]
 # Parses and removes the unnecessary noise from the backtrace before printing
 better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
 # Enables location capture

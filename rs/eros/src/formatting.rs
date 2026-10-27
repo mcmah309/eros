@@ -1,6 +1,6 @@
 #[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "backtrace")]
+#[cfg(any(feature = "backtrace", feature = "spantrace"))]
 use alloc::string::ToString;
 #[cfg(feature = "alloc")]
 use alloc::{collections::BTreeMap, vec::Vec};
@@ -25,6 +25,8 @@ pub(crate) struct Report<'a> {
     pub(crate) location: &'static core::panic::Location<'static>,
     #[cfg(feature = "backtrace")]
     backtrace: &'a std::backtrace::Backtrace,
+    #[cfg(feature = "spantrace")]
+    span_trace: &'a tracing_error::SpanTrace,
 }
 
 impl<'a> Report<'a> {
@@ -61,6 +63,8 @@ impl<'a> Report<'a> {
             location: inner.location,
             #[cfg(feature = "backtrace")]
             backtrace,
+            #[cfg(feature = "spantrace")]
+            span_trace: &inner.span_trace,
         }
     }
 
@@ -98,24 +102,19 @@ impl<'a> Report<'a> {
         }
     }
 
+    #[cfg(feature = "backtrace")]
     pub(crate) fn backtrace_status(&self) -> &'static str {
-        #[cfg(feature = "backtrace")]
-        {
-            use std::backtrace::BacktraceStatus;
-            match self.backtrace.status() {
-                BacktraceStatus::Captured => "captured",
-                BacktraceStatus::Disabled => "disabled",
-                BacktraceStatus::Unsupported => "unsupported",
-                _ => "unknown",
-            }
+        use std::backtrace::BacktraceStatus;
+        match self.backtrace.status() {
+            BacktraceStatus::Captured => "captured",
+            BacktraceStatus::Disabled => "disabled",
+            BacktraceStatus::Unsupported => "unsupported",
+            _ => "unknown",
         }
-        #[cfg(not(feature = "backtrace"))]
-        "feature_disabled"
     }
 
-    #[cfg(any(feature = "backtrace", feature = "diagnostic"))]
+    #[cfg(feature = "backtrace")]
     pub(crate) fn backtrace_text(&self) -> Option<String> {
-        #[cfg(feature = "backtrace")]
         if self.backtrace_status() == "captured" {
             #[cfg(feature = "better_backtrace")]
             if let Some(text) = better_backtrace(self.backtrace) {
@@ -124,6 +123,22 @@ impl<'a> Report<'a> {
             return Some(self.backtrace.to_string().trim_end_matches('\n').into());
         }
         None
+    }
+
+    #[cfg(feature = "spantrace")]
+    pub(crate) fn span_trace_status(&self) -> &'static str {
+        use tracing_error::SpanTraceStatus;
+        match self.span_trace.status() {
+            SpanTraceStatus::CAPTURED => "captured",
+            SpanTraceStatus::EMPTY => "empty",
+            SpanTraceStatus::UNSUPPORTED => "unsupported",
+        }
+    }
+
+    #[cfg(feature = "spantrace")]
+    pub(crate) fn span_trace_text(&self) -> Option<String> {
+        (self.span_trace_status() == "captured")
+            .then(|| self.span_trace.to_string().trim_end_matches('\n').into())
     }
 }
 
@@ -233,8 +248,14 @@ impl ReportRenderer {
         report: &Report<'_>,
     ) -> fmt::Result {
         self.source_fields(out, report)?;
+        #[cfg(any(
+            feature = "context",
+            feature = "location",
+            feature = "backtrace",
+            feature = "spantrace"
+        ))]
         let fields = self;
-        #[cfg(any(feature = "context", feature = "backtrace"))]
+        #[cfg(feature = "context")]
         let values = fields.nested();
         #[cfg(feature = "context")]
         if !report.contexts.is_empty() {
@@ -252,19 +273,42 @@ impl ReportRenderer {
         if self.detailed {
             #[cfg(feature = "location")]
             fields.next_line(out, &format_args!("location: {}", report.location))?;
-            let status = report.backtrace_status();
-            let status = if status == "feature_disabled" {
-                "feature disabled"
-            } else {
-                status
-            };
-            fields.next_line(out, &format_args!("backtrace ({status}):"))?;
+            #[cfg(feature = "spantrace")]
+            fields.trace(
+                out,
+                "span trace",
+                report.span_trace_status(),
+                report.span_trace_text(),
+            )?;
             #[cfg(feature = "backtrace")]
-            if let Some(text) = report.backtrace_text() {
-                values.next_line(out, &text)?;
-            }
+            fields.trace(
+                out,
+                "backtrace",
+                report.backtrace_status(),
+                report.backtrace_text(),
+            )?;
         }
         Ok(())
+    }
+
+    #[cfg(any(feature = "backtrace", feature = "spantrace"))]
+    fn trace(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        name: &str,
+        status: &str,
+        text: Option<String>,
+    ) -> fmt::Result {
+        if let Some(text) = text {
+            self.next_line(out, &format_args!("{name}:"))?;
+            self.nested().next_line(out, &text)
+        } else {
+            let status = match status {
+                "disabled" | "empty" => "not captured",
+                status => status,
+            };
+            self.next_line(out, &format_args!("{name}: {status}"))
+        }
     }
 
     #[cfg(feature = "alloc")]
@@ -388,6 +432,8 @@ enum GroupKeyPart {
     Location(String),
     #[cfg(feature = "backtrace")]
     Backtrace(&'static str, Option<String>),
+    #[cfg(feature = "spantrace")]
+    SpanTrace(&'static str, Option<String>),
     Children {
         total: usize,
         omitted: usize,
@@ -462,6 +508,11 @@ impl<'a> DebugNode<'a> {
                 key.push(GroupKeyPart::Backtrace(
                     report.backtrace_status(),
                     report.backtrace_text(),
+                ));
+                #[cfg(feature = "spantrace")]
+                key.push(GroupKeyPart::SpanTrace(
+                    report.span_trace_status(),
+                    report.span_trace_text(),
                 ));
             }
         }

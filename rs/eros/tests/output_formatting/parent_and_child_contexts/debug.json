@@ -1,14 +1,8 @@
 {
-  "backtrace": {
-    "status": "<status>",
-    "text": null
-  },
+  "backtrace": null,
   "children": [
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [
         {
           "location": {
@@ -26,13 +20,11 @@
         "line": 0
       },
       "root": "invalid email",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [
         {
           "location": {
@@ -50,7 +42,8 @@
         "line": 0
       },
       "root": "missing field\ncustomer name",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     }
   ],
   "contexts": [
@@ -70,5 +63,6 @@
     "line": 0
   },
   "root": "errors (2 total):",
-  "sources": []
+  "sources": [],
+  "span_trace": null
 }

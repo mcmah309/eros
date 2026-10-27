@@ -3,6 +3,8 @@ error:
         - error: invalid input
           at: [0..4]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

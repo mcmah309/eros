@@ -123,7 +123,7 @@ fn bare_errors_have_no_empty_source_or_context_sections() {
     assert_eq!(error.to_string(), "configuration missing");
     assert_eq!(format!("{error:#?}"), "error: configuration missing");
     let report = format!("{error:?}");
-    assert!(report.starts_with("error: configuration missing\n"));
+    assert_eq!(report.lines().next(), Some("error: configuration missing"));
     assert!(!report.contains("caused by:"));
     assert!(!report.contains("context:"));
     assert!(!report.ends_with('\n'));
@@ -384,11 +384,11 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
             ErrorUnion::from_anyhow(original)
         };
         let report = format!("{error:?}");
-        let (_, original_section) = report.split_once("\nbacktrace (").unwrap();
+        let (_, original_section) = report.split_once("\nbacktrace:").unwrap();
         #[cfg(feature = "diagnostic")]
         if original_status == std::backtrace::BacktraceStatus::Captured {
             assert!(
-                error.to_debug_json()["backtrace"]["text"]
+                error.to_debug_json()["backtrace"]
                     .as_str()
                     .unwrap()
                     .contains("anyhow_failure_origin")
@@ -397,7 +397,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
 
         match original_status {
             std::backtrace::BacktraceStatus::Captured => {
-                let frames = original_section.strip_prefix("captured):\n").unwrap();
+                let frames = original_section.strip_prefix('\n').unwrap();
                 assert!(frames.contains("anyhow_failure_origin"), "{report}");
                 #[cfg(not(feature = "better_backtrace"))]
                 assert_eq!(
@@ -411,10 +411,10 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
                 );
             }
             std::backtrace::BacktraceStatus::Disabled => {
-                assert_eq!(original_section, "disabled):");
+                assert_eq!(original_section, " not captured");
             }
             std::backtrace::BacktraceStatus::Unsupported => {
-                assert_eq!(original_section, "unsupported):");
+                assert_eq!(original_section, " unsupported");
             }
             _ => panic!("unexpected backtrace status"),
         }
@@ -518,24 +518,21 @@ fn debug_reports_the_actual_backtrace_capture_status() {
     match error.backtrace().status() {
         std::backtrace::BacktraceStatus::Captured => {
             let (_, frames) = report
-                .split_once("\nbacktrace (captured):\n")
+                .split_once("\nbacktrace:\n")
                 .expect("captured backtraces must be printed in the human report");
             assert!(!frames.trim().is_empty());
             assert!(frames.contains("open_config_file"), "{report}");
         }
         std::backtrace::BacktraceStatus::Disabled => {
-            assert!(report.ends_with("\nbacktrace (disabled):"), "{report}");
+            assert!(report.ends_with("\nbacktrace: not captured"), "{report}");
         }
         std::backtrace::BacktraceStatus::Unsupported => {
-            assert!(report.ends_with("\nbacktrace (unsupported):"), "{report}");
+            assert!(report.ends_with("\nbacktrace: unsupported"), "{report}");
         }
         _ => panic!("unexpected backtrace status"),
     }
     #[cfg(not(feature = "backtrace"))]
-    assert!(
-        report.ends_with("\nbacktrace (feature disabled):"),
-        "{report}"
-    );
+    assert!(!report.contains("backtrace:"), "{report}");
 
     assert!(!report.ends_with('\n'));
     assert_eq!(format!("{error:#?}"), report_without_metadata());
@@ -614,7 +611,7 @@ fn to_display_json_is_data_with_the_same_root_and_source_messages() {
 
 #[cfg(feature = "diagnostic")]
 #[test]
-fn to_debug_json_includes_contexts_locations_and_backtrace_status() {
+fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
     let native = NativeError::caused_by(
         "cannot open configuration",
         NativeError::leaf("permission denied"),
@@ -634,8 +631,14 @@ fn to_debug_json_includes_contexts_locations_and_backtrace_status() {
     );
     assert_eq!(
         diagnostic.as_object().unwrap().len(),
-        if cfg!(feature = "location") { 5 } else { 4 }
+        3 + usize::from(cfg!(feature = "location"))
+            + usize::from(cfg!(feature = "spantrace"))
+            + usize::from(cfg!(feature = "backtrace"))
     );
+    #[cfg(feature = "spantrace")]
+    assert_eq!(diagnostic.get("span_trace"), Some(&serde_json::Value::Null));
+    #[cfg(not(feature = "spantrace"))]
+    assert!(diagnostic.get("span_trace").is_none());
 
     #[cfg(feature = "location")]
     assert_json_location(&diagnostic["location"], _root_line);
@@ -663,13 +666,10 @@ fn to_debug_json_includes_contexts_locations_and_backtrace_status() {
         assert!(contexts.is_empty());
     }
 
-    let backtrace = &diagnostic["backtrace"];
-    assert_eq!(backtrace.as_object().unwrap().len(), 2);
     #[cfg(feature = "backtrace")]
     match error.backtrace().status() {
         std::backtrace::BacktraceStatus::Captured => {
-            assert_eq!(backtrace["status"], "captured");
-            let text = backtrace["text"].as_str().unwrap();
+            let text = diagnostic["backtrace"].as_str().unwrap();
             assert!(!text.trim().is_empty());
             let indented = text
                 .lines()
@@ -678,25 +678,14 @@ fn to_debug_json_includes_contexts_locations_and_backtrace_status() {
                 .join("\n");
             assert!(format!("{error:?}").ends_with(&indented));
         }
-        std::backtrace::BacktraceStatus::Disabled => {
-            assert_eq!(
-                backtrace,
-                &serde_json::json!({"status": "disabled", "text": null})
-            );
-        }
-        std::backtrace::BacktraceStatus::Unsupported => {
-            assert_eq!(
-                backtrace,
-                &serde_json::json!({"status": "unsupported", "text": null})
-            );
+        std::backtrace::BacktraceStatus::Disabled
+        | std::backtrace::BacktraceStatus::Unsupported => {
+            assert_eq!(diagnostic.get("backtrace"), Some(&serde_json::Value::Null));
         }
         _ => panic!("unexpected backtrace status"),
     }
     #[cfg(not(feature = "backtrace"))]
-    assert_eq!(
-        backtrace,
-        &serde_json::json!({"status": "feature_disabled", "text": null})
-    );
+    assert!(diagnostic.get("backtrace").is_none());
 }
 
 #[cfg(all(feature = "diagnostic", feature = "location"))]

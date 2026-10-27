@@ -1,0 +1,4 @@
+error: invalid input
+location: <location>
+span trace: not captured
+backtrace: <status>

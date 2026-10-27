@@ -7,4 +7,5 @@ context:
     - start service
       location: <location>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

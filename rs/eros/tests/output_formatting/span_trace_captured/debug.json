@@ -1,0 +1,12 @@
+{
+  "backtrace": null,
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "invalid input",
+  "sources": [],
+  "span_trace": "   0: output_formatting::span_traces::read_config\n           with path=\"config.toml\"\n             at <location>\n   1: output_formatting::span_traces::request\n           with request_id=42\n             at <location>"
+}

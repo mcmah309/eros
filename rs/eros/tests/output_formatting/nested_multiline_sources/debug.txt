@@ -10,9 +10,12 @@ error:
                         - permission denied
                           access policy rejected
                     location: <location>
-                    backtrace (<status>):
+                    span trace: not captured
+                    backtrace: <status>
           at: [0]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

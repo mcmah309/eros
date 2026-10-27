@@ -3,14 +3,18 @@ error:
         - error: zebra
           at: [0..3, 4, 9]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
         - error: alpha
           at: [3, 7..9]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
         - error: beta
           at: [5..7]
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

@@ -1,0 +1,12 @@
+{
+  "backtrace": null,
+  "contexts": [],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "invalid input",
+  "sources": [],
+  "span_trace": null
+}

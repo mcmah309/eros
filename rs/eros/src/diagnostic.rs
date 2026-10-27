@@ -17,11 +17,12 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// Returns the information in ordinary Debug as structured JSON.
     ///
     /// Adds `contexts` in attachment order (innermost first), root/context `location`
-    /// objects (`file`, `line`, `column`), and `backtrace` (`status`, `text`).
-    /// Each context has `message` and `user_facing`. Without captured frames,
-    /// backtrace text is null; status is `disabled`, `unsupported`, or
-    /// `feature_disabled`. Captured frames use `captured` and a rendered string.
+    /// objects (`file`, `line`, `column`), and enabled traces.
+    /// Each context has `message` and `user_facing`. With `backtrace`, adds
+    /// `backtrace` as rendered text when captured, or null otherwise.
     /// Locations are omitted when the `location` feature is off.
+    /// With `spantrace`, also adds `span_trace` as rendered text when captured,
+    /// or null otherwise. The field is omitted when `spantrace` is disabled.
     /// See [`crate::ErrorUnionVec`] for batch reporting.
     pub fn to_debug_json(&self) -> Value {
         self.report().to_debug_json()
@@ -55,11 +56,11 @@ impl ErrorReport<'_> {
         value
     }
 
-    fn add_debug_fields(&self, value: &mut Value, report: &Report<'_>) {
+    fn add_debug_fields(&self, value: &mut Value, _report: &Report<'_>) {
         #[allow(unused_mut)]
         let mut contexts = Vec::<Value>::new();
         #[cfg(feature = "context")]
-        for context in report.contexts {
+        for context in _report.contexts {
             #[allow(unused_mut)]
             let mut frame = json!({
                 "message": context.context.to_string(),
@@ -78,12 +79,16 @@ impl ErrorReport<'_> {
         value["contexts"] = contexts.into();
         #[cfg(feature = "location")]
         {
-            value["location"] = location_value(report.location);
+            value["location"] = location_value(_report.location);
         }
-        value["backtrace"] = json!({
-            "status": report.backtrace_status(),
-            "text": report.backtrace_text(),
-        });
+        #[cfg(feature = "backtrace")]
+        {
+            value["backtrace"] = _report.backtrace_text().into();
+        }
+        #[cfg(feature = "spantrace")]
+        {
+            value["span_trace"] = _report.span_trace_text().into();
+        }
     }
 
     fn add_children(&self, value: &mut Value, detailed: bool, remaining: &mut usize) {
@@ -116,4 +121,39 @@ fn display_value(report: &Report<'_>) -> Value {
 #[cfg(feature = "location")]
 fn location_value(location: &core::panic::Location<'_>) -> Value {
     json!({ "file": location.file(), "line": location.line(), "column": location.column() })
+}
+
+#[cfg(all(test, feature = "backtrace"))]
+mod tests {
+    use super::*;
+    use std::backtrace::{Backtrace, BacktraceStatus};
+
+    #[test]
+    fn uncaptured_backtrace_is_json_null_and_has_a_single_text_status_line() {
+        let mut error: ErrorUnion = ErrorUnion::new(core::fmt::Error);
+        error.inner.backtrace = Backtrace::disabled();
+        for value in [error.to_debug_json(), error.report().to_debug_json()] {
+            assert_eq!(value.get("backtrace"), Some(&Value::Null));
+        }
+        assert!(format!("{error:?}").ends_with("\nbacktrace: not captured"));
+    }
+
+    #[test]
+    fn captured_backtrace_is_a_json_string_and_has_a_plain_text_header() {
+        let mut error: ErrorUnion = ErrorUnion::new(core::fmt::Error);
+        error.inner.backtrace = Backtrace::force_capture();
+        assert_eq!(error.backtrace().status(), BacktraceStatus::Captured);
+        for value in [error.to_debug_json(), error.report().to_debug_json()] {
+            let text = value["backtrace"]
+                .as_str()
+                .expect("captured backtrace text");
+            assert!(
+                text.contains("captured_backtrace_is_a_json_string"),
+                "{text}"
+            );
+        }
+        let text = format!("{error:?}");
+        assert!(text.contains("\nbacktrace:\n"), "{text}");
+        assert!(!text.contains("(captured)"), "{text}");
+    }
 }

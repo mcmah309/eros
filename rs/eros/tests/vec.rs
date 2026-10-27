@@ -163,11 +163,17 @@ fn wrapped_vectors_preserve_report_boundaries_and_multiline_indentation() {
 
     let standalone = format!("{batch:?}");
     // The vector itself has no captured metadata; its child has one report.
-    assert_eq!(standalone.matches("backtrace (").count(), 1);
+    assert_eq!(
+        standalone.matches("backtrace:").count(),
+        usize::from(cfg!(feature = "backtrace"))
+    );
     let wrapped: ErrorUnion<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)> = batch.into_union();
     assert_eq!(format!("{wrapped:#?}"), wrapped_collection(&expected));
     let wrapped_detailed = format!("{wrapped:?}");
-    assert_eq!(wrapped_detailed.matches("backtrace (").count(), 2);
+    assert_eq!(
+        wrapped_detailed.matches("backtrace:").count(),
+        2 * usize::from(cfg!(feature = "backtrace"))
+    );
     assert!(wrapped_detailed.starts_with(&wrapped_collection(&standalone)));
 
     let outer = ErrorUnionVec::new(vec![wrapped]);
@@ -180,11 +186,17 @@ fn wrapped_vectors_preserve_report_boundaries_and_multiline_indentation() {
             .join("\n"),
     );
     assert_eq!(format!("{outer:#?}"), nested_expected);
-    assert_eq!(format!("{outer:?}").matches("backtrace (").count(), 2);
+    assert_eq!(
+        format!("{outer:?}").matches("backtrace:").count(),
+        2 * usize::from(cfg!(feature = "backtrace"))
+    );
     let outer: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)>,)> =
         outer.into_union();
     assert_eq!(format!("{outer:#?}"), wrapped_collection(&nested_expected));
-    assert_eq!(format!("{outer:?}").matches("backtrace (").count(), 3);
+    assert_eq!(
+        format!("{outer:?}").matches("backtrace:").count(),
+        3 * usize::from(cfg!(feature = "backtrace"))
+    );
 }
 
 #[test]
@@ -284,7 +296,10 @@ fn equal_messages_retain_distinct_locations_in_detailed_reports() {
     assert!(detailed.contains("      at: [1]"));
     assert!(detailed.contains(&first_location));
     assert!(detailed.contains(&second_location));
-    assert_eq!(detailed.matches("backtrace (").count(), 2);
+    assert_eq!(
+        detailed.matches("backtrace:").count(),
+        2 * usize::from(cfg!(feature = "backtrace"))
+    );
 }
 
 #[test]

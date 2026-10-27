@@ -8,15 +8,18 @@ error:
                         - validate row 17
                           location: <location>
                     location: <location>
-                    backtrace (<status>):
+                    span trace: not captured
+                    backtrace: <status>
           at: [0]
           context:
               - import page
                 location: <location>
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 context:
     - import file
       location: <location>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

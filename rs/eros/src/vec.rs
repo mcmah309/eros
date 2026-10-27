@@ -10,7 +10,7 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 ///
 /// Stores [`ErrorUnion<E>`] values. Display prints `errors (N total):`;
 /// Debug groups identical visible reports with zero-based positions and
-/// half-open ranges. Alternate Debug omits locations and backtraces.
+/// half-open ranges. Alternate Debug omits locations, backtraces, and span traces.
 /// Grouping preserves the stored errors and their insertion order.
 /// Debug and JSON reporting expand at most 10 child reports across the whole
 /// tree, in depth-first insertion order, and indicate omitted children. The
@@ -88,7 +88,7 @@ impl<E: TypeSet> ErrorUnionVec<E> {
     ///
     /// The destination set can contain other error types alongside this batch.
     /// Context added to the returned union describes the batch; child contexts
-    /// and captured backtraces remain attached to their original unions.
+    /// and captured traces remain attached to their original unions.
     #[cfg_attr(feature = "location", track_caller)]
     pub fn into_union<OutSet, Index>(self) -> ErrorUnion<OutSet>
     where

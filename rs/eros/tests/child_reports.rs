@@ -75,7 +75,10 @@ mod allocated {
         assert_eq!(format!("{error:#?}"), expected);
         assert_eq!(format!("{:#?}", error.report()), expected);
         let detailed = format!("{error:?}");
-        assert_eq!(detailed.matches("backtrace (").count(), 3);
+        assert_eq!(
+            detailed.matches("backtrace:").count(),
+            3 * usize::from(cfg!(feature = "backtrace"))
+        );
         assert!(!detailed.ends_with('\n'));
 
         #[cfg(feature = "location")]
@@ -103,6 +106,8 @@ mod allocated {
             assert!(core::ptr::addr_eq(child.inner(), original.inner()));
             #[cfg(feature = "backtrace")]
             assert!(core::ptr::eq(child.backtrace(), original.backtrace()));
+            #[cfg(feature = "spantrace")]
+            assert!(core::ptr::eq(child.span_trace(), original.span_trace()));
             #[cfg(feature = "location")]
             assert!(core::ptr::eq(child.location(), original.location()));
             #[cfg(feature = "context")]

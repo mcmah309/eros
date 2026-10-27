@@ -5,4 +5,5 @@ caused by:
     - permission denied
       access policy rejected
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

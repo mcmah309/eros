@@ -1,4 +1,5 @@
 error:
     errors (0 total): []
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

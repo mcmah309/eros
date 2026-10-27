@@ -1,8 +1,5 @@
 {
-  "backtrace": {
-    "status": "<status>",
-    "text": null
-  },
+  "backtrace": null,
   "contexts": [],
   "location": {
     "column": 0,
@@ -13,5 +10,6 @@
   "sources": [
     "cannot open configuration",
     "permission denied"
-  ]
+  ],
+  "span_trace": null
 }

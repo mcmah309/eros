@@ -1,8 +1,5 @@
 {
-  "backtrace": {
-    "status": "<status>",
-    "text": null
-  },
+  "backtrace": null,
   "contexts": [
     {
       "location": {
@@ -31,5 +28,6 @@
   "root": "cannot read configuration",
   "sources": [
     "permission denied"
-  ]
+  ],
+  "span_trace": null
 }

@@ -6,7 +6,8 @@ error:
               - validate customer 104
                 location: <location>
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
         - error:
             missing field
             customer name
@@ -15,9 +16,11 @@ error:
               - validate customer 209
                 location: <location>
           location: <location>
-          backtrace (<status>):
+          span trace: not captured
+          backtrace: <status>
 context:
     - import customers.csv
       location: <location>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

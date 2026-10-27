@@ -1,14 +1,8 @@
 {
-  "backtrace": {
-    "status": "<status>",
-    "text": null
-  },
+  "backtrace": null,
   "children": [
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -16,13 +10,11 @@
         "line": 0
       },
       "root": "zebra",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -30,13 +22,11 @@
         "line": 0
       },
       "root": "zebra",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -44,13 +34,11 @@
         "line": 0
       },
       "root": "zebra",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -58,13 +46,11 @@
         "line": 0
       },
       "root": "alpha",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -72,13 +58,11 @@
         "line": 0
       },
       "root": "zebra",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -86,13 +70,11 @@
         "line": 0
       },
       "root": "beta",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -100,13 +82,11 @@
         "line": 0
       },
       "root": "beta",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -114,13 +94,11 @@
         "line": 0
       },
       "root": "alpha",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -128,13 +106,11 @@
         "line": 0
       },
       "root": "alpha",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     },
     {
-      "backtrace": {
-        "status": "<status>",
-        "text": null
-      },
+      "backtrace": null,
       "contexts": [],
       "location": {
         "column": 0,
@@ -142,7 +118,8 @@
         "line": 0
       },
       "root": "zebra",
-      "sources": []
+      "sources": [],
+      "span_trace": null
     }
   ],
   "contexts": [],
@@ -152,5 +129,6 @@
     "line": 0
   },
   "root": "errors (10 total):",
-  "sources": []
+  "sources": [],
+  "span_trace": null
 }

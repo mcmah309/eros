@@ -62,6 +62,71 @@ fn multiline_root() {
     assert_outputs!("multiline_root", error.report());
 }
 
+#[cfg(not(feature = "spantrace"))]
+#[test]
+fn span_trace_disabled() {
+    tracing::subscriber::with_default(tracing_subscriber::registry(), || {
+        let error: ErrorUnion<(InvalidInput,)> = tracing::info_span!("request", request_id = 42)
+            .in_scope(|| ErrorUnion::new(InvalidInput));
+        assert_outputs!("span_trace_disabled", error.report());
+    });
+}
+
+#[cfg(feature = "spantrace")]
+mod span_traces {
+    use super::*;
+    use tracing_error::{ErrorLayer, SpanTraceStatus};
+    use tracing_subscriber::prelude::*;
+
+    #[test]
+    fn span_trace_captured() {
+        let subscriber = tracing_subscriber::registry().with(ErrorLayer::default());
+        tracing::subscriber::with_default(subscriber, || {
+            let error: ErrorUnion<(InvalidInput,)> =
+                tracing::info_span!("request", request_id = 42).in_scope(|| {
+                    tracing::info_span!("read_config", path = "config.toml")
+                        .in_scope(|| ErrorUnion::new(InvalidInput))
+                });
+            assert_eq!(error.span_trace().status(), SpanTraceStatus::CAPTURED);
+            let mut captured_spans = Vec::new();
+            error.span_trace().with_spans(|metadata, fields| {
+                assert_eq!(metadata.file(), Some(file!()));
+                assert!(metadata.line().is_some_and(|line| line > 0));
+                captured_spans.push((metadata.name(), fields.to_owned()));
+                true
+            });
+            assert_eq!(
+                captured_spans,
+                [
+                    ("read_config", String::from("path=\"config.toml\"")),
+                    ("request", String::from("request_id=42")),
+                ]
+            );
+            assert_outputs!("span_trace_captured", error.report());
+        });
+    }
+
+    #[test]
+    fn span_trace_empty() {
+        let subscriber = tracing_subscriber::registry().with(ErrorLayer::default());
+        tracing::subscriber::with_default(subscriber, || {
+            let error: ErrorUnion<(InvalidInput,)> = ErrorUnion::new(InvalidInput);
+            assert_eq!(error.span_trace().status(), SpanTraceStatus::EMPTY);
+            assert_outputs!("span_trace_empty", error.report());
+        });
+    }
+
+    #[test]
+    fn span_trace_unsupported() {
+        tracing::subscriber::with_default(tracing_subscriber::registry(), || {
+            let error: ErrorUnion<(InvalidInput,)> = tracing::info_span!("without_error_layer")
+                .in_scope(|| ErrorUnion::new(InvalidInput));
+            assert_eq!(error.span_trace().status(), SpanTraceStatus::UNSUPPORTED);
+            assert_outputs!("span_trace_unsupported", error.report());
+        });
+    }
+}
+
 #[cfg(feature = "alloc")]
 mod allocated {
     use super::*;
@@ -304,11 +369,14 @@ mod allocated {
         let error = error.context("read /etc/app.toml").context("start service");
         assert_outputs!("format_levels", error.report());
         let rich = format!("{error:?}");
-        // Removing added location/backtrace fields restores the context level;
+        // Removing added diagnostic fields restores the context level;
         // richer formats must not restyle the existing message or cause list.
         let without_metadata = rich
             .lines()
-            .take_while(|line| !line.trim_start().starts_with("backtrace ("))
+            .take_while(|line| {
+                let line = line.trim_start();
+                !line.starts_with("backtrace:") && !line.starts_with("span trace:")
+            })
             .filter(|line| !line.trim_start().starts_with("location:"))
             .collect::<Vec<_>>()
             .join("\n");

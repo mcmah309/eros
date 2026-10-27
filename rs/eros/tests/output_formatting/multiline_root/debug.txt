@@ -2,4 +2,5 @@ error:
   invalid record
   retry exhausted
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

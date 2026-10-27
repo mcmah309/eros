@@ -1,8 +1,5 @@
 {
-  "backtrace": {
-    "status": "<status>",
-    "text": null
-  },
+  "backtrace": null,
   "contexts": [
     {
       "location": {
@@ -20,5 +17,6 @@
     "line": 0
   },
   "root": "invalid input",
-  "sources": []
+  "sources": [],
+  "span_trace": null
 }

@@ -25,6 +25,8 @@ jobs:
           - "--no-default-features --features context,location,user_context,diagnostic"
           - "--no-default-features --features anyhow"
           - "--no-default-features --features backtrace,diagnostic"
+          - "--no-default-features --features spantrace"
+          - "--no-default-features --features spantrace,diagnostic"
 
     steps:
       - name: Checkout repository

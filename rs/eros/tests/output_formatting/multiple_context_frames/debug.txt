@@ -37,4 +37,5 @@ context:
       continuation
       location: <location>
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>

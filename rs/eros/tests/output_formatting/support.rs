@@ -34,11 +34,28 @@ fn visit_reports(report: ErrorReport<'_>, visitor: &mut impl FnMut(ErrorReport<'
     report.visit_children(&mut |child| visit_reports(child, visitor));
 }
 
+#[cfg(feature = "spantrace")]
+fn normalize_span_locations(report: ErrorReport<'_>, mut text: String) -> String {
+    // Keep span names, fields, frame order, and indentation in the fixtures;
+    // only source locations change when the test file is edited or moved.
+    report.span_trace().with_spans(|metadata, _fields| {
+        if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
+            text = text.replace(&format!("at {file}:{line}"), "at <location>");
+        }
+        true
+    });
+    text
+}
+
 #[allow(unused_mut)] // Location replacement is feature-dependent.
 fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
     let mut statuses = Vec::new();
     visit_reports(report, &mut |report| {
         statuses.push(trace_status(report));
+        #[cfg(feature = "spantrace")]
+        {
+            text = normalize_span_locations(report, std::mem::take(&mut text));
+        }
         #[cfg(feature = "location")]
         {
             text = text.replace(
@@ -60,21 +77,18 @@ fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
     while index < lines.len() {
         let line = lines[index];
         let trimmed = line.trim_start();
-        if let Some(status) = trimmed
-            .strip_prefix("backtrace (")
-            .and_then(|s| s.strip_suffix("):"))
-        {
-            let status = if status == "feature disabled" {
-                "feature_disabled"
-            } else {
-                status
+        if let Some(status) = trimmed.strip_prefix("backtrace:") {
+            let status = match status.trim() {
+                "" => "captured",
+                "not captured" => "disabled",
+                status => status,
             };
             assert!(
                 statuses.contains(&status),
                 "unexpected backtrace status: {status}"
             );
             let indent = line.len() - trimmed.len();
-            normalized.push(format!("{}backtrace (<status>):", " ".repeat(indent)));
+            normalized.push(format!("{}backtrace: <status>", " ".repeat(indent)));
             index += 1;
             // Captured frames are volatile. Only the indented trace body is
             // omitted; blank separators and subsequent report fields remain.
@@ -98,7 +112,9 @@ fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
 fn expected_debug(text: &str) -> String {
     text.split('\n')
         .filter(|line| {
-            cfg!(feature = "location") || !line.trim_start().starts_with("location: <location>")
+            (cfg!(feature = "location") || !line.trim_start().starts_with("location: <location>"))
+                && (cfg!(feature = "spantrace") || !line.trim_start().starts_with("span trace:"))
+                && (cfg!(feature = "backtrace") || !line.trim_start().starts_with("backtrace:"))
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -226,38 +242,52 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     }
     #[cfg(not(feature = "context"))]
     assert!(contexts.is_empty());
-    let trace = &mut value["backtrace"];
-    let status = trace_status(report);
-    assert_eq!(trace["status"], status);
-    if status == "captured" {
-        let frames = trace["text"]
-            .as_str()
-            .expect("captured frames must be text");
-        assert!(!frames.trim().is_empty());
-        assert!(
-            !frames.contains('\u{1b}'),
-            "JSON traces must not contain ANSI escapes"
-        );
-        let human = format!("{report:?}");
-        let heading = human
-            .lines()
-            .rfind(|line| line.trim_start() == "backtrace (captured):")
-            .expect("captured backtrace heading");
-        let indent = heading.len() - heading.trim_start().len() + 4;
-        let indented = frames
-            .lines()
-            .map(|line| format!("{:indent$}{line}", ""))
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert!(
-            human.ends_with(&indented),
-            "JSON must retain the same captured frames as ordinary Debug"
-        );
-    } else {
-        assert!(trace["text"].is_null());
+    #[cfg(feature = "backtrace")]
+    {
+        let trace = value.get("backtrace").expect("enabled backtrace field");
+        if trace_status(report) == "captured" {
+            let frames = trace.as_str().expect("captured frames must be text");
+            assert!(!frames.trim().is_empty());
+            assert!(
+                !frames.contains('\u{1b}'),
+                "JSON traces must not contain ANSI escapes"
+            );
+            let human = format!("{report:?}");
+            let heading = human
+                .lines()
+                .rfind(|line| line.trim_start() == "backtrace:")
+                .expect("captured backtrace heading");
+            let indent = heading.len() - heading.trim_start().len() + 4;
+            let indented = frames
+                .lines()
+                .map(|line| format!("{:indent$}{line}", ""))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                human.ends_with(&indented),
+                "JSON must retain the same captured frames as ordinary Debug"
+            );
+        } else {
+            assert!(trace.is_null());
+        }
+        // Captured stack frames are volatile and checked above.
+        value["backtrace"] = serde_json::Value::Null;
     }
-    trace["status"] = "<status>".into();
-    trace["text"] = serde_json::Value::Null;
+    #[cfg(not(feature = "backtrace"))]
+    assert!(value.get("backtrace").is_none());
+    #[cfg(feature = "spantrace")]
+    {
+        use tracing_error::SpanTraceStatus;
+        let trace = report.span_trace();
+        let text = (trace.status() == SpanTraceStatus::CAPTURED)
+            .then(|| trace.to_string().trim_end_matches('\n').to_owned());
+        assert_eq!(value.get("span_trace"), Some(&serde_json::json!(text)));
+        if let Some(text) = text {
+            value["span_trace"] = normalize_span_locations(report, text).into();
+        }
+    }
+    #[cfg(not(feature = "spantrace"))]
+    assert!(value.get("span_trace").is_none());
     let mut children = Vec::new();
     report.visit_children(&mut |child| children.push(child));
     if children.is_empty() {
@@ -280,6 +310,12 @@ fn adapt_expected_json(value: &mut serde_json::Value) {
             if !cfg!(feature = "location") {
                 object.remove("location");
             }
+            if !cfg!(feature = "spantrace") {
+                object.remove("span_trace");
+            }
+            if !cfg!(feature = "backtrace") {
+                object.remove("backtrace");
+            }
             for value in object.values_mut() {
                 adapt_expected_json(value);
             }
@@ -296,7 +332,7 @@ fn adapt_expected_json(value: &mut serde_json::Value) {
 #[cfg(feature = "diagnostic")]
 fn display_projection(mut value: serde_json::Value) -> serde_json::Value {
     let object = value.as_object_mut().unwrap();
-    for key in ["contexts", "location", "backtrace"] {
+    for key in ["contexts", "location", "backtrace", "span_trace"] {
         object.remove(key);
     }
     if let Some(children) = object.get_mut("children") {

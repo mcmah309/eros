@@ -135,6 +135,7 @@ impl ErrorUnion {
     pub(crate) fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
+        #[cfg(feature = "spantrace")] span_trace: tracing_error::SpanTrace,
         #[cfg(feature = "context")] context: Vec<ContextFrame>,
         #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
     ) -> ErrorUnion<OutSet>
@@ -148,6 +149,8 @@ impl ErrorUnion {
                 t,
                 #[cfg(feature = "backtrace")]
                 backtrace,
+                #[cfg(feature = "spantrace")]
+                span_trace,
                 #[cfg(feature = "context")]
                 context,
                 #[cfg(feature = "location")]
@@ -163,7 +166,7 @@ impl ErrorUnion {
 /// An [`ErrorUnion`] adapter implementing [`core::error::Error`].
 ///
 /// Created using [`ErrorUnion::into_adapter`] or [`From`] without allocating or
-/// discarding context, location, or backtrace.
+/// discarding saved diagnostics.
 ///
 /// Use [`AsRef`] or [`AsMut`] to borrow the union, and
 /// [`into_unadapted`](Self::into_unadapted) to recover it by value.
@@ -281,7 +284,7 @@ where
 {
     /// Adapts this union to [`core::error::Error`] without allocating.
     ///
-    /// Preserves the error set, context, location, and backtrace. Use
+    /// Preserves the error set and all saved diagnostics. Use
     /// [`ErrorUnionAdapter::into_unadapted`] to recover the original union.
     ///
     /// ```
@@ -326,8 +329,8 @@ where
     /// Selects one error type or a group, returning the remaining error union
     /// when the stored error does not match.
     ///
-    /// A bare target, `narrow::<T, _>()`, extracts `T`, discarding context,
-    /// location, and backtrace on a match. A tuple target, `narrow::<(T,), _>()`
+    /// A bare target, `narrow::<T, _>()`, extracts `T`, discarding saved
+    /// diagnostics on a match. A tuple target, `narrow::<(T,), _>()`
     /// or `narrow::<(A, B), _>()`, returns an `ErrorUnion` of the selected types
     /// and preserves all diagnostics. The remainder always retains its
     /// diagnostics and original type order; the selected union uses the target order.
@@ -380,7 +383,7 @@ where
 
     /// Extracts the inner error if its concrete type is `T`.
     ///
-    /// On success, context, location, and backtrace are discarded. On failure,
+    /// On success, saved diagnostics are discarded. On failure,
     /// returns the original union unchanged, including its error set and metadata.
     /// This checks only the inner error, not its sources or contexts.
     ///
@@ -422,6 +425,17 @@ where
     #[cfg(feature = "backtrace")]
     pub fn backtrace(&self) -> &std::backtrace::Backtrace {
         &self.inner.backtrace
+    }
+
+    /// Borrows the span trace captured when this error first entered Eros.
+    ///
+    /// Requires the `spantrace` feature. The application must install
+    /// [`tracing_error::ErrorLayer`] and instrument its operations for useful
+    /// traces. Reshaping, recovery, and mapping preserve the original trace;
+    /// borrowing or formatting never captures a new one.
+    #[cfg(feature = "spantrace")]
+    pub fn span_trace(&self) -> &tracing_error::SpanTrace {
+        &self.inner.span_trace
     }
 
     /// Returns where the error was first wrapped in an Eros union.
@@ -489,7 +503,7 @@ where
         self.inner.error_mut()
     }
 
-    /// Extracts the boxed inner error, discarding context, location, and backtrace.
+    /// Extracts the boxed inner error, discarding saved diagnostics.
     ///
     /// Reuses the root allocation for heap-stored errors. Inline non-zero-sized
     /// errors are moved into a new box. Requires the `alloc` feature.
@@ -577,13 +591,13 @@ impl<A: SendSyncError> AsMut<A> for ErrorUnion<(A,)> {
 }
 
 impl<A: SendSyncError> ErrorUnion<(A,)> {
-    /// Borrows the single concrete inner error, preserving context, location, and backtrace.
+    /// Borrows the single concrete inner error, preserving saved diagnostics.
     #[inline]
     pub fn as_single(&self) -> &A {
         self.as_ref()
     }
 
-    /// Mutably borrows the single concrete inner error, preserving context, location, and backtrace.
+    /// Mutably borrows the single concrete inner error, preserving saved diagnostics.
     #[inline]
     pub fn as_single_mut(&mut self) -> &mut A {
         self.as_mut()
@@ -598,7 +612,7 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
         unsafe { self.inner.downcast_error_unchecked() }
     }
 
-    /// Maps the single concrete inner error, preserving context, location, and backtrace.
+    /// Maps the single concrete inner error, preserving saved diagnostics.
     ///
     /// With the `alloc` feature, `map_inner` maps the boxed inner error for
     /// unions with any number of variants. Without `alloc`, `U` must fit the inline
@@ -615,6 +629,8 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
                 f(inner.error),
                 #[cfg(feature = "backtrace")]
                 inner.backtrace,
+                #[cfg(feature = "spantrace")]
+                inner.span_trace,
                 #[cfg(feature = "context")]
                 inner.context,
                 #[cfg(feature = "location")]
@@ -686,8 +702,8 @@ where
     /// Handles one error type or a group, removing the handled types from the result.
     ///
     /// Calls `f` once on a matching error and returns its value as `Ok`. The
-    /// handler receives a union of the selected types with the original context,
-    /// location, and backtrace. Unhandled types retain their original order.
+    /// handler receives a union of the selected types with its original
+    /// diagnostics. Unhandled types retain their original order.
     ///
     /// Use `recover::<ErrorType, _>(...)` for one type or
     /// `recover::<(FirstError, SecondError), _>(...)` for a group of 2–26 types.
@@ -740,8 +756,8 @@ where
 
     /// Handles one error type or a group with a fallible fallback.
     ///
-    /// The handler receives the matching error with its original context,
-    /// location, and backtrace. Its result is returned unchanged, including any
+    /// The handler receives the matching error with its original diagnostics.
+    /// Its result is returned unchanged, including any
     /// fallback error's diagnostics. The original error's diagnostics are not
     /// automatically attached to a new fallback error. Successful input values
     /// and unhandled errors pass through without calling the handler.
@@ -922,7 +938,7 @@ impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
 pub trait Erase<S> {
     /// Preserves the concrete error, including boxes and domain wrappers.
     ///
-    /// Existing unions retain their storage, context, location, and backtrace.
+    /// Existing unions retain their storage and saved diagnostics.
     /// Plain errors are wrapped in a new union. Successful values pass through
     /// unchanged. This works with or without `alloc`.
     ///
@@ -1062,6 +1078,8 @@ impl ErrorUnion {
             AnyhowError(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
+            #[cfg(feature = "spantrace")]
+            tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
             #[cfg(feature = "location")]
@@ -1075,6 +1093,8 @@ impl ErrorUnion {
             AnyhowErrorArc(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
+            #[cfg(feature = "spantrace")]
+            tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
             #[cfg(feature = "location")]
@@ -1137,7 +1157,12 @@ mod tests {
     }
     impl std::error::Error for BarError {}
 
-    #[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+    #[cfg(not(any(
+        feature = "backtrace",
+        feature = "context",
+        feature = "location",
+        feature = "spantrace"
+    )))]
     #[test]
     fn inner_without_metadata_uses_two_words_for_every_error_type() {
         assert_eq!(size_of::<ErrorUnionInner>(), 2 * size_of::<usize>());

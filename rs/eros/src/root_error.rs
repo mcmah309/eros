@@ -19,8 +19,8 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// retains two distinct categories instead of a shared `io::Error` variant.
     /// A wrapper can retain the original failure as its source for diagnostics.
     ///
-    /// Only the inner error is checked, not its sources or contexts. Context,
-    /// location, and backtrace are preserved. Requires `alloc`.
+    /// Only the inner error is checked, not its sources or contexts. All saved
+    /// diagnostics are preserved. Requires `alloc`.
     /// Heap roots reuse their allocation inside the wrapper; inline roots are
     /// boxed. Eros selects inline or boxed storage for the wrapper itself.
     ///
@@ -95,8 +95,9 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// error and returning it from `Error::source()`. Eros uses the new error's
     /// source chain without automatically adding the old inner error.
     ///
-    /// Context, the original Eros capture location, and the saved Eros backtrace
-    /// are preserved. No new backtrace or location is captured.
+    /// All saved diagnostics are preserved, including context, the original
+    /// Eros capture location, backtrace, and span trace. No new diagnostics
+    /// are captured.
     ///
     /// Heap-stored roots retain their allocation when passed to the closure.
     /// Inline non-zero-sized roots are boxed to satisfy the closure's argument.
@@ -146,6 +147,8 @@ impl<E: TypeSet> ErrorUnion<E> {
                 f(parts.error),
                 #[cfg(feature = "backtrace")]
                 parts.backtrace,
+                #[cfg(feature = "spantrace")]
+                parts.span_trace,
                 #[cfg(feature = "context")]
                 parts.context,
                 #[cfg(feature = "location")]

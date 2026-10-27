@@ -1,3 +1,4 @@
 error: invalid input
 location: <location>
-backtrace (<status>):
+span trace: not captured
+backtrace: <status>
