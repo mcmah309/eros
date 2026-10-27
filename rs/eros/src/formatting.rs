@@ -9,6 +9,11 @@ use core::{error::Error, fmt};
 use crate::SendSyncError;
 use crate::{ErrorUnion, TypeSet};
 
+// Shared by human and JSON reporting. Charge before descending into a child so
+// both wide batches and deeply nested batches have bounded child expansion.
+#[cfg(feature = "alloc")]
+pub(crate) const MAX_CHILD_REPORTS: usize = 10;
+
 /// One view of the saved data, shared by human formatting and JSON diagnostics.
 pub(crate) struct Report<'a> {
     #[cfg(feature = "alloc")]
@@ -82,7 +87,8 @@ impl<'a> Report<'a> {
         };
         #[cfg(feature = "alloc")]
         {
-            let node = DebugNode::new(self.inner, renderer.detailed)?;
+            let mut remaining = MAX_CHILD_REPORTS;
+            let node = DebugNode::new(self.inner, renderer.detailed, &mut remaining)?;
             renderer.node(f, &node)
         }
         #[cfg(not(feature = "alloc"))]
@@ -285,12 +291,22 @@ impl ReportRenderer {
     fn collection(
         self,
         out: &mut (impl fmt::Write + ?Sized),
-        groups: &[DebugGroup<'_>],
+        children: &DebugChildren<'_>,
     ) -> fmt::Result {
-        let count: usize = groups.iter().map(|group| group.positions.len()).sum();
-        let empty = if groups.is_empty() { " []" } else { "" };
+        let count = children.total;
+        let empty = if count == 0 { " []" } else { "" };
         self.line(out, &format_args!("errors ({count} total):{empty}"))?;
-        self.groups(out, groups)
+        self.groups(out, &children.groups)?;
+        if children.omitted != 0 {
+            self.nested().next_bullet(
+                out,
+                &format_args!(
+                    "... {} errors omitted (report limit reached)",
+                    children.omitted
+                ),
+            )?;
+        }
+        Ok(())
     }
 
     #[cfg(feature = "alloc")]
@@ -341,7 +357,14 @@ impl ReportRenderer {
 #[cfg(feature = "alloc")]
 struct DebugNode<'a> {
     report: Option<Report<'a>>,
-    children: Option<Vec<DebugGroup<'a>>>,
+    children: Option<DebugChildren<'a>>,
+}
+
+#[cfg(feature = "alloc")]
+struct DebugChildren<'a> {
+    groups: Vec<DebugGroup<'a>>,
+    total: usize,
+    omitted: usize,
 }
 
 #[cfg(feature = "alloc")]
@@ -365,7 +388,11 @@ enum GroupKeyPart {
     Location(String),
     #[cfg(feature = "backtrace")]
     Backtrace(&'static str, Option<String>),
-    Children(Vec<(Vec<usize>, Vec<GroupKeyPart>)>),
+    Children {
+        total: usize,
+        omitted: usize,
+        groups: Vec<(Vec<usize>, Vec<GroupKeyPart>)>,
+    },
 }
 
 #[cfg(feature = "alloc")]
@@ -377,11 +404,16 @@ fn message_key(value: &(impl fmt::Display + ?Sized)) -> Result<String, fmt::Erro
 
 #[cfg(feature = "alloc")]
 impl<'a> DebugNode<'a> {
-    fn new(inner: &'a crate::storage::ErrorUnionInner, detailed: bool) -> Result<Self, fmt::Error> {
+    fn new(
+        inner: &'a crate::storage::ErrorUnionInner,
+        detailed: bool,
+        remaining: &mut usize,
+    ) -> Result<Self, fmt::Error> {
         let children = if inner.is_collection() {
             Some(group_reports(
                 |visitor| inner.visit_children(visitor),
                 detailed,
+                remaining,
             )?)
         } else {
             None
@@ -395,11 +427,16 @@ impl<'a> DebugNode<'a> {
     fn grouping_key(&self, detailed: bool) -> Result<Vec<GroupKeyPart>, fmt::Error> {
         let mut key = Vec::new();
         if let Some(children) = &self.children {
-            let children = children
+            let groups = children
+                .groups
                 .iter()
                 .map(|group| Ok((group.positions.clone(), group.node.grouping_key(detailed)?)))
                 .collect::<Result<_, fmt::Error>>()?;
-            key.push(GroupKeyPart::Children(children));
+            key.push(GroupKeyPart::Children {
+                total: children.total,
+                omitted: children.omitted,
+                groups,
+            });
         }
         if let Some(report) = &self.report {
             if self.children.is_none() {
@@ -436,15 +473,24 @@ impl<'a> DebugNode<'a> {
 fn group_reports<'a>(
     visit: impl FnOnce(&mut dyn FnMut(crate::ErrorReport<'a>)),
     detailed: bool,
-) -> Result<Vec<DebugGroup<'a>>, fmt::Error> {
+    remaining: &mut usize,
+) -> Result<DebugChildren<'a>, fmt::Error> {
     let mut groups = Vec::<DebugGroup<'a>>::new();
     let mut lookup = BTreeMap::<Vec<GroupKeyPart>, usize>::new();
     let mut result = Ok(());
-    let mut position = 0;
+    let mut total = 0;
+    let mut omitted = 0;
     visit(&mut |child| {
+        let position = total;
+        total += 1;
         if result.is_ok() {
+            if *remaining == 0 {
+                omitted += 1;
+                return;
+            }
+            *remaining -= 1;
             result = (|| {
-                let node = DebugNode::new(child.inner, detailed)?;
+                let node = DebugNode::new(child.inner, detailed, remaining)?;
                 let key = node.grouping_key(detailed)?;
                 let index = *lookup.entry(key).or_insert(groups.len());
                 if index == groups.len() {
@@ -454,13 +500,16 @@ fn group_reports<'a>(
                     });
                 }
                 groups[index].positions.push(position);
-                position += 1;
                 Ok(())
             })();
         }
     });
     result?;
-    Ok(groups)
+    Ok(DebugChildren {
+        groups,
+        total,
+        omitted,
+    })
 }
 
 #[cfg(feature = "alloc")]
@@ -472,9 +521,10 @@ pub(crate) fn debug_vector<'a>(
         indent: 0,
         detailed: !f.alternate(),
     };
+    let mut remaining = MAX_CHILD_REPORTS;
     let node = DebugNode {
         report: None,
-        children: Some(group_reports(visit, renderer.detailed)?),
+        children: Some(group_reports(visit, renderer.detailed, &mut remaining)?),
     };
     renderer.node(f, &node)
 }

@@ -25,6 +25,8 @@ impl<'a> ErrorReport<'a> {
     }
 
     /// Borrows the immediate batch children in insertion order.
+    ///
+    /// Visits every child, including those omitted by the built-in report limit.
     pub fn visit_children(&self, visitor: &mut dyn FnMut(ErrorReport<'a>)) {
         self.inner.visit_children(visitor);
     }

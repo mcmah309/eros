@@ -8,9 +8,11 @@ impl<E: TypeSet> ErrorUnion<E> {
     ///
     /// The object contains `root` (a string) and `sources` (an array of strings
     /// in source-chain order). Registered children appear recursively in a
-    /// `children` array, omitted when empty. This creates data, without logging
-    /// or serializing it to text. Requires the `diagnostic` feature; works with
-    /// `no_std + alloc`.
+    /// `children` array, omitted when empty. At most 10 children are expanded
+    /// across the whole report, in depth-first insertion order. Truncated batches
+    /// include `children_omitted`, the number of immediate children skipped.
+    /// This creates data, without logging or serializing it to text. Requires
+    /// the `diagnostic` feature; works with `no_std + alloc`.
     pub fn to_display_json(&self) -> Value {
         self.report().to_display_json()
     }
@@ -24,7 +26,8 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// `feature_disabled`. Captured frames use `captured` and a rendered string.
     /// Locations are omitted when the `location` feature is off.
     /// Registered children appear recursively in `children`, with their own
-    /// metadata. The array is omitted when empty.
+    /// metadata. The array is omitted when empty. The same child limit and
+    /// `children_omitted` field as [`Self::to_display_json`] apply.
     pub fn to_debug_json(&self) -> Value {
         self.report().to_debug_json()
     }
@@ -35,17 +38,29 @@ impl ErrorReport<'_> {
     ///
     /// Uses the same schema as [`ErrorUnion::to_display_json`].
     pub fn to_display_json(&self) -> Value {
-        let mut value = display_value(&Report::from_inner(self.inner));
-        self.add_children(&mut value, |child| child.to_display_json());
-        value
+        let mut remaining = crate::formatting::MAX_CHILD_REPORTS;
+        self.to_json(false, &mut remaining)
     }
 
     /// Returns this report and its children with their saved diagnostic metadata.
     ///
     /// Uses the same schema as [`ErrorUnion::to_debug_json`].
     pub fn to_debug_json(&self) -> Value {
+        let mut remaining = crate::formatting::MAX_CHILD_REPORTS;
+        self.to_json(true, &mut remaining)
+    }
+
+    fn to_json(&self, detailed: bool, remaining: &mut usize) -> Value {
         let report = Report::from_inner(self.inner);
         let mut value = display_value(&report);
+        if detailed {
+            self.add_debug_fields(&mut value, &report);
+        }
+        self.add_children(&mut value, detailed, remaining);
+        value
+    }
+
+    fn add_debug_fields(&self, value: &mut Value, report: &Report<'_>) {
         #[allow(unused_mut)]
         let mut contexts = Vec::<Value>::new();
         #[cfg(feature = "context")]
@@ -74,15 +89,24 @@ impl ErrorReport<'_> {
             "status": report.backtrace_status(),
             "text": report.backtrace_text(),
         });
-        self.add_children(&mut value, |child| child.to_debug_json());
-        value
     }
 
-    fn add_children(&self, value: &mut Value, render: fn(&ErrorReport<'_>) -> Value) {
+    fn add_children(&self, value: &mut Value, detailed: bool, remaining: &mut usize) {
         let mut children = Vec::new();
-        self.visit_children(&mut |child| children.push(render(&child)));
+        let mut omitted = 0usize;
+        self.visit_children(&mut |child| {
+            if *remaining == 0 {
+                omitted += 1;
+                return;
+            }
+            *remaining -= 1;
+            children.push(child.to_json(detailed, remaining));
+        });
         if !children.is_empty() {
             value["children"] = children.into();
+        }
+        if omitted != 0 {
+            value["children_omitted"] = omitted.into();
         }
     }
 }
