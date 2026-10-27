@@ -587,9 +587,9 @@ Only annotated parameters are included in the generated context. Parameters with
 
 ## Formatting
 
-`ErrorUnion` and `eros::Vec` support four report formats:
+`ErrorUnion` and `ErrorUnionVec` support four report formats:
 
-| Format | `ErrorUnion` | `eros::Vec` |
+| Format | `ErrorUnion` | `ErrorUnionVec` |
 | --- | --- | --- |
 | `{:#}` (`Display`) | Root only | `errors (N total):` heading |
 | `{}` (`Display`) | Root and `Error::source()` chain | Same heading |
@@ -606,9 +606,9 @@ zero-based positions and half-open ranges (`0..3` means indices 0, 1, and 2):
 ```rust
 # #[cfg(feature = "alloc")]
 # fn main() {
-use eros::ErrorUnion;
+use eros::{ErrorUnion, ErrorUnionVec};
 
-let errors: eros::Vec<(std::io::Error,)> = [
+let errors: ErrorUnionVec<(std::io::Error,)> = [
     "invalid input", "invalid input", "invalid input",
     "permission denied", "invalid input", "invalid input",
 ]

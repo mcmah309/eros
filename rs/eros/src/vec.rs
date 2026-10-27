@@ -17,12 +17,12 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 /// reporting. Ordinary `.union()` and [`ErrorUnion::new`] do not register children.
 ///
 /// ```
-/// use eros::ErrorUnion;
+/// use eros::{ErrorUnion, ErrorUnionVec};
 ///
 /// let child: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
-/// let batch: eros::Vec<(core::fmt::Error,)> =
-///     eros::Vec::new(vec![child.context("format item 3")]);
-/// let error: ErrorUnion<(eros::Vec<(core::fmt::Error,)>,)> = batch.into_union();
+/// let batch: ErrorUnionVec<(core::fmt::Error,)> =
+///     ErrorUnionVec::new(vec![child.context("format item 3")]);
+/// let error: ErrorUnion<(ErrorUnionVec<(core::fmt::Error,)>,)> = batch.into_union();
 /// let error = error.context("process batch");
 /// println!("{error:?}");
 ///
@@ -31,11 +31,11 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 ///     let _: core::fmt::Error = child.into_single();
 /// }
 /// ```
-pub struct Vec<E: TypeSet = AnyError> {
+pub struct ErrorUnionVec<E: TypeSet = AnyError> {
     errors: AllocVec<ErrorUnion<E>>,
 }
 
-impl<E: TypeSet> Vec<E> {
+impl<E: TypeSet> ErrorUnionVec<E> {
     /// Takes ownership of existing unions without reallocating or recapturing diagnostics.
     pub fn new(errors: AllocVec<ErrorUnion<E>>) -> Self {
         Self { errors }
@@ -89,31 +89,31 @@ impl<E: TypeSet> Vec<E> {
     }
 }
 
-impl<E: TypeSet> Default for Vec<E> {
+impl<E: TypeSet> Default for ErrorUnionVec<E> {
     fn default() -> Self {
         Self::new(AllocVec::new())
     }
 }
 
-impl<E: TypeSet> From<AllocVec<ErrorUnion<E>>> for Vec<E> {
+impl<E: TypeSet> From<AllocVec<ErrorUnion<E>>> for ErrorUnionVec<E> {
     fn from(errors: AllocVec<ErrorUnion<E>>) -> Self {
         Self::new(errors)
     }
 }
 
-impl<E: TypeSet> FromIterator<ErrorUnion<E>> for Vec<E> {
+impl<E: TypeSet> FromIterator<ErrorUnion<E>> for ErrorUnionVec<E> {
     fn from_iter<T: IntoIterator<Item = ErrorUnion<E>>>(iter: T) -> Self {
         Self::new(iter.into_iter().collect())
     }
 }
 
-impl<E: TypeSet> Extend<ErrorUnion<E>> for Vec<E> {
+impl<E: TypeSet> Extend<ErrorUnion<E>> for ErrorUnionVec<E> {
     fn extend<T: IntoIterator<Item = ErrorUnion<E>>>(&mut self, iter: T) {
         self.errors.extend(iter);
     }
 }
 
-impl<E: TypeSet> IntoIterator for Vec<E> {
+impl<E: TypeSet> IntoIterator for ErrorUnionVec<E> {
     type Item = ErrorUnion<E>;
     type IntoIter = vec::IntoIter<Self::Item>;
 
@@ -122,7 +122,7 @@ impl<E: TypeSet> IntoIterator for Vec<E> {
     }
 }
 
-impl<'a, E: TypeSet> IntoIterator for &'a Vec<E> {
+impl<'a, E: TypeSet> IntoIterator for &'a ErrorUnionVec<E> {
     type Item = &'a ErrorUnion<E>;
     type IntoIter = slice::Iter<'a, ErrorUnion<E>>;
 
@@ -131,7 +131,7 @@ impl<'a, E: TypeSet> IntoIterator for &'a Vec<E> {
     }
 }
 
-impl<'a, E: TypeSet> IntoIterator for &'a mut Vec<E> {
+impl<'a, E: TypeSet> IntoIterator for &'a mut ErrorUnionVec<E> {
     type Item = &'a mut ErrorUnion<E>;
     type IntoIter = slice::IterMut<'a, ErrorUnion<E>>;
 
@@ -140,13 +140,13 @@ impl<'a, E: TypeSet> IntoIterator for &'a mut Vec<E> {
     }
 }
 
-impl<E: TypeSet> fmt::Display for Vec<E> {
+impl<E: TypeSet> fmt::Display for ErrorUnionVec<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "errors ({} total):", self.len())
     }
 }
 
-impl<E: TypeSet> fmt::Debug for Vec<E> {
+impl<E: TypeSet> fmt::Debug for ErrorUnionVec<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         crate::formatting::debug_vector(f, |visitor| {
             for child in self {
@@ -156,4 +156,4 @@ impl<E: TypeSet> fmt::Debug for Vec<E> {
     }
 }
 
-impl<E: TypeSet> core::error::Error for Vec<E> {}
+impl<E: TypeSet> core::error::Error for ErrorUnionVec<E> {}

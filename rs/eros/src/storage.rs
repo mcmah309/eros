@@ -52,12 +52,12 @@ impl<T: SendSyncError> OpsFor<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<E: crate::TypeSet> OpsFor<crate::Vec<E>> {
+impl<E: crate::TypeSet> OpsFor<crate::ErrorUnionVec<E>> {
     const WITH_CHILDREN: ErrorOps = ErrorOps {
         children: Some(|root, visitor| {
-            // This table is selected only when wrapping an eros::Vec<E>.
+            // This table is selected only when wrapping an eros::ErrorUnionVec<E>.
             let batch = (root as &dyn Any)
-                .downcast_ref::<crate::Vec<E>>()
+                .downcast_ref::<crate::ErrorUnionVec<E>>()
                 .expect("child visitor must match the stored batch");
             for child in batch {
                 visitor(child.report());
@@ -255,9 +255,9 @@ pub(crate) struct ErrorParts<T> {
 impl ErrorUnionInner {
     #[cfg(feature = "alloc")]
     #[cfg_attr(feature = "location", track_caller)]
-    pub(crate) fn new_vec<E: crate::TypeSet>(value: crate::Vec<E>) -> Self {
+    pub(crate) fn new_vec<E: crate::TypeSet>(value: crate::ErrorUnionVec<E>) -> Self {
         let mut inner = Self::new(value);
-        inner.error.ops = &OpsFor::<crate::Vec<E>>::WITH_CHILDREN;
+        inner.error.ops = &OpsFor::<crate::ErrorUnionVec<E>>::WITH_CHILDREN;
         inner
     }
 

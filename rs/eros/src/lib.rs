@@ -100,7 +100,7 @@ pub use msg_error::MsgError;
 pub use report::ErrorReport;
 pub use type_set::TypeSet;
 #[cfg(feature = "alloc")]
-pub use vec::Vec;
+pub use vec::ErrorUnionVec;
 
 // traits
 pub use context::Context;

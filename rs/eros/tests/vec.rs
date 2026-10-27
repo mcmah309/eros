@@ -1,6 +1,6 @@
 #![cfg(feature = "alloc")]
 
-use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
+use eros::{ErrorUnion, ErrorUnionVec, IntoUnion, ReshapeUnion};
 
 #[derive(Debug, thiserror::Error)]
 #[error("odd number")]
@@ -11,7 +11,7 @@ struct Odd;
 struct Overflow;
 
 type ItemErrors = (Odd, Overflow);
-type Batch = eros::Vec<ItemErrors>;
+type Batch = ErrorUnionVec<ItemErrors>;
 
 fn double_even(value: u8) -> eros::Result<u8, ItemErrors> {
     let result = if value % 2 != 0 {
@@ -121,8 +121,8 @@ fn batches_support_collect_extend_mutable_iteration_and_owned_iteration() {
 #[test]
 fn nested_convenience_batches_report_each_level() {
     let child_batch = check_nums(0..3).unwrap_err();
-    let batch = eros::Vec::new(vec![child_batch]);
-    let error: ErrorUnion<(eros::Vec<(Batch,)>,)> = batch.into_union();
+    let batch = ErrorUnionVec::new(vec![child_batch]);
+    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = batch.into_union();
     let report = format!("{error:#?}");
     assert!(report.starts_with(
         "errors (1 total):\n    groups:\n        - message: errors (1 total)\n          at: [0]"
@@ -143,7 +143,7 @@ fn standalone_and_wrapped_vectors_share_nested_multiline_indentation() {
         source: std::io::Error::other("permission denied\npolicy rejected"),
     });
     let child = child.context("validate record\nrow 17");
-    let batch = eros::Vec::new(vec![child]);
+    let batch = ErrorUnionVec::new(vec![child]);
     let mut expected = "errors (1 total):\n    groups:\n        - message: |\n              invalid record\n              retry exhausted\n          at: [0]\n          caused by:\n              - permission denied\n                policy rejected".to_owned();
     if cfg!(feature = "context") {
         expected.push_str(
@@ -155,13 +155,13 @@ fn standalone_and_wrapped_vectors_share_nested_multiline_indentation() {
     let standalone = format!("{batch:?}");
     // The vector itself has no captured metadata; its child has one report.
     assert_eq!(standalone.matches("backtrace (").count(), 1);
-    let wrapped: ErrorUnion<(eros::Vec<(Multiline,)>, std::fmt::Error)> = batch.into_union();
+    let wrapped: ErrorUnion<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)> = batch.into_union();
     assert_eq!(format!("{wrapped:#?}"), expected);
     let wrapped_detailed = format!("{wrapped:?}");
     assert_eq!(wrapped_detailed.matches("backtrace (").count(), 2);
     assert!(wrapped_detailed.starts_with(&standalone));
 
-    let outer = eros::Vec::new(vec![wrapped]);
+    let outer = ErrorUnionVec::new(vec![wrapped]);
     let mut nested_expected = "errors (1 total):\n    groups:\n        - message: errors (1 total)\n          at: [0]\n          groups:\n              - message: |\n                    invalid record\n                    retry exhausted\n                at: [0]\n                caused by:\n                    - permission denied\n                      policy rejected".to_owned();
     if cfg!(feature = "context") {
         nested_expected.push_str(
@@ -170,7 +170,7 @@ fn standalone_and_wrapped_vectors_share_nested_multiline_indentation() {
     }
     assert_eq!(format!("{outer:#?}"), nested_expected);
     assert_eq!(format!("{outer:?}").matches("backtrace (").count(), 2);
-    let outer: ErrorUnion<(eros::Vec<(eros::Vec<(Multiline,)>, std::fmt::Error)>,)> =
+    let outer: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)>,)> =
         outer.into_union();
     assert_eq!(format!("{outer:#?}"), nested_expected);
     assert_eq!(format!("{outer:?}").matches("backtrace (").count(), 3);
@@ -178,7 +178,7 @@ fn standalone_and_wrapped_vectors_share_nested_multiline_indentation() {
 
 #[test]
 fn empty_vectors_have_the_same_summary_in_every_format() {
-    let batch = eros::Vec::<ItemErrors>::default();
+    let batch = ErrorUnionVec::<ItemErrors>::default();
     assert_eq!(format!("{batch}"), "errors (0 total):");
     assert_eq!(format!("{batch:#}"), "errors (0 total):");
     assert_eq!(format!("{batch:?}"), "errors (0 total):");
@@ -187,7 +187,7 @@ fn empty_vectors_have_the_same_summary_in_every_format() {
 
 #[test]
 fn matching_messages_group_nonconsecutive_ranges_in_first_occurrence_order() {
-    let batch: eros::Vec<(std::io::Error,)> = [
+    let batch: ErrorUnionVec<(std::io::Error,)> = [
         "zebra", "zebra", "zebra", "alpha", "zebra", "beta", "beta", "alpha", "alpha", "zebra",
     ]
     .into_iter()
@@ -196,7 +196,7 @@ fn matching_messages_group_nonconsecutive_ranges_in_first_occurrence_order() {
     let expected =
         include_str!("output_formatting/grouped_ranges/debug.special.txt").trim_end_matches('\n');
     assert_eq!(format!("{batch:#?}"), expected);
-    let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = batch.into_union();
+    let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = batch.into_union();
     assert_eq!(format!("{error:#?}"), expected);
     assert_eq!(error.to_string(), "errors (10 total):");
     let mut children = Vec::new();
@@ -220,7 +220,7 @@ fn matching_messages_group_different_concrete_error_types() {
     let first: ErrorUnion<(Odd,)> = ErrorUnion::new(Odd);
     let second: ErrorUnion<(std::io::Error,)> =
         ErrorUnion::new(std::io::Error::other("odd number"));
-    let batch = eros::Vec::new(vec![first.erase(), second.erase()]);
+    let batch = ErrorUnionVec::new(vec![first.erase(), second.erase()]);
     assert_eq!(
         format!("{batch:#?}"),
         "errors (2 total):\n    groups:\n        - message: odd number\n          at: [0..2]"
@@ -233,7 +233,7 @@ fn matching_messages_group_different_concrete_error_types() {
 #[cfg(feature = "context")]
 #[test]
 fn equal_messages_with_distinct_contexts_form_separate_groups() {
-    let batch: eros::Vec<(std::io::Error,)> = ["row 17", "row 29", "row 17"]
+    let batch: ErrorUnionVec<(std::io::Error,)> = ["row 17", "row 29", "row 17"]
         .into_iter()
         .map(|context| {
             let child: ErrorUnion<(std::io::Error,)> =
@@ -257,7 +257,7 @@ fn equal_messages_retain_distinct_locations_in_detailed_reports() {
         ErrorUnion::new(std::io::Error::other("invalid input"));
     let first_location = first.location().to_string();
     let second_location = second.location().to_string();
-    let batch = eros::Vec::new(vec![first, second]);
+    let batch = ErrorUnionVec::new(vec![first, second]);
     assert_eq!(
         format!("{batch:#?}"),
         "errors (2 total):\n    groups:\n        - message: invalid input\n          at: [0..2]"
@@ -273,7 +273,7 @@ fn equal_messages_retain_distinct_locations_in_detailed_reports() {
 
 #[test]
 fn equal_roots_with_different_sources_remain_separate_groups() {
-    let batch: eros::Vec<(Multiline,)> = ["permission denied", "file missing"]
+    let batch: ErrorUnionVec<(Multiline,)> = ["permission denied", "file missing"]
         .into_iter()
         .map(|message| {
             ErrorUnion::new(Multiline {
@@ -322,10 +322,10 @@ fn multiline_roots_cannot_impersonate_source_fields_when_grouping() {
             if nested {
                 children = children
                     .into_iter()
-                    .map(|child| eros::Vec::new(vec![child]).into_union())
+                    .map(|child| ErrorUnionVec::new(vec![child]).into_union())
                     .collect();
             }
-            let batch = eros::Vec::new(children);
+            let batch = ErrorUnionVec::new(children);
             let report = format!("{batch:#?}");
             assert_eq!(
                 report.matches("- message:").count(),
@@ -349,12 +349,12 @@ fn multiline_roots_cannot_impersonate_source_fields_when_grouping() {
 
 #[test]
 fn equal_batch_summaries_preserve_different_nested_children() {
-    let batch: eros::Vec<(eros::Vec<(std::io::Error,)>,)> = ["alpha", "beta"]
+    let batch: ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)> = ["alpha", "beta"]
         .into_iter()
         .map(|message| {
             let child: ErrorUnion<(std::io::Error,)> =
                 ErrorUnion::new(std::io::Error::other(message));
-            eros::Vec::new(vec![child]).into_union()
+            ErrorUnionVec::new(vec![child]).into_union()
         })
         .collect();
     assert_eq!(

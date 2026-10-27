@@ -29,7 +29,7 @@ fn leaf_reports_work_without_alloc_and_preserve_formats() {
 #[cfg(feature = "alloc")]
 mod allocated {
     use super::*;
-    use eros::ReshapeUnion;
+    use eros::{ErrorUnionVec, ReshapeUnion};
 
     #[derive(Debug, thiserror::Error)]
     #[error("invalid email")]
@@ -41,7 +41,7 @@ mod allocated {
 
     type ItemError = ErrorUnion<(InvalidEmail, MissingField)>;
 
-    type BatchErrors = eros::Vec<(InvalidEmail, MissingField)>;
+    type BatchErrors = ErrorUnionVec<(InvalidEmail, MissingField)>;
 
     #[inline(never)]
     fn email_failure() -> ItemError {
@@ -189,8 +189,8 @@ mod allocated {
         let child: ErrorUnion<(ImportFailure,)> = ErrorUnion::new(ImportFailure {
             source: std::io::Error::other("permission denied"),
         });
-        let error: ErrorUnion<(eros::Vec<(ImportFailure,)>,)> =
-            eros::Vec::new(vec![child]).into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(ImportFailure,)>,)> =
+            ErrorUnionVec::new(vec![child]).into_union();
         assert_eq!(error.to_string(), "errors (1 total):");
         let report = format!("{error:#?}");
         assert!(report.contains(
@@ -254,11 +254,11 @@ mod allocated {
         impl Error for Broken {}
 
         let child: ErrorUnion<(Broken,)> = ErrorUnion::new(Broken);
-        let batch = eros::Vec::new(vec![child]);
+        let batch = ErrorUnionVec::new(vec![child]);
         let mut output = String::new();
         assert!(fmt::write(&mut output, format_args!("{batch:?}")).is_err());
         assert!(fmt::write(&mut output, format_args!("{batch:#?}")).is_err());
-        let error: ErrorUnion<(eros::Vec<(Broken,)>,)> = batch.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(Broken,)>,)> = batch.into_union();
         let mut output = String::new();
         assert!(fmt::write(&mut output, format_args!("{error:#?}")).is_err());
     }

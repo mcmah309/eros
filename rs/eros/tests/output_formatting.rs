@@ -4,6 +4,8 @@
 //! Run with `-- --nocapture --test-threads=1` to print the examples in order.
 
 use eros::ErrorUnion;
+#[cfg(feature = "alloc")]
+use eros::ErrorUnionVec;
 
 #[path = "output_formatting/support.rs"]
 mod support;
@@ -106,46 +108,47 @@ mod allocated {
 
     #[test]
     fn empty_vector() {
-        let errors = eros::Vec::<(std::io::Error,)>::default();
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let errors = ErrorUnionVec::<(std::io::Error,)>::default();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("empty_vector", error.report());
     }
 
     #[test]
     fn single_child() {
-        let errors = eros::Vec::new(vec![error("invalid input")]);
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>, std::fmt::Error)> =
+        let errors = ErrorUnionVec::new(vec![error("invalid input")]);
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>, std::fmt::Error)> =
             errors.into_union();
         assert_outputs!("single_child", error.report());
     }
 
     #[test]
     fn distinct_children() {
-        let errors: eros::Vec<(std::io::Error,)> =
+        let errors: ErrorUnionVec<(std::io::Error,)> =
             ["invalid input", "permission denied", "file missing"]
                 .into_iter()
                 .map(error)
                 .collect();
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("distinct_children", error.report());
     }
 
     #[test]
     fn identical_children() {
-        let errors: eros::Vec<(std::io::Error,)> = (0..4).map(|_| error("invalid input")).collect();
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let errors: ErrorUnionVec<(std::io::Error,)> =
+            (0..4).map(|_| error("invalid input")).collect();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("identical_children", error.report());
     }
 
     #[test]
     fn grouped_ranges() {
-        let errors: eros::Vec<(std::io::Error,)> = [
+        let errors: ErrorUnionVec<(std::io::Error,)> = [
             "zebra", "zebra", "zebra", "alpha", "zebra", "beta", "beta", "alpha", "alpha", "zebra",
         ]
         .into_iter()
         .map(error)
         .collect();
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("grouped_ranges", error.report());
         assert_outputs!("grouped_ranges", error.report());
         assert_outputs!(
@@ -157,8 +160,8 @@ mod allocated {
     #[test]
     fn matching_messages_from_different_types() {
         let first: ErrorUnion<(InvalidInput,)> = ErrorUnion::new(InvalidInput);
-        let errors = eros::Vec::new(vec![first.erase(), error("invalid input").erase()]);
-        let error: ErrorUnion<(eros::Vec<eros::AnyError>,)> = errors.into_union();
+        let errors = ErrorUnionVec::new(vec![first.erase(), error("invalid input").erase()]);
+        let error: ErrorUnion<(ErrorUnionVec<eros::AnyError>,)> = errors.into_union();
         assert_outputs!(
             "matching_messages_from_different_types",
             error.report(),
@@ -170,16 +173,16 @@ mod allocated {
 
     #[test]
     fn grouped_multiline_messages() {
-        let errors: eros::Vec<(std::io::Error,)> = (0..3)
+        let errors: ErrorUnionVec<(std::io::Error,)> = (0..3)
             .map(|_| error("invalid record\r\nretry exhausted"))
             .collect();
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("grouped_multiline_messages", error.report());
     }
 
     #[test]
     fn matching_roots_with_different_sources() {
-        let errors: eros::Vec<(Failure,)> = ["permission denied", "file missing"]
+        let errors: ErrorUnionVec<(Failure,)> = ["permission denied", "file missing"]
             .into_iter()
             .map(|message| {
                 ErrorUnion::new(Failure {
@@ -191,29 +194,32 @@ mod allocated {
                 })
             })
             .collect();
-        let error: ErrorUnion<(eros::Vec<(Failure,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(Failure,)>,)> = errors.into_union();
         assert_outputs!("matching_roots_with_different_sources", error.report());
     }
 
     #[test]
     fn nested_distinct_children() {
-        let errors: eros::Vec<(eros::Vec<(std::io::Error,)>,)> = ["alpha", "beta"]
+        let errors: ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)> = ["alpha", "beta"]
             .into_iter()
-            .map(|message| eros::Vec::new(vec![error(message)]).into_union())
+            .map(|message| ErrorUnionVec::new(vec![error(message)]).into_union())
             .collect();
-        let error: ErrorUnion<(eros::Vec<(eros::Vec<(std::io::Error,)>,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)> =
+            errors.into_union();
         assert_outputs!("nested_distinct_children", error.report());
     }
 
     #[test]
     fn deeply_nested_groups() {
-        let errors: eros::Vec<(std::io::Error,)> = (0..2).map(|_| error("invalid input")).collect();
-        let inner: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
-        let middle: ErrorUnion<(eros::Vec<(eros::Vec<(std::io::Error,)>,)>,)> =
-            eros::Vec::new(vec![inner]).into_union();
-        let outer = eros::Vec::new(vec![middle]);
-        let error: ErrorUnion<(eros::Vec<(eros::Vec<(eros::Vec<(std::io::Error,)>,)>,)>,)> =
-            outer.into_union();
+        let errors: ErrorUnionVec<(std::io::Error,)> =
+            (0..2).map(|_| error("invalid input")).collect();
+        let inner: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let middle: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)> =
+            ErrorUnionVec::new(vec![inner]).into_union();
+        let outer = ErrorUnionVec::new(vec![middle]);
+        let error: ErrorUnion<(
+            ErrorUnionVec<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)>,
+        )> = outer.into_union();
         assert_outputs!("deeply_nested_groups", error.report());
     }
 
@@ -226,16 +232,17 @@ mod allocated {
                 source: None,
             })),
         });
-        let inner: ErrorUnion<(eros::Vec<(Failure,)>,)> = eros::Vec::new(vec![child]).into_union();
-        let outer = eros::Vec::new(vec![inner]);
-        let error: ErrorUnion<(eros::Vec<(eros::Vec<(Failure,)>,)>,)> = outer.into_union();
+        let inner: ErrorUnion<(ErrorUnionVec<(Failure,)>,)> =
+            ErrorUnionVec::new(vec![child]).into_union();
+        let outer = ErrorUnionVec::new(vec![inner]);
+        let error: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Failure,)>,)>,)> = outer.into_union();
         assert_outputs!("nested_multiline_sources", error.report());
     }
 
     #[test]
     fn unicode_multiline_child() {
-        let errors = eros::Vec::new(vec![error("🦀 invalid café\n检查输入")]);
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let errors = ErrorUnionVec::new(vec![error("🦀 invalid café\n检查输入")]);
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("unicode_multiline_child", error.report());
     }
 
@@ -259,11 +266,11 @@ mod allocated {
     #[cfg(feature = "context")]
     #[test]
     fn grouped_distinct_contexts() {
-        let errors: eros::Vec<(std::io::Error,)> = ["row 17", "row 29", "row 17"]
+        let errors: ErrorUnionVec<(std::io::Error,)> = ["row 17", "row 29", "row 17"]
             .into_iter()
             .map(|context| error("invalid input").context(context))
             .collect();
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("grouped_distinct_contexts", error.report());
     }
 
@@ -271,11 +278,11 @@ mod allocated {
     #[test]
     fn nested_parent_contexts() {
         let child = error("invalid input").context("validate row 17");
-        let inner: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> =
-            eros::Vec::new(vec![child]).into_union();
+        let inner: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> =
+            ErrorUnionVec::new(vec![child]).into_union();
         let inner = inner.context("import page");
-        let outer: ErrorUnion<(eros::Vec<(eros::Vec<(std::io::Error,)>,)>,)> =
-            eros::Vec::new(vec![inner]).into_union();
+        let outer: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)> =
+            ErrorUnionVec::new(vec![inner]).into_union();
         let outer = outer.context("import file");
         assert_outputs!("nested_parent_contexts", outer.report());
         assert_outputs!(
@@ -315,8 +322,8 @@ mod allocated {
     fn parent_and_child_contexts() {
         let first = error("invalid email").context("validate customer 104");
         let second = error("missing field\ncustomer name").context("validate customer 209");
-        let error: ErrorUnion<(eros::Vec<(std::io::Error,)>,)> =
-            eros::Vec::new(vec![first, second]).into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> =
+            ErrorUnionVec::new(vec![first, second]).into_union();
         let error = error.context("import customers.csv");
         assert_outputs!("parent_and_child_contexts", error.report());
     }
