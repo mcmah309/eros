@@ -1,4 +1,4 @@
-invalid input
-    context:
-        - validate record
-          row 17
+error: invalid input
+context:
+    - validate record
+      row 17

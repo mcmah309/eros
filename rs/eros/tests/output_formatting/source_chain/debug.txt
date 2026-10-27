@@ -1,6 +1,6 @@
-startup failed
-    caused by:
-        - cannot open configuration
-        - permission denied
-    location: <location>
-    backtrace (<status>):
+error: startup failed
+caused by:
+    - cannot open configuration
+    - permission denied
+location: <location>
+backtrace (<status>):

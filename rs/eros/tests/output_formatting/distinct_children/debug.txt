@@ -1,17 +1,16 @@
-errors (3 total):
-    groups:
-        - message: invalid input
+error:
+    errors (3 total):
+        - error: invalid input
           at: [0]
           location: <location>
           backtrace (<status>):
-        - message: permission denied
+        - error: permission denied
           at: [1]
           location: <location>
           backtrace (<status>):
-        - message: file missing
+        - error: file missing
           at: [2]
           location: <location>
           backtrace (<status>):
-
-    location: <location>
-    backtrace (<status>):
+location: <location>
+backtrace (<status>):

@@ -1,7 +1,6 @@
-errors (2 total):
-    groups:
-        - message: invalid input
+error:
+    errors (2 total):
+        - error: invalid input
           at: [0..2]
           backtrace (<status>):
-
-    backtrace (<status>):
+backtrace (<status>):

@@ -1,20 +1,18 @@
-errors (1 total):
-    groups:
-        - message: errors (1 total)
+error:
+    errors (1 total):
+        - error:
+              errors (1 total):
+                  - error:
+                      invalid record
+                      retry exhausted
+                    at: [0]
+                    caused by:
+                        - permission denied
+                          access policy rejected
+                    location: <location>
+                    backtrace (<status>):
           at: [0]
-          groups:
-              - message: |
-                    invalid record
-                    retry exhausted
-                at: [0]
-                caused by:
-                    - permission denied
-                      access policy rejected
-                location: <location>
-                backtrace (<status>):
-
           location: <location>
           backtrace (<status>):
-
-    location: <location>
-    backtrace (<status>):
+location: <location>
+backtrace (<status>):

@@ -113,7 +113,7 @@ fn closure_can_drop_the_source_chain_completely() {
 
     assert_eq!(error.to_string(), "configuration unavailable");
     assert!(error.source().is_none());
-    assert_eq!(format!("{error:#?}"), "configuration unavailable");
+    assert_eq!(format!("{error:#?}"), "error: configuration unavailable");
 }
 
 #[test]

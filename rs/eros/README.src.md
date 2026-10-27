@@ -352,20 +352,20 @@ fn main() {
 With `RUST_BACKTRACE=1`:
 
 ```console
-invalid digit found in string
-    context:
-        - Parse server port
-        - Configure server api
-        - Start application
-    backtrace (captured):
-        [3 frames hidden for brevity]
-           3: example::parse_port
-                     at ./src/main.rs:4:29
-           4: example::configure_server
-                     at ./src/main.rs:8:5
-           5: example::main
-                     at ./src/main.rs:12:25
-        [17 frames hidden for brevity]
+error: invalid digit found in string
+context:
+    - Parse server port
+    - Configure server api
+    - Start application
+backtrace (captured):
+    [3 frames hidden for brevity]
+       3: example::parse_port
+                 at ./src/main.rs:4:29
+       4: example::configure_server
+                 at ./src/main.rs:8:5
+       5: example::main
+                 at ./src/main.rs:12:25
+    [17 frames hidden for brevity]
 ```
 
 #### Location
@@ -593,7 +593,7 @@ Only annotated parameters are included in the generated context. Parameters with
 | --- | --- | --- |
 | `{:#}` (`Display`) | Root only | `errors (N total):` heading |
 | `{}` (`Display`) | Root and `Error::source()` chain | Same heading |
-| `{:#?}` (`Debug`) | Root, sources, and contexts | Heading and grouped child reports |
+| `{:#?}` (`Debug`) | Root, sources, and contexts | `errors (N total):` list of grouped child reports |
 | `{:?}` (`Debug`) | Same report, plus enabled locations and backtrace | Same grouping, including metadata |
 
 Sources and contexts use bullets; contexts appear innermost first. Empty
@@ -617,7 +617,7 @@ let errors: ErrorUnionVec<(std::io::Error,)> = [
 .collect();
 
 println!("{errors:#?}");
-# assert_eq!(format!("{errors:#?}"), "errors (6 total):\n    groups:\n        - message: invalid input\n          at: [0..3, 4..6]\n        - message: permission denied\n          at: [3]");
+# assert_eq!(format!("{errors:#?}"), "errors (6 total):\n    - error: invalid input\n      at: [0..3, 4..6]\n    - error: permission denied\n      at: [3]");
 # }
 # #[cfg(not(feature = "alloc"))]
 # fn main() {}
@@ -625,11 +625,10 @@ println!("{errors:#?}");
 
 ```text
 errors (6 total):
-    groups:
-        - message: invalid input
-          at: [0..3, 4..6]
-        - message: permission denied
-          at: [3]
+    - error: invalid input
+      at: [0..3, 4..6]
+    - error: permission denied
+      at: [3]
 ```
 
 Different sources, contexts, or nested children form separate groups; ordinary
@@ -1210,7 +1209,7 @@ let error = eros::error!("TLS certificate has expired")
     .context("prepare application update to v2.4.0");
 
 println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
-# assert_eq!(format!("{error:#?}"), "TLS certificate has expired\n    context:\n        - fetch https://updates.example.com/manifest.json\n        - prepare application update to v2.4.0");
+# assert_eq!(format!("{error:#?}"), "error: TLS certificate has expired\ncontext:\n    - fetch https://updates.example.com/manifest.json\n    - prepare application update to v2.4.0");
 # }
 # #[cfg(not(feature = "context"))]
 # fn main() {}
@@ -1219,10 +1218,10 @@ println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
 With the `context` feature enabled (the default):
 
 ```text
-TLS certificate has expired
-    context:
-        - fetch https://updates.example.com/manifest.json
-        - prepare application update to v2.4.0
+error: TLS certificate has expired
+context:
+    - fetch https://updates.example.com/manifest.json
+    - prepare application update to v2.4.0
 ```
 
 The headline identifies the problem immediately: an expired certificate. The context then identifies the request and the application operation that encountered it.

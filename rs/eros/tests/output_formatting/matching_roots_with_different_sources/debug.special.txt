@@ -1,10 +1,10 @@
-errors (2 total):
-    groups:
-        - message: import failed
+error:
+    errors (2 total):
+        - error: import failed
           at: [0]
           caused by:
               - permission denied
-        - message: import failed
+        - error: import failed
           at: [1]
           caused by:
               - file missing

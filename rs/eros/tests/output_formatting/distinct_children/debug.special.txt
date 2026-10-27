@@ -1,8 +1,8 @@
-errors (3 total):
-    groups:
-        - message: invalid input
+error:
+    errors (3 total):
+        - error: invalid input
           at: [0]
-        - message: permission denied
+        - error: permission denied
           at: [1]
-        - message: file missing
+        - error: file missing
           at: [2]

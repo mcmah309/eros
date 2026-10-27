@@ -34,7 +34,7 @@ macro_rules! check_arity {
                 assert!(matches!(Kind::from(&error), Kind::$variant));
                 assert!(matches!(Kind::from(&mut error), Kind::$variant));
                 assert_eq!(error.to_string(), format!("error {}: {original}", $n));
-                assert_eq!(format!("{error:#?}"), format!("error {}: {original}", $n));
+                assert_eq!(format!("{error:#?}"), format!("error: error {}: {original}", $n));
                 match OwnedRef::from(&error) {
                     OwnedRef::$variant(payload) => assert_eq!(payload.0, original),
                     #[allow(unreachable_patterns)]

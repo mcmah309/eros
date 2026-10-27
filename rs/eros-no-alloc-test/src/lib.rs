@@ -83,7 +83,7 @@ pub fn run_checks() {
     assert_eq!(buffer.contents(), b"failure\ndetail");
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{union:#?}").unwrap();
-    assert_eq!(buffer.contents(), b"failure\ndetail");
+    assert_eq!(buffer.contents(), b"error:\n  failure\n  detail");
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{union:?}").unwrap();
     assert!(

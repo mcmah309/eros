@@ -1,10 +1,10 @@
-cannot read configuration
-    caused by:
-        - permission denied
-    context:
-        - read /etc/app.toml
-            location: <location>
-        - start service
-            location: <location>
-    location: <location>
-    backtrace (<status>):
+error: cannot read configuration
+caused by:
+    - permission denied
+context:
+    - read /etc/app.toml
+      location: <location>
+    - start service
+      location: <location>
+location: <location>
+backtrace (<status>):

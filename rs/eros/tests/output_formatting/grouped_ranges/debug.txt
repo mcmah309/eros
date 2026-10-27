@@ -1,17 +1,16 @@
-errors (10 total):
-    groups:
-        - message: zebra
+error:
+    errors (10 total):
+        - error: zebra
           at: [0..3, 4, 9]
           location: <location>
           backtrace (<status>):
-        - message: alpha
+        - error: alpha
           at: [3, 7..9]
           location: <location>
           backtrace (<status>):
-        - message: beta
+        - error: beta
           at: [5..7]
           location: <location>
           backtrace (<status>):
-
-    location: <location>
-    backtrace (<status>):
+location: <location>
+backtrace (<status>):

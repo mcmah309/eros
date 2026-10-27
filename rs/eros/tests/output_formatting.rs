@@ -313,7 +313,11 @@ mod allocated {
             .collect::<Vec<_>>()
             .join("\n");
         assert_eq!(without_metadata, format!("{error:#?}"));
-        assert!(format!("{error:#?}").starts_with(&format!("{error}")));
+        assert!(
+            format!("{error:#?}").starts_with(
+                "error: cannot read configuration\ncaused by:\n    - permission denied"
+            )
+        );
         assert!(format!("{error}").starts_with(&format!("{error:#}")));
     }
 

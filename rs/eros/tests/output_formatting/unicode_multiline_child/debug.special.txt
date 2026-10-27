@@ -1,6 +1,6 @@
-errors (1 total):
-    groups:
-        - message: |
-              🦀 invalid café
-              检查输入
+error:
+    errors (1 total):
+        - error:
+            🦀 invalid café
+            检查输入
           at: [0]

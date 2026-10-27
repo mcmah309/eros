@@ -87,8 +87,8 @@ impl<'a> Report<'a> {
         }
         #[cfg(not(feature = "alloc"))]
         {
-            renderer.line(f, self.root)?;
-            renderer.details(f, self)
+            renderer.error(f, self.root)?;
+            renderer.detail_fields(f, self)
         }
     }
 
@@ -130,9 +130,17 @@ struct ReportRenderer {
 }
 
 impl ReportRenderer {
+    // Structural nesting and text continuation have distinct indentation.
     fn nested(self) -> Self {
         Self {
             indent: self.indent + 4,
+            ..self
+        }
+    }
+
+    fn continued(self) -> Self {
+        Self {
+            indent: self.indent + 2,
             ..self
         }
     }
@@ -186,9 +194,31 @@ impl ReportRenderer {
         Ok(())
     }
 
-    #[cfg(not(feature = "alloc"))]
-    fn details(self, out: &mut (impl fmt::Write + ?Sized), report: &Report<'_>) -> fmt::Result {
-        self.nested().detail_fields(out, report)
+    fn error(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        value: &(impl fmt::Display + ?Sized),
+    ) -> fmt::Result {
+        // Probe normalized lines without allocating, including when CRLF is
+        // split across writes. A final newline does not make a multiline error.
+        let multiline = {
+            struct Probe(bool);
+            impl fmt::Write for Probe {
+                fn write_str(&mut self, text: &str) -> fmt::Result {
+                    self.0 |= text.contains('\n');
+                    Ok(())
+                }
+            }
+            let mut probe = Probe(false);
+            write_lines(&mut probe, format_args!(""), 0, value)?;
+            probe.0
+        };
+        if multiline {
+            self.line(out, &"error:")?;
+            self.continued().next_line(out, value)
+        } else {
+            self.line(out, &format_args!("error: {value}"))
+        }
     }
 
     fn detail_fields(
@@ -208,7 +238,7 @@ impl ReportRenderer {
                 #[cfg(feature = "location")]
                 if self.detailed {
                     values
-                        .nested()
+                        .continued()
                         .next_line(out, &format_args!("location: {}", context.location))?;
                 }
             }
@@ -234,35 +264,44 @@ impl ReportRenderer {
     #[cfg(feature = "alloc")]
     fn node(self, out: &mut (impl fmt::Write + ?Sized), node: &DebugNode<'_>) -> fmt::Result {
         if let Some(groups) = &node.children {
-            let count: usize = groups.iter().map(|group| group.positions.len()).sum();
-            self.line(out, &format_args!("errors ({count} total):"))?;
+            let collection = if node.report.is_some() {
+                self.line(out, &"error:")?;
+                out.write_char('\n')?;
+                self.nested()
+            } else {
+                self
+            };
+            collection.collection(out, groups)?;
         } else if let Some(report) = &node.report {
-            self.line(out, report.root)?;
+            self.error(out, report.root)?;
         }
-        self.nested().body(out, node)
+        if let Some(report) = &node.report {
+            self.detail_fields(out, report)?;
+        }
+        Ok(())
     }
 
     #[cfg(feature = "alloc")]
-    fn body(self, out: &mut (impl fmt::Write + ?Sized), node: &DebugNode<'_>) -> fmt::Result {
-        let mut has_groups = false;
-        if let Some(groups) = &node.children {
-            if !groups.is_empty() {
-                has_groups = true;
-                self.next_line(out, &"groups:")?;
-                for group in groups {
-                    out.write_char('\n')?;
-                    self.nested().group(out, group)?;
-                }
-            }
-        }
-        if let Some(report) = &node.report {
-            let has_details = self.detailed || report.sources().next().is_some();
-            #[cfg(feature = "context")]
-            let has_details = has_details || !report.contexts.is_empty();
-            if has_groups && has_details {
-                out.write_char('\n')?;
-            }
-            self.detail_fields(out, report)?;
+    fn collection(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        groups: &[DebugGroup<'_>],
+    ) -> fmt::Result {
+        let count: usize = groups.iter().map(|group| group.positions.len()).sum();
+        let empty = if groups.is_empty() { " []" } else { "" };
+        self.line(out, &format_args!("errors ({count} total):{empty}"))?;
+        self.groups(out, groups)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn groups(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        groups: &[DebugGroup<'_>],
+    ) -> fmt::Result {
+        for group in groups {
+            out.write_char('\n')?;
+            self.nested().group(out, group)?;
         }
         Ok(())
     }
@@ -273,21 +312,27 @@ impl ReportRenderer {
             indent: self.indent + 2,
             ..self
         };
-        let mut message = String::new();
         if let Some(children) = &group.node.children {
-            let count: usize = children.iter().map(|child| child.positions.len()).sum();
-            fmt::write(&mut message, format_args!("errors ({count} total)"))?;
-        } else if let Some(report) = &group.node.report {
-            write_lines(&mut message, format_args!(""), 0, report.root)?;
-        }
-        if message.contains('\n') {
-            self.line(out, &"- message: |")?;
-            fields.nested().next_line(out, &message)?;
+            self.line(out, &"- error:")?;
+            out.write_char('\n')?;
+            fields.nested().collection(out, children)?;
         } else {
-            self.line(out, &format_args!("- message: {message}"))?;
+            let mut message = String::new();
+            if let Some(report) = &group.node.report {
+                write_lines(&mut message, format_args!(""), 0, report.root)?;
+            }
+            if message.contains('\n') {
+                self.line(out, &"- error:")?;
+                fields.continued().next_line(out, &message)?;
+            } else {
+                self.line(out, &format_args!("- error: {message}"))?;
+            }
         }
         fields.next_line(out, &format_args!("at: [{}]", Positions(&group.positions)))?;
-        fields.body(out, &group.node)
+        if let Some(report) = &group.node.report {
+            fields.detail_fields(out, report)?;
+        }
+        Ok(())
     }
 }
 
@@ -626,6 +671,16 @@ mod streaming_tests {
             write_lines(f, format_args!("prefix: "), 8, &self.0)
         }
     }
+    struct ErrorField<'a>(Fragmented<'a>);
+    impl fmt::Display for ErrorField<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            ReportRenderer {
+                indent: 0,
+                detailed: false,
+            }
+            .error(f, &self.0)
+        }
+    }
 
     #[test]
     fn multiline_output_matches_lines_for_every_chunk_boundary() {
@@ -648,10 +703,22 @@ mod streaming_tests {
                 expected.push_str("\n        ");
                 expected.push_str(line);
             }
+            let expected_error = if text.lines().count() > 1 {
+                let mut output = std::string::String::from("error:");
+                for line in text.lines() {
+                    output.push_str("\n  ");
+                    output.push_str(line);
+                }
+                output
+            } else {
+                std::format!("error: {}", text.lines().next().unwrap_or_default())
+            };
             for split in 0..=text.len() {
                 if text.is_char_boundary(split) {
                     let actual = std::format!("{}", Indented(Fragmented { text, split }));
                     assert_eq!(actual, expected, "text={text:?}, split={split}");
+                    let actual = std::format!("{}", ErrorField(Fragmented { text, split }));
+                    assert_eq!(actual, expected_error, "text={text:?}, split={split}");
                 }
             }
         }

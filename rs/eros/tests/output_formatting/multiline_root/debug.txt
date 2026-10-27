@@ -1,4 +1,5 @@
-invalid record
-retry exhausted
-    location: <location>
-    backtrace (<status>):
+error:
+  invalid record
+  retry exhausted
+location: <location>
+backtrace (<status>):

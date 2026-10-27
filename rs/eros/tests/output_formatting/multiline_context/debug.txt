@@ -1,7 +1,7 @@
-invalid input
-    context:
-        - validate record
-          row 17
-            location: <location>
-    location: <location>
-    backtrace (<status>):
+error: invalid input
+context:
+    - validate record
+      row 17
+      location: <location>
+location: <location>
+backtrace (<status>):

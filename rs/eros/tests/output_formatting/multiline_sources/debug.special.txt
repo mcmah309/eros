@@ -1,5 +1,6 @@
-cannot open configuration
-retry exhausted
-    caused by:
-        - permission denied
-          access policy rejected
+error:
+  cannot open configuration
+  retry exhausted
+caused by:
+    - permission denied
+      access policy rejected

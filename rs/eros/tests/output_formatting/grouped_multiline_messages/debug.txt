@@ -1,11 +1,10 @@
-errors (3 total):
-    groups:
-        - message: |
-              invalid record
-              retry exhausted
+error:
+    errors (3 total):
+        - error:
+            invalid record
+            retry exhausted
           at: [0..3]
           location: <location>
           backtrace (<status>):
-
-    location: <location>
-    backtrace (<status>):
+location: <location>
+backtrace (<status>):

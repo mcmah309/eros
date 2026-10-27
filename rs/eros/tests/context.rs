@@ -230,6 +230,6 @@ fn integration_with_anyhow() {
     );
     assert_eq!(
         format!("{error:#?}"),
-        "This is some anyhow context\n    caused by:\n        - This is the root\n    context:\n        - eros context"
+        "error: This is some anyhow context\ncaused by:\n    - This is the root\ncontext:\n    - eros context"
     );
 }

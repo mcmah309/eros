@@ -13,6 +13,17 @@ struct Overflow;
 type ItemErrors = (Odd, Overflow);
 type Batch = ErrorUnionVec<ItemErrors>;
 
+fn indented(text: &str) -> String {
+    text.lines()
+        .map(|line| format!("    {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn wrapped_collection(text: &str) -> String {
+    format!("error:\n{}", indented(text))
+}
+
 fn double_even(value: u8) -> eros::Result<u8, ItemErrors> {
     let result = if value % 2 != 0 {
         Err(Odd).union()
@@ -75,8 +86,8 @@ fn wrapping_preserves_child_reports_and_registers_human_and_json_traversal() {
     let error: ErrorUnion<(Batch, std::fmt::Error)> = batch.into_union();
     let error = error.context("process batch");
     let report = format!("{error:#?}");
-    assert!(report.contains("- message: odd number\n          at: [0]"));
-    assert!(report.contains("- message: calculation overflowed\n          at: [1]"));
+    assert!(report.contains("- error: odd number\n          at: [0]"));
+    assert!(report.contains("- error: calculation overflowed\n          at: [1]"));
     #[cfg(feature = "context")]
     assert!(report.contains("process batch"));
     let mut children = Vec::new();
@@ -115,7 +126,7 @@ fn batches_support_collect_extend_mutable_iteration_and_owned_iteration() {
     assert!(batch.is_empty());
     assert_eq!(batch.to_string(), "errors (0 total):");
     let error: ErrorUnion<(Batch,)> = batch.into_union();
-    assert_eq!(format!("{error:#?}"), "errors (0 total):");
+    assert_eq!(format!("{error:#?}"), "error:\n    errors (0 total): []");
 }
 
 #[test]
@@ -125,9 +136,9 @@ fn nested_convenience_batches_report_each_level() {
     let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = batch.into_union();
     let report = format!("{error:#?}");
     assert!(report.starts_with(
-        "errors (1 total):\n    groups:\n        - message: errors (1 total)\n          at: [0]"
+        "error:\n    errors (1 total):\n        - error:\n              errors (1 total):"
     ));
-    assert!(report.contains("              - message: odd number\n                at: [0]"));
+    assert!(report.contains("                  - error: odd number\n                    at: [0]"));
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -138,17 +149,15 @@ struct Multiline {
 }
 
 #[test]
-fn standalone_and_wrapped_vectors_share_nested_multiline_indentation() {
+fn wrapped_vectors_preserve_report_boundaries_and_multiline_indentation() {
     let child: ErrorUnion<(Multiline,)> = ErrorUnion::new(Multiline {
         source: std::io::Error::other("permission denied\npolicy rejected"),
     });
     let child = child.context("validate record\nrow 17");
     let batch = ErrorUnionVec::new(vec![child]);
-    let mut expected = "errors (1 total):\n    groups:\n        - message: |\n              invalid record\n              retry exhausted\n          at: [0]\n          caused by:\n              - permission denied\n                policy rejected".to_owned();
+    let mut expected = "errors (1 total):\n    - error:\n        invalid record\n        retry exhausted\n      at: [0]\n      caused by:\n          - permission denied\n            policy rejected".to_owned();
     if cfg!(feature = "context") {
-        expected.push_str(
-            "\n          context:\n              - validate record\n                row 17",
-        );
+        expected.push_str("\n      context:\n          - validate record\n            row 17");
     }
     assert_eq!(format!("{batch:#?}"), expected);
 
@@ -156,33 +165,40 @@ fn standalone_and_wrapped_vectors_share_nested_multiline_indentation() {
     // The vector itself has no captured metadata; its child has one report.
     assert_eq!(standalone.matches("backtrace (").count(), 1);
     let wrapped: ErrorUnion<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)> = batch.into_union();
-    assert_eq!(format!("{wrapped:#?}"), expected);
+    assert_eq!(format!("{wrapped:#?}"), wrapped_collection(&expected));
     let wrapped_detailed = format!("{wrapped:?}");
     assert_eq!(wrapped_detailed.matches("backtrace (").count(), 2);
-    assert!(wrapped_detailed.starts_with(&standalone));
+    assert!(wrapped_detailed.starts_with(&wrapped_collection(&standalone)));
 
     let outer = ErrorUnionVec::new(vec![wrapped]);
-    let mut nested_expected = "errors (1 total):\n    groups:\n        - message: errors (1 total)\n          at: [0]\n          groups:\n              - message: |\n                    invalid record\n                    retry exhausted\n                at: [0]\n                caused by:\n                    - permission denied\n                      policy rejected".to_owned();
-    if cfg!(feature = "context") {
-        nested_expected.push_str(
-            "\n                context:\n                    - validate record\n                      row 17",
-        );
-    }
+    let nested_expected = format!(
+        "errors (1 total):\n    - error:\n{}\n      at: [0]",
+        expected
+            .lines()
+            .map(|line| format!("          {line}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
     assert_eq!(format!("{outer:#?}"), nested_expected);
     assert_eq!(format!("{outer:?}").matches("backtrace (").count(), 2);
     let outer: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)>,)> =
         outer.into_union();
-    assert_eq!(format!("{outer:#?}"), nested_expected);
+    assert_eq!(format!("{outer:#?}"), wrapped_collection(&nested_expected));
     assert_eq!(format!("{outer:?}").matches("backtrace (").count(), 3);
 }
 
 #[test]
-fn empty_vectors_have_the_same_summary_in_every_format() {
+fn empty_vectors_use_an_explicit_empty_list_in_debug() {
     let batch = ErrorUnionVec::<ItemErrors>::default();
     assert_eq!(format!("{batch}"), "errors (0 total):");
     assert_eq!(format!("{batch:#}"), "errors (0 total):");
-    assert_eq!(format!("{batch:?}"), "errors (0 total):");
-    assert_eq!(format!("{batch:#?}"), "errors (0 total):");
+    assert_eq!(format!("{batch:?}"), "errors (0 total): []");
+    assert_eq!(format!("{batch:#?}"), "errors (0 total): []");
+    let nested: ErrorUnionVec<(Batch,)> = ErrorUnionVec::new(vec![batch.into_union()]);
+    assert_eq!(
+        format!("{nested:#?}"),
+        "errors (1 total):\n    - error:\n          errors (0 total): []\n      at: [0]"
+    );
 }
 
 #[test]
@@ -195,7 +211,7 @@ fn matching_messages_group_nonconsecutive_ranges_in_first_occurrence_order() {
     .collect();
     let expected =
         include_str!("output_formatting/grouped_ranges/debug.special.txt").trim_end_matches('\n');
-    assert_eq!(format!("{batch:#?}"), expected);
+    assert_eq!(wrapped_collection(&format!("{batch:#?}")), expected);
     let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = batch.into_union();
     assert_eq!(format!("{error:#?}"), expected);
     assert_eq!(error.to_string(), "errors (10 total):");
@@ -223,7 +239,7 @@ fn matching_messages_group_different_concrete_error_types() {
     let batch = ErrorUnionVec::new(vec![first.erase(), second.erase()]);
     assert_eq!(
         format!("{batch:#?}"),
-        "errors (2 total):\n    groups:\n        - message: odd number\n          at: [0..2]"
+        "errors (2 total):\n    - error: odd number\n      at: [0..2]"
     );
     let mut children = batch.into_iter();
     assert!(children.next().unwrap().is_inner::<Odd>());
@@ -242,7 +258,7 @@ fn equal_messages_with_distinct_contexts_form_separate_groups() {
         })
         .collect();
     assert_eq!(
-        format!("{batch:#?}"),
+        wrapped_collection(&format!("{batch:#?}")),
         include_str!("output_formatting/grouped_distinct_contexts/debug.special.txt")
             .trim_end_matches('\n')
     );
@@ -260,12 +276,12 @@ fn equal_messages_retain_distinct_locations_in_detailed_reports() {
     let batch = ErrorUnionVec::new(vec![first, second]);
     assert_eq!(
         format!("{batch:#?}"),
-        "errors (2 total):\n    groups:\n        - message: invalid input\n          at: [0..2]"
+        "errors (2 total):\n    - error: invalid input\n      at: [0..2]"
     );
     let detailed = format!("{batch:?}");
-    assert_eq!(detailed.matches("- message: invalid input\n").count(), 2);
-    assert!(detailed.contains("          at: [0]"));
-    assert!(detailed.contains("          at: [1]"));
+    assert_eq!(detailed.matches("- error: invalid input\n").count(), 2);
+    assert!(detailed.contains("      at: [0]"));
+    assert!(detailed.contains("      at: [1]"));
     assert!(detailed.contains(&first_location));
     assert!(detailed.contains(&second_location));
     assert_eq!(detailed.matches("backtrace (").count(), 2);
@@ -284,11 +300,11 @@ fn equal_roots_with_different_sources_remain_separate_groups() {
     let report = format!("{batch:#?}");
     assert!(!report.contains("at: [0..2]"));
     assert!(report.contains(
-        "- message: |\n              invalid record\n              retry exhausted\n          at: [0]\n          caused by:\n              - permission denied"
+        "- error:\n        invalid record\n        retry exhausted\n      at: [0]\n      caused by:\n          - permission denied"
     ));
     assert!(
         report.contains(
-            "- message: |\n              invalid record\n              retry exhausted\n          at: [1]\n          caused by:\n              - file missing"
+            "- error:\n        invalid record\n        retry exhausted\n      at: [1]\n      caused by:\n          - file missing"
         )
     );
 }
@@ -313,8 +329,10 @@ fn multiline_roots_cannot_impersonate_source_fields_when_grouping() {
                 message: "foo",
                 source: Some(std::io::Error::other("bar")),
             });
-            // The standalone text is ambiguous, but the underlying fields differ.
-            assert_eq!(format!("{literal:#?}"), format!("{sourced:#?}"));
+            // Display is ambiguous; Debug keeps the multiline root separate
+            // from actual source fields.
+            assert_eq!(format!("{literal}"), format!("{sourced}"));
+            assert_ne!(format!("{literal:#?}"), format!("{sourced:#?}"));
             let mut children = vec![literal.erase(), sourced.erase()];
             if reverse {
                 children.reverse();
@@ -328,19 +346,19 @@ fn multiline_roots_cannot_impersonate_source_fields_when_grouping() {
             let batch = ErrorUnionVec::new(children);
             let report = format!("{batch:#?}");
             assert_eq!(
-                report.matches("- message:").count(),
+                report.matches("- error:").count(),
                 if nested { 4 } else { 2 }
             );
             assert!(!report.contains("at: [0..2]"), "{report}");
-            let indent = " ".repeat(if nested { 16 } else { 10 });
+            let indent = " ".repeat(if nested { 16 } else { 6 });
             assert!(
                 report.contains(&format!("\n{indent}caused by:\n{indent}    - bar")),
                 "the actual source chain must remain a separate field: {report}"
             );
             let error: ErrorUnion = batch.into_union();
-            assert_eq!(format!("{error:#?}"), report);
+            assert_eq!(format!("{error:#?}"), wrapped_collection(&report));
             assert_eq!(
-                format!("{error:?}").matches("- message:").count(),
+                format!("{error:?}").matches("- error:").count(),
                 if nested { 4 } else { 2 }
             );
         }
@@ -358,7 +376,7 @@ fn equal_batch_summaries_preserve_different_nested_children() {
         })
         .collect();
     assert_eq!(
-        format!("{batch:#?}"),
+        wrapped_collection(&format!("{batch:#?}")),
         include_str!("output_formatting/nested_distinct_children/debug.special.txt")
             .trim_end_matches('\n')
     );

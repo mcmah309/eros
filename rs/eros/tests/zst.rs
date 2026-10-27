@@ -142,7 +142,7 @@ fn zero_sized_roots_can_borrow_non_zero_sized_static_sources() {
     assert_eq!(std::format!("{union:#}"), "root");
     assert_eq!(
         std::format!("{union:#?}"),
-        "root\n    caused by:\n        - source\n          more\n        - leaf"
+        "error: root\ncaused by:\n    - source\n      more\n    - leaf"
     );
 }
 

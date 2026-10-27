@@ -179,7 +179,7 @@ pub fn static_messages_compare_and_hash_by_text_and_format_without_a_heap() {
         len: 0,
     };
     write!(&mut buffer, "{error} {error:#?}").unwrap();
-    assert_eq!(&buffer.bytes[..buffer.len], b"message message");
+    assert_eq!(&buffer.bytes[..buffer.len], b"message error: message");
 }
 
 #[cfg(feature = "location")]

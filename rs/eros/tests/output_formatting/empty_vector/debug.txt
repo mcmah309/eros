@@ -1,3 +1,4 @@
-errors (0 total):
-    location: <location>
-    backtrace (<status>):
+error:
+    errors (0 total): []
+location: <location>
+backtrace (<status>):

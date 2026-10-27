@@ -1,24 +1,22 @@
-errors (1 total):
-    groups:
-        - message: errors (1 total)
+error:
+    errors (1 total):
+        - error:
+              errors (1 total):
+                  - error: invalid input
+                    at: [0]
+                    context:
+                        - validate row 17
+                          location: <location>
+                    location: <location>
+                    backtrace (<status>):
           at: [0]
-          groups:
-              - message: invalid input
-                at: [0]
-                context:
-                    - validate row 17
-                        location: <location>
-                location: <location>
-                backtrace (<status>):
-
           context:
               - import page
-                  location: <location>
+                location: <location>
           location: <location>
           backtrace (<status>):
-
-    context:
-        - import file
-            location: <location>
-    location: <location>
-    backtrace (<status>):
+context:
+    - import file
+      location: <location>
+location: <location>
+backtrace (<status>):

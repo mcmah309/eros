@@ -1,12 +1,12 @@
-errors (2 total):
-    groups:
-        - message: errors (1 total)
+error:
+    errors (2 total):
+        - error:
+              errors (1 total):
+                  - error: alpha
+                    at: [0]
           at: [0]
-          groups:
-              - message: alpha
-                at: [0]
-        - message: errors (1 total)
+        - error:
+              errors (1 total):
+                  - error: beta
+                    at: [0]
           at: [1]
-          groups:
-              - message: beta
-                at: [0]

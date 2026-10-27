@@ -70,7 +70,7 @@ mod allocated {
             include_str!("output_formatting/parent_and_child_contexts/debug.special.txt")
                 .trim_end_matches('\n')
         } else {
-            "errors (2 total):\n    groups:\n        - message: invalid email\n          at: [0]\n        - message: |\n              missing field\n              customer name\n          at: [1]"
+            "error:\n    errors (2 total):\n        - error: invalid email\n          at: [0]\n        - error:\n            missing field\n            customer name\n          at: [1]"
         };
         assert_eq!(format!("{error:#?}"), expected);
         assert_eq!(format!("{:#?}", error.report()), expected);
@@ -157,13 +157,12 @@ mod allocated {
     fn registration_is_explicit_and_reads_live_children() {
         let plain: ErrorUnion<(BatchErrors,)> =
             ErrorUnion::new(BatchErrors::new(vec![email_failure()]));
-        assert_eq!(format!("{plain:#?}"), "errors (1 total):");
+        assert_eq!(format!("{plain:#?}"), "error: errors (1 total):");
         let mut error = batch();
         *error.as_single_mut().iter_mut().next().unwrap() = field_failure();
-        assert!(
-            format!("{error:#?}")
-                .contains("- message: |\n              missing field\n              customer name\n          at: [0..2]")
-        );
+        assert!(format!("{error:#?}").contains(
+            "- error:\n            missing field\n            customer name\n          at: [0..2]"
+        ));
         assert!(!format!("{error:#?}").contains("invalid email"));
         *error.as_single_mut() = BatchErrors::default();
         assert!(!format!("{error:#?}").contains("at:"));
@@ -194,7 +193,7 @@ mod allocated {
         assert_eq!(error.to_string(), "errors (1 total):");
         let report = format!("{error:#?}");
         assert!(report.contains(
-            "- message: import failed\n          at: [0]\n          caused by:\n              - permission denied"
+            "- error: import failed\n          at: [0]\n          caused by:\n              - permission denied"
         ));
         assert_eq!(report.matches("caused by:").count(), 1);
         #[cfg(feature = "diagnostic")]

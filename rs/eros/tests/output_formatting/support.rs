@@ -238,13 +238,19 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
             !frames.contains('\u{1b}'),
             "JSON traces must not contain ANSI escapes"
         );
+        let human = format!("{report:?}");
+        let heading = human
+            .lines()
+            .rfind(|line| line.trim_start() == "backtrace (captured):")
+            .expect("captured backtrace heading");
+        let indent = heading.len() - heading.trim_start().len() + 4;
         let indented = frames
             .lines()
-            .map(|line| format!("        {line}"))
+            .map(|line| format!("{:indent$}{line}", ""))
             .collect::<Vec<_>>()
             .join("\n");
         assert!(
-            format!("{report:?}").ends_with(&indented),
+            human.ends_with(&indented),
             "JSON must retain the same captured frames as ordinary Debug"
         );
     } else {

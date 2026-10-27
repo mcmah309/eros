@@ -1,1 +1,1 @@
-invalid input
+error: invalid input
