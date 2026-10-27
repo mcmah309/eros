@@ -4,13 +4,10 @@ use serde_json::{Value, json};
 use crate::{ErrorReport, ErrorUnion, TypeSet, formatting::Report};
 
 impl<E: TypeSet> ErrorUnion<E> {
-    /// Returns root/source messages and registered child reports as structured JSON.
+    /// Returns root/source messages as structured JSON.
     ///
     /// The object contains `root` (a string) and `sources` (an array of strings
-    /// in source-chain order). Registered children appear recursively in a
-    /// `children` array, omitted when empty. At most 10 children are expanded
-    /// across the whole report, in depth-first insertion order. Truncated batches
-    /// include `children_omitted`, the number of immediate children skipped.
+    /// in source-chain order). See [`crate::ErrorUnionVec`] for batch reporting.
     /// This creates data, without logging or serializing it to text. Requires
     /// the `diagnostic` feature; works with `no_std + alloc`.
     pub fn to_display_json(&self) -> Value {
@@ -25,9 +22,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// backtrace text is null; status is `disabled`, `unsupported`, or
     /// `feature_disabled`. Captured frames use `captured` and a rendered string.
     /// Locations are omitted when the `location` feature is off.
-    /// Registered children appear recursively in `children`, with their own
-    /// metadata. The array is omitted when empty. The same child limit and
-    /// `children_omitted` field as [`Self::to_display_json`] apply.
+    /// See [`crate::ErrorUnionVec`] for batch reporting.
     pub fn to_debug_json(&self) -> Value {
         self.report().to_debug_json()
     }
