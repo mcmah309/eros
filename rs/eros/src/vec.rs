@@ -3,6 +3,9 @@ use core::{fmt, slice};
 
 use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::Contains};
 
+// TODO: When specialization is stabilized, revisit replacing this wrapper with
+// Vec<ErrorUnion<E>> using a local union-member trait, while retaining blanket
+// support for ordinary errors and recursive child reporting.
 /// A vector of independent failures, each retaining its typed error and diagnostics.
 ///
 /// Stores [`ErrorUnion<E>`] values. Display prints `errors (N total):`;
