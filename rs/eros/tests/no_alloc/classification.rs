@@ -35,7 +35,6 @@ type PublicErrors = (fmt::Error, DomainError);
 // Also runs in the freestanding binary, without a global allocator.
 pub fn run_checks() {
     classify_word_payloads();
-    classify_error_values();
     let known: ErrorUnion = ErrorUnion::new(fmt::Error);
     #[cfg(feature = "error_location")]
     let location = known.location();
@@ -144,30 +143,4 @@ fn classify_word_payloads() {
         });
         assert!(kept.is_inner::<Status>());
     }
-}
-
-fn classify_error_values() {
-    let original: ErrorUnion = ErrorUnion::new(Code { error_code: 7 });
-    #[cfg(feature = "error_location")]
-    let location = original.location();
-    let classified: ErrorUnion<PublicErrors> = original.classify(DomainError);
-    assert!(classified.is_inner::<DomainError>());
-    #[cfg(feature = "error_location")]
-    assert!(core::ptr::eq(location, classified.location()));
-
-    let original: ErrorUnion = ErrorUnion::new(DomainError);
-    let classified: ErrorUnion<(Code,)> = original.classify(Code { error_code: 37 });
-    assert_eq!(classified.into_single().error_code, 37);
-
-    let success: eros::Result<u8> = Ok(7);
-    let success: eros::Result<u8, PublicErrors> = success.classify(DomainError);
-    assert_eq!(success.unwrap(), 7);
-
-    let failure: eros::Result<u8> = Err(ErrorUnion::new(Code { error_code: 7 }));
-    let failure: eros::Result<u8, PublicErrors> = failure.classify(DomainError);
-    assert!(failure.unwrap_err().is_inner::<DomainError>());
-
-    let known: eros::Result<u8> = Err(ErrorUnion::new(fmt::Error));
-    let known: eros::Result<u8, PublicErrors> = known.classify(DomainError);
-    assert!(known.unwrap_err().is_inner::<fmt::Error>());
 }

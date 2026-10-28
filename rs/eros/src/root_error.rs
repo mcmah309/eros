@@ -16,14 +16,20 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// configuration. With `alloc`, callbacks taking `Box<dyn SendSyncError>`
     /// are also accepted, including tuple struct constructors.
     ///
-    /// Pass an error value directly to discard the original when classification
-    /// is needed. This works for unit structs and errors with fields. The value
-    /// is dropped unused when the original type already belongs to `Other`.
+    /// Discarding the original error requires an explicit callback:
     ///
     /// ```
     /// let error = eros::error!("device unavailable");
-    /// let error: eros::ErrorUnion<(core::fmt::Error,)> = error.classify(core::fmt::Error);
+    /// let error: eros::ErrorUnion<(core::fmt::Error,)> =
+    ///     error.classify(|_: eros::InnerError| core::fmt::Error);
     /// assert_eq!(error.into_single(), core::fmt::Error);
+    /// ```
+    ///
+    /// Error values cannot be passed directly:
+    ///
+    /// ```compile_fail
+    /// let error = eros::error!("device unavailable");
+    /// let _: eros::ErrorUnion<(core::fmt::Error,)> = error.classify(core::fmt::Error);
     /// ```
     ///
     /// Closure parameters may need an explicit type, such as `|inner: InnerError|`

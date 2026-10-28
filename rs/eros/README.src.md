@@ -310,11 +310,9 @@ equivalent to the constructor call above. Annotate closure parameters with
 `InnerError` or `Box<dyn SendSyncError>` when their type cannot be inferred;
 callbacks that ignore the input can use `|_: eros::InnerError|`.
 
-To discard the original error, pass a replacement value directly, such as
-`.classify(MyError)` for a unit struct or `.classify(MyError { code: 7 })` for an
-error with fields. Values work with or without `alloc`. Successful results and
-errors already in the destination set pass through, dropping the unused
-replacement. Saved diagnostics remain with classified errors.
+To discard the original error, use an explicit callback such as
+`.classify(|_: eros::InnerError| MyError)`. Replacement error values cannot be
+passed directly to `classify`.
 
 `InnerError` and its downcasting methods are available with every feature
 configuration. Enabling `alloc` adds `InnerError::into_boxed()` to preserve the

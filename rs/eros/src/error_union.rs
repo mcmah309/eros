@@ -680,16 +680,15 @@ where
     /// ```
     fn adapter(self) -> Result<S, ErrorUnionAdapter<E>>;
 
-    /// Classifies implementation errors using a callback or replacement error.
+    /// Classifies implementation errors using an owned error callback.
     ///
     /// Callbacks taking [`crate::InnerError`] work with every feature configuration.
     /// With `alloc`, callbacks taking `Box<dyn SendSyncError>` are also accepted,
     /// including tuple struct constructors. Closure parameters may need explicit
     /// types. Successful values and concrete types already represented in `Other`
     /// bypass the callback. All saved diagnostics stay with the replacement.
-    /// An error value can also be passed directly to discard an unrepresented
-    /// original error. Supplied values are dropped unused on success or when
-    /// the original type already belongs to `Other`.
+    /// Discarding the original error requires an explicit callback such as
+    /// `|_: crate::InnerError| MyError`; error values cannot be passed directly.
     /// See [`ErrorUnion::classify`] for details.
     ///
     /// ```
