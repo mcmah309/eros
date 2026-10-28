@@ -62,7 +62,7 @@ fn multiline_root() {
     assert_outputs!("multiline_root", error.report());
 }
 
-#[cfg(not(feature = "error_spantrace"))]
+#[cfg(not(feature = "error_span_trace"))]
 #[test]
 fn span_trace_disabled() {
     tracing::subscriber::with_default(tracing_subscriber::registry(), || {
@@ -72,7 +72,7 @@ fn span_trace_disabled() {
     });
 }
 
-#[cfg(feature = "error_spantrace")]
+#[cfg(feature = "error_span_trace")]
 mod span_traces {
     use super::*;
     use tracing_error::{ErrorLayer, SpanTraceStatus};
@@ -146,7 +146,7 @@ mod span_traces {
     }
 }
 
-#[cfg(all(feature = "context", feature = "context_spantrace"))]
+#[cfg(all(feature = "context", feature = "context_span_trace"))]
 #[test]
 fn context_span_trace_captured() {
     use tracing_subscriber::prelude::*;

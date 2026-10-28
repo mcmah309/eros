@@ -147,7 +147,7 @@ impl<E: TypeSet> ErrorUnion<E> {
                 f(parts.error),
                 #[cfg(feature = "backtrace")]
                 parts.backtrace,
-                #[cfg(feature = "error_spantrace")]
+                #[cfg(feature = "error_span_trace")]
                 parts.span_trace,
                 #[cfg(feature = "context")]
                 parts.context,

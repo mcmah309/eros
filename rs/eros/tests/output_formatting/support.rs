@@ -35,8 +35,8 @@ fn visit_reports(report: ErrorReport<'_>, visitor: &mut impl FnMut(ErrorReport<'
 }
 
 #[cfg(any(
-    feature = "error_spantrace",
-    all(feature = "context", feature = "context_spantrace")
+    feature = "error_span_trace",
+    all(feature = "context", feature = "context_span_trace")
 ))]
 fn normalize_span_locations(trace: &tracing_error::SpanTrace, mut text: String) -> String {
     // Keep span names, fields, frame order, and indentation in the fixtures;
@@ -66,11 +66,11 @@ fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
     let mut statuses = Vec::new();
     visit_reports(report, &mut |report| {
         statuses.push(trace_status(report));
-        #[cfg(feature = "error_spantrace")]
+        #[cfg(feature = "error_span_trace")]
         {
             text = normalize_span_locations(report.span_trace(), std::mem::take(&mut text));
         }
-        #[cfg(all(feature = "context", feature = "context_spantrace"))]
+        #[cfg(all(feature = "context", feature = "context_span_trace"))]
         for frame in report.contexts() {
             text = normalize_span_locations(frame.span_trace(), std::mem::take(&mut text));
         }
@@ -153,9 +153,9 @@ fn expected_debug(text: &str) -> String {
                 })
                 && (!trimmed.starts_with("span trace:")
                     || if context_indent.is_some_and(|context| indent == context + 6) {
-                        cfg!(feature = "context_spantrace")
+                        cfg!(feature = "context_span_trace")
                     } else {
-                        cfg!(feature = "error_spantrace")
+                        cfg!(feature = "error_span_trace")
                     })
                 && (cfg!(feature = "backtrace") || !line.trim_start().starts_with("backtrace:"))
         })
@@ -186,8 +186,8 @@ fn record(case: &str, file: &str, actual: &str) -> bool {
                     feature = "context",
                     feature = "error_location",
                     feature = "context_location",
-                    feature = "error_spantrace",
-                    feature = "context_spantrace"
+                    feature = "error_span_trace",
+                    feature = "context_span_trace"
                 )),
                 "record fixtures with --all-features"
             );
@@ -271,8 +271,8 @@ fn assert_location(value: &mut serde_json::Value, location: &core::panic::Locati
 #[cfg(all(
     feature = "json",
     any(
-        feature = "error_spantrace",
-        all(feature = "context", feature = "context_spantrace")
+        feature = "error_span_trace",
+        all(feature = "context", feature = "context_span_trace")
     )
 ))]
 fn normalize_span_json(trace: &tracing_error::SpanTrace, value: &mut serde_json::Value) {
@@ -329,9 +329,9 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
             assert_location(&mut value["location"], frame.location());
             #[cfg(not(feature = "context_location"))]
             assert!(value.get("location").is_none());
-            #[cfg(feature = "context_spantrace")]
+            #[cfg(feature = "context_span_trace")]
             normalize_span_json(frame.span_trace(), value);
-            #[cfg(not(feature = "context_spantrace"))]
+            #[cfg(not(feature = "context_span_trace"))]
             assert!(value.get("span_trace").is_none());
         }
     }
@@ -370,9 +370,9 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     }
     #[cfg(not(feature = "backtrace"))]
     assert!(value.get("backtrace").is_none());
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     normalize_span_json(report.span_trace(), value);
-    #[cfg(not(feature = "error_spantrace"))]
+    #[cfg(not(feature = "error_span_trace"))]
     assert!(value.get("span_trace").is_none());
     let mut children = Vec::new();
     report.visit_children(&mut |child| children.push(child));
@@ -402,9 +402,9 @@ fn adapt_expected_json(value: &mut serde_json::Value) {
                 object.remove("location");
             }
             let include_span_trace = if object.contains_key("message") {
-                cfg!(feature = "context_spantrace")
+                cfg!(feature = "context_span_trace")
             } else {
-                cfg!(feature = "error_spantrace")
+                cfg!(feature = "error_span_trace")
             };
             if !include_span_trace {
                 object.remove("span_trace");

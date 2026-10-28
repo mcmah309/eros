@@ -106,7 +106,7 @@ mod allocated {
             assert!(core::ptr::addr_eq(child.inner(), original.inner()));
             #[cfg(feature = "backtrace")]
             assert!(core::ptr::eq(child.backtrace(), original.backtrace()));
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             assert!(core::ptr::eq(child.span_trace(), original.span_trace()));
             #[cfg(feature = "error_location")]
             assert!(core::ptr::eq(child.location(), original.location()));

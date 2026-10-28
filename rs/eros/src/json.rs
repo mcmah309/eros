@@ -22,9 +22,9 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// `backtrace` as rendered text when captured, or null otherwise.
     /// Root locations require `error_location`; context locations require
     /// `context_location`. The `location` feature enables both.
-    /// `error_spantrace` adds root `span_trace` text, and `context_spantrace`
+    /// `error_span_trace` adds root `span_trace` text, and `context_span_trace`
     /// adds it to each context. Enabled traces are null when not captured;
-    /// disabled fields are omitted. The `spantrace` feature enables both.
+    /// disabled fields are omitted. The `span_trace` feature enables both.
     /// See [`crate::ErrorUnionVec`] for batch reporting.
     pub fn to_debug_json(&self) -> Value {
         self.report().to_debug_json()
@@ -76,7 +76,7 @@ impl ErrorReport<'_> {
             {
                 frame["location"] = location_value(context.location);
             }
-            #[cfg(feature = "context_spantrace")]
+            #[cfg(feature = "context_span_trace")]
             {
                 frame["span_trace"] = crate::formatting::SpanTraceDisplay(&context.span_trace)
                     .text()
@@ -93,7 +93,7 @@ impl ErrorReport<'_> {
         {
             value["backtrace"] = _report.backtrace_text().into();
         }
-        #[cfg(feature = "error_spantrace")]
+        #[cfg(feature = "error_span_trace")]
         {
             value["span_trace"] = _report.span_trace_text().into();
         }

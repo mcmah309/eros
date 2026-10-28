@@ -30,13 +30,13 @@ jobs:
           - "--no-default-features --features context,location,user_context,json"
           - "--no-default-features --features anyhow"
           - "--no-default-features --features backtrace,json"
-          - "--no-default-features --features error_spantrace"
-          - "--no-default-features --features context_spantrace"
-          - "--no-default-features --features context,error_spantrace,user_context,json"
-          - "--no-default-features --features context,context_spantrace,user_context,json"
-          - "--no-default-features --features context,error_spantrace,context_spantrace,user_context,json"
-          - "--no-default-features --features spantrace"
-          - "--no-default-features --features spantrace,json"
+          - "--no-default-features --features error_span_trace"
+          - "--no-default-features --features context_span_trace"
+          - "--no-default-features --features context,error_span_trace,user_context,json"
+          - "--no-default-features --features context,context_span_trace,user_context,json"
+          - "--no-default-features --features context,error_span_trace,context_span_trace,user_context,json"
+          - "--no-default-features --features span_trace"
+          - "--no-default-features --features span_trace,json"
 
     steps:
       - name: Checkout repository

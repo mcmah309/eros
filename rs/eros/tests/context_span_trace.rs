@@ -1,4 +1,4 @@
-#![cfg(all(feature = "context", feature = "context_spantrace"))]
+#![cfg(all(feature = "context", feature = "context_span_trace"))]
 
 use eros::{Context, ErrorUnion, ErrorUnionAdapter, ErrorUnionVec, MsgError, ReshapeUnion};
 use std::fmt;
@@ -39,7 +39,7 @@ fn each_context_retains_its_attachment_span_after_the_subscriber_exits() {
     );
     assert_eq!(names(frames[1].span_trace()), ["second_attachment"]);
     assert!(frames[0].span_trace().to_string().contains("id=42"));
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     assert_eq!(names(error.span_trace()), ["origin"]);
     for (frame, borrowed) in frames.iter().zip(error.report().contexts()) {
         assert!(std::ptr::eq(frame.span_trace(), borrowed.span_trace()));
@@ -65,7 +65,7 @@ fn each_context_retains_its_attachment_span_after_the_subscriber_exits() {
             assert!(text.contains("attempt=1"), "{text}");
             assert!(text.contains("id=42"), "{text}");
             assert!(!text.contains("::reporting"), "{text}");
-            #[cfg(not(feature = "error_spantrace"))]
+            #[cfg(not(feature = "error_span_trace"))]
             assert!(!text.contains("::origin"), "{text}");
             for compact in [
                 format!("{error}"),
@@ -94,7 +94,7 @@ fn each_context_retains_its_attachment_span_after_the_subscriber_exits() {
         );
         assert_eq!(
             json.get("span_trace").is_some(),
-            cfg!(feature = "error_spantrace")
+            cfg!(feature = "error_span_trace")
         );
         assert!(error.to_display_json().get("contexts").is_none());
     }

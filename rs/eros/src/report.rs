@@ -46,8 +46,8 @@ impl<'a> ErrorReport<'a> {
     }
 
     /// Borrows the original span trace without capturing a new one.
-    /// Requires `error_spantrace` (also enabled by `spantrace`).
-    #[cfg(feature = "error_spantrace")]
+    /// Requires `error_span_trace` (also enabled by `span_trace`).
+    #[cfg(feature = "error_span_trace")]
     pub fn span_trace(&self) -> &'a tracing_error::SpanTrace {
         &self.inner.span_trace
     }

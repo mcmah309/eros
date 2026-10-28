@@ -236,7 +236,7 @@ pub(crate) struct ErrorUnionInner {
     error: StoredError,
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     pub(crate) span_trace: tracing_error::SpanTrace,
     #[cfg(feature = "context")]
     pub(crate) context: Vec<ContextFrame>,
@@ -248,7 +248,7 @@ pub(crate) struct ErrorParts<T> {
     pub(crate) error: T,
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     pub(crate) span_trace: tracing_error::SpanTrace,
     #[cfg(feature = "context")]
     pub(crate) context: Vec<ContextFrame>,
@@ -283,7 +283,7 @@ impl ErrorUnionInner {
             value,
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::capture(),
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
@@ -296,7 +296,7 @@ impl ErrorUnionInner {
     pub(crate) fn new_from_parts<T: SendSyncError>(
         value: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "error_spantrace")] span_trace: tracing_error::SpanTrace,
+        #[cfg(feature = "error_span_trace")] span_trace: tracing_error::SpanTrace,
         #[cfg(feature = "context")] context: Vec<ContextFrame>,
         #[cfg(feature = "error_location")] location: &'static core::panic::Location<'static>,
     ) -> Self {
@@ -304,7 +304,7 @@ impl ErrorUnionInner {
             error: StoredError::new(value),
             #[cfg(feature = "backtrace")]
             backtrace,
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             span_trace,
             #[cfg(feature = "context")]
             context,
@@ -350,7 +350,7 @@ impl ErrorUnionInner {
             error: unsafe { self.error.take::<T>() },
             #[cfg(feature = "backtrace")]
             backtrace: self.backtrace,
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             span_trace: self.span_trace,
             #[cfg(feature = "context")]
             context: self.context,
@@ -366,7 +366,7 @@ impl ErrorUnionInner {
             error: self.error.into_box(),
             #[cfg(feature = "backtrace")]
             backtrace: self.backtrace,
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             span_trace: self.span_trace,
             #[cfg(feature = "context")]
             context: self.context,

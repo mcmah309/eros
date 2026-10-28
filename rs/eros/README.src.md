@@ -325,7 +325,7 @@ a typed union into an untyped one.
 
 Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
-For code already instrumented with `tracing`, [span traces](#tracing-span-traces) offer an alternative to adding operation context manually: the `error_spantrace` feature captures the active span and its parents, including their fields, when an error first enters Eros. Use `context_spantrace` to capture spans at context attachments, or `spantrace` for both.
+For code already instrumented with `tracing`, [span traces](#tracing-span-traces) offer an alternative to adding operation context manually: the `error_span_trace` feature captures the active span and its parents, including their fields, when an error first enters Eros. Use `context_span_trace` to capture spans at context attachments, or `span_trace` for both.
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -705,7 +705,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, `error_spantrace`, or `error_location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, `error_span_trace`, or `error_location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
 
 For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
@@ -838,7 +838,7 @@ fn func1b() -> eros::Result<()> {
 
 ### Backtrace vs Location
 
-`backtrace` captures a backtrace at error creation when enabled by the backtrace environment settings. For lighter location tracking, enable `error_location` to capture where an error first enters Eros, `context_location` to capture where each context is attached, or `location` for both. The two location flags work independently and can be combined with `backtrace` or `spantrace`. They use compiler-provided call locations and support wasm and `no_std` environments. None of the location flags is enabled by default; `backtrace` is.
+`backtrace` captures a backtrace at error creation when enabled by the backtrace environment settings. For lighter location tracking, enable `error_location` to capture where an error first enters Eros, `context_location` to capture where each context is attached, or `location` for both. The two location flags work independently and can be combined with `backtrace` or `span_trace`. They use compiler-provided call locations and support wasm and `no_std` environments. None of the location flags is enabled by default; `backtrace` is.
 
 ### Logging
 
@@ -902,15 +902,15 @@ WARN Something went wrong
 
 ### Tracing Span Traces
 
-The optional `error_spantrace` feature captures the current
+The optional `error_span_trace` feature captures the current
 [`tracing`](https://docs.rs/tracing) span and its parents, including fields and
-source locations, when an error first enters Eros. `context_spantrace` captures
-that information separately when each context is attached. Enable `spantrace`
-as a shortcut for both. Both capture features require `std`; `context_spantrace`
+source locations, when an error first enters Eros. `context_span_trace` captures
+that information separately when each context is attached. Enable `span_trace`
+as a shortcut for both. Both capture features require `std`; `context_span_trace`
 does not enable `context` itself.
 
 ```rust
-# #[cfg(feature = "error_spantrace")]
+# #[cfg(feature = "error_span_trace")]
 # fn main() {
 use tracing_subscriber::prelude::*;
 
@@ -927,7 +927,7 @@ if let Err(error) = load_settings("config.toml", 2) {
     println!("{error:?}");
 }
 # }
-# #[cfg(not(feature = "error_spantrace"))]
+# #[cfg(not(feature = "error_span_trace"))]
 # fn main() {}
 ```
 
@@ -947,9 +947,9 @@ backtrace: not captured
 Here, `bail!` captures the `load_settings` span before the function returns.
 Converting an error into an Eros error after the function returns would miss that span.
 
-Print the saved traces with `{:?}`. With `error_spantrace`, inspect the original
+Print the saved traces with `{:?}`. With `error_span_trace`, inspect the original
 trace through `.span_trace()` on an `ErrorUnion` or `ErrorReport`. With `context`
-and `context_spantrace`, inspect each attachment trace through
+and `context_span_trace`, inspect each attachment trace through
 `error.contexts()` and `ContextFrame::span_trace()`. Attaching context preserves
 the original error trace, so a context attached by an instrumented caller can
 record a different span from the error's origin. Detailed reports show each
@@ -1654,7 +1654,7 @@ reference per error without allocating. `context_location` adds one location
 reference per context frame when `context` is enabled; it does not enable
 `context` or `alloc` itself. Both support `no_std`. The `location` feature enables
 both flags. The `std`, `context`, and `json` features enable
-`alloc` automatically. `backtrace`, `error_spantrace`, and `context_spantrace`
+`alloc` automatically. `backtrace`, `error_span_trace`, and `context_span_trace`
 require `std`. With `context` disabled,
 static string contexts remain accepted as no-ops and lazy context closures are
 not evaluated. Default features enable `alloc`, context, and backtraces, so keep

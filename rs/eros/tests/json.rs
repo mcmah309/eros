@@ -2,12 +2,12 @@
 
 use eros::{ErrorUnion, ErrorUnionVec, MsgError};
 use serde_json::Value;
-#[cfg(feature = "error_spantrace")]
+#[cfg(feature = "error_span_trace")]
 use tracing_subscriber::prelude::*;
 
 fn with_span<T>(f: impl FnOnce() -> T) -> T {
     let subscriber = tracing_subscriber::registry();
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     let subscriber = subscriber.with(tracing_error::ErrorLayer::default());
     tracing::subscriber::with_default(subscriber, || {
         tracing::info_span!("operation", request_id = 42).in_scope(f)
@@ -52,7 +52,7 @@ fn assert_span_trace_absent(value: &Value) {
     );
 }
 
-#[cfg(not(feature = "error_spantrace"))]
+#[cfg(not(feature = "error_span_trace"))]
 #[test]
 fn debug_json_omits_span_trace_when_disabled_for_typed_and_erased_errors() {
     // Active tracing spans must not add JSON fields when Eros's feature is off.
@@ -67,7 +67,7 @@ fn debug_json_omits_span_trace_when_disabled_for_typed_and_erased_errors() {
     }
 }
 
-#[cfg(not(feature = "error_spantrace"))]
+#[cfg(not(feature = "error_span_trace"))]
 #[test]
 fn debug_json_omits_span_trace_when_disabled_at_every_batch_depth() {
     let error = with_span(nested_batch);
@@ -89,7 +89,7 @@ fn debug_json_omits_backtrace_when_disabled_at_every_batch_depth() {
     }
 }
 
-#[cfg(feature = "error_spantrace")]
+#[cfg(feature = "error_span_trace")]
 #[test]
 fn debug_json_uses_null_when_enabled_without_a_capture_at_every_batch_depth() {
     let error = tracing::subscriber::with_default(tracing_subscriber::registry(), nested_batch);
@@ -100,7 +100,7 @@ fn debug_json_uses_null_when_enabled_without_a_capture_at_every_batch_depth() {
     }
 }
 
-#[cfg(feature = "error_spantrace")]
+#[cfg(feature = "error_span_trace")]
 #[test]
 fn debug_json_uses_trace_text_directly_when_captured_at_every_batch_depth() {
     let error = with_span(nested_batch);

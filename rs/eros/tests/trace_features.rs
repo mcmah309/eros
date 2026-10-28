@@ -6,7 +6,7 @@ fn debug_trace_fields_follow_their_own_feature_flags() {
     for text in [format!("{error:?}"), format!("{:?}", error.report())] {
         assert_eq!(
             text.contains("\nspan trace:"),
-            cfg!(feature = "error_spantrace"),
+            cfg!(feature = "error_span_trace"),
             "{text}"
         );
         assert_eq!(
@@ -14,7 +14,7 @@ fn debug_trace_fields_follow_their_own_feature_flags() {
             cfg!(feature = "backtrace"),
             "{text}"
         );
-        #[cfg(feature = "error_spantrace")]
+        #[cfg(feature = "error_span_trace")]
         assert!(text.contains("\nspan trace: no active spans"), "{text}");
         assert!(!text.contains("(captured)"), "{text}");
     }
@@ -28,7 +28,7 @@ fn context_trace_fields_follow_the_context_feature_flag() {
     for text in [format!("{error:?}"), format!("{:?}", error.report())] {
         assert_eq!(
             text.contains("\n      span trace:"),
-            cfg!(feature = "context_spantrace"),
+            cfg!(feature = "context_span_trace"),
             "{text}"
         );
     }
@@ -37,11 +37,11 @@ fn context_trace_fields_follow_the_context_feature_flag() {
         let json = error.to_debug_json();
         assert_eq!(
             json.get("span_trace").is_some(),
-            cfg!(feature = "error_spantrace")
+            cfg!(feature = "error_span_trace")
         );
         assert_eq!(
             json["contexts"][0].get("span_trace").is_some(),
-            cfg!(feature = "context_spantrace")
+            cfg!(feature = "context_span_trace")
         );
     }
 }

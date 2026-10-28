@@ -135,7 +135,7 @@ impl ErrorUnion {
     pub(crate) fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "error_spantrace")] span_trace: tracing_error::SpanTrace,
+        #[cfg(feature = "error_span_trace")] span_trace: tracing_error::SpanTrace,
         #[cfg(feature = "context")] context: Vec<ContextFrame>,
         #[cfg(feature = "error_location")] location: &'static core::panic::Location<'static>,
     ) -> ErrorUnion<OutSet>
@@ -149,7 +149,7 @@ impl ErrorUnion {
                 t,
                 #[cfg(feature = "backtrace")]
                 backtrace,
-                #[cfg(feature = "error_spantrace")]
+                #[cfg(feature = "error_span_trace")]
                 span_trace,
                 #[cfg(feature = "context")]
                 context,
@@ -429,11 +429,11 @@ where
 
     /// Borrows the span trace captured when this error first entered Eros.
     ///
-    /// Requires `error_spantrace` (also enabled by `spantrace`). The application must install
+    /// Requires `error_span_trace` (also enabled by `span_trace`). The application must install
     /// [`tracing_error::ErrorLayer`] and instrument its operations for useful
     /// traces. Reshaping, recovery, and mapping preserve the original trace;
     /// borrowing or formatting never captures a new one.
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     pub fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.inner.span_trace
     }
@@ -630,7 +630,7 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
                 f(inner.error),
                 #[cfg(feature = "backtrace")]
                 inner.backtrace,
-                #[cfg(feature = "error_spantrace")]
+                #[cfg(feature = "error_span_trace")]
                 inner.span_trace,
                 #[cfg(feature = "context")]
                 inner.context,
@@ -1079,7 +1079,7 @@ impl ErrorUnion {
             AnyhowError(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
@@ -1094,7 +1094,7 @@ impl ErrorUnion {
             AnyhowErrorArc(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
-            #[cfg(feature = "error_spantrace")]
+            #[cfg(feature = "error_span_trace")]
             tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
@@ -1162,7 +1162,7 @@ mod tests {
         feature = "backtrace",
         feature = "context",
         feature = "error_location",
-        feature = "error_spantrace"
+        feature = "error_span_trace"
     )))]
     #[test]
     fn inner_without_metadata_uses_two_words_for_every_error_type() {

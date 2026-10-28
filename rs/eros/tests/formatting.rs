@@ -633,12 +633,12 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
     assert_eq!(
         diagnostic.as_object().unwrap().len(),
         3 + usize::from(cfg!(feature = "error_location"))
-            + usize::from(cfg!(feature = "error_spantrace"))
+            + usize::from(cfg!(feature = "error_span_trace"))
             + usize::from(cfg!(feature = "backtrace"))
     );
-    #[cfg(feature = "error_spantrace")]
+    #[cfg(feature = "error_span_trace")]
     assert_eq!(diagnostic.get("span_trace"), Some(&serde_json::Value::Null));
-    #[cfg(not(feature = "error_spantrace"))]
+    #[cfg(not(feature = "error_span_trace"))]
     assert!(diagnostic.get("span_trace").is_none());
 
     #[cfg(feature = "error_location")]
@@ -656,7 +656,7 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
             assert_eq!(
                 context.as_object().unwrap().len(),
                 2 + usize::from(cfg!(feature = "context_location"))
-                    + usize::from(cfg!(feature = "context_spantrace"))
+                    + usize::from(cfg!(feature = "context_span_trace"))
             );
         }
         #[cfg(feature = "context_location")]

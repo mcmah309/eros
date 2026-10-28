@@ -16,7 +16,7 @@ impl<T: Any + Debug + Display + Send + Sync + 'static> SendSyncDebugDisplay for 
 #[derive(Debug)]
 pub struct ContextFrame {
     pub(crate) context: ContextValue,
-    #[cfg(feature = "context_spantrace")]
+    #[cfg(feature = "context_span_trace")]
     pub(crate) span_trace: tracing_error::SpanTrace,
     #[cfg(feature = "context_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
@@ -30,7 +30,7 @@ impl ContextFrame {
     pub(crate) fn new(context: ContextValue) -> Self {
         Self {
             context,
-            #[cfg(feature = "context_spantrace")]
+            #[cfg(feature = "context_span_trace")]
             span_trace: tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context_location")]
             location: core::panic::Location::caller(),
@@ -44,7 +44,7 @@ impl ContextFrame {
     pub(crate) fn new_user_facing(context: ContextValue) -> Self {
         Self {
             context,
-            #[cfg(feature = "context_spantrace")]
+            #[cfg(feature = "context_span_trace")]
             span_trace: tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context_location")]
             location: core::panic::Location::caller(),
@@ -68,8 +68,8 @@ impl ContextFrame {
     }
 
     /// Borrows the span trace captured when this context was attached.
-    /// Requires `context_spantrace` (also enabled by `spantrace`).
-    #[cfg(feature = "context_spantrace")]
+    /// Requires `context_span_trace` (also enabled by `span_trace`).
+    #[cfg(feature = "context_span_trace")]
     pub fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.span_trace
     }

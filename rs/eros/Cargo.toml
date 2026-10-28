@@ -49,11 +49,11 @@ context = ["alloc", "eros-macros/context"]
 # Enables backtrace
 backtrace = ["std"]
 # Captures the current tracing span and its parents when an error first enters Eros.
-error_spantrace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
+error_span_trace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
 # Captures tracing spans at context attachment; does not enable context.
-context_spantrace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
+context_span_trace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
 # Enables both error and context span trace capture.
-spantrace = ["error_spantrace", "context_spantrace"]
+span_trace = ["error_span_trace", "context_span_trace"]
 # Parses and removes the unnecessary noise from the backtrace before printing
 better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
 # Captures where an error first enters Eros, without requiring alloc or std.
