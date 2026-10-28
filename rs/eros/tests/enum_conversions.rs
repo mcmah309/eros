@@ -59,7 +59,7 @@ macro_rules! check_arity {
                 let adapter: Box<dyn std::error::Error + Send + Sync> = Box::new(error.adapter());
                 assert!(std::error::Error::source(adapter.as_ref()).is_none());
                 let error = adapter.downcast::<eros::ErrorUnionAdapter<Set>>()
-                    .unwrap().into_unadapted();
+                    .unwrap().union();
                 let mut erased: ErrorUnion = error.into();
                 assert!(matches!(Kind::try_from(&erased).unwrap(), Kind::$variant));
                 assert!(matches!(Kind::try_from(&mut erased).unwrap(), Kind::$variant));

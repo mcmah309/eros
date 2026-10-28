@@ -90,7 +90,7 @@ fn inline_mutable_references_remain_valid_after_moves_and_downcasts() {
     let reference = Box::leak(Box::new(41));
     let mut error: ErrorUnion<(Reference,)> = ErrorUnion::new(Reference(reference));
     *error.as_single_mut().0 += 1;
-    let mut erased: ErrorUnion = eros::ErrorUnionAdapter::from(error).into_unadapted().into();
+    let mut erased: ErrorUnion = eros::ErrorUnionAdapter::from(error).union().into();
     *erased.downcast_inner_mut::<Reference>().unwrap().0 += 1;
     let error = erased.narrow::<(Reference,), _>().unwrap().into_single();
     assert_eq!(*error.0, 43);

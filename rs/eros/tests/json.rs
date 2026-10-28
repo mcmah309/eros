@@ -22,9 +22,9 @@ fn leaf(message: &'static str) -> ErrorUnion {
 
 fn nested_batch() -> ErrorUnion {
     let inner: ErrorUnion<(ErrorUnionVec,)> =
-        ErrorUnionVec::new(vec![leaf("first failure"), leaf("second failure")]).into_union();
+        ErrorUnionVec::new(vec![leaf("first failure"), leaf("second failure")]).union();
     let outer: ErrorUnion<(ErrorUnionVec,)> =
-        ErrorUnionVec::new(vec![inner.erase(), leaf("third failure")]).into_union();
+        ErrorUnionVec::new(vec![inner.erase(), leaf("third failure")]).union();
     outer.erase()
 }
 
@@ -179,7 +179,7 @@ fn json_messages_match_human_line_endings_without_losing_content_or_field_bounda
         });
         #[cfg(feature = "context")]
         let error = error.context(text);
-        let error = ErrorUnionVec::new(vec![error]).into_union::<(ErrorUnionVec<(Message,)>,), _>();
+        let error = ErrorUnionVec::new(vec![error]).union::<(ErrorUnionVec<(Message,)>,), _>();
         if expected.contains('\n') {
             let indented = expected.replace('\n', "\n            ");
             assert!(
@@ -221,12 +221,12 @@ fn debug_json_preserves_user_context_flags_at_every_batch_depth_after_erasure() 
         .context("leaf detail")
         .with_user_context(|| "leaf hint");
     let inner: ErrorUnion = ErrorUnionVec::new(vec![leaf])
-        .into_union::<(ErrorUnionVec,), _>()
+        .union::<(ErrorUnionVec,), _>()
         .user_context("inner hint")
         .context("inner detail")
         .erase();
     let outer: ErrorUnion = ErrorUnionVec::new(vec![inner])
-        .into_union::<(ErrorUnionVec,), _>()
+        .union::<(ErrorUnionVec,), _>()
         .context("outer detail")
         .user_context("outer hint")
         .erase();
@@ -255,11 +255,11 @@ fn debug_json_preserves_user_context_flags_at_every_batch_depth_after_erasure() 
 fn debug_json_omits_user_context_flags_when_disabled_at_every_batch_depth() {
     let leaf = leaf("failure").context("leaf detail");
     let inner: ErrorUnion = ErrorUnionVec::new(vec![leaf])
-        .into_union::<(ErrorUnionVec,), _>()
+        .union::<(ErrorUnionVec,), _>()
         .context("inner detail")
         .erase();
     let outer: ErrorUnion = ErrorUnionVec::new(vec![inner])
-        .into_union::<(ErrorUnionVec,), _>()
+        .union::<(ErrorUnionVec,), _>()
         .context("outer detail")
         .erase();
     let adapter = outer.adapter();
@@ -373,8 +373,7 @@ fn json_omits_failed_messages_and_preserves_other_diagnostics() {
         assert_node(&value, detailed);
     }
     let error: ErrorUnion =
-        ErrorUnionVec::new(vec![leaf("first child"), error.erase(), leaf("last child")])
-            .into_union();
+        ErrorUnionVec::new(vec![leaf("first child"), error.erase(), leaf("last child")]).union();
     let adapter = error.adapter();
     for (value, detailed) in [
         (adapter.as_ref().to_display_json(), false),

@@ -57,7 +57,7 @@ mod allocated {
 
     fn batch() -> ErrorUnion<(BatchErrors,)> {
         let error: ErrorUnion<(BatchErrors,)> =
-            BatchErrors::new(vec![email_failure(), field_failure()]).into_union();
+            BatchErrors::new(vec![email_failure(), field_failure()]).union();
         error.context("import customers.csv")
     }
 
@@ -143,7 +143,7 @@ mod allocated {
         let error: ErrorUnion<(fmt::Error, BatchErrors)> = error.widen();
         let error: ErrorUnion = error.erase();
         let error = error.narrow::<(BatchErrors,), _>().unwrap();
-        let error = error.adapter().into_unadapted();
+        let error = error.adapter().union();
         assert_eq!(format!("{error:?}"), expected);
         let result = Err::<(), _>(error);
         result
@@ -194,7 +194,7 @@ mod allocated {
             source: std::io::Error::other("permission denied"),
         });
         let error: ErrorUnion<(ErrorUnionVec<(ImportFailure,)>,)> =
-            ErrorUnionVec::new(vec![child]).into_union();
+            ErrorUnionVec::new(vec![child]).union();
         assert_eq!(error.to_string(), "errors (1 total):");
         let report = format!("{error:#?}");
         assert!(report.contains(
@@ -220,7 +220,7 @@ mod allocated {
         let second = field_failure();
         let expected_display = vec![first.to_display_json(), second.to_display_json()];
         let expected_debug = vec![first.to_debug_json(), second.to_debug_json()];
-        let error: ErrorUnion<(BatchErrors,)> = BatchErrors::new(vec![first, second]).into_union();
+        let error: ErrorUnion<(BatchErrors,)> = BatchErrors::new(vec![first, second]).union();
         let error = error.context("import customers.csv");
         assert_eq!(
             error.to_display_json()["children"],
@@ -262,7 +262,7 @@ mod allocated {
         let mut output = String::new();
         assert!(fmt::write(&mut output, format_args!("{batch:?}")).is_err());
         assert!(fmt::write(&mut output, format_args!("{batch:#?}")).is_err());
-        let error: ErrorUnion<(ErrorUnionVec<(Broken,)>,)> = batch.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(Broken,)>,)> = batch.union();
         let mut output = String::new();
         assert!(fmt::write(&mut output, format_args!("{error:#?}")).is_err());
     }

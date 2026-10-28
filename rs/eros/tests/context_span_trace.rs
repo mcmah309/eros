@@ -186,7 +186,7 @@ fn reshaping_mapping_recovery_and_adapters_preserve_context_traces() {
             let error = boxed
                 .downcast::<ErrorUnionAdapter<(fmt::Error,)>>()
                 .unwrap()
-                .into_unadapted();
+                .union();
             let result: eros::Result<(), (fmt::Error, MsgError)> = Err(error.widen());
             let result = result.recover::<MsgError, _>(|_| panic!("must not handle this error"));
             let result: eros::Result<(), (fmt::Error,)> = result
@@ -231,7 +231,7 @@ fn context_span_fields_distinguish_batch_groups_only_in_detailed_reports() {
     assert!(!compact.contains("span trace"));
     #[cfg(feature = "json")]
     {
-        let error: ErrorUnion<(ErrorUnionVec<(MsgError,)>,)> = batch.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(MsgError,)>,)> = batch.union();
         let json = error.to_debug_json();
         let children = json["children"].as_array().unwrap();
         assert_eq!(children.len(), 3);

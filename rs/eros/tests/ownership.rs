@@ -476,7 +476,7 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
     let error = adapter
         .downcast::<eros::ErrorUnionAdapter<AnyError>>()
         .unwrap()
-        .into_unadapted();
+        .union();
     assert_eq!(
         error.inner() as *const dyn SendSyncError as *const (),
         original
@@ -502,7 +502,7 @@ fn typed_adapter_recovery_requires_its_original_set() {
     let error = adapter
         .downcast::<eros::ErrorUnionAdapter<(Tracked,)>>()
         .unwrap()
-        .into_unadapted();
+        .union();
     // This path uses the singleton's unchecked extraction, so the set must be exact.
     let value = error.into_single();
     assert_eq!(value.payload, [1, 2, 3]);

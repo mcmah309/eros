@@ -50,7 +50,7 @@ pub fn inline_values_survive_mutation_moving_reshaping_and_enum_extraction() {
     let error: ErrorUnion<Errors> = ErrorUnion::new(Padded { tag: 7, value: 513 });
     let error = error.narrow::<Code, _>().unwrap_err();
     let error = error.narrow::<(Padded,), _>().unwrap();
-    let mut error = eros::ErrorUnionAdapter::from(error).into_unadapted();
+    let mut error = eros::ErrorUnionAdapter::from(error).union();
     error.as_single_mut().value += 1;
     let mapped = error.map_single(|padded| Code(u32::from(padded.value)));
     assert_eq!(mapped.into_single(), Code(514));
@@ -79,7 +79,7 @@ pub fn full_word_payload_survives_multiple_moves_and_shared_interior_mutation() 
     let error: ErrorUnion<(fmt::Error, Counter)> = error.widen();
     let error = eros::ErrorUnionAdapter::from(error.narrow::<(Counter,), _>().unwrap());
     assert_eq!(
-        error.into_unadapted().into_single().0.into_inner(),
+        error.union().into_single().0.into_inner(),
         usize::MAX - 9
     );
 }
@@ -114,7 +114,7 @@ pub fn thin_static_reference_preserves_pointer_provenance_and_source() {
         }
     }
     let error: ErrorUnion<(StaticError,)> = StaticError(&DETAILS).into();
-    let erased: ErrorUnion = eros::ErrorUnionAdapter::from(error).into_unadapted().into();
+    let erased: ErrorUnion = eros::ErrorUnionAdapter::from(error).union().into();
     let error = erased.narrow::<(StaticError,), _>().unwrap();
     assert!(core::ptr::eq(error.as_single().0, &DETAILS));
     assert_eq!(

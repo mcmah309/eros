@@ -95,7 +95,7 @@ pub fn run_checks() {
     let adapter = eros::ErrorUnionAdapter::from(union);
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{adapter}").unwrap();
-    let union = adapter.into_unadapted();
+    let union = adapter.union();
     #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(location, union.location()));
     let before = DROPS.load(Ordering::SeqCst);

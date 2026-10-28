@@ -6,7 +6,7 @@ Enable `json` to get reports as `serde_json::Value` with
 This format is not covered by SemVer guarantees and may change in any release.
 
 Each object describes one `ErrorUnion`. Display JSON contains `root` and
-`sources`; Debug JSON adds diagnostics. Only `ErrorUnionVec::into_union()` adds
+`sources`; Debug JSON adds diagnostics. Only `ErrorUnionVec::union()` adds
 batch fields (`children` and `children_omitted`), with each child using the same
 format.
 

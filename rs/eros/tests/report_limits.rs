@@ -46,7 +46,7 @@ fn large_batches_limit_formatting_and_preserve_all_errors() {
                 assert!(!text.contains("omitted"));
             }
         }
-        let error: ErrorUnion<(Batch,)> = batch.into_union();
+        let error: ErrorUnion<(Batch,)> = batch.union();
         assert_eq!(error.to_string(), format!("errors ({count} total):"));
         for text in [format!("{error:?}"), format!("{error:#?}")] {
             assert_eq!(text.matches("- error: failure ").count(), count.min(10));
@@ -65,7 +65,7 @@ fn large_batches_limit_formatting_and_preserve_all_errors() {
 
 #[test]
 fn more_than_ten_errors_show_the_full_count_and_omission_notice() {
-    let error: ErrorUnion<(Batch,)> = batch(12, 10).into_union();
+    let error: ErrorUnion<(Batch,)> = batch(12, 10).union();
     let output = format!("{error:#?}");
     println!("{output}");
     assert_eq!(
@@ -112,7 +112,7 @@ fn report_limit_applies_before_grouping_duplicates() {
     );
     #[cfg(feature = "json")]
     {
-        let error: ErrorUnion<(Batch,)> = batch.into_union();
+        let error: ErrorUnion<(Batch,)> = batch.union();
         for value in [error.to_display_json(), error.to_debug_json()] {
             let children = value["children"].as_array().unwrap();
             assert_eq!(children.len(), 10);
@@ -127,14 +127,14 @@ fn nested_batch() -> ErrorUnionVec<(Batch,)> {
     // 3 for the second batch and its first 2 children. The third is omitted.
     [(6, 6), (6, 2), (6, 0)]
         .into_iter()
-        .map(|(count, visible)| batch(count, visible).into_union())
+        .map(|(count, visible)| batch(count, visible).union())
         .collect()
 }
 
 #[test]
 fn nested_batches_share_one_report_limit() {
     let batch = nested_batch();
-    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = nested_batch().into_union();
+    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = nested_batch().union();
     for text in [
         format!("{batch:?}"),
         format!("{batch:#?}"),
@@ -155,7 +155,7 @@ fn deeply_nested_batches_stop_expanding_at_the_report_limit() {
         may_format: false,
     });
     for _ in 0..150 {
-        error = ErrorUnionVec::new(vec![error]).into_union();
+        error = ErrorUnionVec::new(vec![error]).union();
     }
     let text = format!("{error:#?}");
     assert_eq!(text.matches("- error:").count(), 10);
@@ -178,7 +178,7 @@ fn deeply_nested_batches_stop_expanding_at_the_report_limit() {
 #[test]
 fn json_reports_limit_children_and_mark_omissions() {
     for count in [0, 9, 10, 11, 10_000] {
-        let error: ErrorUnion<(Batch,)> = batch(count, 10).into_union();
+        let error: ErrorUnion<(Batch,)> = batch(count, 10).union();
         for value in [
             error.to_display_json(),
             error.to_debug_json(),
@@ -207,7 +207,7 @@ fn json_reports_limit_children_and_mark_omissions() {
 #[cfg(feature = "json")]
 #[test]
 fn nested_json_reports_share_one_report_limit() {
-    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = nested_batch().into_union();
+    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = nested_batch().union();
     for value in [error.to_display_json(), error.to_debug_json()] {
         assert_eq!(value["children_omitted"], 1);
         let children = value["children"].as_array().unwrap();

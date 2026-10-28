@@ -284,7 +284,7 @@ fn reshaping_mapping_classification_and_adapters_preserve_the_original_trace() {
             let error = boxed
                 .downcast::<ErrorUnionAdapter<(fmt::Error,)>>()
                 .unwrap()
-                .into_unadapted();
+                .union();
             assert_eq!(error.span_trace().to_string(), original);
         });
     });
@@ -360,8 +360,7 @@ fn batch_grouping_distinguishes_span_fields_only_in_detailed_reports() {
     let error: ErrorUnion<(ErrorUnionVec<(MsgError,)>,)> = with_traces(|| {
         let children =
             [1, 2, 1].map(|id| tracing::info_span!("item", id).in_scope(read_configuration));
-        tracing::info_span!("batch")
-            .in_scope(|| ErrorUnionVec::new(Vec::from(children)).into_union())
+        tracing::info_span!("batch").in_scope(|| ErrorUnionVec::new(Vec::from(children)).union())
     });
     let detailed = format!("{error:?}");
     assert_eq!(

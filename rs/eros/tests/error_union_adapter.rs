@@ -8,11 +8,11 @@ fn result_adapter_preserves_error_sets_and_success_values() {
     }
 
     let typed: eros::Result<(), (fmt::Error, ParseIntError)> = Err(ErrorUnion::new(fmt::Error));
-    let error: ErrorUnion<(fmt::Error, ParseIntError)> = adapt(typed).unwrap_err().into_unadapted();
+    let error: ErrorUnion<(fmt::Error, ParseIntError)> = adapt(typed).unwrap_err().union();
     assert!(error.is_inner::<fmt::Error>());
 
     let erased: eros::Result<()> = Err(ErrorUnion::new(fmt::Error));
-    let error: ErrorUnion = adapt(erased).unwrap_err().into_unadapted();
+    let error: ErrorUnion = adapt(erased).unwrap_err().union();
     assert!(error.is_inner::<fmt::Error>());
 
     let mut value = 7;
@@ -41,22 +41,12 @@ fn result_adapter_infers_error_sets_in_return_expressions() {
         result.widen().adapter()
     }
 
-    assert!(
-        typed()
-            .unwrap_err()
-            .into_unadapted()
-            .is_inner::<fmt::Error>()
-    );
-    assert!(
-        erased()
-            .unwrap_err()
-            .into_unadapted()
-            .is_inner::<fmt::Error>()
-    );
+    assert!(typed().unwrap_err().union().is_inner::<fmt::Error>());
+    assert!(erased().unwrap_err().union().is_inner::<fmt::Error>());
     assert!(
         widened(Err::<(), _>(ErrorUnion::new(fmt::Error)))
             .unwrap_err()
-            .into_unadapted()
+            .union()
             .is_inner::<fmt::Error>()
     );
     assert_eq!(widened(Ok(7)).unwrap(), 7);
@@ -72,7 +62,7 @@ fn result_adapter_preserves_diagnostics() {
     #[cfg(feature = "error_location")]
     let location = result.as_ref().unwrap_err().location();
 
-    let error = result.adapter().unwrap_err().into_unadapted();
+    let error = result.adapter().unwrap_err().union();
     assert!(error.is_inner::<fmt::Error>());
     assert_eq!(format!("{error:?}"), before);
     #[cfg(feature = "context")]
@@ -93,13 +83,10 @@ fn union_then_adapter_question_mark_infers_typed_and_erased_error_sets() {
         Ok(result.union().adapter()?)
     }
 
-    let error: ErrorUnion<(fmt::Error, ParseIntError)> = typed(Err::<(), _>(fmt::Error))
-        .unwrap_err()
-        .into_unadapted();
+    let error: ErrorUnion<(fmt::Error, ParseIntError)> =
+        typed(Err::<(), _>(fmt::Error)).unwrap_err().union();
     assert!(error.is_inner::<fmt::Error>());
-    let error: ErrorUnion = erased(Err::<(), _>(fmt::Error))
-        .unwrap_err()
-        .into_unadapted();
+    let error: ErrorUnion = erased(Err::<(), _>(fmt::Error)).unwrap_err().union();
     assert!(error.is_inner::<fmt::Error>());
 
     let mut value = 7;
@@ -113,7 +100,7 @@ fn union_then_adapter_question_mark_infers_typed_and_erased_error_sets() {
 fn union_then_adapter_preserves_call_location() {
     let line = line!() + 1;
     let result: Result<(), ErrorUnionAdapter> = Err(fmt::Error).union().adapter();
-    let error = result.unwrap_err().into_unadapted();
+    let error = result.unwrap_err().union();
     assert_eq!(error.location().file(), file!());
     assert_eq!(error.location().line(), line);
 }
@@ -131,9 +118,9 @@ fn union_question_mark_infers_typed_and_erased_error_sets() {
     }
 
     let error = typed(Err::<(), _>(fmt::Error)).unwrap_err();
-    let _: ErrorUnion<(fmt::Error, ParseIntError)> = error.into_unadapted();
+    let _: ErrorUnion<(fmt::Error, ParseIntError)> = error.union();
     let error = erased(Err::<(), _>(fmt::Error)).unwrap_err();
-    assert!(error.into_unadapted().is_inner::<fmt::Error>());
+    assert!(error.union().is_inner::<fmt::Error>());
 
     let mut value = 7;
     *typed(Ok(&mut value)).unwrap() += 1;
@@ -154,10 +141,10 @@ fn widen_question_mark_infers_larger_and_erased_error_sets() {
     }
 
     let error = typed(Err::<(), _>(ErrorUnion::new(fmt::Error))).unwrap_err();
-    let error: ErrorUnion<(ParseIntError, fmt::Error)> = error.into_unadapted();
+    let error: ErrorUnion<(ParseIntError, fmt::Error)> = error.union();
     assert!(error.is_inner::<fmt::Error>());
     let error = erased(Err::<(), _>(ErrorUnion::new(fmt::Error))).unwrap_err();
-    assert!(error.into_unadapted().is_inner::<fmt::Error>());
+    assert!(error.union().is_inner::<fmt::Error>());
 
     assert_eq!(typed(Ok(7)).unwrap(), 7);
     assert_eq!(erased(Ok(8)).unwrap(), 8);
@@ -171,11 +158,11 @@ fn question_mark_converts_matching_unions_without_reshaping() {
 
     let typed: eros::Result<(), (fmt::Error,)> = Err(ErrorUnion::new(fmt::Error));
     let error: ErrorUnionAdapter<(fmt::Error,)> = propagate(typed).unwrap_err();
-    let _: fmt::Error = error.into_unadapted().into_single();
+    let _: fmt::Error = error.union().into_single();
 
     let erased: eros::Result<()> = Err(ErrorUnion::new(fmt::Error));
     let error: ErrorUnionAdapter = propagate(erased).unwrap_err();
-    assert!(error.into_unadapted().is_inner::<fmt::Error>());
+    assert!(error.union().is_inner::<fmt::Error>());
 
     let empty: eros::Result<_, ()> = Ok(7);
     assert_eq!(propagate(empty).unwrap(), 7);
@@ -201,7 +188,7 @@ fn borrowing_and_recovery_preserve_typed_and_erased_roots() {
         let borrowed: &mut ErrorUnion<E> = adapter.as_mut();
         borrowed.downcast_inner_mut::<Code>().unwrap().0 += 1;
 
-        let error = adapter.into_unadapted();
+        let error = adapter.union();
         assert_eq!(error.downcast_inner_ref::<Code>().unwrap().0, 8);
         error
     }

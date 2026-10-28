@@ -169,12 +169,12 @@ impl ErrorUnion {
 /// discarding saved diagnostics.
 ///
 /// Use [`AsRef`] or [`AsMut`] to borrow the union, and
-/// [`into_unadapted`](Self::into_unadapted) to recover it by value.
+/// [`union`](Self::union) to recover it by value.
 /// To adapt a result's error directly, use [`ReshapeUnion::adapter`].
 /// For plain errors, call [`IntoUnion::union`] first.
 ///
 /// For a boxed trait object, use its native `downcast` method with the adapter's
-/// exact error set, then call [`into_unadapted`](Self::into_unadapted).
+/// exact error set, then call [`union`](Self::union).
 /// A failed downcast returns the original box.
 ///
 /// ```
@@ -187,7 +187,7 @@ impl ErrorUnion {
 /// let error = eros::error!("missing configuration");
 /// let boxed: Box<dyn core::error::Error + Send + Sync> = Box::new(error.adapter());
 /// let error = boxed.downcast::<ErrorUnionAdapter>()
-///     .map(|adapter| adapter.into_unadapted())
+///     .map(|adapter| adapter.union())
 ///     .unwrap();
 /// assert_eq!(error.to_string(), "missing configuration");
 /// # }
@@ -244,10 +244,10 @@ impl<E: TypeSet> ErrorUnionAdapter<E> {
     /// let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
     /// let adapter = ErrorUnionAdapter::from(error);
     /// assert!(adapter.as_ref().is_inner::<core::fmt::Error>());
-    /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.into_unadapted();
+    /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.union();
     /// let _: core::fmt::Error = error.into_single();
     /// ```
-    pub fn into_unadapted(self) -> ErrorUnion<E> {
+    pub fn union(self) -> ErrorUnion<E> {
         self.0
     }
 }
@@ -287,14 +287,14 @@ where
     /// Adapts this union to [`core::error::Error`] without allocating.
     ///
     /// Preserves the error set and all saved diagnostics. Use
-    /// [`ErrorUnionAdapter::into_unadapted`] to recover the original union.
+    /// [`ErrorUnionAdapter::union`] to recover the original union.
     ///
     /// ```
     /// use eros::ErrorUnion;
     ///
     /// let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
     /// let adapter = error.adapter();
-    /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.into_unadapted();
+    /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.union();
     /// let _: core::fmt::Error = error.into_single();
     /// ```
     pub fn adapter(self) -> ErrorUnionAdapter<E> {
@@ -668,7 +668,7 @@ where
     ///     result.adapter()
     /// }
     ///
-    /// assert!(load().unwrap_err().into_unadapted().is_inner::<core::fmt::Error>());
+    /// assert!(load().unwrap_err().union().is_inner::<core::fmt::Error>());
     /// ```
     fn adapter(self) -> Result<S, ErrorUnionAdapter<E>>;
 
@@ -1335,7 +1335,7 @@ mod tests {
         let recovered = dyn_err
             .downcast::<ErrorUnionAdapter<(FooError,)>>()
             .expect("round-trip should succeed")
-            .into_unadapted();
+            .union();
 
         assert_eq!(recovered.as_ref(), &FooError("roundtrip".into()));
     }
@@ -1376,7 +1376,7 @@ mod tests {
         let recovered = dyn_err
             .downcast::<ErrorUnionAdapter<(FooError,)>>()
             .unwrap()
-            .into_unadapted();
+            .union();
 
         #[cfg(feature = "context")]
         assert_eq!(recovered.inner.context.len(), 1);
@@ -1393,7 +1393,7 @@ mod tests {
         let recovered = dyn_err
             .downcast::<ErrorUnionAdapter<(FooError, BarError)>>()
             .unwrap()
-            .into_unadapted();
+            .union();
 
         let bar: BarError = recovered.narrow::<BarError, _>().unwrap();
         assert_eq!(bar, BarError(99));

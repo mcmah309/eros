@@ -471,7 +471,7 @@ fn failed_native_adapter_downcast_retains_the_original_adapter() {
     let recovered = adapter
         .downcast::<eros::ErrorUnionAdapter<Pair>>()
         .unwrap()
-        .into_unadapted();
+        .union();
     assert_eq!(format!("{recovered:?}"), report);
 }
 

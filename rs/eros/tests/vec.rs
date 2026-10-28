@@ -45,7 +45,7 @@ fn check_nums(nums: impl IntoIterator<Item = u8>) -> eros::Result<Vec<u8>, (Batc
     if errors.is_empty() {
         Ok(values)
     } else {
-        Err(errors.into_union())
+        Err(errors.union())
     }
 }
 
@@ -83,7 +83,7 @@ fn wrapping_preserves_child_reports_and_registers_human_and_json_traversal() {
     let original_allocation = errors.as_ptr();
     let batch = Batch::new(errors);
     assert_eq!(batch.iter().as_slice().as_ptr(), original_allocation);
-    let error: ErrorUnion<(Batch, std::fmt::Error)> = batch.into_union();
+    let error: ErrorUnion<(Batch, std::fmt::Error)> = batch.union();
     let error = error.context("process batch");
     let report = format!("{error:#?}");
     assert!(report.contains("- error: odd number\n          at: [0]"));
@@ -125,7 +125,7 @@ fn batches_support_collect_extend_mutable_iteration_and_owned_iteration() {
     let batch: Batch = Vec::new().into();
     assert!(batch.is_empty());
     assert_eq!(batch.to_string(), "errors (0 total):");
-    let error: ErrorUnion<(Batch,)> = batch.into_union();
+    let error: ErrorUnion<(Batch,)> = batch.union();
     assert_eq!(format!("{error:#?}"), "error:\n    errors (0 total): []");
 }
 
@@ -133,7 +133,7 @@ fn batches_support_collect_extend_mutable_iteration_and_owned_iteration() {
 fn nested_convenience_batches_report_each_level() {
     let child_batch = check_nums(0..3).unwrap_err();
     let batch = ErrorUnionVec::new(vec![child_batch]);
-    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = batch.into_union();
+    let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = batch.union();
     let report = format!("{error:#?}");
     assert!(report.starts_with(
         "error:\n    errors (1 total):\n        - error:\n              errors (1 total):"
@@ -167,7 +167,7 @@ fn wrapped_vectors_preserve_report_boundaries_and_multiline_indentation() {
         standalone.matches("backtrace:").count(),
         usize::from(cfg!(feature = "backtrace"))
     );
-    let wrapped: ErrorUnion<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)> = batch.into_union();
+    let wrapped: ErrorUnion<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)> = batch.union();
     assert_eq!(format!("{wrapped:#?}"), wrapped_collection(&expected));
     let wrapped_detailed = format!("{wrapped:?}");
     assert_eq!(
@@ -191,7 +191,7 @@ fn wrapped_vectors_preserve_report_boundaries_and_multiline_indentation() {
         2 * usize::from(cfg!(feature = "backtrace"))
     );
     let outer: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Multiline,)>, std::fmt::Error)>,)> =
-        outer.into_union();
+        outer.union();
     assert_eq!(format!("{outer:#?}"), wrapped_collection(&nested_expected));
     assert_eq!(
         format!("{outer:?}").matches("backtrace:").count(),
@@ -206,7 +206,7 @@ fn empty_vectors_use_an_explicit_empty_list_in_debug() {
     assert_eq!(format!("{batch:#}"), "errors (0 total):");
     assert_eq!(format!("{batch:?}"), "errors (0 total): []");
     assert_eq!(format!("{batch:#?}"), "errors (0 total): []");
-    let nested: ErrorUnionVec<(Batch,)> = ErrorUnionVec::new(vec![batch.into_union()]);
+    let nested: ErrorUnionVec<(Batch,)> = ErrorUnionVec::new(vec![batch.union()]);
     assert_eq!(
         format!("{nested:#?}"),
         "errors (1 total):\n    - error:\n          errors (0 total): []\n      at: [0]"
@@ -224,7 +224,7 @@ fn matching_messages_group_nonconsecutive_ranges_in_first_occurrence_order() {
     let expected =
         include_str!("output_formatting/grouped_ranges/debug.special.txt").trim_end_matches('\n');
     assert_eq!(wrapped_collection(&format!("{batch:#?}")), expected);
-    let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = batch.into_union();
+    let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = batch.union();
     assert_eq!(format!("{error:#?}"), expected);
     assert_eq!(error.to_string(), "errors (10 total):");
     let mut children = Vec::new();
@@ -376,7 +376,7 @@ fn multiline_roots_cannot_impersonate_source_fields_when_grouping() {
             if nested {
                 children = children
                     .into_iter()
-                    .map(|child| ErrorUnionVec::new(vec![child]).into_union())
+                    .map(|child| ErrorUnionVec::new(vec![child]).union())
                     .collect();
             }
             let batch = ErrorUnionVec::new(children);
@@ -391,7 +391,7 @@ fn multiline_roots_cannot_impersonate_source_fields_when_grouping() {
                 report.contains(&format!("\n{indent}caused by:\n{indent}    - bar")),
                 "the actual source chain must remain a separate field: {report}"
             );
-            let error: ErrorUnion = batch.into_union();
+            let error: ErrorUnion = batch.union();
             assert_eq!(format!("{error:#?}"), wrapped_collection(&report));
             assert_eq!(
                 format!("{error:?}").matches("- error:").count(),
@@ -408,7 +408,7 @@ fn equal_batch_summaries_preserve_different_nested_children() {
         .map(|message| {
             let child: ErrorUnion<(std::io::Error,)> =
                 ErrorUnion::new(std::io::Error::other(message));
-            ErrorUnionVec::new(vec![child]).into_union()
+            ErrorUnionVec::new(vec![child]).union()
         })
         .collect();
     assert_eq!(

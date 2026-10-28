@@ -19,8 +19,9 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 /// Requires `alloc`. An empty batch is allowed while accumulating failures;
 /// check [`is_empty`](Self::is_empty) before returning it as an error.
 ///
-/// Use [`into_union`](Self::into_union) to register recursive human and JSON
-/// reporting. Ordinary `.union()` and [`ErrorUnion::new`] do not register children.
+/// Use [`union`](Self::union) on the batch to register recursive human and JSON
+/// reporting. Converting a result with [`IntoUnion::union`](crate::IntoUnion::union)
+/// or wrapping the batch with [`ErrorUnion::new`] does not register children.
 ///
 /// With the `json` feature, the returned union's
 /// `to_display_json()` and `to_debug_json()` methods include registered children
@@ -35,7 +36,7 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 /// let child: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
 /// let batch: ErrorUnionVec<(core::fmt::Error,)> =
 ///     ErrorUnionVec::new(vec![child.context("format item 3")]);
-/// let error: ErrorUnion<(ErrorUnionVec<(core::fmt::Error,)>,)> = batch.into_union();
+/// let error: ErrorUnion<(ErrorUnionVec<(core::fmt::Error,)>,)> = batch.union();
 /// let error = error.context("process batch");
 /// println!("{error:?}");
 ///
@@ -90,7 +91,7 @@ impl<E: TypeSet> ErrorUnionVec<E> {
     /// Context added to the returned union describes the batch; child contexts
     /// and captured traces remain attached to their original unions.
     #[cfg_attr(feature = "error_location", track_caller)]
-    pub fn into_union<OutSet, Index>(self) -> ErrorUnion<OutSet>
+    pub fn union<OutSet, Index>(self) -> ErrorUnion<OutSet>
     where
         OutSet: TypeSet,
         OutSet::Variants: Contains<Self, Index>,

@@ -196,7 +196,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     );
     assert_eq!(format!("{native:?}"), expected_debug);
     assert_eq!(format!("{native:#?}"), expected_alternate_debug);
-    let error: ErrorUnion<(NativeError,)> = native.into_unadapted();
+    let error: ErrorUnion<(NativeError,)> = native.union();
     #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(error.location(), original_location));
     let native: Box<dyn Error + Send + Sync> = Box::new(error.adapter());
@@ -217,7 +217,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     let recovered = native
         .downcast::<eros::ErrorUnionAdapter<(NativeError,)>>()
         .unwrap()
-        .into_unadapted();
+        .union();
     assert!(recovered.is_inner::<NativeError>());
     assert_eq!(recovered.to_string(), expected_display);
     assert_eq!(format!("{recovered:?}"), expected_debug);

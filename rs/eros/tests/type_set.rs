@@ -121,7 +121,7 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
         let error = boxed
             .downcast::<eros::ErrorUnionAdapter<E>>()
             .unwrap()
-            .into_unadapted();
+            .union();
         assert_eq!(
             error.inner() as *const dyn SendSyncError as *const (),
             original

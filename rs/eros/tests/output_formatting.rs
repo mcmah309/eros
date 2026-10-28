@@ -209,15 +209,14 @@ mod allocated {
     #[test]
     fn empty_vector() {
         let errors = ErrorUnionVec::<(std::io::Error,)>::default();
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("empty_vector", error.report());
     }
 
     #[test]
     fn single_child() {
         let errors = ErrorUnionVec::new(vec![error("invalid input")]);
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>, std::fmt::Error)> =
-            errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>, std::fmt::Error)> = errors.union();
         assert_outputs!("single_child", error.report());
     }
 
@@ -228,7 +227,7 @@ mod allocated {
                 .into_iter()
                 .map(error)
                 .collect();
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("distinct_children", error.report());
     }
 
@@ -236,7 +235,7 @@ mod allocated {
     fn identical_children() {
         let errors: ErrorUnionVec<(std::io::Error,)> =
             (0..4).map(|_| error("invalid input")).collect();
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("identical_children", error.report());
     }
 
@@ -248,7 +247,7 @@ mod allocated {
         .into_iter()
         .map(error)
         .collect();
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("grouped_ranges", error.report());
         assert_outputs!("grouped_ranges", error.report());
         assert_outputs!("grouped_ranges", error.erase().adapter().as_ref().report());
@@ -258,7 +257,7 @@ mod allocated {
     fn matching_messages_from_different_types() {
         let first: ErrorUnion<(InvalidInput,)> = ErrorUnion::new(InvalidInput);
         let errors = ErrorUnionVec::new(vec![first.erase(), error("invalid input").erase()]);
-        let error: ErrorUnion<(ErrorUnionVec<eros::AnyError>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<eros::AnyError>,)> = errors.union();
         assert_outputs!(
             "matching_messages_from_different_types",
             error.report(),
@@ -273,7 +272,7 @@ mod allocated {
         let errors: ErrorUnionVec<(std::io::Error,)> = (0..3)
             .map(|_| error("invalid record\r\nretry exhausted"))
             .collect();
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("grouped_multiline_messages", error.report());
     }
 
@@ -291,7 +290,7 @@ mod allocated {
                 })
             })
             .collect();
-        let error: ErrorUnion<(ErrorUnionVec<(Failure,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(Failure,)>,)> = errors.union();
         assert_outputs!("matching_roots_with_different_sources", error.report());
     }
 
@@ -299,10 +298,10 @@ mod allocated {
     fn nested_distinct_children() {
         let errors: ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)> = ["alpha", "beta"]
             .into_iter()
-            .map(|message| ErrorUnionVec::new(vec![error(message)]).into_union())
+            .map(|message| ErrorUnionVec::new(vec![error(message)]).union())
             .collect();
         let error: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)> =
-            errors.into_union();
+            errors.union();
         assert_outputs!("nested_distinct_children", error.report());
     }
 
@@ -310,13 +309,13 @@ mod allocated {
     fn deeply_nested_groups() {
         let errors: ErrorUnionVec<(std::io::Error,)> =
             (0..2).map(|_| error("invalid input")).collect();
-        let inner: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let inner: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         let middle: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)> =
-            ErrorUnionVec::new(vec![inner]).into_union();
+            ErrorUnionVec::new(vec![inner]).union();
         let outer = ErrorUnionVec::new(vec![middle]);
         let error: ErrorUnion<(
             ErrorUnionVec<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)>,
-        )> = outer.into_union();
+        )> = outer.union();
         assert_outputs!("deeply_nested_groups", error.report());
     }
 
@@ -330,16 +329,16 @@ mod allocated {
             })),
         });
         let inner: ErrorUnion<(ErrorUnionVec<(Failure,)>,)> =
-            ErrorUnionVec::new(vec![child]).into_union();
+            ErrorUnionVec::new(vec![child]).union();
         let outer = ErrorUnionVec::new(vec![inner]);
-        let error: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Failure,)>,)>,)> = outer.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(Failure,)>,)>,)> = outer.union();
         assert_outputs!("nested_multiline_sources", error.report());
     }
 
     #[test]
     fn unicode_multiline_child() {
         let errors = ErrorUnionVec::new(vec![error("🦀 invalid café\n检查输入")]);
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("unicode_multiline_child", error.report());
     }
 
@@ -367,7 +366,7 @@ mod allocated {
             .into_iter()
             .map(|context| error("invalid input").context(context))
             .collect();
-        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         assert_outputs!("grouped_distinct_contexts", error.report());
     }
 
@@ -376,10 +375,10 @@ mod allocated {
     fn nested_parent_contexts() {
         let child = error("invalid input").context("validate row 17");
         let inner: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> =
-            ErrorUnionVec::new(vec![child]).into_union();
+            ErrorUnionVec::new(vec![child]).union();
         let inner = inner.context("import page");
         let outer: ErrorUnion<(ErrorUnionVec<(ErrorUnionVec<(std::io::Error,)>,)>,)> =
-            ErrorUnionVec::new(vec![inner]).into_union();
+            ErrorUnionVec::new(vec![inner]).union();
         let outer = outer.context("import file");
         assert_outputs!("nested_parent_contexts", outer.report());
         assert_outputs!(
@@ -427,7 +426,7 @@ mod allocated {
         let first = error("invalid email").context("validate customer 104");
         let second = error("missing field\ncustomer name").context("validate customer 209");
         let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> =
-            ErrorUnionVec::new(vec![first, second]).into_union();
+            ErrorUnionVec::new(vec![first, second]).union();
         let error = error.context("import customers.csv");
         assert_outputs!("parent_and_child_contexts", error.report());
     }

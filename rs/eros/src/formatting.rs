@@ -886,7 +886,7 @@ mod tests {
         let first = captured_error("invalid port").context("read http port");
         let second = captured_error("invalid port").context("read https port");
         let errors = ErrorUnionVec::new(alloc::vec![first, second]);
-        let mut error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        let mut error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
         error.inner.backtrace = Backtrace::force_capture();
         let error = error.context("configure server");
 

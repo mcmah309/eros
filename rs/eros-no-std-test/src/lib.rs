@@ -174,7 +174,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let native = eros::ErrorUnionAdapter::from(u);
     assert_display(&native, "Timeout")?;
     assert_eq(native.as_ref().contexts().len(), 1)?;
-    let u = native.into_unadapted();
+    let u = native.union();
     assert_eq(u.as_ref(), &Timeout)?;
     assert_eq(u.into_single(), Timeout)?;
 
