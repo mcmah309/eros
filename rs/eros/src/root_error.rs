@@ -42,6 +42,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// assert_eq!(error.source().unwrap().to_string(), "permission denied");
     /// # }
     /// ```
+    #[inline]
     pub fn map_inner<T, F>(self, f: F) -> ErrorUnion<(T,)>
     where
         T: SendSyncError,
@@ -80,6 +81,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// let error: ErrorUnion = ErrorUnion::new(fmt::Error);
     /// let _: ErrorUnion<(ParseIntError,)> = error.collapse(|_| fmt::Error);
     /// ```
+    #[inline]
     pub fn collapse<Other, T, Index>(self, f: impl FnOnce(InnerError) -> T) -> ErrorUnion<Other>
     where
         Other: TypeSet,

@@ -57,6 +57,7 @@ impl MsgError {
     }
 
     /// Returns the message text.
+    #[inline]
     pub const fn as_str(&self) -> &str {
         #[cfg(feature = "alloc")]
         match &self.0 {
@@ -82,6 +83,7 @@ impl Display for MsgError {
 
 #[cfg(feature = "alloc")]
 impl From<&'static str> for MsgError {
+    #[inline]
     fn from(s: &'static str) -> Self {
         Self::from_static(s)
     }
@@ -89,6 +91,7 @@ impl From<&'static str> for MsgError {
 
 #[cfg(feature = "alloc")]
 impl From<String> for MsgError {
+    #[inline]
     fn from(s: String) -> Self {
         Self::from_owned(s)
     }
@@ -96,6 +99,7 @@ impl From<String> for MsgError {
 
 #[cfg(feature = "alloc")]
 impl From<Cow<'static, str>> for MsgError {
+    #[inline]
     fn from(s: Cow<'static, str>) -> Self {
         Self(s)
     }

@@ -13,6 +13,7 @@ pub struct ErrorReport<'a> {
 
 impl<E: TypeSet> ErrorUnion<E> {
     /// Borrows this union's report without erasing its owned error set.
+    #[inline]
     pub const fn report(&self) -> ErrorReport<'_> {
         ErrorReport { inner: &self.inner }
     }
@@ -20,6 +21,7 @@ impl<E: TypeSet> ErrorUnion<E> {
 
 impl<'a> ErrorReport<'a> {
     /// Borrows the concrete root, supporting downcasts by custom reporters.
+    #[inline]
     pub fn inner(&self) -> &'a dyn SendSyncError {
         self.inner.error()
     }
@@ -33,6 +35,7 @@ impl<'a> ErrorReport<'a> {
 
     /// Borrows saved contexts in attachment order (innermost first).
     #[cfg(feature = "context")]
+    #[inline]
     pub fn contexts(
         &self,
     ) -> impl DoubleEndedIterator<Item = &'a crate::ContextFrame> + ExactSizeIterator {
@@ -41,6 +44,7 @@ impl<'a> ErrorReport<'a> {
 
     /// Borrows the saved Eros backtrace, without capturing a new one.
     #[cfg(feature = "backtrace")]
+    #[inline]
     pub const fn backtrace(&self) -> &'a std::backtrace::Backtrace {
         &self.inner.diagnostics().backtrace
     }
@@ -48,6 +52,7 @@ impl<'a> ErrorReport<'a> {
     /// Borrows the original span trace without capturing a new one.
     /// Requires `error_span_trace` (also enabled by `span_trace`).
     #[cfg(feature = "error_span_trace")]
+    #[inline]
     pub const fn span_trace(&self) -> &'a tracing_error::SpanTrace {
         &self.inner.diagnostics().span_trace
     }
@@ -55,6 +60,7 @@ impl<'a> ErrorReport<'a> {
     /// Returns the original Eros capture location.
     /// Requires `error_location` (also enabled by `location`).
     #[cfg(feature = "error_location")]
+    #[inline]
     pub const fn location(&self) -> &'static core::panic::Location<'static> {
         self.inner.diagnostics().location
     }

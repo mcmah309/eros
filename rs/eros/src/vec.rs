@@ -52,36 +52,43 @@ pub struct ErrorUnionVec<E: TypeSet = AnyError> {
 
 impl<E: TypeSet> ErrorUnionVec<E> {
     /// Takes ownership of existing unions without reallocating or recapturing diagnostics.
+    #[inline]
     pub const fn new(errors: AllocVec<ErrorUnion<E>>) -> Self {
         Self { errors }
     }
 
     /// Returns the number of failures.
+    #[inline]
     pub const fn len(&self) -> usize {
         self.errors.len()
     }
 
     /// Returns whether the batch has no failures.
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
 
     /// Appends an existing union without changing its diagnostics.
+    #[inline]
     pub fn push(&mut self, error: ErrorUnion<E>) {
         self.errors.push(error);
     }
 
     /// Borrows the typed child unions in insertion order.
+    #[inline]
     pub fn iter(&self) -> slice::Iter<'_, ErrorUnion<E>> {
         self.errors.iter()
     }
 
     /// Mutably borrows the typed child unions in insertion order.
+    #[inline]
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, ErrorUnion<E>> {
         self.errors.iter_mut()
     }
 
     /// Returns the original vector, preserving its allocation and child diagnostics.
+    #[inline]
     pub fn into_inner(self) -> AllocVec<ErrorUnion<E>> {
         self.errors
     }
@@ -105,18 +112,21 @@ impl<E: TypeSet> ErrorUnionVec<E> {
 }
 
 impl<E: TypeSet> Default for ErrorUnionVec<E> {
+    #[inline]
     fn default() -> Self {
         Self::new(AllocVec::new())
     }
 }
 
 impl<E: TypeSet> From<AllocVec<ErrorUnion<E>>> for ErrorUnionVec<E> {
+    #[inline]
     fn from(errors: AllocVec<ErrorUnion<E>>) -> Self {
         Self::new(errors)
     }
 }
 
 impl<E: TypeSet> From<ErrorUnionVec<E>> for AllocVec<ErrorUnion<E>> {
+    #[inline]
     fn from(errors: ErrorUnionVec<E>) -> Self {
         errors.into_inner()
     }
@@ -138,6 +148,7 @@ impl<E: TypeSet> IntoIterator for ErrorUnionVec<E> {
     type Item = ErrorUnion<E>;
     type IntoIter = vec::IntoIter<Self::Item>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.errors.into_iter()
     }
@@ -147,6 +158,7 @@ impl<'a, E: TypeSet> IntoIterator for &'a ErrorUnionVec<E> {
     type Item = &'a ErrorUnion<E>;
     type IntoIter = slice::Iter<'a, ErrorUnion<E>>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -156,6 +168,7 @@ impl<'a, E: TypeSet> IntoIterator for &'a mut ErrorUnionVec<E> {
     type Item = &'a mut ErrorUnion<E>;
     type IntoIter = slice::IterMut<'a, ErrorUnion<E>>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }

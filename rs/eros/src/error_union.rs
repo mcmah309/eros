@@ -26,6 +26,7 @@ impl<T> SendSyncError for T where T: core::error::Error + core::any::Any + Send 
 
 #[cfg(feature = "alloc")]
 impl core::error::Error for Box<dyn SendSyncError> {
+    #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(&**self)
     }
@@ -224,18 +225,21 @@ where
     E: TypeSet;
 
 impl<E: TypeSet> From<ErrorUnion<E>> for ErrorUnionAdapter<E> {
+    #[inline]
     fn from(error: ErrorUnion<E>) -> Self {
         Self(error)
     }
 }
 
 impl<E: TypeSet> AsRef<ErrorUnion<E>> for ErrorUnionAdapter<E> {
+    #[inline]
     fn as_ref(&self) -> &ErrorUnion<E> {
         &self.0
     }
 }
 
 impl<E: TypeSet> AsMut<ErrorUnion<E>> for ErrorUnionAdapter<E> {
+    #[inline]
     fn as_mut(&mut self) -> &mut ErrorUnion<E> {
         &mut self.0
     }
@@ -255,6 +259,7 @@ impl<E: TypeSet> ErrorUnionAdapter<E> {
     /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.union();
     /// let _: core::fmt::Error = error.into_single();
     /// ```
+    #[inline]
     pub fn union(self) -> ErrorUnion<E> {
         self.0
     }
@@ -264,6 +269,7 @@ impl<E> core::error::Error for ErrorUnionAdapter<E>
 where
     E: TypeSet,
 {
+    #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.0.source()
     }
@@ -305,6 +311,7 @@ where
     /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.union();
     /// let _: core::fmt::Error = error.into_single();
     /// ```
+    #[inline]
     pub fn adapter(self) -> ErrorUnionAdapter<E> {
         self.into()
     }
@@ -329,6 +336,7 @@ where
     /// let erased: ErrorUnion = typed.erase();
     /// assert!(erased.is_inner::<std::fmt::Error>());
     /// ```
+    #[inline]
     pub fn erase(self) -> ErrorUnion {
         ErrorUnion {
             inner: self.inner,
@@ -368,6 +376,7 @@ where
     /// # }
     /// ```
     #[allow(clippy::type_complexity)]
+    #[inline]
     pub fn narrow<Target, Index>(
         self,
     ) -> Result<Target::Output, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>
@@ -380,6 +389,7 @@ where
     /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
     /// which is a superset of the current one. This may also be
     /// the same set of variants, but in a different order.
+    #[inline]
     pub fn widen<Other, Index>(self) -> ErrorUnion<Other>
     where
         Other: TypeSet,
@@ -433,6 +443,7 @@ where
     }
 
     #[cfg(feature = "backtrace")]
+    #[inline]
     pub const fn backtrace(&self) -> &std::backtrace::Backtrace {
         &self.inner.diagnostics().backtrace
     }
@@ -444,6 +455,7 @@ where
     /// traces. Reshaping, recovery, and mapping preserve the original trace;
     /// borrowing or formatting never captures a new one.
     #[cfg(feature = "error_span_trace")]
+    #[inline]
     pub const fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.inner.diagnostics().span_trace
     }
@@ -455,6 +467,7 @@ where
     /// `context` and `context_location`, each context frame also exposes
     /// its attachment location.
     #[cfg(feature = "error_location")]
+    #[inline]
     pub const fn location(&self) -> &'static core::panic::Location<'static> {
         self.inner.diagnostics().location
     }
@@ -494,22 +507,26 @@ where
     /// # }
     /// ```
     #[cfg(feature = "context")]
+    #[inline]
     pub fn contexts(
         &self,
     ) -> impl DoubleEndedIterator<Item = &crate::ContextFrame> + ExactSizeIterator {
         self.inner.diagnostics().context.iter()
     }
 
+    #[inline]
     pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.inner.error().source()
     }
 
     /// Returns a reference to the stored inner error.
+    #[inline]
     pub fn inner(&self) -> &dyn SendSyncError {
         self.inner.error()
     }
 
     /// Returns a mutable reference to the stored inner error.
+    #[inline]
     pub fn inner_mut(&mut self) -> &mut dyn SendSyncError {
         self.inner.error_mut()
     }
@@ -529,6 +546,7 @@ where
     /// assert!(inner.is::<fmt::Error>());
     /// assert_eq!(inner.downcast::<fmt::Error>().unwrap(), fmt::Error);
     /// ```
+    #[inline]
     pub fn into_inner(self) -> crate::InnerError {
         self.inner.into_owner()
     }
@@ -646,6 +664,7 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
     /// [`Self::map_inner`] passes an owned [`crate::InnerError`] for unions
     /// with any number of variants. Without `alloc`, `U` must fit in one
     /// word in size and alignment, or be zero-sized, as with [`ErrorUnion::new`].
+    #[inline]
     pub fn map_single<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
@@ -913,10 +932,12 @@ impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
+    #[inline]
     fn adapter(self) -> Result<S, ErrorUnionAdapter<E>> {
         self.map_err(ErrorUnion::adapter)
     }
 
+    #[inline]
     fn map_inner<T>(self, f: impl FnOnce(crate::InnerError) -> T) -> crate::Result<S, (T,)>
     where
         T: SendSyncError,
@@ -924,6 +945,7 @@ where
         self.map_err(|error| error.map_inner(f))
     }
 
+    #[inline]
     fn collapse<Other, T, Index>(
         self,
         f: impl FnOnce(crate::InnerError) -> T,
@@ -936,6 +958,7 @@ where
         self.map_inner(f).widen()
     }
 
+    #[inline]
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
@@ -944,6 +967,7 @@ where
         self.map_err(|e| e.widen())
     }
 
+    #[inline]
     fn narrow<Target, Index>(
         self,
     ) -> Result<Target::Output, Result<S, ErrorUnion<<Target::Remainder as TupleForm>::Tuple>>>
@@ -959,6 +983,7 @@ where
         }
     }
 
+    #[inline]
     fn recover<Target, Index>(
         self,
         f: impl RecoveryHandler<Target, E, Index, S>,
@@ -975,6 +1000,7 @@ where
         }
     }
 
+    #[inline]
     fn try_recover<Target, Other, Index, OtherIndex>(
         self,
         f: impl RecoveryHandler<Target, E, Index, Result<S, ErrorUnion<Other>>>,
@@ -998,6 +1024,7 @@ where
         }
     }
 
+    #[inline]
     fn into_value(self) -> S
     where
         E: TypeSet<Variants = crate::type_set::End>,
@@ -1045,6 +1072,7 @@ pub trait IntoUnion<S, F> {
 
 impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
     #[cfg_attr(feature = "error_location", track_caller)]
+    #[inline]
     fn union<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
@@ -1078,6 +1106,7 @@ pub trait Erase<S> {
 
 impl<S, F: SendSyncError> Erase<S> for Result<S, F> {
     #[cfg_attr(feature = "error_location", track_caller)]
+    #[inline]
     fn erase(self) -> Result<S, ErrorUnion> {
         match self {
             Ok(value) => Ok(value),
@@ -1087,6 +1116,7 @@ impl<S, F: SendSyncError> Erase<S> for Result<S, F> {
 }
 
 impl<S, E: TypeSet> Erase<S> for Result<S, ErrorUnion<E>> {
+    #[inline]
     fn erase(self) -> Result<S, ErrorUnion> {
         self.map_err(ErrorUnion::erase)
     }
@@ -1171,6 +1201,7 @@ impl fmt::Display for AnyhowError {
 
 #[cfg(feature = "anyhow")]
 impl core::error::Error for AnyhowError {
+    #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.0.source()
     }
@@ -1189,6 +1220,7 @@ impl fmt::Display for AnyhowErrorArc {
 
 #[cfg(feature = "anyhow")]
 impl core::error::Error for AnyhowErrorArc {
+    #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         self.0.source()
     }

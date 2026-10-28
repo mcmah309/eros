@@ -56,6 +56,7 @@ impl ContextFrame {
 #[cfg(feature = "context")]
 impl ContextFrame {
     /// Returns the attached message or boxed value without formatting or cloning it.
+    #[inline]
     pub const fn value(&self) -> &ContextValue {
         &self.context
     }
@@ -63,6 +64,7 @@ impl ContextFrame {
     /// Returns where this context was attached.
     /// Requires `context_location` (also enabled by `location`).
     #[cfg(feature = "context_location")]
+    #[inline]
     pub const fn location(&self) -> &'static core::panic::Location<'static> {
         self.location
     }
@@ -70,6 +72,7 @@ impl ContextFrame {
     /// Borrows the span trace captured when this context was attached.
     /// Requires `context_span_trace` (also enabled by `span_trace`).
     #[cfg(feature = "context_span_trace")]
+    #[inline]
     pub const fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.span_trace
     }
@@ -77,6 +80,7 @@ impl ContextFrame {
     /// Returns whether this frame was attached with `user_context` or
     /// `with_user_context`. Requires the `user_context` feature.
     #[cfg(feature = "user_context")]
+    #[inline]
     pub const fn is_user_context(&self) -> bool {
         self.is_user_context
     }
@@ -102,6 +106,7 @@ enum ContextValueInner {
 
 impl ContextValue {
     /// Returns the message text, or `None` for boxed context.
+    #[inline]
     pub const fn as_str(&self) -> Option<&str> {
         match &self.0 {
             #[cfg(feature = "alloc")]
@@ -113,6 +118,7 @@ impl ContextValue {
     }
 
     /// Returns the boxed value, or `None` for message-valued context.
+    #[inline]
     pub fn as_boxed(&self) -> Option<&dyn SendSyncDebugDisplay> {
         match &self.0 {
             ContextValueInner::StaticMessage(_) => None,
@@ -153,6 +159,7 @@ impl core::fmt::Display for ContextValue {
 }
 
 impl From<&'static str> for ContextValue {
+    #[inline]
     fn from(s: &'static str) -> ContextValue {
         Self(ContextValueInner::StaticMessage(s))
     }
@@ -160,6 +167,7 @@ impl From<&'static str> for ContextValue {
 
 #[cfg(feature = "alloc")]
 impl From<String> for ContextValue {
+    #[inline]
     fn from(s: String) -> ContextValue {
         Self(ContextValueInner::OwnedMessage(s))
     }
@@ -167,6 +175,7 @@ impl From<String> for ContextValue {
 
 #[cfg(feature = "alloc")]
 impl From<Cow<'static, str>> for ContextValue {
+    #[inline]
     fn from(s: Cow<'static, str>) -> ContextValue {
         match s {
             Cow::Borrowed(s) => s.into(),
@@ -177,6 +186,7 @@ impl From<Cow<'static, str>> for ContextValue {
 
 #[cfg(feature = "alloc")]
 impl From<Box<dyn SendSyncDebugDisplay>> for ContextValue {
+    #[inline]
     fn from(value: Box<dyn SendSyncDebugDisplay>) -> Self {
         Self(ContextValueInner::Boxed(value))
     }
@@ -184,6 +194,7 @@ impl From<Box<dyn SendSyncDebugDisplay>> for ContextValue {
 
 #[cfg(feature = "alloc")]
 impl From<Box<dyn SendSyncError>> for ContextValue {
+    #[inline]
     fn from(e: Box<dyn SendSyncError>) -> Self {
         Self::from(e as Box<dyn SendSyncDebugDisplay>)
     }

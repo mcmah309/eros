@@ -79,6 +79,7 @@ impl InnerError {
     /// source chain continue to refer to that error. Conversion into
     /// `Box<dyn SendSyncError>` using `.into()` is equivalent.
     #[cfg(feature = "alloc")]
+    #[inline]
     pub fn into_boxed(self) -> Box<dyn SendSyncError> {
         self.inner.into_boxed()
     }
@@ -86,6 +87,7 @@ impl InnerError {
 
 #[cfg(feature = "alloc")]
 impl From<InnerError> for Box<dyn SendSyncError> {
+    #[inline]
     fn from(error: InnerError) -> Self {
         error.into_boxed()
     }
@@ -93,21 +95,25 @@ impl From<InnerError> for Box<dyn SendSyncError> {
 
 impl Deref for InnerError {
     type Target = dyn SendSyncError;
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_error()
     }
 }
 impl DerefMut for InnerError {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_error_mut()
     }
 }
 impl AsRef<dyn SendSyncError> for InnerError {
+    #[inline]
     fn as_ref(&self) -> &(dyn SendSyncError + 'static) {
         self.as_error()
     }
 }
 impl AsMut<dyn SendSyncError> for InnerError {
+    #[inline]
     fn as_mut(&mut self) -> &mut (dyn SendSyncError + 'static) {
         self.as_error_mut()
     }
@@ -123,6 +129,7 @@ impl fmt::Debug for InnerError {
     }
 }
 impl Error for InnerError {
+    #[inline]
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.as_error().source()
     }

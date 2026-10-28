@@ -23,7 +23,8 @@ pub(crate) struct Storage {
 pub(crate) struct Owner {
     allocation: Box<HeapError<dyn SendSyncError>>,
 }
-#[repr(C)]
+// Casts recover the original HeapError<T>; allocation reuse initializes every
+// field at the replacement type's own offsets.
 struct HeapError<T: ?Sized> {
     diagnostics: MaybeUninit<ErrorDiagnostics>,
     into_box: IntoBox,
@@ -135,16 +136,18 @@ impl Storage {
             // allocation. The moved-out payload cannot be dropped twice.
             let parts = self.into_owner_parts();
             // SAFETY: the caller guarantees T. Box::into_raw transfers the sole
-            // allocation, and MaybeUninit<T> preserves T's layout while allowing
-            // the guard to free storage after the payload has been moved out.
+            // allocation. Wrapping the entire HeapError<T> in MaybeUninit keeps
+            // its exact size and alignment, allowing the guard to free storage
+            // after the payload moves out without relying on field ordering.
             let allocation = unsafe {
                 Box::from_raw(
-                    Box::into_raw(parts.error.allocation).cast::<HeapError<MaybeUninit<T>>>(),
+                    Box::into_raw(parts.error.allocation).cast::<MaybeUninit<HeapError<T>>>(),
                 )
             };
-            // SAFETY: the T payload is initialized and exclusively owned. The
-            // guard stores MaybeUninit<T>, so it will not drop the moved value.
-            let value = f(unsafe { allocation.value.as_ptr().read() });
+            // SAFETY: the original HeapError<T> layout locates the initialized,
+            // exclusively owned payload. Raw field access avoids borrowing a
+            // partially initialized struct, and the guard skips its destructor.
+            let value = f(unsafe { ptr::addr_of!((*allocation.as_ptr()).value).read() });
             let raw = Box::into_raw(allocation).cast::<HeapError<U>>();
             // SAFETY: the branch checks the complete allocation's size and
             // alignment for U. We initialize every HeapError<U> field before
@@ -207,8 +210,9 @@ impl Owner {
     #[inline]
     pub(crate) unsafe fn concrete_ref<T>(&self) -> &T {
         let raw = ptr::from_ref(&*self.allocation).cast::<HeapError<T>>();
-        // SAFETY: the caller guarantees T, so repr(C) gives the payload's actual
-        // offset and alignment. The reference cannot outlive the shared borrow.
+        // SAFETY: the caller guarantees T, so the cast recovers the allocation's
+        // original HeapError<T> layout and payload offset. The reference cannot
+        // outlive the shared borrow.
         unsafe { &*ptr::addr_of!((*raw).value) }
     }
     /// # Safety
@@ -216,8 +220,9 @@ impl Owner {
     #[inline]
     pub(crate) unsafe fn concrete_mut<T>(&mut self) -> &mut T {
         let raw = ptr::from_mut(&mut *self.allocation).cast::<HeapError<T>>();
-        // SAFETY: the caller guarantees T, so repr(C) gives the payload's actual
-        // offset and alignment. &mut self excludes access through other borrows.
+        // SAFETY: the caller guarantees T, so the cast recovers the allocation's
+        // original HeapError<T> layout and payload offset. &mut self excludes
+        // access through other borrows.
         unsafe { &mut *ptr::addr_of_mut!((*raw).value) }
     }
 

@@ -37,6 +37,7 @@ where
     type Output = Target;
     type Remainder = <E::Variants as Narrow<Target, Index>>::Remainder;
 
+    #[inline]
     fn split(
         error: ErrorUnion<E>,
     ) -> Result<Self::Output, ErrorUnion<<Self::Remainder as TupleForm>::Tuple>> {
@@ -63,6 +64,7 @@ where
     type Output = ErrorUnion<Target>;
     type Remainder = <E::Variants as SupersetOf<Target::Variants, Index>>::Remainder;
 
+    #[inline]
     fn split(
         error: ErrorUnion<E>,
     ) -> Result<Self::Output, ErrorUnion<<Self::Remainder as TupleForm>::Tuple>> {

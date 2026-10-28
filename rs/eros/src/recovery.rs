@@ -50,6 +50,7 @@ where
     type Remainder =
         <E::Variants as SupersetOf<<Self::Selected as TypeSet>::Variants, Index>>::Remainder;
 
+    #[inline]
     fn split(
         error: ErrorUnion<E>,
     ) -> Result<ErrorUnion<Self::Selected>, ErrorUnion<<Self::Remainder as TupleForm>::Tuple>> {
@@ -80,6 +81,7 @@ macro_rules! group_recovery {
             type Selected = Self;
             type Remainder = <SourceErrors::Variants as SupersetOf<<Self as TypeSet>::Variants, Index>>::Remainder;
 
+            #[inline]
             fn split(error: ErrorUnion<SourceErrors>) -> Result<ErrorUnion<Self>, ErrorUnion<<Self::Remainder as TupleForm>::Tuple>> {
                 error.narrow::<Self, GroupNarrow<Index>>()
             }

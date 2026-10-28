@@ -491,6 +491,7 @@ pub trait IsFold: sealed::Sealed {
 }
 
 impl IsFold for End {
+    #[inline]
     fn is_fold(_: &dyn Any) -> bool {
         false
     }
@@ -501,6 +502,7 @@ where
     Head: 'static,
     Tail: IsFold,
 {
+    #[inline]
     fn is_fold(any: &dyn Any) -> bool {
         if any.is::<Head>() {
             true
@@ -511,6 +513,7 @@ where
 }
 
 impl IsFold for AnyError {
+    #[inline]
     fn is_fold(_: &dyn Any) -> bool {
         true
     }
