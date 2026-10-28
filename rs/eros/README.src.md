@@ -1,10 +1,6 @@
 # eros
 
-[<img alt="github" src="https://img.shields.io/badge/github-mcmah309/eros-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/mcmah309/eros)
-[<img alt="crates.io" src="https://img.shields.io/crates/v/eros.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/eros)
-[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros)
-[<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml)
-[<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std)
+[<img alt="github" src="https://img.shields.io/badge/github-mcmah309/eros-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/mcmah309/eros) [<img alt="crates.io" src="https://img.shields.io/crates/v/eros.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/eros) [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-eros-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/eros) [<img alt="test status" src="https://img.shields.io/github/actions/workflow/status/mcmah309/eros/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/mcmah309/eros/actions/workflows/ci.yml) [<img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-success?style=for-the-badge" height="20">](#no_std)
 
 **Typed or untyped errors, with ergonomic propagation and no enum boilerplate.** Eros lets each API specify its possible error types or leave them untyped. Callers can handle specific error types and attach context as errors move through the call stack. Both approaches work in libraries and applications.
 
@@ -76,7 +72,6 @@ fn main() {
 ### No Boilerplate
 
 There should be no boilerplate needed when handling any number of errors (typed or untyped). This is where the magic of [ErrorUnion](#errorunion) happens.
-
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -236,16 +231,9 @@ To convert the whole result directly, use `.erase()` with `use eros::Erase;`.
 
 ### Handling A Type Along An Otherwise Untyped Path
 
-In a mostly untyped codebase, keep returning `eros::Result<T>` until a path
-needs to explicitly track an error type. Use `classify` on the result to wrap
-loader errors as `PortConfigError`. Downstream signatures describe the
-categories callers care about without exposing implementation error types.
-The callback receives an owned `InnerError`, including when the original error
-already has the replacement type. Successful values pass through unchanged.
+In a mostly untyped codebase, keep returning `eros::Result<T>` until a path needs to explicitly track an error type. Use `classify` on the result to wrap loader errors as `PortConfigError`. Downstream signatures describe the categories callers care about without exposing implementation error types. The callback receives an owned `InnerError`, including when the original error already has the replacement type. Successful values pass through unchanged.
 
-Here empty or malformed ports fail as `PortConfigError`. The typed path adds
-`DynamicPortNotAllowed` for port 0, and the caller handles that error by using
-port 8080:
+Here empty or malformed ports fail as `PortConfigError`. The typed path adds `DynamicPortNotAllowed` for port 0, and the caller handles that error by using port 8080:
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -297,41 +285,15 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 # fn main() {}
 ```
 
-`classify(f)` is shorthand for `map_inner(f).widen()`: it transforms every error
-and infers the destination error set from the surrounding type. The destination
-must contain the replacement type; it does not control whether the callback
-runs. Use `map_inner` alone when a singleton error set is sufficient. The original
-error becomes a source only if the callback retains it, as this wrapper does.
-Saved diagnostics remain with the replacement; no new diagnostics are captured.
+`classify(f)` is shorthand for `map_inner(f).widen()`: it transforms every error and infers the destination error set from the surrounding type. The destination must contain the replacement type; it does not control whether the callback runs. Use `map_inner` alone when a singleton error set is sufficient. The original error becomes a source only if the callback retains it, as this wrapper does. Saved diagnostics remain with the replacement; no new diagnostics are captured.
 
-For a selective transformation, use `narrow` to separate the desired types,
-map that branch with `map_inner`, and use `widen` to combine the possible errors.
+For a selective transformation, use `narrow` to separate the desired types, map that branch with `map_inner`, and use `widen` to combine the possible errors.
 
-`InnerError` and its downcasting methods are available with every feature
-configuration. Enabling `alloc` adds `InnerError::into_boxed()` and conversion
-into `Box<dyn SendSyncError>` through `.into()` to preserve the original concrete
-error as an owned source. An already boxed root reuses its
-allocation when root diagnostics are disabled; inline nonzero roots and roots
-sharing an allocation with diagnostics move into a new box when that method
-is called. The replacement follows the compile-time storage choice.
+`InnerError` and its downcasting methods are available with every feature configuration. Enabling `alloc` adds `InnerError::into_boxed()` and conversion into `Box<dyn SendSyncError>` through `.into()` to preserve the original concrete error as an owned source. An already boxed root reuses its allocation when root diagnostics are disabled; inline nonzero roots and roots sharing an allocation with diagnostics move into a new box when that method is called. The replacement follows the compile-time storage choice.
 
-Mapping into domain errors also keeps failures from different operations distinct. An
-`io::Error` while reading configuration and an `io::Error` while connecting to
-a database have the same concrete type, but callers may need to handle them
-differently. Wrap them at their respective boundaries as `PortConfigError`
-and `DatabaseError` before combining the paths with `widen`. The combined set
-can be `(DynamicPortNotAllowed, PortConfigError, DatabaseError)`:
-recovering a configuration failure then leaves database failures untouched.
-The original errors can remain inside the wrappers as sources for diagnostics.
-Paths intentionally using the same category can share one variant. Use
-`recover`, `try_recover`, or `narrow` where those categories are handled.
+Mapping into domain errors also keeps failures from different operations distinct. An `io::Error` while reading configuration and an `io::Error` while connecting to a database have the same concrete type, but callers may need to handle them differently. Wrap them at their respective boundaries as `PortConfigError` and `DatabaseError` before combining the paths with `widen`. The combined set can be `(DynamicPortNotAllowed, PortConfigError, DatabaseError)`: recovering a configuration failure then leaves database failures untouched. The original errors can remain inside the wrappers as sources for diagnostics. Paths intentionally using the same category can share one variant. Use `recover`, `try_recover`, or `narrow` where those categories are handled.
 
-`erase()` returns to `eros::Result<T>` while preserving the concrete root,
-including its boxes and domain wrappers. Later callers can still downcast or
-recover `PortConfigError`. Only the static error set changes; all saved diagnostics
-remain intact. The method is also available directly on
-`ErrorUnion`. Plain `into()` and `?` perform the same type erasure when converting
-a typed union into an untyped one.
+`erase()` returns to `eros::Result<T>` while preserving the concrete root, including its boxes and domain wrappers. Later callers can still downcast or recover `PortConfigError`. Only the static error set changes; all saved diagnostics remain intact. The method is also available directly on `ErrorUnion`. Plain `into()` and `?` perform the same type erasure when converting a typed union into an untyped one.
 
 ### Adding Context As Errors Propagate
 
@@ -621,12 +583,9 @@ Only annotated parameters are included in the generated context. Parameters with
 | `{:#?}` (`Debug`) | Root, sources, and contexts | `errors (N total):` list of grouped child reports |
 | `{:?}` (`Debug`) | Same report, plus enabled locations, backtrace, and span trace | Same grouping, including metadata |
 
-Sources and contexts use bullets; contexts appear innermost first. Empty
-sections are omitted. Alternate Debug omits locations, backtraces, and span traces
-at every nesting level. Formatting never captures new diagnostics.
+Sources and contexts use bullets; contexts appear innermost first. Empty sections are omitted. Alternate Debug omits locations, backtraces, and span traces at every nesting level. Formatting never captures new diagnostics.
 
-Debug groups identical visible child reports in first-occurrence order, with
-zero-based positions and half-open ranges (`0..3` means indices 0, 1, and 2):
+Debug groups identical visible child reports in first-occurrence order, with zero-based positions and half-open ranges (`0..3` means indices 0, 1, and 2):
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -656,11 +615,9 @@ errors (6 total):
       at: [3]
 ```
 
-Different sources, contexts, or nested children form separate groups; ordinary
-Debug also distinguishes locations, backtraces, and span traces.
+Different sources, contexts, or nested children form separate groups; ordinary Debug also distinguishes locations, backtraces, and span traces.
 
-See [Logging](#logging) for tracing fields and
-[Structured JSON](#structured-json) for JSON reports.
+See [Logging](#logging) for tracing fields and [Structured JSON](#structured-json) for JSON reports.
 
 ## Best Practices
 
@@ -925,12 +882,7 @@ WARN Something went wrong
 
 ### Tracing Span Traces
 
-The optional `error_span_trace` feature captures the current
-[`tracing`](https://docs.rs/tracing) span and its parents, including fields and
-source locations, when an error first enters Eros. `context_span_trace` captures
-that information separately when each context is attached. Enable `span_trace`
-as a shortcut for both. Both capture features require `std`; `context_span_trace`
-does not enable `context` itself.
+The optional `error_span_trace` feature captures the current [`tracing`](https://docs.rs/tracing) span and its parents, including fields and source locations, when an error first enters Eros. `context_span_trace` captures that information separately when each context is attached. Enable `span_trace` as a shortcut for both. Both capture features require `std`; `context_span_trace` does not enable `context` itself.
 
 ```rust
 # #[cfg(feature = "error_span_trace")]
@@ -967,29 +919,19 @@ span trace:
 backtrace: not captured
 ```
 
-Here, `bail!` captures the `load_settings` span before the function returns.
-Converting an error into an Eros error after the function returns would miss that span.
+Here, `bail!` captures the `load_settings` span before the function returns. Converting an error into an Eros error after the function returns would miss that span.
 
-Print the saved traces with `{:?}`. With `error_span_trace`, inspect the original
-trace through `.span_trace()` on an `ErrorUnion` or `ErrorReport`. With `context`
-and `context_span_trace`, inspect each attachment trace through
-`error.contexts()` and `ContextFrame::span_trace()`. Attaching context preserves
-the original error trace, so a context attached by an instrumented caller can
-record a different span from the error's origin. Detailed reports show each
-context's trace beneath its message; debug JSON includes `span_trace` on each
-context object. Display (`{}`) and alternate Debug (`{:#?}`) omit all traces.
+Print the saved traces with `{:?}`. With `error_span_trace`, inspect the original trace through `.span_trace()` on an `ErrorUnion` or `ErrorReport`. With `context` and `context_span_trace`, inspect each attachment trace through `error.contexts()` and `ContextFrame::span_trace()`. Attaching context preserves the original error trace, so a context attached by an instrumented caller can record a different span from the error's origin. Detailed reports show each context's trace beneath its message; debug JSON includes `span_trace` on each context object. Display (`{}`) and alternate Debug (`{:#?}`) omit all traces.
 
 ### Filtered Backtrace
 
 Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `filtered_backtrace` to filter recognized dependency and runtime frames automatically.
 
-Filtering only changes formatted output; the original trace remains available
-through `.backtrace()`.
+Filtering only changes formatted output; the original trace remains available through `.backtrace()`.
 
 ### Composing Type Sets
 
-Use `type_set!` to share members between named error sets. Join sets and tuples
-with `||`; the macro emits flat tuple aliases and includes repeated members once:
+Use `type_set!` to share members between named error sets. Join sets and tuples with `||`; the macro emits flat tuple aliases and includes repeated members once:
 
 ```rust
 use eros::{type_set, ErrorUnion};
@@ -1005,17 +947,9 @@ let error: ErrorUnion<Combined> = ErrorUnion::new(fmt::Error);
 let _: ErrorUnion<(ParseIntError, ParseFloatError, fmt::Error)> = error;
 ```
 
-References must name sets in the same invocation, in any declaration order.
-Members keep their first occurrence order. Deduplication compares type spellings;
-use the same path for shared members, since the macro cannot resolve different
-paths or external aliases for the same type. Tuples can be empty or contain one
-member, written `()` and `(T,)`. Generic aliases are not supported, but members
-can be generic types. Sets support up to 26 distinct members.
+References must name sets in the same invocation, in any declaration order. Members keep their first occurrence order. Deduplication compares type spellings; use the same path for shared members, since the macro cannot resolve different paths or external aliases for the same type. Tuples can be empty or contain one member, written `()` and `(T,)`. Generic aliases are not supported, but members can be generic types. Sets support up to 26 distinct members.
 
-Visibility and attributes apply to the emitted aliases. You can place
-`#[eros::error_enum(Name)]` on a composed alias inside `type_set!` to generate
-an enum from its flattened tuple. A `#[cfg(...)]` attribute gates the emitted
-alias; composition still uses its declared members.
+Visibility and attributes apply to the emitted aliases. You can place `#[eros::error_enum(Name)]` on a composed alias inside `type_set!` to generate an enum from its flattened tuple. A `#[cfg(...)]` attribute gates the emitted alias; composition still uses its declared members.
 
 ### Error Enum Macro
 
@@ -1096,7 +1030,6 @@ Update preparation failed
 ```
 
 For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving all saved diagnostics. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
-
 
 ### Structured JSON
 
@@ -1280,8 +1213,7 @@ Traditional enum-based error handling breaks down as soon as you compose functio
 
 ### The Problem
 
-Suppose three low-level functions each return a precise error enum. The function
-bodies below are placeholders; the example is compiled but not executed:
+Suppose three low-level functions each return a precise error enum. The function bodies below are placeholders; the example is compiled but not executed:
 
 ```rust,no_run
 # #[cfg(feature = "alloc")]
@@ -1482,17 +1414,11 @@ The signature stays exact — only the errors that can actually occur are listed
 
 ## no_std
 
-Eros supports `#![no_std]` with or without a global allocator. Disable default
-features to use and enable the other features such as `alloc` as needed.
+Eros supports `#![no_std]` with or without a global allocator. Disable default features to use and enable the other features such as `alloc` as needed.
 
 ### Without an allocator
 
-Each concrete error must implement `core::error::Error + Send + Sync + 'static`
-and fit in the size and alignment of `usize`. Zero-sized errors support
-arbitrary alignment. Only the active error must satisfy these storage limits;
-other types may still appear in its type set. The handle occupies two words,
-or three with `error_location` enabled. Enums, numeric error codes, and thin
-references to static errors can be stored without allocation.
+Each concrete error must implement `core::error::Error + Send + Sync + 'static` and fit in the size and alignment of `usize`. Zero-sized errors support arbitrary alignment. Only the active error must satisfy these storage limits; other types may still appear in its type set. The handle occupies two words, or three with `error_location` enabled. Enums, numeric error codes, and thin references to static errors can be stored without allocation.
 
 ```rust
 use core::{error::Error, fmt};
@@ -1520,10 +1446,7 @@ assert!(recovered.is_ok());
 
 ### Inline errors
 
-`#[eros::inline_error]` declares nongeneric structs and enums whose size and
-alignment fit in one `usize`. A compile-time check enforces this even with
-`alloc` enabled; zero-sized types may have any alignment. Allocation behavior
-depends on the [storage configuration](#reducing-error-handling-overhead).
+`#[eros::inline_error]` declares nongeneric structs and enums whose size and alignment fit in one `usize`. A compile-time check enforces this even with `alloc` enabled; zero-sized types may have any alignment. Allocation behavior depends on the [storage configuration](#reducing-error-handling-overhead).
 
 ```rust
 #[eros::inline_error("operation timed out")]
@@ -1541,23 +1464,13 @@ assert_eq!(erased.to_string(), "device code 0007");
 assert_eq!(erased.downcast_inner::<DeviceFailure>().unwrap().0, 7);
 ```
 
-The macro generates `Debug`, `Error`, and, when a message is supplied, `Display`.
-Messages accept `format!` syntax with fields accessed through `self`, and format
-without allocating. `"{self:?}"` delegates display to debug. Omit the message
-(`#[inline_error]` or `#[inline_error()]`) to implement `Display` yourself.
-Add derives such as `Clone`, `Copy`, or `Eq` explicitly when needed.
+The macro generates `Debug`, `Error`, and, when a message is supplied, `Display`. Messages accept `format!` syntax with fields accessed through `self`, and format without allocating. `"{self:?}"` delegates display to debug. Omit the message (`#[inline_error]` or `#[inline_error()]`) to implement `Display` yourself. Add derives such as `Clone`, `Copy`, or `Eq` explicitly when needed.
 
-Thin references to static data can borrow larger payloads; `&'static &'static str`
-fits, while `&'static str` exceeds the limit. Literal `error!` messages use a
-zero-sized error without `alloc`, as described below. Eros operations require
-`Send + Sync + 'static` and preserve the concrete type and payload through
-erasure and downcasting.
+Thin references to static data can borrow larger payloads; `&'static &'static str` fits, while `&'static str` exceeds the limit. Literal `error!` messages use a zero-sized error without `alloc`, as described below. Eros operations require `Send + Sync + 'static` and preserve the concrete type and payload through erasure and downcasting.
 
 ### Static message errors
 
-Literal messages in `error!`, `bail!`, and `ensure!` work without `alloc`. Each
-literal expands to an ad hoc zero-sized error whose `Display` and `Debug` write
-the static text. There is no string pointer in the concrete error itself.
+Literal messages in `error!`, `bail!`, and `ensure!` work without `alloc`. Each literal expands to an ad hoc zero-sized error whose `Display` and `Debug` write the static text. There is no string pointer in the concrete error itself.
 
 ```rust
 fn validate(ready: bool) -> eros::Result<()> {
@@ -1571,16 +1484,11 @@ let message = eros::error!("unexpected {{status}}");
 assert_eq!(message.to_string(), "unexpected {status}");
 ```
 
-Escape literal braces as `{{` and `}}`, as with formatting macros. Without
-`alloc`, literal messages have anonymous concrete types and use erased error
-sets; they cannot be downcast to `MsgError`. Use named error types for typed
-`bail!` and `ensure!` results. With `alloc`, literals retain their `MsgError` type.
+Escape literal braces as `{{` and `}}`, as with formatting macros. Without `alloc`, literal messages have anonymous concrete types and use erased error sets; they cannot be downcast to `MsgError`. Use named error types for typed `bail!` and `ensure!` results. With `alloc`, literals retain their `MsgError` type.
 
 ### What requires `alloc`
 
-Errors exceeding one word in size or alignment require `alloc`. A direct
-`&'static str` contains two words and exceeds the payload limit, while a thin
-reference to a static error or `MsgError::from_static_ref` fits.
+Errors exceeding one word in size or alignment require `alloc`. A direct `&'static str` contains two words and exceeds the payload limit, while a thin reference to a static error or `MsgError::from_static_ref` fits.
 
 Numeric error codes work without `alloc`:
 
@@ -1598,9 +1506,7 @@ let error: eros::ErrorUnion<(Code,)> = eros::ErrorUnion::new(Code(7));
 assert_eq!(error.into_single().0, 7);
 ```
 
-Formatted message macros require `alloc`, including implicit format captures.
-Custom errors can format their stored fields into a formatter without allocating.
-These message macro examples are rejected with `alloc` disabled:
+Formatted message macros require `alloc`, including implicit format captures. Custom errors can format their stored fields into a formatter without allocating. These message macro examples are rejected with `alloc` disabled:
 
 ```rust,ignore
 fn operation(code: u8) -> eros::Result<()> {
@@ -1612,11 +1518,7 @@ let _ = eros::error!("device status {}", 7); // Explicit arguments need formatti
 
 ### Mapping without allocation
 
-`map_inner` works on both unions and results without allocation. Its callback
-owns the original error through `InnerError` and returns a replacement fitting
-the inline payload word. Every error goes through the callback, including an
-existing instance of the replacement type. The original capture location is
-preserved.
+`map_inner` works on both unions and results without allocation. Its callback owns the original error through `InnerError` and returns a replacement fitting the inline payload word. Every error goes through the callback, including an existing instance of the replacement type. The original capture location is preserved.
 
 ```rust
 use eros::ReshapeUnion;
@@ -1629,38 +1531,17 @@ let classified: eros::Result<(), (fmt::Error,)> =
 assert!(classified.unwrap_err().is_inner::<fmt::Error>());
 ```
 
-Callbacks declared to take `InnerError` continue to receive it when a downstream
-crate enables `alloc`. Its `is::<T>()`, `downcast_ref::<T>()`, `downcast_mut::<T>()`, and
-`downcast::<T>()` methods inspect or extract the original concrete error using
-its actual storage. The type remains the same whether stored inline or on the
-heap. Failed owned downcasts return the original owner.
+Callbacks declared to take `InnerError` continue to receive it when a downstream crate enables `alloc`. Its `is::<T>()`, `downcast_ref::<T>()`, `downcast_mut::<T>()`, and `downcast::<T>()` methods inspect or extract the original concrete error using its actual storage. The type remains the same whether stored inline or on the heap. Failed owned downcasts return the original owner.
 
-Extracting a concrete error allows a wrapper such as `DomainError(Code(7))`
-to fit the inline limit. Retaining the erased `InnerError` itself requires more
-than one payload word, so a replacement containing it requires `alloc`. With
-`alloc`, `inner.into_boxed()` can also keep the original as a boxed source.
+Extracting a concrete error allows a wrapper such as `DomainError(Code(7))` to fit the inline limit. Retaining the erased `InnerError` itself requires more than one payload word, so a replacement containing it requires `alloc`. With `alloc`, `inner.into_boxed()` can also keep the original as a boxed source.
 
 ### With an allocator
 
-Enable `alloc` to use arbitrary-sized errors and owned or runtime-formatted
-messages in a `no_std` environment with a global allocator:
+Enable `alloc` to use arbitrary-sized errors and owned or runtime-formatted messages in a `no_std` environment with a global allocator:
 
-With root diagnostics enabled, a boxed fat pointer owns one allocation containing
-the diagnostics and trailing payload. Otherwise, small roots stay inline and
-larger roots use `Box<T>`. The union handle always occupies two words with `alloc`. Allocation behavior and diagnostic costs are described in
-[Reducing Error Handling Overhead](#reducing-error-handling-overhead).
+With root diagnostics enabled, a boxed fat pointer owns one allocation containing the diagnostics and trailing payload. Otherwise, small roots stay inline and larger roots use `Box<T>`. The union handle always occupies two words with `alloc`. Allocation behavior and diagnostic costs are described in [Reducing Error Handling Overhead](#reducing-error-handling-overhead).
 
-The `error_location` feature works with or without `alloc`. Without `alloc`, its
-location reference adds one word to the handle; with `alloc`, it selects boxed
-root diagnostics. `context_location` adds one location
-reference per context frame when `context` is enabled; it does not enable
-`context` or `alloc` itself. Both support `no_std`. The `location` feature enables
-both flags. The `std`, `context`, and `json` features enable
-`alloc` automatically. `backtrace`, `error_span_trace`, and `context_span_trace`
-require `std`. With `context` disabled,
-static string contexts remain accepted as no-ops and lazy context closures are
-not evaluated. Default features enable `alloc`, context, and backtraces, so keep
-them disabled for an environment without an allocator.
+The `error_location` feature works with or without `alloc`. Without `alloc`, its location reference adds one word to the handle; with `alloc`, it selects boxed root diagnostics. `context_location` adds one location reference per context frame when `context` is enabled; it does not enable `context` or `alloc` itself. Both support `no_std`. The `location` feature enables both flags. The `std`, `context`, and `json` features enable `alloc` automatically. `backtrace`, `error_span_trace`, and `context_span_trace` require `std`. With `context` disabled, static string contexts remain accepted as no-ops and lazy context closures are not evaluated. Default features enable `alloc`, context, and backtraces, so keep them disabled for an environment without an allocator.
 
 ## Special Thanks
 
