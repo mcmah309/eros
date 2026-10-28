@@ -1,5 +1,3 @@
-#[cfg(feature = "alloc")]
-use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
 
@@ -28,7 +26,7 @@ mod boxed;
         feature = "error_location"
     )
 ))]
-use boxed::Storage;
+pub(crate) use boxed::{Owner as ErrorOwner, Storage};
 #[cfg(any(
     not(feature = "alloc"),
     not(any(
@@ -48,7 +46,7 @@ mod inline;
         feature = "error_location"
     ))
 ))]
-use inline::Storage;
+pub(crate) use inline::{Owner as ErrorOwner, Storage};
 
 #[cfg(feature = "alloc")]
 type ChildVisitor = for<'a> fn(&'a dyn SendSyncError, &mut dyn FnMut(crate::ErrorReport<'a>));
@@ -88,26 +86,6 @@ pub(crate) struct ErrorDiagnostics {
     pub(crate) context: Vec<ContextFrame>,
     #[cfg(feature = "error_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
-}
-
-impl ErrorDiagnostics {
-    // Transfer metadata without capturing new diagnostics. A span clone shares
-    // the already captured span until the old root is dropped.
-    fn take(&mut self) -> Self {
-        Self {
-            #[cfg(feature = "backtrace")]
-            backtrace: core::mem::replace(
-                &mut self.backtrace,
-                std::backtrace::Backtrace::disabled(),
-            ),
-            #[cfg(feature = "error_span_trace")]
-            span_trace: self.span_trace.clone(),
-            #[cfg(feature = "context")]
-            context: core::mem::take(&mut self.context),
-            #[cfg(feature = "error_location")]
-            location: self.location,
-        }
-    }
 }
 
 pub(crate) struct ErrorParts<T> {
@@ -213,6 +191,8 @@ impl ErrorUnionInner {
     pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self) -> T {
         let error;
         {
+            // SAFETY: the caller guarantees the exact concrete type T; this
+            // forwards ownership to the extraction with the same requirement.
             let parts = unsafe { self.downcast_error_unchecked_with_parts::<T>() };
             // Keep the root owned while dropping diagnostics, including if a
             // context destructor panics before the root reaches its caller.
@@ -227,18 +207,15 @@ impl ErrorUnionInner {
     #[inline]
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(self) -> ErrorParts<T> {
         debug_assert!(self.is_error_type::<T>());
+        // SAFETY: the caller guarantees T, which is the requirement imposed by
+        // Storage::into_parts. The debug assertion is only a diagnostic check.
         unsafe { self.storage.into_parts::<T>() }
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub(crate) fn into_boxed_parts(self) -> ErrorParts<Box<dyn SendSyncError>> {
-        self.storage.into_boxed_parts()
     }
 
     #[inline]
     pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
         if self.is_error_type::<T>() {
+            // SAFETY: the concrete payload type was checked above.
             Some(unsafe { self.downcast_error_ref_unchecked::<T>() })
         } else {
             None
@@ -247,6 +224,8 @@ impl ErrorUnionInner {
     #[inline]
     pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
         if self.is_error_type::<T>() {
+            // SAFETY: the concrete payload type was checked above, and &mut self
+            // keeps access exclusive for the returned reference.
             Some(unsafe { self.downcast_error_mut_unchecked::<T>() })
         } else {
             None
@@ -258,6 +237,8 @@ impl ErrorUnionInner {
     #[inline]
     pub(crate) unsafe fn downcast_error_ref_unchecked<T: 'static>(&self) -> &T {
         debug_assert!(self.is_error_type::<T>());
+        // SAFETY: the caller guarantees the concrete type required by Storage;
+        // the returned reference remains tied to this shared borrow.
         unsafe { self.storage.concrete_ref::<T>() }
     }
     /// # Safety
@@ -265,19 +246,29 @@ impl ErrorUnionInner {
     #[inline]
     pub(crate) unsafe fn downcast_error_mut_unchecked<T: 'static>(&mut self) -> &mut T {
         debug_assert!(self.is_error_type::<T>());
+        // SAFETY: the caller guarantees the concrete type required by Storage;
+        // &mut self gives exclusive access for the returned reference.
         unsafe { self.storage.concrete_mut::<T>() }
     }
 
+    pub(crate) fn into_owner(self) -> crate::InnerError {
+        let parts = self.storage.into_owner_parts();
+        let owner = crate::InnerError { inner: parts.error };
+        // Own the payload while dropping diagnostics, including on unwind.
+        drop(parts.diagnostics);
+        owner
+    }
+
     pub(crate) fn map_error<T: SendSyncError>(
-        mut self,
+        self,
         classifier: impl FnOnce(crate::InnerError) -> T,
     ) -> Self {
-        let diagnostics = self.storage.take_diagnostics();
+        let parts = self.storage.into_owner_parts();
         // The callback owns the old root. Metadata remains owned here if the
         // callback, the original destructor, or replacement construction panics.
-        let value = classifier(crate::InnerError { inner: self });
+        let value = classifier(crate::InnerError { inner: parts.error });
         Self {
-            storage: Storage::new(value, diagnostics),
+            storage: Storage::new(value, parts.diagnostics),
         }
     }
 
@@ -290,8 +281,36 @@ impl ErrorUnionInner {
     ) -> Self {
         debug_assert!(self.is_error_type::<T>());
         Self {
+            // SAFETY: the caller guarantees T, and consuming self transfers
+            // sole ownership to Storage::map_single with the same requirement.
             storage: unsafe { self.storage.map_single::<T, U>(f) },
         }
+    }
+}
+
+impl ErrorOwner {
+    pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
+        self.is_error_type::<T>().then(|| {
+            // SAFETY: the concrete payload type was checked above.
+            unsafe { self.concrete_ref::<T>() }
+        })
+    }
+
+    pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.is_error_type::<T>().then(|| {
+            // SAFETY: the concrete payload type was checked above, and &mut self
+            // gives exclusive access for the returned reference.
+            unsafe { self.concrete_mut::<T>() }
+        })
+    }
+
+    /// # Safety
+    /// T must be the exact concrete type of the owned error.
+    pub(crate) unsafe fn downcast_error_unchecked<T: 'static>(self) -> T {
+        debug_assert!(self.is_error_type::<T>());
+        // SAFETY: the caller guarantees T, and self transfers sole ownership
+        // to into_error with the same concrete-type requirement.
+        unsafe { self.into_error::<T>() }
     }
 }
 

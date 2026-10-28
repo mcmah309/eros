@@ -472,6 +472,9 @@ fn conversions(
     let dispatch = |method: Option<Ident>, fallible: bool| {
         let value = |variant: &Ident, ty: &Type| match &method {
             Some(method) => quote! {
+                // SAFETY: dispatch reaches this extraction only after an exact
+                // type check, or in its final branch where the sealed subset
+                // proof and previous checks guarantee the remaining exact type.
                 Self::#variant(unsafe {
                     #crate_path::__private::#method::<#ty>(union_of)
                 })

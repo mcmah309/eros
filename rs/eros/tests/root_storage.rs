@@ -128,8 +128,8 @@ fn mutable_references_remain_valid_after_moves_and_downcasts() {
     *erased.downcast_inner_mut::<Reference>().unwrap().0 += 1;
     let error = erased.narrow::<(Reference,), _>().unwrap().into_single();
     assert_eq!(*error.0, 43);
-    // Reclaim the deliberately leaked allocation after transferring its unique
-    // reference through root storage. Miri checks for leaks and aliasing.
+    // SAFETY: error.0 is the unique reference to the Box leaked above. Storage
+    // has relinquished ownership, and no reference is used after reclaiming it.
     unsafe {
         drop(Box::from_raw(error.0 as *mut usize));
     }
@@ -152,8 +152,13 @@ mod allocation_checks {
         static COUNTS: Cell<Option<(usize, usize)>> = const { Cell::new(None) };
     }
     struct CountingAllocator;
+    // SAFETY: allocation and deallocation forward the original arguments to
+    // System. Counting uses thread-local Cells, does not unwind, and preserves
+    // System's allocation pointers and layouts.
     unsafe impl GlobalAlloc for CountingAllocator {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: GlobalAlloc's caller supplies a valid nonzero layout,
+            // which is forwarded unchanged to System.
             let result = unsafe { System.alloc(layout) };
             let _ = COUNTS.try_with(|counts| {
                 if let Some((allocs, frees)) = counts.get() {
@@ -168,6 +173,8 @@ mod allocation_checks {
                     counts.set(Some((allocs, frees + 1)));
                 }
             });
+            // SAFETY: alloc returned System's original pointer, and the caller
+            // supplies its matching layout and relinquishes the allocation.
             unsafe { System.dealloc(ptr, layout) };
         }
     }
@@ -218,7 +225,7 @@ mod allocation_checks {
     fn owned_classification_does_not_box_the_old_root() {
         let counts = measured(|| {
             let original: ErrorUnion = ErrorUnion::new(Small(37));
-            let classified: ErrorUnion<(fmt::Error,)> = original.classify(|original| {
+            let classified: ErrorUnion<(fmt::Error,)> = original.map_inner(|original| {
                 let original = original.downcast_ref::<Small>().unwrap();
                 assert_eq!(original.0, 37);
                 fmt::Error
@@ -305,7 +312,7 @@ mod allocation_checks {
         assert_eq!(
             measured(|| {
                 let error: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
-                let boxed = error.into_inner();
+                let boxed = error.into_inner().into_boxed();
                 assert!((boxed.as_ref() as &dyn std::any::Any).is::<fmt::Error>());
             }),
             (SMALL_ALLOCS, SMALL_ALLOCS)
@@ -400,11 +407,34 @@ mod allocation_checks {
 
     #[cfg(feature = "alloc")]
     #[test]
+    fn owned_extraction_retains_storage_without_allocating() {
+        let counts = measured(|| {
+            let error: ErrorUnion = ErrorUnion::new(Small(37));
+            let mut inner: eros::InnerError = error.into_inner();
+            inner.downcast_mut::<Small>().unwrap().0 += 1;
+            assert_eq!(inner.downcast::<Small>().unwrap().0, 38);
+        });
+        assert_eq!(counts, (SMALL_ALLOCS, SMALL_ALLOCS));
+        let counts = measured(|| {
+            let error: ErrorUnion = ErrorUnion::new(Large([17, 29]));
+            let address = core::ptr::from_ref(error.downcast_inner_ref::<Large>().unwrap());
+            let inner = error.into_inner();
+            assert_eq!(
+                core::ptr::from_ref(inner.downcast_ref::<Large>().unwrap()),
+                address
+            );
+            assert_eq!(inner.downcast::<Large>().unwrap().0, [17, 29]);
+        });
+        assert_eq!(counts, (1, 1));
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
     fn boxed_extraction_moves_the_original_concrete_type() {
         let counts = measured(|| {
             let error: ErrorUnion = ErrorUnion::new(Large([17, 29]));
             let error = error.narrow::<(Large,), _>().unwrap();
-            let boxed = error.into_inner();
+            let boxed = error.into_inner().into_boxed();
             assert_eq!(
                 (boxed.as_ref() as &dyn std::any::Any)
                     .downcast_ref::<Large>()
@@ -423,7 +453,7 @@ mod allocation_checks {
         assert_eq!(
             measured(|| {
                 let error: ErrorUnion<(Small,)> = ErrorUnion::new(Small(42));
-                let boxed = error.into_inner();
+                let boxed = error.into_inner().into_boxed();
                 assert_eq!(
                     (boxed.as_ref() as &dyn std::any::Any)
                         .downcast_ref::<Small>()
@@ -447,18 +477,11 @@ mod allocation_checks {
         assert_eq!(
             measured(|| {
                 let error: ErrorUnion<(Small,)> = ErrorUnion::new(Small(42));
-                let mapped = error.map_inner(|boxed| {
-                    Small(
-                        (boxed.as_ref() as &dyn std::any::Any)
-                            .downcast_ref::<Small>()
-                            .unwrap()
-                            .0
-                            + 1,
-                    )
-                });
+                let mapped =
+                    error.map_inner(|inner| Small(inner.downcast_ref::<Small>().unwrap().0 + 1));
                 assert_eq!(mapped.into_single().0, 43);
             }),
-            (1 + 2 * SMALL_ALLOCS, 1 + 2 * SMALL_ALLOCS)
+            (2 * SMALL_ALLOCS, 2 * SMALL_ALLOCS)
         );
     }
 

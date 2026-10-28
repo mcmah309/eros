@@ -450,7 +450,7 @@ fn mutable_erased_root_and_boxed_error_trait_refer_to_the_actual_error() {
     );
     assert!(error.source().is_none());
 
-    let boxed = error.into_inner();
+    let boxed = error.into_inner().into_boxed();
     assert!((&boxed as &dyn core::any::Any).is::<Box<dyn eros::SendSyncError>>());
     assert!((boxed.as_ref() as &dyn core::any::Any).is::<MsgError>());
     let source = std::error::Error::source(&boxed).unwrap();

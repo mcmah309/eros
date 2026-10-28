@@ -35,7 +35,7 @@ impl Error for WrappedCode {
     }
 }
 
-pub type Errors = (fmt::Error, DomainError);
+pub type Errors = (DomainError,);
 
 pub fn code_error(code: usize) -> ErrorUnion {
     ErrorUnion::new(Code(code))
@@ -57,15 +57,15 @@ pub fn category(mut inner: InnerError) -> DomainError {
 }
 
 pub fn classify_error(error: ErrorUnion) -> ErrorUnion<Errors> {
-    error.classify(category)
+    error.collapse(category)
 }
 
 pub fn classify_result(result: eros::Result<u8>) -> eros::Result<u8, Errors> {
-    result.classify(category)
+    result.collapse(category)
 }
 
 pub fn wrap_concrete(error: ErrorUnion) -> ErrorUnion<(WrappedCode,)> {
-    error.classify(|inner| WrappedCode(inner.downcast::<Code>().unwrap()))
+    error.map_inner(|inner| WrappedCode(inner.downcast::<Code>().unwrap()))
 }
 
 pub fn run_checks() {
@@ -81,7 +81,7 @@ pub fn run_checks() {
     );
     assert_eq!(classify_result(Ok(7)).unwrap(), 7);
     let represented = classify_error(ErrorUnion::new(fmt::Error));
-    assert!(represented.is_inner::<fmt::Error>());
+    assert_eq!(represented.into_single(), DomainError(0));
     let wrapped = wrap_concrete(code_error(37)).into_single();
     assert_eq!(wrapped, WrappedCode(Code(37)));
     assert!(wrapped.source().unwrap().is::<Code>());

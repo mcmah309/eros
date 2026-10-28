@@ -1,4 +1,4 @@
-use crate::{SendSyncError, storage::ErrorUnionInner};
+use crate::{SendSyncError, storage::ErrorOwner};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use core::{
@@ -7,7 +7,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-/// Owns the original concrete error passed to a classification callback.
+/// Owns a concrete error extracted by [`crate::ErrorUnion::into_inner`] or
+/// passed to a mapping callback.
 ///
 /// Inspection, mutation, and concrete extraction work without allocation. The
 /// representation is private: enabling `alloc` does not change the callback
@@ -15,12 +16,13 @@ use core::{
 /// `into_boxed` or conversion into `Box<dyn SendSyncError>` can transfer the
 /// original error into a source wrapper.
 ///
-/// Saved union diagnostics stay with the classified result. Dropping this owner
+/// Mapping keeps saved union diagnostics with the mapped result;
+/// `ErrorUnion::into_inner` discards them. Dropping this owner
 /// drops the original error exactly once. Retaining this owner inside a new
 /// error requires enough payload space; extracting a concrete error can keep
 /// a replacement within the no-alloc inline limit.
 pub struct InnerError {
-    pub(crate) inner: ErrorUnionInner,
+    pub(crate) inner: ErrorOwner,
 }
 
 impl InnerError {
@@ -78,7 +80,7 @@ impl InnerError {
     /// `Box<dyn SendSyncError>` using `.into()` is equivalent.
     #[cfg(feature = "alloc")]
     pub fn into_boxed(self) -> Box<dyn SendSyncError> {
-        self.inner.into_boxed_parts().error
+        self.inner.into_boxed()
     }
 }
 

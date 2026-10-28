@@ -356,7 +356,7 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
 #[cfg(test)]
 mod tests {
     use super::{NamedErrors, NamedErrorsError, NotEnoughMemory, Timeout, run_no_std_checks};
-    use eros::{AnyError, Context, ErrorUnion, SendSyncError, MsgError};
+    use eros::{AnyError, Context, ErrorUnion, InnerError, MsgError};
 
     #[test]
     fn all_no_std_checks_pass() {
@@ -376,8 +376,8 @@ mod tests {
         assert_send::<ErrorUnion<(NotEnoughMemory,)>>();
         assert_sync::<ErrorUnion<(NotEnoughMemory,)>>();
         let dyn_err = u.into_inner();
-        assert_send::<Box<dyn SendSyncError>>();
-        assert_sync::<Box<dyn SendSyncError>>();
+        assert_send::<InnerError>();
+        assert_sync::<InnerError>();
         assert!((&*dyn_err as &dyn core::any::Any).is::<NotEnoughMemory>());
     }
 

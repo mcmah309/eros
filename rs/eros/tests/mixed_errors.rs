@@ -20,8 +20,7 @@ struct ConfigError(#[source] Box<dyn SendSyncError>);
 struct DatabaseError(#[source] Box<dyn SendSyncError>);
 
 #[test]
-fn classifier_runs_once_only_for_implementation_errors() {
-    type Domain = (fmt::Error, ConfigError);
+fn mapper_runs_once_for_every_error_including_an_existing_replacement() {
     let inputs: [eros::Result<String>; 4] = [
         Ok(String::from("success")),
         Err(ErrorUnion::new(fmt::Error)),
@@ -31,42 +30,34 @@ fn classifier_runs_once_only_for_implementation_errors() {
         ))))),
     ];
     for (index, result) in inputs.into_iter().enumerate() {
-        let identity = result
-            .as_ref()
-            .err()
-            .map(|error| common::identity(error.inner()));
+        let original = result.as_ref().err().map(|error| {
+            (
+                core::any::Any::type_id(error.inner()),
+                error.inner().to_string(),
+            )
+        });
         let mut calls = 0;
         // Moving a captured String makes this wrapper FnOnce, not FnMut.
         let capture = String::from("captured");
-        let mixed: eros::Result<String, Domain> = result.classify(|inner| {
+        let mapped = result.map_inner(|inner| {
             drop(capture);
             calls += 1;
             ConfigError(inner.into_boxed())
         });
-        assert_eq!(calls, usize::from(index == 2));
-        match index {
-            0 => assert_eq!(mixed.unwrap(), "success"),
-            1 | 3 => assert_eq!(
-                common::identity(mixed.unwrap_err().inner()),
-                identity.unwrap()
-            ),
-            2 => assert_eq!(
-                mixed
-                    .unwrap_err()
-                    .narrow::<ConfigError, _>()
-                    .unwrap()
-                    .0
-                    .to_string(),
-                "failure"
-            ),
-            _ => unreachable!(),
+        assert_eq!(calls, usize::from(index != 0));
+        if let Some((root_type, message)) = original {
+            let wrapped = mapped.unwrap_err().into_single();
+            assert_eq!(core::any::Any::type_id(wrapped.0.as_ref()), root_type);
+            assert_eq!(wrapped.0.to_string(), message);
+        } else {
+            assert_eq!(mapped.unwrap(), "success");
         }
     }
 }
 
 #[test]
 fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
-    type Combined = (fmt::Error, ConfigError, DatabaseError);
+    type Combined = (ConfigError, DatabaseError);
     let inputs: [ErrorUnion; 2] = [
         ErrorUnion::new(io::Error::other("first path")),
         ErrorUnion::new(io::Error::other("second path")),
@@ -84,14 +75,10 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
         let root = core::any::Any::type_id(error.inner());
         let error: ErrorUnion<Combined> = match index {
             0 => error
-                .classify::<(fmt::Error, ConfigError), _, _>(|inner| {
-                    ConfigError(inner.into_boxed())
-                })
+                .map_inner(|inner| ConfigError(inner.into_boxed()))
                 .widen(),
             1 => error
-                .classify::<(DatabaseError, fmt::Error), _, _>(|inner| {
-                    DatabaseError(inner.into_boxed())
-                })
+                .map_inner(|inner| DatabaseError(inner.into_boxed()))
                 .widen(),
             _ => unreachable!(),
         };
@@ -136,11 +123,11 @@ fn identical_io_errors_recover_separately_after_classification_and_merging() {
         let error: ErrorUnion = ErrorUnion::new(io::Error::from(io::ErrorKind::PermissionDenied));
         let classified: ErrorUnion<Errors> = if configuration {
             error
-                .classify::<(ConfigError,), _, _>(|inner| ConfigError(inner.into_boxed()))
+                .map_inner(|inner| ConfigError(inner.into_boxed()))
                 .widen()
         } else {
             error
-                .classify::<(DatabaseError,), _, _>(|inner| DatabaseError(inner.into_boxed()))
+                .map_inner(|inner| DatabaseError(inner.into_boxed()))
                 .widen()
         };
         let result: eros::Result<&str, Errors> = Err(classified);
@@ -186,15 +173,16 @@ fn identical_io_errors_recover_separately_after_classification_and_merging() {
 #[test]
 fn result_recovery_handles_only_the_explicit_type() {
     type Errors = (fmt::Error, ConfigError);
-    let inputs: [eros::Result<String>; 3] = [
+    let inputs: [eros::Result<String, Errors>; 3] = [
         Ok(String::from("success")),
         Err(ErrorUnion::new(fmt::Error)),
-        Err(ErrorUnion::new(io::Error::other("unhandled"))),
+        Err(ErrorUnion::new(ConfigError(Box::new(io::Error::other(
+            "unhandled",
+        ))))),
     ];
     for (index, result) in inputs.into_iter().enumerate() {
         let success = result.as_ref().ok().map(|value| value.as_ptr());
-        let mixed: eros::Result<String, Errors> =
-            result.classify(|inner| ConfigError(inner.into_boxed()));
+        let mixed = result;
         let mut calls = 0;
         let remainder: eros::Result<String, (ConfigError,)> =
             mixed.recover::<fmt::Error, _>(|_| {
@@ -340,7 +328,7 @@ fn erased_roots_support_borrows_mutation_extraction_and_drop() {
 }
 
 #[test]
-fn source_chains_and_subsequent_classification_still_work() {
+fn source_chains_and_repeated_mapping_still_work() {
     #[derive(Debug)]
     struct SourceError(MsgError);
     impl fmt::Display for SourceError {
@@ -355,20 +343,22 @@ fn source_chains_and_subsequent_classification_still_work() {
     }
     let error = erased(SourceError(MsgError::from("source")));
     assert_eq!(error.source().unwrap().to_string(), "source");
-    let error: ErrorUnion<(SourceError, ConfigError)> =
-        error.classify(|inner| ConfigError(inner.into_boxed()));
-    assert!(error.is_inner::<SourceError>());
-    let error = error.narrow::<(SourceError,), _>().unwrap();
-    assert_eq!(error.into_single().to_string(), "root");
-
-    let error: ErrorUnion = ErrorUnion::new(SourceError(MsgError::from("source")));
-    let error =
-        error.classify::<(MsgError, ConfigError), _, _>(|inner| ConfigError(inner.into_boxed()));
+    let error = error.map_inner(|inner| ConfigError(inner.into_boxed()));
     assert!(error.is_inner::<ConfigError>());
+    let source = error.as_single().0.as_ref();
+    assert!((source as &dyn core::any::Any).is::<SourceError>());
+    assert!(source.source().unwrap().is::<MsgError>());
+    let error = error.map_inner(|inner| DatabaseError(inner.into_boxed()));
+    assert!(error.is_inner::<DatabaseError>());
+    assert!((error.as_single().0.as_ref() as &dyn core::any::Any).is::<ConfigError>());
+
     let context: Box<dyn SendSyncError> = Box::new(fmt::Error);
     let error: ErrorUnion = ErrorUnion::new(MsgError::from("root"));
     let error = error.context(context);
-    let error =
-        error.classify::<(fmt::Error, ConfigError), _, _>(|inner| ConfigError(inner.into_boxed()));
+    let error = error.map_inner(|inner| {
+        assert!(inner.is::<MsgError>());
+        assert!(!inner.is::<fmt::Error>());
+        ConfigError(inner.into_boxed())
+    });
     assert!(error.is_inner::<ConfigError>());
 }

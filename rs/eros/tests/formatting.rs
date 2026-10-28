@@ -257,8 +257,8 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     let mut expected_diagnostic = error.to_debug_json();
 
     let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
-        assert!((old.as_ref() as &dyn core::any::Any).is::<NativeError>());
-        StartupError(old)
+        assert!(old.is::<NativeError>());
+        StartupError(old.into())
     });
     // The new root keeps the old root as a cause. All saved metadata stays in
     // its original place, including the exact captured frames and locations.
@@ -353,7 +353,7 @@ fn anyhow_owned_and_shared_adapters_preserve_source_order_after_new_root() {
         }
         assert_eq!(format!("{error:#?}"), expected_report);
 
-        let error = error.map_inner(StartupError);
+        let error = error.map_inner(|inner| StartupError(inner.into()));
         assert_eq!(
             error.to_string(),
             "startup failed\n    caused by:\n        - initialize application\n        - load configuration\n        - cannot open configuration\n        - permission denied"

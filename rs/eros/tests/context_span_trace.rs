@@ -178,7 +178,7 @@ fn reshaping_mapping_recovery_and_adapters_preserve_context_traces() {
             let error = error
                 .map_single(|_| fmt::Error)
                 .map_inner(|_| MsgError::from("replacement"));
-            let error: ErrorUnion<(fmt::Error,)> = error.classify(|_| fmt::Error);
+            let error: ErrorUnion<(fmt::Error,)> = error.map_inner(|_| fmt::Error);
             let error = error.erase();
             assert_saved(&error);
             let error = error.narrow::<(fmt::Error,), _>().unwrap();

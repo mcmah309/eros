@@ -33,6 +33,13 @@ mod tests {
     #[test]
     fn core_only_library_callbacks_work_after_enabling_alloc() {
         library::run_checks();
+        assert_eq!(
+            library::classify_error(library::code_error(41)).into_single(),
+            DomainError(42)
+        );
+        let failure = library::classify_result(Err(library::code_error(41)));
+        assert_eq!(failure.unwrap_err().into_single(), DomainError(42));
+        assert_eq!(library::classify_result(Ok(7)).unwrap(), 7);
         // The dependency's signatures are checked explicitly in this consumer.
         let _: fn(InnerError) -> DomainError = library::category;
         let error: ErrorUnion<library::Errors> = super::classify(7);
@@ -52,7 +59,7 @@ mod tests {
         let trace = error.span_trace().to_string();
 
         let input: eros::Result<u8, library::Errors> = Err(error);
-        let output: eros::Result<u8, (AppError, fmt::Error)> = input.classify(|mut inner| {
+        let output: eros::Result<u8, (fmt::Error, AppError)> = input.collapse(|mut inner| {
             assert!(inner.is::<DomainError>());
             assert!(!inner.is::<Box<DomainError>>());
             inner.downcast_mut::<DomainError>().unwrap().0 += 1;
@@ -119,7 +126,7 @@ mod tests {
     fn owned_downcasts_keep_original_type_value_and_ownership() {
         let drops = Arc::new(AtomicUsize::new(0));
         let error = large(&drops);
-        let error: ErrorUnion<(DomainError,)> = error.classify(|inner| {
+        let error: ErrorUnion<(DomainError,)> = error.map_inner(|inner| {
             assert!(inner.is::<LargeError>());
             let mut inner = inner.downcast::<Code>().unwrap_err();
             inner.downcast_mut::<LargeError>().unwrap().bytes[0] = 93;
@@ -149,10 +156,10 @@ mod tests {
     #[test]
     fn opaque_owners_survive_nested_classification_and_source_wrapping() {
         let drops = Arc::new(AtomicUsize::new(0));
-        let error: ErrorUnion<(Retained,)> = large(&drops).classify(Retained);
+        let error: ErrorUnion<(Retained,)> = large(&drops).map_inner(Retained);
         assert_eq!(drops.load(Ordering::SeqCst), 0);
         assert!(error.source().unwrap().is::<LargeError>());
-        let error: ErrorUnion<(AppError,)> = error.classify(|inner| {
+        let error: ErrorUnion<(AppError,)> = error.map_inner(|inner| {
             assert!(
                 inner
                     .downcast_ref::<Retained>()
@@ -177,7 +184,7 @@ mod tests {
         let drops = Arc::new(AtomicUsize::new(0));
         let error = large(&drops);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            error.classify::<(DomainError,), _, _>(|inner| {
+            error.map_inner(|inner| -> DomainError {
                 let inner = inner.downcast::<Code>().unwrap_err();
                 assert!(inner.is::<LargeError>());
                 panic!("classifier failed");

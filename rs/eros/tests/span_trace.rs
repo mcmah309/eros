@@ -277,7 +277,7 @@ fn reshaping_mapping_classification_and_adapters_preserve_the_original_trace() {
             assert_eq!(error.span_trace().to_string(), original);
             let error = error.map_inner(|_| MsgError::from("replacement"));
             assert_eq!(error.span_trace().to_string(), original);
-            let error: ErrorUnion<(fmt::Error,)> = error.classify(|_| fmt::Error);
+            let error: ErrorUnion<(fmt::Error,)> = error.map_inner(|_| fmt::Error);
             assert_eq!(error.span_trace().to_string(), original);
             let error = error.erase().narrow::<(fmt::Error,), _>().unwrap();
             let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(error.adapter());
@@ -467,4 +467,30 @@ fn anyhow_imports_capture_the_conversion_span() {
     for error in errors {
         assert_eq!(names(error.span_trace()), ["import_anyhow"]);
     }
+}
+
+#[test]
+fn into_inner_releases_the_captured_span_before_the_owner_is_dropped() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct Closed(Arc<AtomicUsize>);
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Closed {
+        fn on_close(&self, _: tracing::span::Id, _: tracing_subscriber::layer::Context<'_, S>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    let closed = Arc::new(AtomicUsize::new(0));
+    let subscriber = tracing_subscriber::registry()
+        .with(ErrorLayer::new(eros::SpanTraceFields))
+        .with(Closed(closed.clone()));
+    tracing::subscriber::with_default(subscriber, || {
+        let span = tracing::info_span!("extracted_root");
+        let error: ErrorUnion = span.in_scope(|| ErrorUnion::new(fmt::Error));
+        drop(span);
+        assert_eq!(closed.load(Ordering::SeqCst), 0);
+        let inner: eros::InnerError = error.into_inner();
+        assert_eq!(closed.load(Ordering::SeqCst), 1);
+        assert!(inner.is::<fmt::Error>());
+        drop(inner);
+        assert_eq!(closed.load(Ordering::SeqCst), 1);
+    });
 }

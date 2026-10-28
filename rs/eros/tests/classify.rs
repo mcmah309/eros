@@ -2,7 +2,7 @@
 mod classification;
 
 #[test]
-fn owned_classification_preserves_known_types_and_replaces_unknown_types() {
+fn owned_mapping_transforms_all_errors_and_preserves_diagnostics() {
     classification::run_checks();
 }
 
@@ -29,7 +29,7 @@ fn panicking_classifier_drops_the_original_once() {
     }
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Root);
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(fmt::Error,), _, _>(|_| -> fmt::Error { panic!("classification failed") })
+        error.map_inner(|_| -> fmt::Error { panic!("classification failed") })
     }));
     assert!(outcome.is_err());
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
@@ -60,7 +60,7 @@ fn panicking_boxing_callback_drops_original_and_context_once() {
     let error = error.context(Box::new(Tracked(contexts.clone())) as Box<dyn eros::SendSyncError>);
 
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(core::fmt::Error,), _, _>(|inner| -> core::fmt::Error {
+        error.map_inner(|inner| -> core::fmt::Error {
             let boxed = inner.into_boxed();
             assert!((boxed.as_ref() as &dyn std::any::Any).is::<Tracked>());
             panic!("boxed classification failed");
@@ -115,7 +115,7 @@ fn panicking_original_destructor_drops_replacement_and_saved_context_once() {
     #[cfg(feature = "context")]
     let error = error.context(Box::new(Tracked(&CONTEXTS)) as Box<dyn eros::SendSyncError>);
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(Tracked,), _, _>(|original| {
+        error.map_inner(|original| {
             let replacement = Tracked(&REPLACEMENTS);
             drop(original);
             replacement
@@ -153,7 +153,7 @@ fn an_owner_can_escape_the_callback_and_transfer_to_another_thread() {
     assert_traits::<eros::InnerError>();
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Owner(&FIRST));
     let mut saved = None;
-    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|inner| {
+    let classified: eros::ErrorUnion<(fmt::Error,)> = error.map_inner(|inner| {
         saved = Some(inner);
         fmt::Error
     });
@@ -195,7 +195,7 @@ fn aligned_zsts_can_be_inspected_and_extracted_from_an_owner() {
         }
     }
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Aligned);
-    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|mut inner| {
+    let classified: eros::ErrorUnion<(fmt::Error,)> = error.map_inner(|mut inner| {
         assert_eq!(
             core::ptr::from_ref(inner.downcast_ref::<Aligned>().unwrap()).addr() % 256,
             0

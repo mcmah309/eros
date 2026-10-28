@@ -78,11 +78,9 @@ fn boxed_mapping_preserves_payload_allocation() {
         .as_ptr();
 
     let error = error.map_inner(|old| {
-        let root = (old.as_ref() as &dyn core::any::Any)
-            .downcast_ref::<Tracked>()
-            .unwrap();
+        let root = old.downcast_ref::<Tracked>().unwrap();
         assert_eq!(root.payload.as_ptr(), original);
-        old
+        old.into_boxed()
     });
     let boxed = error.into_single();
     assert_eq!(

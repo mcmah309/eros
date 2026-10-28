@@ -106,7 +106,11 @@ fn _send_sync_error_assert() {
     is_error(&ErrorUnionAdapter::from(error_union));
 }
 
+// SAFETY: ErrorUnionInner owns only Send payloads and diagnostics. The invariant
+// PhantomData carries no value, and T is additionally required to be Send.
 unsafe impl<T> Send for ErrorUnion<T> where T: TypeSet + Send {}
+// SAFETY: ErrorUnionInner permits shared access only to Sync payloads and
+// diagnostics. PhantomData carries no value, and T is also required to be Sync.
 unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
 
 //************************************************************************//
@@ -510,22 +514,23 @@ where
         self.inner.error_mut()
     }
 
-    /// Extracts the boxed inner error, discarding saved diagnostics.
+    /// Extracts the owned [`crate::InnerError`], discarding saved diagnostics.
     ///
-    /// Reuses an already boxed root when root diagnostics are disabled.
-    /// Inline nonzero roots and roots stored with diagnostics move into a new
-    /// box. Boxing a zero-sized concrete error needs no new allocation. Use
-    /// [`Self::into_single`] for allocation-free extraction from a singleton.
+    /// Preserves the original concrete error and its storage without allocating.
+    /// Available with every feature configuration. The owner supports inspection,
+    /// mutation, and owned downcasting. With `alloc`, call `.into_boxed()` on the
+    /// returned owner when a boxed trait object is needed.
     ///
-    /// Requires the `alloc` feature.
-    #[cfg(feature = "alloc")]
-    pub fn into_inner(self) -> Box<dyn SendSyncError> {
-        let error;
-        {
-            let parts = self.inner.into_boxed_parts();
-            error = parts.error;
-        }
-        error
+    /// ```
+    /// use eros::{ErrorUnion, InnerError};
+    /// use core::fmt;
+    /// let error: ErrorUnion = ErrorUnion::new(fmt::Error);
+    /// let inner: InnerError = error.into_inner();
+    /// assert!(inner.is::<fmt::Error>());
+    /// assert_eq!(inner.downcast::<fmt::Error>().unwrap(), fmt::Error);
+    /// ```
+    pub fn into_inner(self) -> crate::InnerError {
+        self.inner.into_owner()
     }
 
     /// Adds additional context. This becomes a no-op if the `context` feature is disabled.
@@ -626,6 +631,8 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
     /// instead of consuming the `ErrorUnion`.
     #[inline]
     pub fn into_single(self) -> A {
+        // SAFETY: the invariant singleton set guarantees the exact type A,
+        // and consuming self transfers sole ownership to the extraction.
         unsafe { self.inner.downcast_error_unchecked() }
     }
 
@@ -636,8 +643,8 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
     /// size and alignment. Other boxed results allocate replacement storage.
     /// The storage and layout choices are known at compile time.
     ///
-    /// With the `alloc` feature, `map_inner` maps the boxed inner error for
-    /// unions with any number of variants. Without `alloc`, `U` must fit in one
+    /// [`Self::map_inner`] passes an owned [`crate::InnerError`] for unions
+    /// with any number of variants. Without `alloc`, `U` must fit in one
     /// word in size and alignment, or be zero-sized, as with [`ErrorUnion::new`].
     pub fn map_single<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
@@ -680,39 +687,55 @@ where
     /// ```
     fn adapter(self) -> Result<S, ErrorUnionAdapter<E>>;
 
-    /// Classifies implementation errors using an owned [`crate::InnerError`].
+    /// Maps every inner error, preserving saved diagnostics.
     ///
-    /// The callback type is independent of features. Successful values and concrete
-    /// types already represented in `Other` bypass the callback. Other errors
-    /// transfer to the callback to inspect, extract, drop, or (with `alloc`) convert
-    /// using `InnerError::into_boxed`. All saved diagnostics stay with the replacement.
-    /// Discarding the original error requires an explicit callback such as
-    /// `|_| MyError`; error values cannot be passed directly.
-    /// See [`ErrorUnion::classify`] for details.
+    /// The callback always runs for `Err`, even if the original already has the
+    /// replacement type. Successful values pass through without calling it.
+    /// Receives the owned [`crate::InnerError`], just like [`ErrorUnion::map_inner`],
+    /// and returns a union with the replacement as its single error type.
+    /// Available with every feature configuration. For selective transformations,
+    /// use [`Self::narrow`] to select errors before mapping them.
     ///
     /// ```
-    /// # #[cfg(feature = "alloc")]
-    /// # {
-    /// use eros::{ReshapeUnion, SendSyncError};
-    ///
-    /// #[derive(Debug, thiserror::Error)]
-    /// #[error("configuration failed: {0}")]
-    /// struct ConfigError(#[source] Box<dyn SendSyncError>);
-    ///
-    /// let result: eros::Result<u16> = Err(eros::error!("missing port"));
-    /// let result: eros::Result<u16, (ConfigError,)> =
-    ///     result.classify(|inner| ConfigError(inner.into()));
-    /// assert!(result.unwrap_err().is_inner::<ConfigError>());
-    /// # }
+    /// use eros::{ErrorUnion, ReshapeUnion};
+    /// use core::fmt;
+    /// let result: eros::Result<u16> = Err(ErrorUnion::new(fmt::Error));
+    /// let result: eros::Result<u16, (fmt::Error,)> = result.map_inner(|inner| {
+    ///     assert!(inner.is::<fmt::Error>());
+    ///     fmt::Error
+    /// });
+    /// assert!(result.unwrap_err().is_inner::<fmt::Error>());
     /// ```
-    fn classify<Other, ClassifiedError, Index>(
+    fn map_inner<T>(self, f: impl FnOnce(crate::InnerError) -> T) -> crate::Result<S, (T,)>
+    where
+        T: SendSyncError;
+
+    /// Maps every inner error and widens to the destination error set.
+    ///
+    /// Equivalent to `self.map_inner(f).widen()`. The destination is inferred
+    /// from the surrounding type and must contain the replacement type.
+    /// Successful values pass through unchanged without calling `f`. Every
+    /// error reaches the callback, including an existing replacement error.
+    /// Saved diagnostics are preserved. See [`ErrorUnion::collapse`].
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, ReshapeUnion};
+    /// use core::{fmt, num::ParseIntError};
+    /// fn load() -> eros::Result<u16, (ParseIntError, fmt::Error)> {
+    ///     let input: eros::Result<u16> = Err(ErrorUnion::new(fmt::Error));
+    ///     let port = input.collapse(|_| fmt::Error)?;
+    ///     Ok(port)
+    /// }
+    /// assert!(load().unwrap_err().is_inner::<fmt::Error>());
+    /// ```
+    fn collapse<Other, T, Index>(
         self,
-        classifier: impl FnOnce(crate::InnerError) -> ClassifiedError,
+        f: impl FnOnce(crate::InnerError) -> T,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
-        ClassifiedError: SendSyncError,
-        Other::Variants: Contains<ClassifiedError, Index>;
+        T: SendSyncError,
+        Other::Variants: SupersetOf<<(T,) as TypeSet>::Variants, Index>;
 
     /// Expands or reorders the result's error set.
     ///
@@ -894,16 +917,23 @@ where
         self.map_err(ErrorUnion::adapter)
     }
 
-    fn classify<Other, ClassifiedError, Index>(
+    fn map_inner<T>(self, f: impl FnOnce(crate::InnerError) -> T) -> crate::Result<S, (T,)>
+    where
+        T: SendSyncError,
+    {
+        self.map_err(|error| error.map_inner(f))
+    }
+
+    fn collapse<Other, T, Index>(
         self,
-        classifier: impl FnOnce(crate::InnerError) -> ClassifiedError,
+        f: impl FnOnce(crate::InnerError) -> T,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
-        ClassifiedError: SendSyncError,
-        Other::Variants: Contains<ClassifiedError, Index>,
+        T: SendSyncError,
+        Other::Variants: SupersetOf<<(T,) as TypeSet>::Variants, Index>,
     {
-        self.map_err(|error| error.classify::<Other, ClassifiedError, Index>(classifier))
+        self.map_inner(f).widen()
     }
 
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
@@ -1210,7 +1240,7 @@ impl From<ErrorUnion> for anyhow::Error {
     fn from(mut value: ErrorUnion) -> Self {
         #[cfg(feature = "context")]
         let context = core::mem::take(&mut value.inner.diagnostics_mut().context);
-        let inner_error = value.into_inner();
+        let inner_error = value.into_inner().into_boxed();
         let mut error = anyhow::Error::new(inner_error);
         #[cfg(feature = "context")]
         for c in context {
@@ -1271,6 +1301,7 @@ mod tests {
     fn downcast_error_unchecked_correct_type_recovers_value() {
         let inner = ErrorUnionInner::new(FooError("hello".into()));
         assert!(inner.is_error_type::<FooError>());
+        // SAFETY: construction and the preceding check establish exactly FooError.
         let recovered: FooError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered, FooError("hello".into()));
     }
@@ -1289,6 +1320,7 @@ mod tests {
         impl std::error::Error for VecError {}
 
         let inner = ErrorUnionInner::new(VecError(payload.clone()));
+        // SAFETY: inner was constructed with exactly VecError.
         let recovered: VecError = unsafe { inner.downcast_error_unchecked() };
         assert_eq!(recovered.0, payload);
     }
@@ -1316,6 +1348,8 @@ mod tests {
                 .push(ContextFrame::new("step two".into()));
         }
 
+        // SAFETY: the payload was constructed as FooError; adding context above
+        // changes only diagnostics, so its concrete type remains unchanged.
         let parts: crate::storage::ErrorParts<FooError> =
             unsafe { union.inner.downcast_error_unchecked_with_parts() };
 
@@ -1328,6 +1362,7 @@ mod tests {
     #[test]
     fn downcast_error_unchecked_with_parts_correct_error_value() {
         let inner = ErrorUnionInner::new(BarError(42));
+        // SAFETY: inner was constructed with exactly BarError.
         let parts: crate::storage::ErrorParts<BarError> =
             unsafe { inner.downcast_error_unchecked_with_parts() };
         assert_eq!(parts.error, BarError(42));
@@ -1406,27 +1441,27 @@ mod tests {
     }
 
     #[test]
-    fn into_inner_dyn_error_returns_concrete_type_not_wrapper() {
+    fn into_inner_owner_returns_concrete_type_not_wrapper() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("concrete".into()));
         let dyn_err = union.into_inner();
 
         assert!(
-            (&*dyn_err as &dyn Any).is::<FooError>(),
+            dyn_err.is::<FooError>(),
             "expected FooError, got a wrapper or wrong type"
         );
     }
 
     #[test]
-    fn into_inner_dyn_error_value_is_preserved() {
+    fn into_inner_owner_value_is_preserved() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("preserved".into()));
         let dyn_err = union.into_inner();
 
-        let foo = (&*dyn_err as &dyn Any).downcast_ref::<FooError>().unwrap();
+        let foo = dyn_err.downcast_ref::<FooError>().unwrap();
         assert_eq!(foo, &FooError("preserved".into()));
     }
 
     #[test]
-    fn into_inner_dyn_error_display_is_concrete_type() {
+    fn into_inner_owner_display_is_concrete_type() {
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("display".into()));
         let dyn_err = union.into_inner();
 
@@ -1434,7 +1469,7 @@ mod tests {
     }
 
     #[test]
-    fn into_inner_dyn_error_is_send_and_sync() {
+    fn into_inner_owner_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>(_: T) {}
         let union: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("traits".into()));
         assert_send_sync(union.into_inner());
@@ -1448,35 +1483,35 @@ mod tests {
         let inner_dyn = union_a.into_inner();
         let wrapper_dyn = Box::new(ErrorUnionAdapter::from(union_b));
 
-        assert!((&*inner_dyn as &dyn Any).is::<FooError>());
+        assert!(inner_dyn.is::<FooError>());
         assert!(!(&*wrapper_dyn as &dyn Any).is::<FooError>());
         assert!((&*wrapper_dyn as &dyn Any).is::<ErrorUnionAdapter<(FooError,)>>());
     }
 
     #[test]
-    fn into_inner_dyn_error_multi_variant_foo() {
+    fn into_inner_owner_multi_variant_foo() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(FooError("multi".into()));
         let dyn_err = union.into_inner();
 
-        assert!((&*dyn_err as &dyn Any).is::<FooError>());
-        assert!(!(&*dyn_err as &dyn Any).is::<BarError>());
-        let foo = (&*dyn_err as &dyn Any).downcast_ref::<FooError>().unwrap();
+        assert!(dyn_err.is::<FooError>());
+        assert!(!dyn_err.is::<BarError>());
+        let foo = dyn_err.downcast_ref::<FooError>().unwrap();
         assert_eq!(foo, &FooError("multi".into()));
     }
 
     #[test]
-    fn into_inner_dyn_error_multi_variant_bar() {
+    fn into_inner_owner_multi_variant_bar() {
         let union: ErrorUnion<(FooError, BarError)> = ErrorUnion::new(BarError(77));
         let dyn_err = union.into_inner();
 
-        assert!((&*dyn_err as &dyn Any).is::<BarError>());
-        assert!(!(&*dyn_err as &dyn Any).is::<FooError>());
-        let bar = (&*dyn_err as &dyn Any).downcast_ref::<BarError>().unwrap();
+        assert!(dyn_err.is::<BarError>());
+        assert!(!dyn_err.is::<FooError>());
+        let bar = dyn_err.downcast_ref::<BarError>().unwrap();
         assert_eq!(bar, &BarError(77));
     }
 
     #[test]
-    fn into_inner_dyn_error_does_not_leak_heap_allocation() {
+    fn into_inner_owner_does_not_leak_heap_allocation() {
         // Uses a Vec payload so Miri / address-sanitizer can catch leaks or double-drops.
         #[derive(Debug, PartialEq)]
         struct VecError(Vec<u8>);
@@ -1491,15 +1526,15 @@ mod tests {
         let union: ErrorUnion<(VecError,)> = ErrorUnion::new(VecError(payload.clone()));
         let dyn_err = union.into_inner();
 
-        let recovered = (&*dyn_err as &dyn Any).downcast_ref::<VecError>().unwrap();
+        let recovered = dyn_err.downcast_ref::<VecError>().unwrap();
         assert_eq!(recovered.0, payload);
         // `dyn_err` drops here — Miri will catch any double-free or leak.
     }
 
     #[test]
-    fn into_inner_dyn_error_is_not_an_adapter() {
+    fn into_inner_owner_is_not_an_adapter() {
         let union_a: ErrorUnion<(FooError,)> = ErrorUnion::new(FooError("bare".into()));
-        let bare_dyn: Box<dyn core::error::Error + Send + Sync> = union_a.into_inner();
+        let bare_dyn: Box<dyn core::error::Error + Send + Sync> = union_a.into_inner().into_boxed();
 
         let result = bare_dyn.downcast::<ErrorUnionAdapter<(FooError,)>>();
         assert!(

@@ -237,14 +237,15 @@ To convert the whole result directly, use `.erase()` with `use eros::Erase;`.
 ### Handling A Type Along An Otherwise Untyped Path
 
 In a mostly untyped codebase, keep returning `eros::Result<T>` until a path
-needs to explicitly track an error type. Use `classify` to
-keep the types callers handle explicitly and classify implementation errors
-as `PortConfigError`. Downstream signatures describe the categories callers
-care about without exposing every error type used inside the implementation.
+needs to explicitly track an error type. Use `collapse` on the result to wrap
+loader errors as `PortConfigError`. Downstream signatures describe the
+categories callers care about without exposing implementation error types.
+The callback receives an owned `InnerError`, including when the original error
+already has the replacement type. Successful values pass through unchanged.
 
-Here the service uses port 8080 when no port is configured or port 0 would let
-the OS choose one. Malformed numbers still fail. The untyped loader can produce
-`MissingPort`, while the typed path introduces `DynamicPortNotAllowed`:
+Here empty or malformed ports fail as `PortConfigError`. The typed path adds
+`DynamicPortNotAllowed` for port 0, and the caller handles that error by using
+port 8080:
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -271,16 +272,16 @@ fn load_port(contents: &str) -> eros::Result<u16> {
 }
 
 fn checked_port(contents: &str)
-    -> eros::Result<u16, (MissingPort, DynamicPortNotAllowed, PortConfigError)>
+    -> eros::Result<u16, (DynamicPortNotAllowed, PortConfigError)>
 {
-    let port = load_port(contents).classify(|inner| PortConfigError(inner.into()))?;
+    let port = load_port(contents).collapse(|inner| PortConfigError(inner.into()))?;
     eros::ensure!(port != 0, DynamicPortNotAllowed);
     Ok(port)
 }
 
 fn port_or_default(contents: &str) -> eros::Result<u16> {
     let remaining: eros::Result<u16, (PortConfigError,)> =
-        checked_port(contents).recover::<(MissingPort, DynamicPortNotAllowed), _>(|error| {
+        checked_port(contents).recover::<DynamicPortNotAllowed, _>(|error| {
             eprintln!("No fixed port configured: {error:?}; using 8080");
             8080
         });
@@ -288,7 +289,7 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 }
 
 # assert_eq!(port_or_default("9000").unwrap(), 9000);
-# assert_eq!(port_or_default("").unwrap(), 8080);
+# assert!(port_or_default("").unwrap_err().is_inner::<PortConfigError>());
 # assert_eq!(port_or_default("0").unwrap(), 8080);
 # assert!(port_or_default("invalid").unwrap_err().is_inner::<PortConfigError>());
 # }
@@ -296,17 +297,15 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 # fn main() {}
 ```
 
-`classify` checks only the concrete inner error, not its sources or contexts.
-Matching types, including an existing `PortConfigError`, retain their storage and
-pass through without invoking the callback. Other roots transfer to the callback
-as an owned `InnerError`. The callback can inspect, mutate, extract, drop, or
-retain that owner without boxing it. A tuple struct constructor taking
-`InnerError` can be passed directly. Saved diagnostics remain with the
-replacement, and no new diagnostics are captured.
+`collapse(f)` is shorthand for `map_inner(f).widen()`: it transforms every error
+and infers the destination error set from the surrounding type. The destination
+must contain the replacement type; it does not control whether the callback
+runs. Use `map_inner` alone when a singleton error set is sufficient. The original
+error becomes a source only if the callback retains it, as this wrapper does.
+Saved diagnostics remain with the replacement; no new diagnostics are captured.
 
-To discard the original error, use an explicit callback such as
-`.classify(|_| MyError)`. Replacement error values cannot be
-passed directly to `classify`.
+For a selective transformation, use `narrow` to separate the desired types,
+map that branch with `map_inner`, and use `widen` to combine the possible errors.
 
 `InnerError` and its downcasting methods are available with every feature
 configuration. Enabling `alloc` adds `InnerError::into_boxed()` and conversion
@@ -316,12 +315,12 @@ allocation when root diagnostics are disabled; inline nonzero roots and roots
 sharing an allocation with diagnostics move into a new box when that method
 is called. The replacement follows the compile-time storage choice.
 
-Classification also keeps errors from different domains distinct. An
+Mapping into domain errors also keeps failures from different operations distinct. An
 `io::Error` while reading configuration and an `io::Error` while connecting to
 a database have the same concrete type, but callers may need to handle them
-differently. Classify them at their respective boundaries as `PortConfigError`
+differently. Wrap them at their respective boundaries as `PortConfigError`
 and `DatabaseError` before combining the paths with `widen`. The combined set
-can be `(MissingPort, DynamicPortNotAllowed, PortConfigError, DatabaseError)`:
+can be `(DynamicPortNotAllowed, PortConfigError, DatabaseError)`:
 recovering a configuration failure then leaves database failures untouched.
 The original errors can remain inside the wrappers as sources for diagnostics.
 Paths intentionally using the same category can share one variant. Use
@@ -404,7 +403,7 @@ Root diagnostics are `backtrace`, `context`, `error_span_trace`, and `error_loca
 
 Inline nonzero payloads must fit both the size and alignment of `usize`. ZSTs support arbitrary alignment. Without `alloc`, oversized or over-aligned nonzero errors are rejected at compile time. The handle uses two words without root location and three with it.
 
-Widening, narrowing, and erasing reuse storage. Typed extraction, such as `into_single`, adds no allocation. `into_inner` reuses an existing `Box<T>` when root diagnostics are disabled; inline nonzero errors and errors stored with diagnostics move into a new box. Boxing a ZST requires no allocation. `map_single` keeps inline results allocation-free and reuses boxed storage when complete sizes and alignments match.
+Widening, narrowing, and erasing reuse storage. Typed extraction, such as `into_single`, adds no allocation. `into_inner` returns an owned `InnerError` without allocating and discards saved diagnostics. Converting that owner with `into_boxed()` reuses an existing `Box<T>` when root diagnostics are disabled; inline nonzero errors and errors stored with diagnostics move into a new box. Boxing a ZST requires no allocation. `map_single` keeps inline results allocation-free and reuses boxed storage when complete sizes and alignments match.
 
 See the [Use In Libraries](#use-in-libraries) section as well.
 
@@ -711,7 +710,7 @@ impl std::error::Error for CrateError {
 
 impl<T: TypeSet> From<ErrorUnion<T>> for CrateError {
     fn from(e: ErrorUnion<T>) -> Self {
-        CrateError(e.into_inner())
+        CrateError(e.into_inner().into_boxed())
     }
 }
 
@@ -729,7 +728,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only see a single concrete error type. Converting at the boundary with `into_inner()` discards saved diagnostics. It reuses the root allocation when diagnostics are disabled and the root was already boxed; other roots move into a new box. The conversion cost does not depend on the number of possible error variants.
+This way the library can use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only see a single concrete error type. Converting at the boundary with `into_inner()` discards saved diagnostics. It returns an owned `InnerError` without allocating or changing the concrete root type. Call `.into_boxed()` on that owner if the public wrapper stores a boxed source, as above. The conversion cost does not depend on the number of possible error variants.
 
 For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
@@ -1025,7 +1024,7 @@ Conversions accept subsets and reordered tuples. Borrowing preserves diagnostics
 
 ### Adding Source Chains
 
-Use `map_inner` to change the main error while keeping the original failure as its source. The closure receives the boxed inner error; return an error that stores it and exposes it through `Error::source()`:
+Use `map_inner` to change the main error while keeping the original failure as its source. The closure receives an owned `InnerError`; convert it into a box to store it and expose it through `Error::source()`:
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -1051,7 +1050,7 @@ impl Error for UpdateError {
 }
 
 let error = eros::error!("TLS certificate has expired")
-    .map_inner(|source| UpdateError { source });
+    .map_inner(|source| UpdateError { source: source.into() });
 
 println!("{error}");
 # }
@@ -1545,12 +1544,13 @@ fn operation(code: u8) -> eros::Result<()> {
 let _ = eros::error!("device status {}", 7); // Explicit arguments need formatting.
 ```
 
-### Classification without allocation
+### Mapping without allocation
 
-`classify` works on both unions and results. The callback owns the original
-error through `InnerError` and returns a replacement fitting the inline payload word. Existing
-members of the destination tuple pass through without calling the callback.
-The original capture location is preserved.
+`map_inner` works on both unions and results without allocation. Its callback
+owns the original error through `InnerError` and returns a replacement fitting
+the inline payload word. Every error goes through the callback, including an
+existing instance of the replacement type. The original capture location is
+preserved.
 
 ```rust
 use eros::ReshapeUnion;
@@ -1559,7 +1559,7 @@ use core::fmt;
 // The owner can inspect the original concrete error to choose a domain error.
 let result: eros::Result<()> = Err(eros::error!("device unavailable"));
 let classified: eros::Result<(), (fmt::Error,)> =
-    result.classify(|_| fmt::Error);
+    result.map_inner(|_| fmt::Error);
 assert!(classified.unwrap_err().is_inner::<fmt::Error>());
 ```
 
