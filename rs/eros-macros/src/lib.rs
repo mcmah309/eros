@@ -205,7 +205,7 @@ pub fn format_error(input: TokenStream) -> TokenStream {
 
     // All braces were escaped pairs; unescape them in the static message.
     let literal = LitStr::new(&literal, message.span());
-    quote! { #crate_path::__private::static_message!(#literal) }.into()
+    quote! { #crate_path::MsgError::from_static_ref(&#literal) }.into()
 }
 
 /// Arguments parsed from `#[context("format string", arg1, arg2, ...)]`

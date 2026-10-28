@@ -2,84 +2,238 @@
 use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
+use core::{
+    any::Any,
+    cell::UnsafeCell,
+    mem::{ManuallyDrop, MaybeUninit},
+    ptr::NonNull,
+};
 
 #[cfg(feature = "context")]
 use crate::ContextFrame;
 use crate::SendSyncError;
 
-// Feature selection is global: diagnostics and their payload share one box.
-// Otherwise a word-sized payload can live directly in the two-word handle.
-#[cfg(all(
-    feature = "alloc",
-    any(
-        feature = "backtrace",
-        feature = "context",
-        feature = "error_span_trace",
-        feature = "error_location"
-    )
-))]
-mod boxed;
-#[cfg(all(
-    feature = "alloc",
-    any(
-        feature = "backtrace",
-        feature = "context",
-        feature = "error_span_trace",
-        feature = "error_location"
-    )
-))]
-use boxed::Storage;
-#[cfg(any(
-    not(feature = "alloc"),
-    not(any(
-        feature = "backtrace",
-        feature = "context",
-        feature = "error_span_trace",
-        feature = "error_location"
-    ))
-))]
-mod inline;
-#[cfg(any(
-    not(feature = "alloc"),
-    not(any(
-        feature = "backtrace",
-        feature = "context",
-        feature = "error_span_trace",
-        feature = "error_location"
-    ))
-))]
-use inline::Storage;
+#[inline]
+const fn fits_inline<T>() -> bool {
+    size_of::<T>() == 0
+        || (size_of::<T>() <= size_of::<usize>() && align_of::<T>() <= align_of::<usize>())
+}
+
+/// Owns an inline error or a thin pointer to a boxed concrete error. The word
+/// is never read as an integer: MaybeUninit preserves padding and provenance
+/// when the owner moves. UnsafeCell permits the stored T's interior mutability.
+struct StoredError {
+    data: UnsafeCell<MaybeUninit<usize>>,
+    ops: &'static ErrorOps,
+}
+
+struct ErrorOps {
+    pointer: unsafe fn(*mut MaybeUninit<usize>) -> *mut dyn SendSyncError,
+    drop: unsafe fn(*mut MaybeUninit<usize>),
+    #[cfg(feature = "alloc")]
+    into_box: unsafe fn(*mut MaybeUninit<usize>) -> Box<dyn SendSyncError>,
+    #[cfg(feature = "alloc")]
+    children: Option<ChildVisitor>,
+}
 
 #[cfg(feature = "alloc")]
 type ChildVisitor = for<'a> fn(&'a dyn SendSyncError, &mut dyn FnMut(crate::ErrorReport<'a>));
 
+struct OpsFor<T>(core::marker::PhantomData<T>);
+impl<T: SendSyncError> OpsFor<T> {
+    const OPS: ErrorOps = ErrorOps {
+        pointer: error_pointer::<T>,
+        drop: drop_error::<T>,
+        #[cfg(feature = "alloc")]
+        into_box: box_error::<T>,
+        #[cfg(feature = "alloc")]
+        children: None,
+    };
+}
+
 #[cfg(feature = "alloc")]
-fn visit_batch<'a, E: crate::TypeSet>(
-    root: &'a dyn SendSyncError,
-    visitor: &mut dyn FnMut(crate::ErrorReport<'a>),
-) {
-    let batch = (root as &dyn core::any::Any)
-        .downcast_ref::<crate::ErrorUnionVec<E>>()
-        .expect("child visitor must match the stored batch");
-    for child in batch {
-        visitor(child.report());
+impl<E: crate::TypeSet> OpsFor<crate::ErrorUnionVec<E>> {
+    const WITH_CHILDREN: ErrorOps = ErrorOps {
+        children: Some(|root, visitor| {
+            // This table is selected only when wrapping an eros::ErrorUnionVec<E>.
+            let batch = (root as &dyn Any)
+                .downcast_ref::<crate::ErrorUnionVec<E>>()
+                .expect("child visitor must match the stored batch");
+            for child in batch {
+                visitor(child.report());
+            }
+        }),
+        ..Self::OPS
+    };
+}
+
+/// # Safety
+/// The word must belong to a live StoredError constructed for exactly T.
+#[inline]
+unsafe fn concrete_pointer<T>(data: *mut MaybeUninit<usize>) -> *mut T {
+    if size_of::<T>() == 0 {
+        // ZSTs may be more aligned than our word. They have no payload bytes,
+        // so their logical owned value uses a freshly aligned dangling pointer.
+        NonNull::<T>::dangling().as_ptr()
+    } else if fits_inline::<T>() {
+        data.cast::<T>()
+    } else {
+        #[cfg(feature = "alloc")]
+        // SAFETY: construction stored the thin Box<T> pointer in this word.
+        unsafe {
+            data.cast::<*mut T>().read()
+        }
+        #[cfg(not(feature = "alloc"))]
+        unreachable!("a non-inline error cannot be constructed without alloc")
     }
 }
 
-pub(crate) struct ErrorUnionInner {
-    storage: Storage,
+/// # Safety
+/// The word must contain a live error of exactly T; access to the returned
+/// pointer must obey the borrow of the owner from which data was obtained.
+#[inline]
+unsafe fn error_pointer<T: SendSyncError>(data: *mut MaybeUninit<usize>) -> *mut dyn SendSyncError {
+    // The coercion supplies Rust's real trait-object metadata without relying
+    // on a vtable layout or storing a pointer into our movable inline word.
+    unsafe { concrete_pointer::<T>(data) }
 }
 
-// Root diagnostics share the allocation when available. Without an allocator,
-// the caller location needs one word alongside the payload and operations.
-const HANDLE_WORDS: usize = if cfg!(all(not(feature = "alloc"), feature = "error_location")) {
-    3
-} else {
-    2
-};
-const _: () = assert!(size_of::<ErrorUnionInner>() <= HANDLE_WORDS * size_of::<usize>());
+/// # Safety
+/// The caller must own the live stored T and never access it again afterwards.
+#[inline]
+unsafe fn drop_error<T: SendSyncError>(data: *mut MaybeUninit<usize>) {
+    let pointer = unsafe { concrete_pointer::<T>(data) };
+    if fits_inline::<T>() {
+        // SAFETY: the supplied value established validity, even for ZSTs.
+        unsafe { pointer.drop_in_place() };
+    } else {
+        #[cfg(feature = "alloc")]
+        // SAFETY: recover the original Box<T>, dropping T and freeing its heap.
+        unsafe {
+            drop(Box::from_raw(pointer));
+        }
+    }
+}
 
-pub(crate) struct ErrorDiagnostics {
+/// # Safety
+/// The caller must exclusively own the live T and suppress StoredError's drop.
+#[cfg(feature = "alloc")]
+#[inline]
+unsafe fn box_error<T: SendSyncError>(data: *mut MaybeUninit<usize>) -> Box<dyn SendSyncError> {
+    let pointer = unsafe { concrete_pointer::<T>(data) };
+    if fits_inline::<T>() {
+        // SAFETY: transfer the inline value into a new box. Box::new does not
+        // allocate for ZSTs, including those with nontrivial alignment.
+        Box::new(unsafe { pointer.read() })
+    } else {
+        // SAFETY: transfer the original allocation without moving its payload.
+        unsafe { Box::from_raw(pointer) }
+    }
+}
+
+impl StoredError {
+    #[inline]
+    fn new<T: SendSyncError>(value: T) -> Self {
+        #[cfg(not(feature = "alloc"))]
+        const {
+            assert!(
+                size_of::<T>() <= size_of::<usize>(),
+                "T must fit in one pointer-sized word when the alloc feature is disabled"
+            );
+            assert!(
+                size_of::<T>() == 0 || align_of::<T>() <= align_of::<usize>(),
+                "T's alignment must fit the inline word when the alloc feature is disabled"
+            );
+        }
+        let data = UnsafeCell::new(MaybeUninit::<usize>::uninit());
+        if size_of::<T>() == 0 {
+            // Transfer logical ownership. No bytes need to be written, and
+            // later operations obtain a pointer with T's alignment.
+            core::mem::forget(value);
+        } else if fits_inline::<T>() {
+            // SAFETY: T fits the word's size and alignment. The word is not
+            // initialized/read as usize, so T may have padding or references.
+            unsafe { data.get().cast::<T>().write(value) };
+        } else {
+            #[cfg(feature = "alloc")]
+            // SAFETY: a thin pointer fits our word. It is always accessed as a
+            // pointer, preserving its provenance through moves of this owner.
+            unsafe {
+                data.get()
+                    .cast::<*mut T>()
+                    .write(Box::into_raw(Box::new(value)));
+            }
+            #[cfg(not(feature = "alloc"))]
+            unreachable!("the inline size/alignment assertion rejects T")
+        }
+        Self {
+            data,
+            ops: &OpsFor::<T>::OPS,
+        }
+    }
+
+    #[inline]
+    fn error(&self) -> &dyn SendSyncError {
+        // SAFETY: ops matches the live T. The temporary trait-object pointer
+        // points to its current address and the borrow is bounded by self.
+        unsafe { &*(self.ops.pointer)(self.data.get()) }
+    }
+
+    #[inline]
+    fn error_mut(&mut self) -> &mut dyn SendSyncError {
+        // SAFETY: exclusive access to the owned error, at its current address.
+        unsafe { &mut *(self.ops.pointer)(self.data.get()) }
+    }
+
+    /// # Safety
+    /// T must be the exact concrete type of the owned error.
+    #[inline]
+    unsafe fn take<T: 'static>(self) -> T {
+        debug_assert!((self.error() as &dyn Any).is::<T>());
+        let owner = ManuallyDrop::new(self);
+        let pointer = unsafe { (owner.ops.pointer)(owner.data.get()).cast::<T>() };
+        if fits_inline::<T>() {
+            // SAFETY: reading transfers ownership; ManuallyDrop suppresses the
+            // old root destructor. No references into the owner remain live.
+            unsafe { pointer.read() }
+        } else {
+            #[cfg(feature = "alloc")]
+            // SAFETY: moving out of the original Box deallocates it without
+            // dropping the extracted T. The caller guarantees the exact type.
+            unsafe {
+                *Box::from_raw(pointer)
+            }
+            #[cfg(not(feature = "alloc"))]
+            unreachable!("a non-inline error cannot be constructed without alloc")
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn into_box(self) -> Box<dyn SendSyncError> {
+        let owner = ManuallyDrop::new(self);
+        // SAFETY: we transfer exclusive ownership and suppress the old drop.
+        unsafe { (owner.ops.into_box)(owner.data.get()) }
+    }
+}
+
+impl Drop for StoredError {
+    #[inline]
+    fn drop(&mut self) {
+        // SAFETY: construction selected these operations for our one live T.
+        unsafe { (self.ops.drop)(self.data.get()) };
+    }
+}
+
+// SAFETY: construction only accepts Send + Sync errors. UnsafeCell hides their
+// storage representation, but every borrow still enforces T's aliasing rules.
+unsafe impl Send for StoredError {}
+unsafe impl Sync for StoredError {}
+
+/// Diagnostic fields live alongside the root so an inline root needs no heap
+/// container. Diagnostic features may still allocate independently.
+pub(crate) struct ErrorUnionInner {
+    error: StoredError,
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
     #[cfg(feature = "error_span_trace")]
@@ -92,7 +246,14 @@ pub(crate) struct ErrorDiagnostics {
 
 pub(crate) struct ErrorParts<T> {
     pub(crate) error: T,
-    pub(crate) diagnostics: ErrorDiagnostics,
+    #[cfg(feature = "backtrace")]
+    pub(crate) backtrace: std::backtrace::Backtrace,
+    #[cfg(feature = "error_span_trace")]
+    pub(crate) span_trace: tracing_error::SpanTrace,
+    #[cfg(feature = "context")]
+    pub(crate) context: Vec<ContextFrame>,
+    #[cfg(feature = "error_location")]
+    pub(crate) location: &'static core::panic::Location<'static>,
 }
 
 impl ErrorUnionInner {
@@ -100,23 +261,20 @@ impl ErrorUnionInner {
     #[cfg_attr(feature = "error_location", track_caller)]
     pub(crate) fn new_vec<E: crate::TypeSet>(value: crate::ErrorUnionVec<E>) -> Self {
         let mut inner = Self::new(value);
-        // SAFETY: this constructor established exactly ErrorUnionVec<E>.
-        unsafe {
-            inner.storage.enable_children::<E>();
-        }
+        inner.error.ops = &OpsFor::<crate::ErrorUnionVec<E>>::WITH_CHILDREN;
         inner
     }
 
     pub(crate) fn visit_children<'a>(&'a self, _visitor: &mut dyn FnMut(crate::ErrorReport<'a>)) {
         #[cfg(feature = "alloc")]
-        if let Some(children) = self.storage.children() {
+        if let Some(children) = self.error.ops.children {
             children(self.error(), _visitor);
         }
     }
 
     #[cfg(feature = "alloc")]
     pub(crate) fn is_collection(&self) -> bool {
-        self.storage.children().is_some()
+        self.error.ops.children.is_some()
     }
 
     #[cfg_attr(feature = "error_location", track_caller)]
@@ -143,48 +301,30 @@ impl ErrorUnionInner {
         #[cfg(feature = "error_location")] location: &'static core::panic::Location<'static>,
     ) -> Self {
         Self {
-            storage: Storage::new(
-                value,
-                ErrorDiagnostics {
-                    #[cfg(feature = "backtrace")]
-                    backtrace,
-                    #[cfg(feature = "error_span_trace")]
-                    span_trace,
-                    #[cfg(feature = "context")]
-                    context,
-                    #[cfg(feature = "error_location")]
-                    location,
-                },
-            ),
+            error: StoredError::new(value),
+            #[cfg(feature = "backtrace")]
+            backtrace,
+            #[cfg(feature = "error_span_trace")]
+            span_trace,
+            #[cfg(feature = "context")]
+            context,
+            #[cfg(feature = "error_location")]
+            location,
         }
-    }
-
-    #[cfg(any(
-        feature = "backtrace",
-        feature = "context",
-        feature = "error_span_trace",
-        feature = "error_location"
-    ))]
-    pub(crate) const fn diagnostics(&self) -> &ErrorDiagnostics {
-        self.storage.diagnostics()
-    }
-
-    #[cfg(any(feature = "backtrace", feature = "context"))]
-    pub(crate) fn diagnostics_mut(&mut self) -> &mut ErrorDiagnostics {
-        self.storage.diagnostics_mut()
     }
 
     #[inline]
     pub(crate) fn error(&self) -> &dyn SendSyncError {
-        self.storage.error()
+        self.error.error()
     }
     #[inline]
     pub(crate) fn error_mut(&mut self) -> &mut dyn SendSyncError {
-        self.storage.error_mut()
+        self.error.error_mut()
     }
+
     #[inline]
     pub(crate) fn is_error_type<T: 'static>(&self) -> bool {
-        self.storage.is_error_type::<T>()
+        (self.error() as &dyn Any).is::<T>()
     }
 
     /// # Safety
@@ -194,10 +334,10 @@ impl ErrorUnionInner {
         let error;
         {
             let parts = unsafe { self.downcast_error_unchecked_with_parts::<T>() };
-            // Keep the root owned while dropping diagnostics, including if a
-            // context destructor panics before the root reaches its caller.
+            // Drop metadata while the root still has a local owner, before
+            // moving it into the return place. This also handles a panic in a
+            // context destructor without leaking the extracted root.
             error = parts.error;
-            let _diagnostics = parts.diagnostics;
         }
         error
     }
@@ -206,31 +346,42 @@ impl ErrorUnionInner {
     /// T must be the exact concrete type of the owned error.
     #[inline]
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(self) -> ErrorParts<T> {
-        debug_assert!(self.is_error_type::<T>());
-        unsafe { self.storage.into_parts::<T>() }
+        ErrorParts {
+            error: unsafe { self.error.take::<T>() },
+            #[cfg(feature = "backtrace")]
+            backtrace: self.backtrace,
+            #[cfg(feature = "error_span_trace")]
+            span_trace: self.span_trace,
+            #[cfg(feature = "context")]
+            context: self.context,
+            #[cfg(feature = "error_location")]
+            location: self.location,
+        }
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
     pub(crate) fn into_boxed_parts(self) -> ErrorParts<Box<dyn SendSyncError>> {
-        self.storage.into_boxed_parts()
+        ErrorParts {
+            error: self.error.into_box(),
+            #[cfg(feature = "backtrace")]
+            backtrace: self.backtrace,
+            #[cfg(feature = "error_span_trace")]
+            span_trace: self.span_trace,
+            #[cfg(feature = "context")]
+            context: self.context,
+            #[cfg(feature = "error_location")]
+            location: self.location,
+        }
     }
 
     #[inline]
     pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
-        if self.is_error_type::<T>() {
-            Some(unsafe { self.downcast_error_ref_unchecked::<T>() })
-        } else {
-            None
-        }
+        (self.error() as &dyn Any).downcast_ref()
     }
     #[inline]
     pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        if self.is_error_type::<T>() {
-            Some(unsafe { self.downcast_error_mut_unchecked::<T>() })
-        } else {
-            None
-        }
+        (self.error_mut() as &mut dyn Any).downcast_mut()
     }
 
     /// # Safety
@@ -238,41 +389,16 @@ impl ErrorUnionInner {
     #[inline]
     pub(crate) unsafe fn downcast_error_ref_unchecked<T: 'static>(&self) -> &T {
         debug_assert!(self.is_error_type::<T>());
-        unsafe { self.storage.concrete_ref::<T>() }
+        // SAFETY: exact type, and the reference lifetime follows self.
+        unsafe { &*(self.error() as *const dyn SendSyncError).cast::<T>() }
     }
+
     /// # Safety
     /// T must be the exact concrete type of the owned error.
     #[inline]
     pub(crate) unsafe fn downcast_error_mut_unchecked<T: 'static>(&mut self) -> &mut T {
         debug_assert!(self.is_error_type::<T>());
-        unsafe { self.storage.concrete_mut::<T>() }
-    }
-
-    /// # Safety
-    /// T must be the exact concrete type of the owned error.
-    #[inline]
-    pub(crate) unsafe fn map_single<T: SendSyncError, U: SendSyncError>(
-        self,
-        f: impl FnOnce(T) -> U,
-    ) -> Self {
-        debug_assert!(self.is_error_type::<T>());
-        Self {
-            storage: unsafe { self.storage.map_single::<T, U>(f) },
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn handle_and_its_option_obey_the_feature_size_limit() {
-        let words = HANDLE_WORDS;
-        assert_eq!(size_of::<ErrorUnionInner>(), words * size_of::<usize>());
-        assert_eq!(
-            size_of::<Option<ErrorUnionInner>>(),
-            words * size_of::<usize>()
-        );
-        assert_eq!(align_of::<ErrorUnionInner>(), align_of::<usize>());
+        // SAFETY: exact type and exclusive access, with lifetime following self.
+        unsafe { &mut *(self.error_mut() as *mut dyn SendSyncError).cast::<T>() }
     }
 }

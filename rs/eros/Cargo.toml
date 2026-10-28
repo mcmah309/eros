@@ -37,12 +37,12 @@ thiserror = "2"
 [features]
 # Libraries should consider disabling these defaults, allowing downstream crates to decide.
 # Or when trying to optimize the binary.
-# Keep alloc enabled separately if errors carry non-zero-sized payloads.
+# Keep alloc enabled separately if errors exceed the inline capacity.
 default = ["alloc", "context", "backtrace"]
-# Enables inline small errors or a single root allocation, with a two-word handle.
+# Enables heap fallback for errors exceeding one word, and owned messages.
 alloc = []
 # Enables the `std` library. Required for `backtrace`, both span trace features, and `anyhow`. When disabled,
-# `eros` is `no_std`. Without alloc, concrete errors must be zero-sized.
+# `eros` is `no_std`. Without alloc, errors must fit the inline size/alignment.
 std = ["alloc"]
 # Enables context
 context = ["alloc", "eros-macros/context"]

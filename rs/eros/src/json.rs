@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn uncaptured_backtrace_is_json_null_and_has_a_single_text_status_line() {
         let mut error: ErrorUnion = ErrorUnion::new(core::fmt::Error);
-        error.inner.diagnostics_mut().backtrace = Backtrace::disabled();
+        error.inner.backtrace = Backtrace::disabled();
         for value in [error.to_debug_json(), error.report().to_debug_json()] {
             assert_eq!(value.get("backtrace"), Some(&Value::Null));
         }
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn captured_backtrace_is_a_json_string_and_has_a_plain_text_header() {
         let mut error: ErrorUnion = ErrorUnion::new(core::fmt::Error);
-        error.inner.diagnostics_mut().backtrace = Backtrace::force_capture();
+        error.inner.backtrace = Backtrace::force_capture();
         assert_eq!(error.backtrace().status(), BacktraceStatus::Captured);
         for value in [error.to_debug_json(), error.report().to_debug_json()] {
             let text = value["backtrace"]

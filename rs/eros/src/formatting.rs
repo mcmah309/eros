@@ -41,7 +41,7 @@ impl<'a> Report<'a> {
     pub(crate) fn from_inner(inner: &'a crate::storage::ErrorUnionInner) -> Self {
         let root = inner.error();
         #[cfg(feature = "backtrace")]
-        let backtrace = &inner.diagnostics().backtrace;
+        let backtrace = &inner.backtrace;
         // Preserve the formatter's existing preference for an anyhow trace.
         #[cfg(all(feature = "anyhow", feature = "backtrace"))]
         let backtrace = {
@@ -62,13 +62,13 @@ impl<'a> Report<'a> {
             inner,
             root,
             #[cfg(feature = "context")]
-            contexts: &inner.diagnostics().context,
+            contexts: &inner.context,
             #[cfg(feature = "error_location")]
-            location: inner.diagnostics().location,
+            location: inner.location,
             #[cfg(feature = "backtrace")]
             backtrace,
             #[cfg(feature = "error_span_trace")]
-            span_trace: &inner.diagnostics().span_trace,
+            span_trace: &inner.span_trace,
         }
     }
 
@@ -887,7 +887,7 @@ mod tests {
         let second = captured_error("invalid port").context("read https port");
         let errors = ErrorUnionVec::new(alloc::vec![first, second]);
         let mut error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.union();
-        error.inner.diagnostics_mut().backtrace = Backtrace::force_capture();
+        error.inner.backtrace = Backtrace::force_capture();
         let error = error.context("configure server");
 
         assert_eq!(format!("{error:#}"), "errors (2 total):");

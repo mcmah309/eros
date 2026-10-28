@@ -1,11 +1,9 @@
-
-
 use core::{
     error::Error,
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use eros::{Erase, ErrorUnion, IntoUnion, ReshapeUnion};
+use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
 
 #[derive(Debug, PartialEq, Eq)]
 struct Code(u32);
@@ -35,7 +33,7 @@ impl Error for Padded {}
 type Errors = (Code, Padded, fmt::Error);
 
 #[cfg_attr(test, test)]
-pub fn payload_values_survive_mutation_moving_reshaping_and_enum_extraction() {
+pub fn inline_values_survive_mutation_moving_reshaping_and_enum_extraction() {
     let mut code: ErrorUnion<Errors> = Err::<(), _>(Code(17)).union().unwrap_err();
     assert!(matches!(Shared::from(&code), Shared::Code(Code(17))));
     match Mutable::from(&mut code) {
@@ -80,7 +78,10 @@ pub fn full_word_payload_survives_multiple_moves_and_shared_interior_mutation() 
     let error = erased.narrow::<(Counter,), _>().unwrap();
     let error: ErrorUnion<(fmt::Error, Counter)> = error.widen();
     let error = eros::ErrorUnionAdapter::from(error.narrow::<(Counter,), _>().unwrap());
-    assert_eq!(error.union().into_single().0.into_inner(), usize::MAX - 9);
+    assert_eq!(
+        error.union().into_single().0.into_inner(),
+        usize::MAX - 9
+    );
 }
 
 #[cfg_attr(test, test)]
@@ -131,7 +132,7 @@ pub fn thin_static_reference_preserves_pointer_provenance_and_source() {
 }
 
 #[cfg_attr(test, test)]
-pub fn non_copy_owners_drop_once_after_recovery_mapping_and_extraction() {
+pub fn inline_non_copy_owners_drop_once_after_recovery_mapping_and_extraction() {
     static DROPS: AtomicUsize = AtomicUsize::new(0);
     #[derive(Debug)]
     struct Tracked(&'static AtomicUsize);
@@ -172,4 +173,12 @@ pub fn non_copy_owners_drop_once_after_recovery_mapping_and_extraction() {
     let error: ErrorUnion<(Tracked,)> = ErrorUnion::new(Tracked(&DROPS));
     drop(eros::ErrorUnionAdapter::from(error));
     assert_eq!(DROPS.load(Ordering::SeqCst), before + 3);
+}
+
+#[cfg_attr(test, allow(dead_code))]
+pub fn run_checks() {
+    inline_values_survive_mutation_moving_reshaping_and_enum_extraction();
+    full_word_payload_survives_multiple_moves_and_shared_interior_mutation();
+    thin_static_reference_preserves_pointer_provenance_and_source();
+    inline_non_copy_owners_drop_once_after_recovery_mapping_and_extraction();
 }
