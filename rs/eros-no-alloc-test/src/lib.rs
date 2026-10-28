@@ -2,6 +2,9 @@
 
 pub mod classify;
 
+#[path = "../../eros/tests/no_alloc/inline_error.rs"]
+pub mod inline_error;
+
 use core::{
     error::Error,
     fmt::{self, Write},
@@ -101,6 +104,7 @@ fn classified_debug_checks() {
 
 /// Exercised both by the host tests and by a binary with no global allocator.
 pub fn run_checks() {
+    inline_error::run_checks();
     classify::run_checks();
     classified_debug_checks();
     classification::run_checks();

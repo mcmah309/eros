@@ -1,0 +1,24 @@
+error: inline_error requires a struct or enum
+ --> tests/trybuild/inline_error_requires_struct_and_message.rs:2:1
+  |
+2 | union Union { field: u8 }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected string literal
+ --> tests/trybuild/inline_error_requires_struct_and_message.rs:4:22
+  |
+4 | #[eros::inline_error(42)]
+  |                      ^^
+
+error: argument never used
+ --> tests/trybuild/inline_error_requires_struct_and_message.rs:7:33
+  |
+7 | #[eros::inline_error("message", "extra")]
+  |                      ---------  ^^^^^^^ argument never used
+  |                      |
+  |                      formatting specifier missing
+  |
+help: format specifiers use curly braces, consider adding a format specifier
+  |
+7 | #[eros::inline_error("message{}", "extra")]
+  |                              ++

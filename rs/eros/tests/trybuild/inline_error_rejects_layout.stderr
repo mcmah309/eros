@@ -1,0 +1,29 @@
+error[E0080]: evaluation panicked: inline_error: `Large` exceeds the one-usize size limit (including padding and enum discriminants)
+ --> tests/trybuild/inline_error_rejects_layout.rs:1:1
+  |
+1 | #[eros::inline_error("too large")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: inline_error: `Wide` exceeds the one-usize size limit (including padding and enum discriminants)
+ --> tests/trybuild/inline_error_rejects_layout.rs:4:1
+  |
+4 | #[eros::inline_error("wide reference")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: inline_error: `Aligned` exceeds the one-usize size limit (including padding and enum discriminants)
+ --> tests/trybuild/inline_error_rejects_layout.rs:7:1
+  |
+7 | #[eros::inline_error("aligned")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: inline_error: `LargeEnum` exceeds the one-usize size limit (including padding and enum discriminants)
+  --> tests/trybuild/inline_error_rejects_layout.rs:11:1
+   |
+11 | #[eros::inline_error("large enum")]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: inline_error: `ManualLarge` exceeds the one-usize size limit (including padding and enum discriminants)
+  --> tests/trybuild/inline_error_rejects_layout.rs:15:1
+   |
+15 | #[eros::inline_error]
+   | ^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here

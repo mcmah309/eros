@@ -337,7 +337,7 @@ The `error_location` feature records where an error first enters Eros. The `cont
 
 Eros comes with the `context` and `backtrace` feature flags enabled by default. Disabling them removes backtrace and context tracking from `ErrorUnion<T>`, and all context methods become a no-op. Thus, it may be optimized away by the compiler.
 
-`ErrorUnion` occupies two pointer-sized words, growing to three only when `error_location` is enabled without `alloc`. The possible error types add no storage. Storage is selected at compile time:
+`ErrorUnion` occupies two pointer-sized words, growing to three only when `error_location` is enabled without `alloc`. The possible error types add no storage. Storage is selected at compile time, including for errors declared with `#[inline_error]`:
 
 | Configuration | Storage | Root allocations |
 | --- | --- | --- |
@@ -1267,6 +1267,41 @@ let recovered = poll(false).recover::<Timeout, _>(|_| ());
 assert!(recovered.is_ok());
 ```
 
+### Inline errors
+
+`#[eros::inline_error]` declares nongeneric structs and enums whose size and
+alignment fit in one `usize`. A compile-time check enforces this even with
+`alloc` enabled; zero-sized types may have any alignment. Allocation behavior
+depends on the [storage configuration](#reducing-error-handling-overhead).
+
+```rust
+#[eros::inline_error("operation timed out")]
+pub struct Timeout;
+
+#[eros::inline_error("device code {code:04x}", code = self.0)]
+pub struct DeviceFailure(pub usize);
+
+#[eros::inline_error("{self:?}")]
+#[repr(u8)]
+pub enum DeviceStatus { Disconnected, InvalidCode(u16) }
+
+let erased = eros::error!(DeviceFailure(7));
+assert_eq!(erased.to_string(), "device code 0007");
+assert_eq!(erased.downcast_inner::<DeviceFailure>().unwrap().0, 7);
+```
+
+The macro generates `Debug`, `Error`, and, when a message is supplied, `Display`.
+Messages accept `format!` syntax with fields accessed through `self`, and format
+without allocating. `"{self:?}"` delegates display to debug. Omit the message
+(`#[inline_error]` or `#[inline_error()]`) to implement `Display` yourself.
+Add derives such as `Clone`, `Copy`, or `Eq` explicitly when needed.
+
+Thin references to static data can borrow larger payloads; `&'static &'static str`
+fits, while `&'static str` exceeds the limit. Literal `error!` messages use a
+zero-sized error without `alloc`, as described below. Eros operations require
+`Send + Sync + 'static` and preserve the concrete type and payload through
+erasure and downcasting.
+
 ### Static message errors
 
 Literal messages in `error!`, `bail!`, and `ensure!` work without `alloc`. Each
@@ -1364,8 +1399,9 @@ the diagnostics and trailing payload. Otherwise, small roots stay inline and
 larger roots use `Box<T>`. The union handle always occupies two words with `alloc`. Allocation behavior and diagnostic costs are described in
 [Reducing Error Handling Overhead](#reducing-error-handling-overhead).
 
-The `error_location` feature works with or without `alloc` and adds one location
-reference per error without allocating. `context_location` adds one location
+The `error_location` feature works with or without `alloc`. Without `alloc`, its
+location reference adds one word to the handle; with `alloc`, it selects boxed
+root diagnostics. `context_location` adds one location
 reference per context frame when `context` is enabled; it does not enable
 `context` or `alloc` itself. Both support `no_std`. The `location` feature enables
 both flags. The `std`, `context`, and `json` features enable

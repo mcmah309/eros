@@ -1,24 +1,21 @@
-use core::{error::Error, fmt, fmt::Write};
-use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion, SendSyncError, TypeSet};
+use core::{fmt, fmt::Write};
+use eros::{Erase, ErrorUnion, IntoUnion, ReshapeUnion, SendSyncError, TypeSet};
 
-macro_rules! unit_error {
-    ($name:ident, $message:literal) => {
-        #[derive(Debug, PartialEq, Eq)]
-        struct $name;
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str($message)
-            }
-        }
-        impl Error for $name {}
-    };
-}
-
-unit_error!(Connect, "connection failed");
-unit_error!(Read, "read failed");
-unit_error!(Decode, "decode failed");
-unit_error!(Validate, "validation failed");
-unit_error!(Fallback, "fallback failed");
+#[eros::inline_error("connection failed")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Connect;
+#[eros::inline_error("read failed")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Read;
+#[eros::inline_error("decode failed")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Decode;
+#[eros::inline_error("validation failed")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Validate;
+#[eros::inline_error("fallback failed")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Fallback;
 
 #[eros::error_enum_ref(AllRef)]
 type All = (Connect, Read, Decode, Validate);

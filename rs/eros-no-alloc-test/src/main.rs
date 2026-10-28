@@ -1,6 +1,57 @@
 #![no_std]
 #![no_main]
 
+use core::any::TypeId;
+
+#[eros::inline_error("operation timed out")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Timeout;
+
+fn application_failure(inner: eros::InnerError) -> Timeout {
+    use eros_no_alloc_test::inline_error::DomainFailure;
+    assert_eq!(inner.downcast::<DomainFailure>().unwrap(), DomainFailure);
+    Timeout
+}
+
+fn application_pipeline(mode: u8) -> eros::Result<u8, (Timeout,)> {
+    use eros::{Erase, ReshapeUnion};
+    use eros_no_alloc_test::inline_error as library;
+
+    let input: eros::Result<
+        u8,
+        (
+            Timeout,
+            library::Timeout,
+            library::DeviceUnavailable,
+            library::OtherError,
+        ),
+    > = library::pipeline(mode).widen();
+    let input = match library::select_result(input.erase()) {
+        Ok(selected) => Err(library::erase_error(library::widen_selected(selected))),
+        Err(remaining) => remaining,
+    };
+    library::classify_result(input).classify(application_failure)
+}
+
+fn application_payload_pipeline(
+    mode: u8,
+) -> eros::Result<
+    u8,
+    (
+        Timeout,
+        eros_no_alloc_test::inline_error::DeviceFailure,
+        eros_no_alloc_test::inline_error::DomainFailure,
+    ),
+> {
+    use eros::ReshapeUnion;
+    use eros_no_alloc_test::inline_error as library;
+    let input = match library::restore_payloads(library::erase_payload_pipeline(mode)) {
+        Ok(selected) => Err(library::widen_payloads(selected).erase()),
+        Err(remaining) => remaining,
+    };
+    library::classify_payload(input).widen()
+}
+
 #[cfg(target_arch = "x86_64")]
 // SAFETY: this binary supplies its sole process entry symbol; startup code is
 // excluded at link time. The naked body establishes stack alignment before
@@ -21,6 +72,49 @@ pub extern "C" fn _start() -> ! {
 }
 
 fn run() -> ! {
+    use eros_no_alloc_test::inline_error as library;
+    assert_ne!(TypeId::of::<Timeout>(), TypeId::of::<library::Timeout>());
+    let error = library::erased_timeout()
+        .downcast_inner::<Timeout>()
+        .unwrap_err();
+    assert_eq!(
+        error.downcast_inner::<library::Timeout>().unwrap(),
+        library::Timeout
+    );
+    // Run the complete chain across this executable's crate boundary, with
+    // classification back into its own distinct Timeout type.
+    for mode in 0..=3 {
+        let result = application_pipeline(mode);
+        if mode == 3 {
+            assert_eq!(result.unwrap(), 12);
+        } else {
+            let error = result.unwrap_err();
+            assert!(!error.is_inner::<library::Timeout>());
+            let error = library::select_error(error.erase()).unwrap_err();
+            assert_eq!(error.downcast_inner::<Timeout>().unwrap(), Timeout);
+        }
+    }
+    for mode in 0..=7 {
+        let result = application_payload_pipeline(mode);
+        if mode == 5 {
+            assert_eq!(result.unwrap(), 43);
+        } else {
+            let error = result.unwrap_err().erase();
+            let expected = [42, 2, 513, 7, 42, 0, 0, 43][usize::from(mode)];
+            assert_eq!(
+                error
+                    .downcast_inner::<library::DeviceFailure>()
+                    .unwrap()
+                    .code,
+                expected
+            );
+        }
+    }
+    let error = library::erase_payload_pipeline(3).unwrap_err();
+    assert!(core::ptr::eq(
+        error.downcast_inner::<library::StaticFailure>().unwrap().0,
+        &library::DETAILS
+    ));
     eros_no_alloc_test::run_checks();
     exit(0)
 }

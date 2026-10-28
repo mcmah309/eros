@@ -3,6 +3,12 @@
 
 extern crate eros as renamed;
 
+#[renamed::inline_error("operation timed out")]
+pub struct Timeout;
+
+#[renamed::inline_error("device {code:04x}", code = self.0)]
+pub struct Code(::core::primitive::usize);
+
 renamed::type_set! {
     type Errors = (::core::fmt::Error,);
     type Combined = Errors || Errors;
@@ -20,6 +26,9 @@ fn ensuring() -> renamed::Result<()> {
 }
 
 fn main() {
+    let _: Code = renamed::error!(Code(7)).downcast_inner::<Code>().unwrap();
+    let error = renamed::error!(Timeout);
+    let _: Timeout = error.downcast_inner::<Timeout>().unwrap();
     let _: renamed::ErrorUnion<Combined> = renamed::ErrorUnion::new(::core::fmt::Error);
     static ERROR: &str = "static message";
     let _: renamed::ErrorUnion = renamed::error!(renamed::MsgError::from_static(ERROR));

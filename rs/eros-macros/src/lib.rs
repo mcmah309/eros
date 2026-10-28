@@ -10,7 +10,39 @@ use syn::{
 };
 
 mod error_enum;
+mod inline_error;
 mod type_set;
+
+/// Implements an inline error for a nongeneric struct or enum.
+///
+/// ```rust
+/// #[eros_macros::inline_error("device code {code:04x}", code = self.0)]
+/// pub struct DeviceFailure(pub usize);
+///
+/// let erased = eros::error!(DeviceFailure(7));
+/// assert_eq!(erased.to_string(), "device code 0007");
+/// assert_eq!(erased.downcast_inner::<DeviceFailure>().unwrap().0, 7);
+/// ```
+///
+/// Generates `Debug`, `core::error::Error`, and optional `Display`. Messages accept
+/// `format!` syntax, with fields accessed through `self`, and use `core::write!`
+/// without allocating. `"{self:?}"` delegates display to debug. Omit the message
+/// (`#[inline_error]` or `#[inline_error()]`) to implement `Display` yourself.
+/// Add other derives explicitly; visibility and attributes are preserved.
+///
+/// A compile-time check requires the complete size and alignment to fit in
+/// `usize`, even with `alloc` enabled. Zero-sized types support any alignment.
+/// Thin static references may borrow larger data; wide references such as
+/// `&'static str` exceed the limit. Eros operations require `Send + Sync + 'static`.
+#[proc_macro_attribute]
+pub fn inline_error(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as inline_error::Args);
+    let item = parse_macro_input!(item as syn::Item);
+    match inline_error::expand(args, item) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
 
 /// Declares flat tuple aliases by composing named type sets with `||`.
 ///

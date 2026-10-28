@@ -1,0 +1,15 @@
+error: invalid format string: expected `}` but string was terminated
+ --> tests/trybuild/inline_error_rejects_format.rs:1:33
+  |
+1 | #[eros::inline_error("unclosed {")]
+  |                                -^ expected `}` in format string
+  |                                |
+  |                                because of this opening brace
+  |
+  = note: if you intended to print `{`, you can escape it using `{{`
+
+error: 1 positional argument in format string, but no arguments were given
+ --> tests/trybuild/inline_error_rejects_format.rs:4:23
+  |
+4 | #[eros::inline_error("{}")]
+  |                       ^^

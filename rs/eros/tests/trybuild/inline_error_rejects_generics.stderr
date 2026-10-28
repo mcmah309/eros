@@ -1,0 +1,5 @@
+error: inline_error requires a nongeneric struct or enum
+ --> tests/trybuild/inline_error_rejects_generics.rs:2:15
+  |
+2 | struct Generic<const CODE: usize>;
+  |               ^^^^^^^^^^^^^^^^^^^
