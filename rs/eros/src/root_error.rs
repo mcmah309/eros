@@ -1,6 +1,7 @@
 use crate::storage::ErrorUnionInner;
 use crate::type_set::{Contains, IsFold};
 use crate::{ErrorUnion, SendSyncError, TypeSet};
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use core::{any::Any, marker::PhantomData};
 
@@ -20,14 +21,24 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// A wrapper can retain the original failure as its source for diagnostics.
     ///
     /// Only the inner error is checked, not its sources or contexts. All saved
-    /// diagnostics are preserved. Requires `alloc`.
-    /// Heap roots reuse their allocation inside the wrapper; inline roots are
-    /// boxed. Eros selects inline or boxed storage for the wrapper itself.
+    /// diagnostics are preserved.
+    ///
+    /// Without `alloc`, the classifier borrows the original error as
+    /// `&dyn SendSyncError` and returns a replacement satisfying the same storage
+    /// limits as [`Self::new`]. The original is dropped after classification;
+    /// the replacement cannot retain it as an owned source.
+    ///
+    /// With `alloc`, the classifier receives ownership of a boxed error.
+    /// The classifier receives the original box when root diagnostics are
+    /// disabled and the root was already boxed. Otherwise the root moves into
+    /// a new box. The returned wrapper follows Eros's compile-time storage choice.
     ///
     /// Pass a tuple struct constructor to distinguish errors from one domain
     /// when combining paths. No `From` implementation is required:
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
     /// use eros::{ErrorUnion, SendSyncError};
     /// use std::{error::Error, fmt};
     ///
@@ -51,6 +62,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// assert!(error.is_inner::<ConfigError>());
     /// // Erasing the set keeps the domain wrapper as the concrete root.
     /// assert!(error.erase().is_inner::<ConfigError>());
+    /// # }
     /// ```
     ///
     /// A wrapper constructor is required:
@@ -69,7 +81,8 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// ```
     pub fn classify<Other, ClassifiedError, Index>(
         self,
-        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+        #[cfg(feature = "alloc")] classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+        #[cfg(not(feature = "alloc"))] classifier: impl FnOnce(&dyn SendSyncError) -> ClassifiedError,
     ) -> ErrorUnion<Other>
     where
         Other: TypeSet,
@@ -79,7 +92,22 @@ impl<E: TypeSet> ErrorUnion<E> {
         let inner = if Other::Variants::is_fold(self.inner() as &dyn Any) {
             self.inner
         } else {
-            self.map_inner(classifier).inner
+            #[cfg(feature = "alloc")]
+            {
+                self.map_inner(classifier).inner
+            }
+            #[cfg(not(feature = "alloc"))]
+            {
+                let replacement = classifier(self.inner());
+                let inner = ErrorUnionInner::new_from_parts(
+                    replacement,
+                    #[cfg(feature = "error_location")]
+                    self.location(),
+                );
+                // Keep both roots owned if the original destructor panics.
+                drop(self);
+                inner
+            }
         };
         ErrorUnion {
             inner,
@@ -90,7 +118,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// Replaces the inner error, passing ownership of the old boxed error to a closure.
     ///
     /// The closure runs once, receives the previous inner error, and returns the new
-    /// concrete error value. Eros selects inline or boxed storage for the replacement.
+    /// concrete error value. Eros selects storage for the replacement at compile time.
     /// Preserve the original failure by storing the old inner error in the new
     /// error and returning it from `Error::source()`. Eros uses the new error's
     /// source chain without automatically adding the old inner error.
@@ -99,8 +127,9 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// Eros capture location, backtrace, and span trace. No new diagnostics
     /// are captured.
     ///
-    /// Heap-stored roots retain their allocation when passed to the closure.
-    /// Inline non-zero-sized roots are boxed to satisfy the closure's argument.
+    /// When root diagnostics are disabled, an already boxed root reuses its
+    /// allocation. Other roots move into a new box before the closure runs;
+    /// boxing a zero-sized concrete root needs no allocation.
     ///
     /// The returned union has the replacement type as its single variant.
     /// For a union with a single variant, [`Self::map_single`] passes the concrete
@@ -136,6 +165,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// assert!(error.is_inner::<ConfigError>());
     /// assert_eq!(error.source().unwrap().to_string(), "permission denied");
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn map_inner<T, F>(self, f: F) -> ErrorUnion<(T,)>
     where
         T: SendSyncError,
@@ -146,20 +176,20 @@ impl<E: TypeSet> ErrorUnion<E> {
             inner: ErrorUnionInner::new_from_parts(
                 f(parts.error),
                 #[cfg(feature = "backtrace")]
-                parts.backtrace,
+                parts.diagnostics.backtrace,
                 #[cfg(feature = "error_span_trace")]
-                parts.span_trace,
+                parts.diagnostics.span_trace,
                 #[cfg(feature = "context")]
-                parts.context,
+                parts.diagnostics.context,
                 #[cfg(feature = "error_location")]
-                parts.location,
+                parts.diagnostics.location,
             ),
             _pd: core::marker::PhantomData,
         }
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     #[cfg(feature = "backtrace")]
     use alloc::string::ToString;
@@ -173,15 +203,15 @@ mod tests {
 
         #[cfg(feature = "backtrace")]
         let original_backtrace = {
-            error.inner.backtrace = std::backtrace::Backtrace::force_capture();
+            error.inner.diagnostics_mut().backtrace = std::backtrace::Backtrace::force_capture();
             error.backtrace().to_string()
         };
         #[cfg(feature = "error_location")]
-        let original_location = error.inner.location;
+        let original_location = error.inner.diagnostics().location;
         #[cfg(feature = "context")]
         let error = error.context("read /etc/app.toml").context("start service");
         #[cfg(feature = "context")]
-        let original_context = error.inner.context.as_ptr();
+        let original_context = error.inner.diagnostics().context.as_ptr();
 
         let error = error.map_inner(|_| MsgError::from("cannot open configuration"));
         let _error = error.map_inner(|_| MsgError::from("startup failed"));
@@ -195,17 +225,23 @@ mod tests {
             assert_eq!(_error.backtrace().to_string(), original_backtrace);
         }
         #[cfg(feature = "error_location")]
-        assert!(core::ptr::eq(_error.inner.location, original_location));
+        assert!(core::ptr::eq(
+            _error.inner.diagnostics().location,
+            original_location
+        ));
         #[cfg(feature = "context")]
         {
-            assert_eq!(_error.inner.context.as_ptr(), original_context);
-            assert_eq!(_error.inner.context.len(), 2);
             assert_eq!(
-                alloc::format!("{}", _error.inner.context[0].context),
+                _error.inner.diagnostics().context.as_ptr(),
+                original_context
+            );
+            assert_eq!(_error.inner.diagnostics().context.len(), 2);
+            assert_eq!(
+                alloc::format!("{}", _error.inner.diagnostics().context[0].context),
                 "read /etc/app.toml"
             );
             assert_eq!(
-                alloc::format!("{}", _error.inner.context[1].context),
+                alloc::format!("{}", _error.inner.diagnostics().context[1].context),
                 "start service"
             );
         }

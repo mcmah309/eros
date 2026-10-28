@@ -18,6 +18,7 @@ pub mod __private {
     use crate::{ErrorUnion, TypeSet};
 
     pub use crate::__eros_format_message as formatted_message;
+    pub use crate::__eros_static_message as static_message;
     #[cfg(feature = "alloc")]
     pub use alloc::format;
     pub use eros_macros::format_error;
@@ -69,7 +70,6 @@ mod narrowing;
 pub mod prelude;
 mod recovery;
 mod report;
-#[cfg(feature = "alloc")]
 mod root_error;
 #[cfg(any(feature = "error_span_trace", feature = "context_span_trace"))]
 mod span_trace_fields;

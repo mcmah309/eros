@@ -71,7 +71,8 @@ where
 
     #[inline]
     fn deref(&self) -> &T {
-        self.inner.downcast_error_ref::<T>().unwrap()
+        // SAFETY: a singleton's invariant type set guarantees the concrete type.
+        unsafe { self.inner.downcast_error_ref_unchecked::<T>() }
     }
 }
 
@@ -113,11 +114,12 @@ unsafe impl<T> Sync for ErrorUnion<T> where T: TypeSet + Sync {}
 impl ErrorUnion {
     /// Create a new `ErrorUnion`.
     ///
-    /// Errors fitting one pointer-sized word with suitable alignment are stored
-    /// inline; other errors are boxed when `alloc` is enabled. Without `alloc`,
-    /// errors exceeding the inline size or alignment are rejected at compile
-    /// time when the constructor is instantiated. Zero-sized errors support
-    /// arbitrary alignment. Diagnostics may allocate independently of the root.
+    /// The union never exceeds two pointer-sized words. With `alloc` and any
+    /// root diagnostics enabled, diagnostics and payload share one allocation
+    /// behind a boxed fat pointer. Otherwise, errors fitting one word with
+    /// suitable alignment are stored inline, with larger errors boxed.
+    /// Without `alloc`, only zero-sized errors are accepted: the union holds
+    /// one operations pointer, plus one location reference when enabled.
     #[cfg_attr(feature = "error_location", track_caller)]
     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
     where
@@ -427,7 +429,7 @@ where
 
     #[cfg(feature = "backtrace")]
     pub const fn backtrace(&self) -> &std::backtrace::Backtrace {
-        &self.inner.backtrace
+        &self.inner.diagnostics().backtrace
     }
 
     /// Borrows the span trace captured when this error first entered Eros.
@@ -438,7 +440,7 @@ where
     /// borrowing or formatting never captures a new one.
     #[cfg(feature = "error_span_trace")]
     pub const fn span_trace(&self) -> &tracing_error::SpanTrace {
-        &self.inner.span_trace
+        &self.inner.diagnostics().span_trace
     }
 
     /// Returns where the error was first wrapped in an Eros union.
@@ -449,7 +451,7 @@ where
     /// its attachment location.
     #[cfg(feature = "error_location")]
     pub const fn location(&self) -> &'static core::panic::Location<'static> {
-        self.inner.location
+        self.inner.diagnostics().location
     }
 
     /// Borrows all context frames in attachment order (innermost first).
@@ -490,7 +492,7 @@ where
     pub fn contexts(
         &self,
     ) -> impl DoubleEndedIterator<Item = &crate::ContextFrame> + ExactSizeIterator {
-        self.inner.context.iter()
+        self.inner.diagnostics().context.iter()
     }
 
     pub fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
@@ -509,8 +511,12 @@ where
 
     /// Extracts the boxed inner error, discarding saved diagnostics.
     ///
-    /// Reuses the root allocation for heap-stored errors. Inline non-zero-sized
-    /// errors are moved into a new box. Requires the `alloc` feature.
+    /// Reuses an already boxed root when root diagnostics are disabled.
+    /// Inline nonzero roots and roots stored with diagnostics move into a new
+    /// box. Boxing a zero-sized concrete error needs no new allocation. Use
+    /// [`Self::into_single`] for allocation-free extraction from a singleton.
+    ///
+    /// Requires the `alloc` feature.
     #[cfg(feature = "alloc")]
     pub fn into_inner(self) -> Box<dyn SendSyncError> {
         let error;
@@ -528,6 +534,7 @@ where
     pub fn context<C: Into<ContextValue>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
+            .diagnostics_mut()
             .context
             .push(crate::context::ContextFrame::new(context.into()));
         self
@@ -541,6 +548,7 @@ where
     pub fn user_context<C: Into<ContextValue>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
+            .diagnostics_mut()
             .context
             .push(crate::context::ContextFrame::new_user_context(
                 context.into(),
@@ -558,6 +566,7 @@ where
     {
         #[cfg(feature = "context")]
         self.inner
+            .diagnostics_mut()
             .context
             .push(crate::context::ContextFrame::new(f().into()));
         self
@@ -574,6 +583,7 @@ where
     {
         #[cfg(feature = "context")]
         self.inner
+            .diagnostics_mut()
             .context
             .push(crate::context::ContextFrame::new_user_context(f().into()));
         self
@@ -583,14 +593,16 @@ where
 impl<A: SendSyncError> AsRef<A> for ErrorUnion<(A,)> {
     #[inline]
     fn as_ref(&self) -> &A {
-        self.inner.downcast_error_ref().unwrap()
+        // SAFETY: a singleton's invariant type set guarantees the concrete type.
+        unsafe { self.inner.downcast_error_ref_unchecked::<A>() }
     }
 }
 
 impl<A: SendSyncError> AsMut<A> for ErrorUnion<(A,)> {
     #[inline]
     fn as_mut(&mut self) -> &mut A {
-        self.inner.downcast_error_mut().unwrap()
+        // SAFETY: a singleton's invariant type set guarantees the concrete type.
+        unsafe { self.inner.downcast_error_mut_unchecked::<A>() }
     }
 }
 
@@ -618,28 +630,22 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
 
     /// Maps the single concrete inner error, preserving saved diagnostics.
     ///
+    /// With `alloc`, inline results need no allocation. Boxed roots reuse their
+    /// allocation when the old and new complete storage layouts have the same
+    /// size and alignment. Other boxed results allocate replacement storage.
+    /// The storage and layout choices are known at compile time.
+    ///
     /// With the `alloc` feature, `map_inner` maps the boxed inner error for
-    /// unions with any number of variants. Without `alloc`, `U` must fit the inline
-    /// size and alignment limits, as with [`ErrorUnion::new`].
+    /// unions with any number of variants. Without `alloc`, `U` must be
+    /// zero-sized, as with [`ErrorUnion::new`].
     pub fn map_single<U, F>(self, f: F) -> ErrorUnion<(U,)>
     where
         U: SendSyncError,
         F: FnOnce(A) -> U,
     {
-        // SAFETY: We know that the inner error is only of type A, so we can safely downcast it
-        let inner = unsafe { self.inner.downcast_error_unchecked_with_parts::<A>() };
         ErrorUnion {
-            inner: ErrorUnionInner::new_from_parts(
-                f(inner.error),
-                #[cfg(feature = "backtrace")]
-                inner.backtrace,
-                #[cfg(feature = "error_span_trace")]
-                inner.span_trace,
-                #[cfg(feature = "context")]
-                inner.context,
-                #[cfg(feature = "error_location")]
-                inner.location,
-            ),
+            // SAFETY: the invariant singleton set guarantees the exact type A.
+            inner: unsafe { self.inner.map_single::<A, U>(f) },
             _pd: PhantomData,
         }
     }
@@ -681,7 +687,9 @@ where
     /// Successful values pass through without calling the classifier.
     ///
     /// Preserves all saved diagnostics. A wrapper can retain the original error
-    /// as its source. See [`ErrorUnion::classify`] for storage details. Requires `alloc`.
+    /// as its source with `alloc`. Without `alloc`, the classifier borrows the
+    /// original error and returns a replacement; the original is then dropped.
+    /// See [`ErrorUnion::classify`] for storage details.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -700,10 +708,10 @@ where
     /// assert!(result.unwrap_err().is_inner::<ConfigError>());
     /// # }
     /// ```
-    #[cfg(feature = "alloc")]
     fn classify<Other, ClassifiedError, Index>(
         self,
-        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+        #[cfg(feature = "alloc")] classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+        #[cfg(not(feature = "alloc"))] classifier: impl FnOnce(&dyn SendSyncError) -> ClassifiedError,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
@@ -890,10 +898,10 @@ where
         self.map_err(ErrorUnion::adapter)
     }
 
-    #[cfg(feature = "alloc")]
     fn classify<Other, ClassifiedError, Index>(
         self,
-        classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+        #[cfg(feature = "alloc")] classifier: impl FnOnce(Box<dyn SendSyncError>) -> ClassifiedError,
+        #[cfg(not(feature = "alloc"))] classifier: impl FnOnce(&dyn SendSyncError) -> ClassifiedError,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
@@ -1206,7 +1214,7 @@ impl From<ErrorUnion> for anyhow::Error {
     #[allow(unused_mut)]
     fn from(mut value: ErrorUnion) -> Self {
         #[cfg(feature = "context")]
-        let context = core::mem::take(&mut value.inner.context);
+        let context = core::mem::take(&mut value.inner.diagnostics_mut().context);
         let inner_error = value.into_inner();
         let mut error = anyhow::Error::new(inner_error);
         #[cfg(feature = "context")]
@@ -1303,10 +1311,12 @@ mod tests {
         {
             union
                 .inner
+                .diagnostics_mut()
                 .context
                 .push(ContextFrame::new("step one".into()));
             union
                 .inner
+                .diagnostics_mut()
                 .context
                 .push(ContextFrame::new("step two".into()));
         }
@@ -1317,7 +1327,7 @@ mod tests {
         assert_eq!(parts.error, FooError("ctx".into()));
 
         #[cfg(feature = "context")]
-        assert_eq!(parts.context.len(), 2);
+        assert_eq!(parts.diagnostics.context.len(), 2);
     }
 
     #[test]
@@ -1380,7 +1390,7 @@ mod tests {
             .union();
 
         #[cfg(feature = "context")]
-        assert_eq!(recovered.inner.context.len(), 1);
+        assert_eq!(recovered.inner.diagnostics().context.len(), 1);
 
         assert_eq!(recovered.as_ref(), &FooError("ctx".into()));
     }
