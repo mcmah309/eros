@@ -909,41 +909,7 @@ For a union with a single possible error type, `as_single` and `as_single_mut` b
 
 ### Structured JSON
 
-Enable `json` to get error reports as `serde_json::Value` with
-`.to_display_json()` or `.to_debug_json()`. Debug JSON includes context, locations,
-and traces when enabled. Both include child reports.
-
-```rust
-// ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
-// Both expose their boxed `source` through Error::source().
-
-let error = eros::error!("permission denied")
-    .map_inner(|source| ConfigError { source })
-    .context("read /etc/app.toml")
-    .context("start service");
-
-println!("to_display_json: {}", error.to_display_json());
-println!("to_debug_json: {}", error.to_debug_json());
-
-// Wrap again, preserving the full source chain.
-let error = error.map_inner(|source| StartupError { source });
-println!("replacement: {error}");
-```
-
-With default Eros features, `json`, and `RUST_LIB_BACKTRACE=0`, the output is:
-
-```text
-to_display_json: {"root":"cannot open configuration","sources":["permission denied"]}
-```
-```text
-to_debug_json: {"backtrace":null,"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
-```
-```text
-replacement: startup failed
-    caused by:
-        - cannot open configuration
-        - permission denied
-```
+See the [Structured JSON documentation](https://github.com/mcmah309/eros/blob/master/docs/json.md).
 
 ### Exposing Errors To Application Users
 

@@ -9,7 +9,7 @@
         "file": "<file>",
         "line": 0
       },
-      "root": "invalid record\r\nretry exhausted",
+      "root": "invalid record\nretry exhausted",
       "sources": [],
       "span_trace": null
     },
@@ -21,7 +21,7 @@
         "file": "<file>",
         "line": 0
       },
-      "root": "invalid record\r\nretry exhausted",
+      "root": "invalid record\nretry exhausted",
       "sources": [],
       "span_trace": null
     },
@@ -33,7 +33,7 @@
         "file": "<file>",
         "line": 0
       },
-      "root": "invalid record\r\nretry exhausted",
+      "root": "invalid record\nretry exhausted",
       "sources": [],
       "span_trace": null
     }

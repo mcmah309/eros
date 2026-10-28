@@ -309,6 +309,28 @@ fn normalize_span_json(trace: &tracing_error::SpanTrace, value: &mut serde_json:
 
 #[cfg(feature = "json")]
 fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
+    // Rebuild ordinary Display from JSON fields, independently of the JSON
+    // serializer. This checks source order, multiline layout, and message text
+    // for every node in every fixture, including nested batch children.
+    let mut display = value["root"].as_str().expect("root message").to_owned();
+    let sources = value["sources"].as_array().expect("source messages");
+    if !sources.is_empty() {
+        display.push_str("\n    caused by:");
+        for source in sources {
+            display.push_str("\n        - ");
+            display.push_str(
+                &source
+                    .as_str()
+                    .expect("source message")
+                    .replace('\n', "\n          "),
+            );
+        }
+    }
+    assert_eq!(
+        canonical_text(&display),
+        canonical_text(&format!("{report}")),
+        "JSON root/source fields must reproduce ordinary Display"
+    );
     #[cfg(feature = "error_location")]
     assert_location(&mut value["location"], report.location());
     #[cfg(not(feature = "error_location"))]
@@ -320,11 +342,15 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     {
         assert_eq!(contexts.len(), report.contexts().len());
         for (value, frame) in contexts.iter_mut().zip(report.contexts()) {
-            assert_eq!(value["message"], frame.to_string());
+            assert_eq!(
+                value["message"],
+                frame.to_string().lines().collect::<Vec<_>>().join("\n")
+            );
+            assert!(value.get("user_facing").is_none());
             #[cfg(feature = "user_context")]
-            assert_eq!(value["user_facing"], frame.is_user_context());
+            assert_eq!(value["user_context"], frame.is_user_context());
             #[cfg(not(feature = "user_context"))]
-            assert_eq!(value["user_facing"], false);
+            assert!(value.get("user_context").is_none());
             #[cfg(feature = "context_location")]
             assert_location(&mut value["location"], frame.location());
             #[cfg(not(feature = "context_location"))]
@@ -393,6 +419,9 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
 fn adapt_expected_json(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(object) => {
+            if !cfg!(feature = "user_context") {
+                object.remove("user_context");
+            }
             let include_location = if object.contains_key("message") {
                 cfg!(feature = "context_location")
             } else {

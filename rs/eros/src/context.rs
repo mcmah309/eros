@@ -41,7 +41,7 @@ impl ContextFrame {
 
     #[cfg(feature = "user_context")]
     #[cfg_attr(feature = "context_location", track_caller)]
-    pub(crate) fn new_user_facing(context: ContextValue) -> Self {
+    pub(crate) fn new_user_context(context: ContextValue) -> Self {
         Self {
             context,
             #[cfg(feature = "context_span_trace")]

@@ -539,7 +539,7 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ContextFrame::new_user_facing(
+            .push(crate::context::ContextFrame::new_user_context(
                 context.into(),
             ));
         self
@@ -572,7 +572,7 @@ where
         #[cfg(feature = "context")]
         self.inner
             .context
-            .push(crate::context::ContextFrame::new_user_facing(f().into()));
+            .push(crate::context::ContextFrame::new_user_context(f().into()));
         self
     }
 }

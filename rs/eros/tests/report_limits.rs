@@ -110,6 +110,16 @@ fn report_limit_applies_before_grouping_duplicates() {
         format!("{batch:#?}"),
         "errors (10000 total):\n    - error: failure 0\n      at: [0..10]\n    - ... 9990 errors omitted (report limit reached)"
     );
+    #[cfg(feature = "json")]
+    {
+        let error: ErrorUnion<(Batch,)> = batch.into_union();
+        for value in [error.to_display_json(), error.to_debug_json()] {
+            let children = value["children"].as_array().unwrap();
+            assert_eq!(children.len(), 10);
+            assert!(children.iter().all(|child| child["root"] == "failure 0"));
+            assert_eq!(value["children_omitted"], 9990);
+        }
+    }
 }
 
 fn nested_batch() -> ErrorUnionVec<(Batch,)> {

@@ -9,7 +9,7 @@
       },
       "message": "read /etc/app.toml",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -19,7 +19,7 @@
       },
       "message": "start service",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     }
   ],
   "location": {

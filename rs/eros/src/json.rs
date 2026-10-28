@@ -1,48 +1,37 @@
-use alloc::{string::ToString, vec::Vec};
+use alloc::{string::String, vec::Vec};
+use core::fmt;
 use serde_json::{Value, json};
 
 use crate::{ErrorReport, ErrorUnion, TypeSet, formatting::Report};
 
 impl<E: TypeSet> ErrorUnion<E> {
-    /// Returns root/source messages as structured JSON.
+    /// Returns a structured JSON report without diagnostics.
     ///
-    /// The object contains `root` (a string) and `sources` (an array of strings
-    /// in source-chain order). See [`crate::ErrorUnionVec`] for batch reporting.
-    /// This creates data, without logging or serializing it to text. Requires
-    /// the `json` feature; works with `no_std + alloc`.
+    /// See the [Structured JSON documentation](https://github.com/mcmah309/eros/blob/master/docs/json.md).
     pub fn to_display_json(&self) -> Value {
         self.report().to_display_json()
     }
 
-    /// Returns the information in ordinary Debug as structured JSON.
+    /// Returns a structured JSON report with diagnostics.
     ///
-    /// Adds `contexts` in attachment order (innermost first), root/context `location`
-    /// objects (`file`, `line`, `column`), and enabled traces.
-    /// Each context has `message` and `user_facing`. With `backtrace`, adds
-    /// `backtrace` as rendered text when captured, or null otherwise.
-    /// Root locations require `error_location`; context locations require
-    /// `context_location`. The `location` feature enables both.
-    /// `error_span_trace` adds root `span_trace` text, and `context_span_trace`
-    /// adds it to each context. Enabled traces are null when not captured;
-    /// disabled fields are omitted. The `span_trace` feature enables both.
-    /// See [`crate::ErrorUnionVec`] for batch reporting.
+    /// See the [Structured JSON documentation](https://github.com/mcmah309/eros/blob/master/docs/json.md).
     pub fn to_debug_json(&self) -> Value {
         self.report().to_debug_json()
     }
 }
 
 impl ErrorReport<'_> {
-    /// Returns root/source messages and any child reports as structured JSON.
+    /// Returns a structured JSON report without diagnostics.
     ///
-    /// Uses the same schema as [`ErrorUnion::to_display_json`].
+    /// See the [Structured JSON documentation](https://github.com/mcmah309/eros/blob/master/docs/json.md).
     pub fn to_display_json(&self) -> Value {
         let mut remaining = crate::formatting::MAX_CHILD_REPORTS;
         self.to_json(false, &mut remaining)
     }
 
-    /// Returns this report and its children with their saved diagnostic metadata.
+    /// Returns a structured JSON report with diagnostics.
     ///
-    /// Uses the same schema as [`ErrorUnion::to_debug_json`].
+    /// See the [Structured JSON documentation](https://github.com/mcmah309/eros/blob/master/docs/json.md).
     pub fn to_debug_json(&self) -> Value {
         let mut remaining = crate::formatting::MAX_CHILD_REPORTS;
         self.to_json(true, &mut remaining)
@@ -63,14 +52,16 @@ impl ErrorReport<'_> {
         let mut contexts = Vec::<Value>::new();
         #[cfg(feature = "context")]
         for context in _report.contexts {
+            let Some(message) = message_text(&context.context) else {
+                continue;
+            };
             #[allow(unused_mut)]
             let mut frame = json!({
-                "message": context.context.to_string(),
-                "user_facing": false,
+                "message": message,
             });
             #[cfg(feature = "user_context")]
             {
-                frame["user_facing"] = context.is_user_context.into();
+                frame["user_context"] = context.is_user_context.into();
             }
             #[cfg(feature = "context_location")]
             {
@@ -120,10 +111,17 @@ impl ErrorReport<'_> {
 }
 
 fn display_value(report: &Report<'_>) -> Value {
-    json!({
-        "root": report.root.to_string(),
-        "sources": report.sources().map(ToString::to_string).collect::<Vec<_>>(),
-    })
+    let root = message_text(report.root);
+    let sources: Vec<_> = report.sources().filter_map(message_text).collect();
+    let mut value = json!({ "sources": sources });
+    if let Some(root) = root {
+        value["root"] = root.into();
+    }
+    value
+}
+
+fn message_text(value: &(impl fmt::Display + ?Sized)) -> Option<String> {
+    crate::formatting::message_text(value).ok()
 }
 
 #[cfg(any(

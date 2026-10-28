@@ -12,7 +12,7 @@
           },
           "message": "validate customer 104",
           "span_trace": null,
-          "user_facing": false
+          "user_context": false
         }
       ],
       "location": {
@@ -35,7 +35,7 @@
           },
           "message": "validate customer 209",
           "span_trace": null,
-          "user_facing": false
+          "user_context": false
         }
       ],
       "location": {
@@ -57,7 +57,7 @@
       },
       "message": "import customers.csv",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     }
   ],
   "location": {

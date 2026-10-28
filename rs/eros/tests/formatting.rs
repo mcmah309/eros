@@ -652,10 +652,17 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
         assert_eq!(contexts[0]["message"], "read /etc/app.toml");
         assert_eq!(contexts[1]["message"], "start service");
         for context in contexts {
-            assert_eq!(context["user_facing"], false);
+            #[cfg(feature = "user_context")]
+            assert_eq!(
+                context.get("user_context"),
+                Some(&serde_json::Value::Bool(false))
+            );
+            #[cfg(not(feature = "user_context"))]
+            assert!(context.get("user_context").is_none());
             assert_eq!(
                 context.as_object().unwrap().len(),
-                2 + usize::from(cfg!(feature = "context_location"))
+                1 + usize::from(cfg!(feature = "user_context"))
+                    + usize::from(cfg!(feature = "context_location"))
                     + usize::from(cfg!(feature = "context_span_trace"))
             );
         }
@@ -703,7 +710,7 @@ fn assert_json_location(location: &serde_json::Value, line: u32) {
 
 #[cfg(all(feature = "json", feature = "user_context"))]
 #[test]
-fn diagnostic_contexts_preserve_user_facing_markers_in_stack_order() {
+fn diagnostic_contexts_preserve_user_context_markers_in_stack_order() {
     let error = eros::error!("permission denied")
         .context("read /etc/app.toml")
         .user_context("Choose a readable configuration file.");
@@ -712,10 +719,10 @@ fn diagnostic_contexts_preserve_user_facing_markers_in_stack_order() {
 
     assert_eq!(contexts.len(), 2);
     assert_eq!(contexts[0]["message"], "read /etc/app.toml");
-    assert_eq!(contexts[0]["user_facing"], false);
+    assert_eq!(contexts[0]["user_context"], false);
     assert_eq!(
         contexts[1]["message"],
         "Choose a readable configuration file."
     );
-    assert_eq!(contexts[1]["user_facing"], true);
+    assert_eq!(contexts[1]["user_context"], true);
 }

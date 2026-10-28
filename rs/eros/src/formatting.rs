@@ -460,16 +460,15 @@ impl ReportRenderer {
             self.line(out, &"- error:")?;
             out.write_char('\n')?;
             fields.nested().collection(out, children)?;
-        } else {
-            let mut message = String::new();
-            if let Some(report) = &group.node.report {
-                write_lines(&mut message, format_args!(""), 0, report.root)?;
-            }
+        } else if let Some(report) = &group.node.report {
+            let message = message_text(report.root)?;
             if message.contains('\n') {
                 self.line(out, &"- error:")?;
-                fields.continued().next_line(out, &message)?;
+                // Render the original value so line endings are normalized
+                // once, retaining intentional trailing blank lines.
+                fields.continued().next_line(out, report.root)?;
             } else {
-                self.line(out, &format_args!("- error: {message}"))?;
+                self.line(out, &format_args!("- error: {}", report.root))?;
             }
         }
         fields.next_line(out, &format_args!("at: [{}]", Positions(&group.positions)))?;
@@ -528,7 +527,7 @@ enum GroupKeyPart {
 }
 
 #[cfg(feature = "alloc")]
-fn message_key(value: &(impl fmt::Display + ?Sized)) -> Result<String, fmt::Error> {
+pub(crate) fn message_text(value: &(impl fmt::Display + ?Sized)) -> Result<String, fmt::Error> {
     let mut message = String::new();
     write_lines(&mut message, format_args!(""), 0, value)?;
     Ok(message)
@@ -572,17 +571,17 @@ impl<'a> DebugNode<'a> {
         }
         if let Some(report) = &self.report {
             if self.children.is_none() {
-                key.push(GroupKeyPart::Root(message_key(report.root)?));
+                key.push(GroupKeyPart::Root(message_text(report.root)?));
             }
             for source in report.sources() {
-                key.push(GroupKeyPart::Source(message_key(source)?));
+                key.push(GroupKeyPart::Source(message_text(source)?));
             }
             #[cfg(feature = "context")]
             for context in report.contexts {
-                key.push(GroupKeyPart::Context(message_key(&context.context)?));
+                key.push(GroupKeyPart::Context(message_text(&context.context)?));
                 #[cfg(feature = "context_location")]
                 if detailed {
-                    key.push(GroupKeyPart::ContextLocation(message_key(
+                    key.push(GroupKeyPart::ContextLocation(message_text(
                         context.location,
                     )?));
                 }
@@ -594,7 +593,7 @@ impl<'a> DebugNode<'a> {
             }
             if detailed {
                 #[cfg(feature = "error_location")]
-                key.push(GroupKeyPart::Location(message_key(report.location)?));
+                key.push(GroupKeyPart::Location(message_text(report.location)?));
                 #[cfg(feature = "backtrace")]
                 key.push(GroupKeyPart::Backtrace(
                     report.backtrace_status(),

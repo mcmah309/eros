@@ -1,4 +1,4 @@
 {
-  "root": "invalid record\r\nretry exhausted",
+  "root": "invalid record\nretry exhausted",
   "sources": []
 }

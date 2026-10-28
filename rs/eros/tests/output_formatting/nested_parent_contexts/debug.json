@@ -15,7 +15,7 @@
               },
               "message": "validate row 17",
               "span_trace": null,
-              "user_facing": false
+              "user_context": false
             }
           ],
           "location": {
@@ -37,7 +37,7 @@
           },
           "message": "import page",
           "span_trace": null,
-          "user_facing": false
+          "user_context": false
         }
       ],
       "location": {
@@ -59,7 +59,7 @@
       },
       "message": "import file",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     }
   ],
   "location": {

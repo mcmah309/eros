@@ -3,7 +3,7 @@
     {
       "children": [
         {
-          "root": "invalid record\r\nretry exhausted",
+          "root": "invalid record\nretry exhausted",
           "sources": [
             "permission denied\naccess policy rejected"
           ]

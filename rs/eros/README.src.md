@@ -1046,76 +1046,7 @@ For a union with a single possible error type, `as_single` and `as_single_mut` b
 
 ### Structured JSON
 
-Enable `json` to get error reports as `serde_json::Value` with
-`.to_display_json()` or `.to_debug_json()`. Debug JSON includes context, locations,
-and traces when enabled. Both include child reports.
-
-```rust
-# #[cfg(feature = "json")]
-# fn main() {
-# use eros::Context;
-# #[derive(Debug)]
-# struct ConfigError { source: Box<dyn eros::SendSyncError> }
-# impl std::fmt::Display for ConfigError {
-#     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-#         f.write_str("cannot open configuration")
-#     }
-# }
-# impl std::error::Error for ConfigError {
-#     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-#         Some(self.source.as_ref())
-#     }
-# }
-# #[derive(Debug)]
-# struct StartupError { source: Box<dyn eros::SendSyncError> }
-# impl std::fmt::Display for StartupError {
-#     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-#         f.write_str("startup failed")
-#     }
-# }
-# impl std::error::Error for StartupError {
-#     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-#         Some(self.source.as_ref())
-#     }
-# }
-// ConfigError displays "cannot open configuration"; StartupError displays "startup failed".
-// Both expose their boxed `source` through Error::source().
-
-let error = eros::error!("permission denied")
-    .map_inner(|source| ConfigError { source })
-    .context("read /etc/app.toml")
-    .context("start service");
-
-println!("to_display_json: {}", error.to_display_json());
-println!("to_debug_json: {}", error.to_debug_json());
-# assert_eq!(error.to_display_json(), serde_json::json!({
-#     "root": "cannot open configuration", "sources": ["permission denied"],
-# }));
-# assert_eq!(error.to_debug_json()["root"], "cannot open configuration");
-
-// Wrap again, preserving the full source chain.
-let error = error.map_inner(|source| StartupError { source });
-println!("replacement: {error}");
-# assert_eq!(error.to_string(), "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied");
-# }
-# #[cfg(not(feature = "json"))]
-# fn main() {}
-```
-
-With default Eros features, `json`, and `RUST_LIB_BACKTRACE=0`, the output is:
-
-```text
-to_display_json: {"root":"cannot open configuration","sources":["permission denied"]}
-```
-```text
-to_debug_json: {"backtrace":null,"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
-```
-```text
-replacement: startup failed
-    caused by:
-        - cannot open configuration
-        - permission denied
-```
+See the [Structured JSON documentation](https://github.com/mcmah309/eros/blob/master/docs/json.md).
 
 ### Exposing Errors To Application Users
 

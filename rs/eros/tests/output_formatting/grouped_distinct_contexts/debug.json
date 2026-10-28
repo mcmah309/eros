@@ -12,7 +12,7 @@
           },
           "message": "row 17",
           "span_trace": null,
-          "user_facing": false
+          "user_context": false
         }
       ],
       "location": {
@@ -35,7 +35,7 @@
           },
           "message": "row 29",
           "span_trace": null,
-          "user_facing": false
+          "user_context": false
         }
       ],
       "location": {
@@ -58,7 +58,7 @@
           },
           "message": "row 17",
           "span_trace": null,
-          "user_facing": false
+          "user_context": false
         }
       ],
       "location": {

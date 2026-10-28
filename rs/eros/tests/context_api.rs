@@ -110,7 +110,7 @@ fn context_adapters_capture_the_public_call_site() {
 
 #[test]
 #[cfg(feature = "user_context")]
-fn contexts_include_user_facing_flags_and_locations() {
+fn contexts_include_user_context_flags_and_locations() {
     let error = eros::error!("root").context("internal");
     let _public_line = line!() + 1;
     let error = error.user_context("public");

@@ -9,7 +9,7 @@
       },
       "message": "step 1\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -19,7 +19,7 @@
       },
       "message": "step 2\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -29,7 +29,7 @@
       },
       "message": "step 3\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -39,7 +39,7 @@
       },
       "message": "step 4\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -49,7 +49,7 @@
       },
       "message": "step 5\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -59,7 +59,7 @@
       },
       "message": "step 6\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -69,7 +69,7 @@
       },
       "message": "step 7\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -79,7 +79,7 @@
       },
       "message": "step 8\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -89,7 +89,7 @@
       },
       "message": "step 9\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -99,7 +99,7 @@
       },
       "message": "step 10\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -109,7 +109,7 @@
       },
       "message": "step 11\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     },
     {
       "location": {
@@ -119,7 +119,7 @@
       },
       "message": "step 12\ncontinuation",
       "span_trace": null,
-      "user_facing": false
+      "user_context": false
     }
   ],
   "location": {
