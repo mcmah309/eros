@@ -52,14 +52,13 @@ mod tests {
         let trace = error.span_trace().to_string();
 
         let input: eros::Result<u8, library::Errors> = Err(error);
-        let output: eros::Result<u8, (AppError, fmt::Error)> =
-            input.classify(|mut inner: eros::InnerError| {
-                assert!(inner.is::<DomainError>());
-                assert!(!inner.is::<Box<DomainError>>());
-                inner.downcast_mut::<DomainError>().unwrap().0 += 1;
-                assert_eq!(inner.to_string(), "domain 9");
-                AppError(inner.into_boxed())
-            });
+        let output: eros::Result<u8, (AppError, fmt::Error)> = input.classify(|mut inner| {
+            assert!(inner.is::<DomainError>());
+            assert!(!inner.is::<Box<DomainError>>());
+            inner.downcast_mut::<DomainError>().unwrap().0 += 1;
+            assert_eq!(inner.to_string(), "domain 9");
+            AppError(inner.into())
+        });
         let error = output.unwrap_err();
         #[cfg(feature = "diagnostics")]
         {
@@ -120,7 +119,7 @@ mod tests {
     fn owned_downcasts_keep_original_type_value_and_ownership() {
         let drops = Arc::new(AtomicUsize::new(0));
         let error = large(&drops);
-        let error: ErrorUnion<(DomainError,)> = error.classify(|inner: eros::InnerError| {
+        let error: ErrorUnion<(DomainError,)> = error.classify(|inner| {
             assert!(inner.is::<LargeError>());
             let mut inner = inner.downcast::<Code>().unwrap_err();
             inner.downcast_mut::<LargeError>().unwrap().bytes[0] = 93;
@@ -153,7 +152,7 @@ mod tests {
         let error: ErrorUnion<(Retained,)> = large(&drops).classify(Retained);
         assert_eq!(drops.load(Ordering::SeqCst), 0);
         assert!(error.source().unwrap().is::<LargeError>());
-        let error: ErrorUnion<(AppError,)> = error.classify(|inner: eros::InnerError| {
+        let error: ErrorUnion<(AppError,)> = error.classify(|inner| {
             assert!(
                 inner
                     .downcast_ref::<Retained>()
@@ -178,7 +177,7 @@ mod tests {
         let drops = Arc::new(AtomicUsize::new(0));
         let error = large(&drops);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            error.classify::<(DomainError,), _, _, _>(|inner: eros::InnerError| {
+            error.classify::<(DomainError,), _, _>(|inner| {
                 let inner = inner.downcast::<Code>().unwrap_err();
                 assert!(inner.is::<LargeError>());
                 panic!("classifier failed");

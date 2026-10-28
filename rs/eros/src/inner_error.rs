@@ -12,7 +12,8 @@ use core::{
 /// Inspection, mutation, and concrete extraction work without allocation. The
 /// representation is private: enabling `alloc` does not change the callback
 /// type or the concrete type observed by downcasting. With `alloc`,
-/// `into_boxed` can transfer the original error into a source wrapper.
+/// `into_boxed` or conversion into `Box<dyn SendSyncError>` can transfer the
+/// original error into a source wrapper.
 ///
 /// Saved union diagnostics stay with the classified result. Dropping this owner
 /// drops the original error exactly once. Retaining this owner inside a new
@@ -73,10 +74,18 @@ impl InnerError {
     /// disabled. Inline nonzero roots and roots sharing an allocation with
     /// diagnostics move into a new box; boxing a ZST needs no allocation.
     /// The box contains the original concrete error, so its downcasts and
-    /// source chain continue to refer to that error.
+    /// source chain continue to refer to that error. Conversion into
+    /// `Box<dyn SendSyncError>` using `.into()` is equivalent.
     #[cfg(feature = "alloc")]
     pub fn into_boxed(self) -> Box<dyn SendSyncError> {
         self.inner.into_boxed_parts().error
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<InnerError> for Box<dyn SendSyncError> {
+    fn from(error: InnerError) -> Self {
+        error.into_boxed()
     }
 }
 

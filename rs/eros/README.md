@@ -233,7 +233,7 @@ fn load_port(contents: &str) -> eros::Result<u16> {
 fn checked_port(contents: &str)
     -> eros::Result<u16, (MissingPort, DynamicPortNotAllowed, PortConfigError)>
 {
-    let port = load_port(contents).classify(PortConfigError)?;
+    let port = load_port(contents).classify(|inner| PortConfigError(inner.into()))?;
     eros::ensure!(port != 0, DynamicPortNotAllowed);
     Ok(port)
 }
@@ -252,24 +252,19 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 `classify` checks only the concrete inner error, not its sources or contexts.
 Matching types, including an existing `PortConfigError`, retain their storage and
 pass through without invoking the callback. Other roots transfer to the callback
-as an owned `InnerError` or, with `alloc`, a `Box<dyn SendSyncError>`. A tuple
-struct constructor taking either type can be passed directly. Saved diagnostics
-remain with the replacement, and no new diagnostics are captured.
-
-An `InnerError` callback can inspect, mutate, extract, drop, or retain the owner
-without boxing it. For example,
-`.classify(|inner: eros::InnerError| PortConfigError(inner.into_boxed()))` is
-equivalent to the constructor call above. Annotate closure parameters with
-`InnerError` or `Box<dyn SendSyncError>` when their type cannot be inferred;
-callbacks that ignore the input can use `|_: eros::InnerError|`.
+as an owned `InnerError`. The callback can inspect, mutate, extract, drop, or
+retain that owner without boxing it. A tuple struct constructor taking
+`InnerError` can be passed directly. Saved diagnostics remain with the
+replacement, and no new diagnostics are captured.
 
 To discard the original error, use an explicit callback such as
-`.classify(|_: eros::InnerError| MyError)`. Replacement error values cannot be
+`.classify(|_| MyError)`. Replacement error values cannot be
 passed directly to `classify`.
 
 `InnerError` and its downcasting methods are available with every feature
-configuration. Enabling `alloc` adds `InnerError::into_boxed()` to preserve the
-original concrete error as an owned source. An already boxed root reuses its
+configuration. Enabling `alloc` adds `InnerError::into_boxed()` and conversion
+into `Box<dyn SendSyncError>` through `.into()` to preserve the original concrete
+error as an owned source. An already boxed root reuses its
 allocation when root diagnostics are disabled; inline nonzero roots and roots
 sharing an allocation with diagnostics move into a new box when that method
 is called. The replacement follows the compile-time storage choice.
@@ -1313,7 +1308,7 @@ use core::fmt;
 // The owner can inspect the original concrete error to choose a domain error.
 let result: eros::Result<()> = Err(eros::error!("device unavailable"));
 let classified: eros::Result<(), (fmt::Error,)> =
-    result.classify(|_: eros::InnerError| fmt::Error);
+    result.classify(|_| fmt::Error);
 assert!(classified.unwrap_err().is_inner::<fmt::Error>());
 ```
 

@@ -38,9 +38,8 @@ pub fn run_checks() {
     let known: ErrorUnion = ErrorUnion::new(fmt::Error);
     #[cfg(feature = "error_location")]
     let location = known.location();
-    let kept: ErrorUnion<PublicErrors> = known.classify(|_: eros::InnerError| -> DomainError {
-        panic!("represented types must bypass classification")
-    });
+    let kept: ErrorUnion<PublicErrors> = known
+        .classify(|_| -> DomainError { panic!("represented types must bypass classification") });
     assert!(kept.is_inner::<fmt::Error>());
     #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(location, kept.location()));
@@ -50,7 +49,7 @@ pub fn run_checks() {
     #[cfg(feature = "error_location")]
     let location = unknown.location();
     let mut calls = 0;
-    let classified: ErrorUnion<PublicErrors> = unknown.classify(|original: eros::InnerError| {
+    let classified: ErrorUnion<PublicErrors> = unknown.classify(|original| {
         calls += 1;
         assert!(original.is::<ImplementationError>());
         assert_eq!(DROPS.load(Ordering::SeqCst), before);
@@ -64,22 +63,18 @@ pub fn run_checks() {
 
     let success: eros::Result<u8> = Ok(7);
     let success: eros::Result<u8, PublicErrors> =
-        success.classify(|_: eros::InnerError| -> DomainError {
-            panic!("successes must bypass classification")
-        });
+        success.classify(|_| -> DomainError { panic!("successes must bypass classification") });
     assert_eq!(success.unwrap(), 7);
 
     let failure: eros::Result<u8> = Err(ErrorUnion::new(ImplementationError));
-    let failure: eros::Result<u8, PublicErrors> =
-        failure.classify(|_: eros::InnerError| DomainError);
+    let failure: eros::Result<u8, PublicErrors> = failure.classify(|_| DomainError);
     assert!(failure.unwrap_err().is_inner::<DomainError>());
     assert_eq!(DROPS.load(Ordering::SeqCst), before + 2);
 
     let failure: eros::Result<u8> = Err(ErrorUnion::new(fmt::Error));
-    let failure: eros::Result<u8, PublicErrors> =
-        failure.classify(|_: eros::InnerError| -> DomainError {
-            panic!("represented result errors must bypass classification")
-        });
+    let failure: eros::Result<u8, PublicErrors> = failure.classify(|_| -> DomainError {
+        panic!("represented result errors must bypass classification")
+    });
     assert!(failure.unwrap_err().is_inner::<fmt::Error>());
 }
 
@@ -138,7 +133,7 @@ fn classify_word_payloads() {
     // Distinct enum variants retain one concrete member of the tuple.
     for status in [Status::Bus, Status::Timeout] {
         let error: ErrorUnion<(Status, fmt::Error)> = ErrorUnion::new(status);
-        let kept: ErrorUnion<(Status,)> = error.classify(|_: eros::InnerError| -> Status {
+        let kept: ErrorUnion<(Status,)> = error.classify(|_| -> Status {
             panic!("all variants of a represented enum must pass through")
         });
         assert!(kept.is_inner::<Status>());

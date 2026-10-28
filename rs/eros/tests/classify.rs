@@ -29,9 +29,7 @@ fn panicking_classifier_drops_the_original_once() {
     }
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Root);
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(fmt::Error,), _, _, _>(|_: eros::InnerError| -> fmt::Error {
-            panic!("classification failed")
-        })
+        error.classify::<(fmt::Error,), _, _>(|_| -> fmt::Error { panic!("classification failed") })
     }));
     assert!(outcome.is_err());
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
@@ -39,7 +37,7 @@ fn panicking_classifier_drops_the_original_once() {
 
 #[cfg(feature = "alloc")]
 #[test]
-fn panicking_boxed_classifier_drops_original_and_context_once() {
+fn panicking_boxing_callback_drops_original_and_context_once() {
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -62,12 +60,11 @@ fn panicking_boxed_classifier_drops_original_and_context_once() {
     let error = error.context(Box::new(Tracked(contexts.clone())) as Box<dyn eros::SendSyncError>);
 
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(core::fmt::Error,), _, _, _>(
-            |boxed: Box<dyn eros::SendSyncError>| -> core::fmt::Error {
-                assert!((boxed.as_ref() as &dyn std::any::Any).is::<Tracked>());
-                panic!("boxed classification failed");
-            },
-        )
+        error.classify::<(core::fmt::Error,), _, _>(|inner| -> core::fmt::Error {
+            let boxed = inner.into_boxed();
+            assert!((boxed.as_ref() as &dyn std::any::Any).is::<Tracked>());
+            panic!("boxed classification failed");
+        })
     }));
     assert!(outcome.is_err());
     assert_eq!(roots.load(Ordering::SeqCst), 1);
@@ -118,7 +115,7 @@ fn panicking_original_destructor_drops_replacement_and_saved_context_once() {
     #[cfg(feature = "context")]
     let error = error.context(Box::new(Tracked(&CONTEXTS)) as Box<dyn eros::SendSyncError>);
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(Tracked,), _, _, _>(|original: eros::InnerError| {
+        error.classify::<(Tracked,), _, _>(|original| {
             let replacement = Tracked(&REPLACEMENTS);
             drop(original);
             replacement
@@ -156,7 +153,7 @@ fn an_owner_can_escape_the_callback_and_transfer_to_another_thread() {
     assert_traits::<eros::InnerError>();
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Owner(&FIRST));
     let mut saved = None;
-    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|inner: eros::InnerError| {
+    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|inner| {
         saved = Some(inner);
         fmt::Error
     });
@@ -198,21 +195,20 @@ fn aligned_zsts_can_be_inspected_and_extracted_from_an_owner() {
         }
     }
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Aligned);
-    let classified: eros::ErrorUnion<(fmt::Error,)> =
-        error.classify(|mut inner: eros::InnerError| {
-            assert_eq!(
-                core::ptr::from_ref(inner.downcast_ref::<Aligned>().unwrap()).addr() % 256,
-                0
-            );
-            assert_eq!(
-                core::ptr::from_mut(inner.downcast_mut::<Aligned>().unwrap()).addr() % 256,
-                0
-            );
-            let original = inner.downcast::<Aligned>().unwrap();
-            assert_eq!(DROPS.load(Ordering::SeqCst), 0);
-            drop(original);
-            fmt::Error
-        });
+    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|mut inner| {
+        assert_eq!(
+            core::ptr::from_ref(inner.downcast_ref::<Aligned>().unwrap()).addr() % 256,
+            0
+        );
+        assert_eq!(
+            core::ptr::from_mut(inner.downcast_mut::<Aligned>().unwrap()).addr() % 256,
+            0
+        );
+        let original = inner.downcast::<Aligned>().unwrap();
+        assert_eq!(DROPS.load(Ordering::SeqCst), 0);
+        drop(original);
+        fmt::Error
+    });
     drop(classified);
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
 }

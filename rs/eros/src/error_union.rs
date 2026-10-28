@@ -17,7 +17,7 @@ use crate::type_set::{
 };
 
 use crate::storage::ErrorUnionInner;
-use crate::{AnyError, Classifier, SendSyncDebugDisplay};
+use crate::{AnyError, SendSyncDebugDisplay};
 
 /// Any error that satisfies this trait's bounds can be used in a `ErrorUnion`
 pub trait SendSyncError: core::error::Error + SendSyncDebugDisplay {}
@@ -680,15 +680,14 @@ where
     /// ```
     fn adapter(self) -> Result<S, ErrorUnionAdapter<E>>;
 
-    /// Classifies implementation errors using an owned error callback.
+    /// Classifies implementation errors using an owned [`crate::InnerError`].
     ///
-    /// Callbacks taking [`crate::InnerError`] work with every feature configuration.
-    /// With `alloc`, callbacks taking `Box<dyn SendSyncError>` are also accepted,
-    /// including tuple struct constructors. Closure parameters may need explicit
-    /// types. Successful values and concrete types already represented in `Other`
-    /// bypass the callback. All saved diagnostics stay with the replacement.
+    /// The callback type is independent of features. Successful values and concrete
+    /// types already represented in `Other` bypass the callback. Other errors
+    /// transfer to the callback to inspect, extract, drop, or (with `alloc`) convert
+    /// using `InnerError::into_boxed`. All saved diagnostics stay with the replacement.
     /// Discarding the original error requires an explicit callback such as
-    /// `|_: crate::InnerError| MyError`; error values cannot be passed directly.
+    /// `|_| MyError`; error values cannot be passed directly.
     /// See [`ErrorUnion::classify`] for details.
     ///
     /// ```
@@ -702,13 +701,13 @@ where
     ///
     /// let result: eros::Result<u16> = Err(eros::error!("missing port"));
     /// let result: eros::Result<u16, (ConfigError,)> =
-    ///     result.classify(ConfigError);
+    ///     result.classify(|inner| ConfigError(inner.into()));
     /// assert!(result.unwrap_err().is_inner::<ConfigError>());
     /// # }
     /// ```
-    fn classify<Other, ClassifiedError, Index, Input>(
+    fn classify<Other, ClassifiedError, Index>(
         self,
-        classifier: impl Classifier<ClassifiedError, Input>,
+        classifier: impl FnOnce(crate::InnerError) -> ClassifiedError,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
@@ -895,16 +894,16 @@ where
         self.map_err(ErrorUnion::adapter)
     }
 
-    fn classify<Other, ClassifiedError, Index, Input>(
+    fn classify<Other, ClassifiedError, Index>(
         self,
-        classifier: impl Classifier<ClassifiedError, Input>,
+        classifier: impl FnOnce(crate::InnerError) -> ClassifiedError,
     ) -> crate::Result<S, Other>
     where
         Other: TypeSet,
         ClassifiedError: SendSyncError,
         Other::Variants: Contains<ClassifiedError, Index>,
     {
-        self.map_err(|error| error.classify::<Other, ClassifiedError, Index, Input>(classifier))
+        self.map_err(|error| error.classify::<Other, ClassifiedError, Index>(classifier))
     }
 
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>

@@ -1,7 +1,7 @@
 #[cfg(feature = "alloc")]
 use crate::storage::ErrorUnionInner;
 use crate::type_set::{Contains, IsFold};
-use crate::{Classifier, ErrorUnion, SendSyncError, TypeSet};
+use crate::{ErrorUnion, InnerError, SendSyncError, TypeSet};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use core::{any::Any, marker::PhantomData};
@@ -11,17 +11,16 @@ impl<E: TypeSet> ErrorUnion<E> {
     ///
     /// `Other` must contain `ClassifiedError`. Concrete types already represented
     /// in `Other` retain their storage and bypass the classifier. For other types,
-    /// the classifier receives ownership of the original error and returns a
-    /// replacement. Callbacks taking [`crate::InnerError`] work with every feature
-    /// configuration. With `alloc`, callbacks taking `Box<dyn SendSyncError>`
-    /// are also accepted, including tuple struct constructors.
+    /// the classifier receives ownership of the original error as [`InnerError`]
+    /// and returns a replacement. The callback type is the same with every
+    /// feature configuration. Dropping the owner drops the original error.
     ///
     /// Discarding the original error requires an explicit callback:
     ///
     /// ```
     /// let error = eros::error!("device unavailable");
     /// let error: eros::ErrorUnion<(core::fmt::Error,)> =
-    ///     error.classify(|_: eros::InnerError| core::fmt::Error);
+    ///     error.classify(|_| core::fmt::Error);
     /// assert_eq!(error.into_single(), core::fmt::Error);
     /// ```
     ///
@@ -31,10 +30,6 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// let error = eros::error!("device unavailable");
     /// let _: eros::ErrorUnion<(core::fmt::Error,)> = error.classify(core::fmt::Error);
     /// ```
-    ///
-    /// Closure parameters may need an explicit type, such as `|inner: InnerError|`
-    /// or `|_: InnerError|`. The final generic parameter selects the callback's
-    /// input type and is normally inferred.
     ///
     /// Only the concrete inner type is checked, not its sources or contexts.
     /// All saved diagnostics are preserved without capturing new ones. The
@@ -53,8 +48,8 @@ impl<E: TypeSet> ErrorUnion<E> {
     ///
     /// Inspect or extract the original with [`crate::InnerError::downcast_ref`] and
     /// [`crate::InnerError::downcast`]. With `alloc`, the owner also provides
-    /// `into_boxed()` to keep the original as a domain wrapper's source.
-    /// A constructor taking a boxed error can also be passed directly:
+    /// `into_boxed()` or `.into()` to keep the original as a domain wrapper's
+    /// boxed source.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -64,7 +59,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// struct ConfigError(#[source] Box<dyn eros::SendSyncError>);
     /// let error = eros::error!("device unavailable");
     /// let error: eros::ErrorUnion<(ConfigError,)> =
-    ///     error.classify(ConfigError);
+    ///     error.classify(|inner| ConfigError(inner.into()));
     /// assert!(error.is_inner::<ConfigError>());
     /// # }
     /// ```
@@ -73,11 +68,11 @@ impl<E: TypeSet> ErrorUnion<E> {
     ///
     /// ```compile_fail
     /// let error: eros::ErrorUnion = eros::ErrorUnion::new(core::fmt::Error);
-    /// let _: eros::ErrorUnion<()> = error.classify(|_: eros::InnerError| core::fmt::Error);
+    /// let _: eros::ErrorUnion<()> = error.classify(|_| core::fmt::Error);
     /// ```
-    pub fn classify<Other, ClassifiedError, Index, Input>(
+    pub fn classify<Other, ClassifiedError, Index>(
         self,
-        classifier: impl Classifier<ClassifiedError, Input>,
+        classifier: impl FnOnce(InnerError) -> ClassifiedError,
     ) -> ErrorUnion<Other>
     where
         Other: TypeSet,
@@ -87,8 +82,7 @@ impl<E: TypeSet> ErrorUnion<E> {
         let inner = if Other::Variants::is_fold(self.inner() as &dyn Any) {
             self.inner
         } else {
-            self.inner
-                .map_error(|inner| classifier.classify_error(inner))
+            self.inner.map_error(classifier)
         };
         ErrorUnion {
             inner,
@@ -195,8 +189,7 @@ mod tests {
         let original_context = error.inner.diagnostics().context.as_ptr();
 
         let error = error.map_inner(|_| MsgError::from("cannot open configuration"));
-        let _error: ErrorUnion<(core::fmt::Error,)> =
-            error.classify(|_: eros::InnerError| core::fmt::Error);
+        let _error: ErrorUnion<(core::fmt::Error,)> = error.classify(|_| core::fmt::Error);
 
         #[cfg(feature = "backtrace")]
         {
