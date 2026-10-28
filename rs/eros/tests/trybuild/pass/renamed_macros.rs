@@ -3,6 +3,11 @@
 
 extern crate eros as renamed;
 
+renamed::type_set! {
+    type Errors = (::core::fmt::Error,);
+    type Combined = Errors || Errors;
+}
+
 fn bailing() -> renamed::Result<()> {
     let value = 7;
     renamed::bail!("bail {value}")
@@ -15,6 +20,7 @@ fn ensuring() -> renamed::Result<()> {
 }
 
 fn main() {
+    let _: renamed::ErrorUnion<Combined> = renamed::ErrorUnion::new(::core::fmt::Error);
     static ERROR: &str = "static message";
     let _: renamed::ErrorUnion = renamed::error!(renamed::MsgError::from_static(ERROR));
     const ROOT_ERROR: renamed::MsgError = renamed::MsgError::from_static("error");

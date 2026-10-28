@@ -10,6 +10,43 @@ use syn::{
 };
 
 mod error_enum;
+mod type_set;
+
+/// Declares flat tuple aliases by composing named type sets with `||`.
+///
+/// ```rust
+/// eros_macros::type_set! {
+///     type ParseErrors = (std::num::ParseIntError,);
+///     pub type LoadErrors = ParseErrors || (std::io::Error,);
+///     type AppErrors = LoadErrors || ParseErrors || (std::fmt::Error,);
+/// }
+///
+/// let error: eros::ErrorUnion<AppErrors> = eros::ErrorUnion::new(std::fmt::Error);
+/// let _: eros::ErrorUnion<(
+///     std::num::ParseIntError, std::io::Error, std::fmt::Error,
+/// )> = error;
+/// ```
+///
+/// Set names must be declared in the same invocation; forward references are
+/// supported. Each operand is a set name or a tuple, including `()` and `(T,)`.
+/// Repeated types with identical token spellings are included once, in the order
+/// first encountered. Different paths or external aliases for the same Rust
+/// type cannot be deduplicated, so use consistent spellings for shared members.
+/// Tuple members are copied as written, without resolving aliases inside them.
+///
+/// Each alias can have visibility and outer attributes, including `error_enum`
+/// attributes, which are applied to its expanded tuple. Conditional attributes
+/// gate the emitted alias, not its participation in composition. Generic aliases,
+/// cycles, unknown sets, and sets with more than 26 distinct members are rejected.
+/// The generated aliases work without `std` or `alloc`.
+#[proc_macro]
+pub fn type_set(input: TokenStream) -> TokenStream {
+    let sets = parse_macro_input!(input as type_set::TypeSets);
+    match sets.expand() {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
 
 /// Keeps a tuple alias and generates the explicitly named owned error enum.
 ///

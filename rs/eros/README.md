@@ -859,6 +859,37 @@ Other backtrace examples in this README use `[N frames hidden for brevity]` to m
 Filtering only changes formatted output; the original trace remains available
 through `.backtrace()`.
 
+### Composing Type Sets
+
+Use `type_set!` to share members between named error sets. Join sets and tuples
+with `||`; the macro emits flat tuple aliases and includes repeated members once:
+
+```rust
+use eros::{type_set, ErrorUnion};
+use core::{fmt, num::{ParseIntError, ParseFloatError}};
+
+type_set! {
+    type ParseErrors = (ParseIntError, ParseFloatError);
+    pub type AppErrors = ParseErrors || (fmt::Error,);
+    type Combined = AppErrors || ParseErrors;
+}
+
+let error: ErrorUnion<Combined> = ErrorUnion::new(fmt::Error);
+let _: ErrorUnion<(ParseIntError, ParseFloatError, fmt::Error)> = error;
+```
+
+References must name sets in the same invocation, in any declaration order.
+Members keep their first occurrence order. Deduplication compares type spellings;
+use the same path for shared members, since the macro cannot resolve different
+paths or external aliases for the same type. Tuples can be empty or contain one
+member, written `()` and `(T,)`. Generic aliases are not supported, but members
+can be generic types. Sets support up to 26 distinct members.
+
+Visibility and attributes apply to the emitted aliases. You can place
+`#[eros::error_enum(Name)]` on a composed alias inside `type_set!` to generate
+an enum from its flattened tuple. A `#[cfg(...)]` attribute gates the emitted
+alias; composition still uses its declared members.
+
 ### Error Enum Macro
 
 `#[eros::error_enum(Name)]` keeps a tuple alias and generates an owned enum with `Debug`, `Display`, and `Error` implementations, useful for matching errors or [exposing a concrete public error](#approach-b-replacing-errorunion-with-concrete-crate-errors). Add `error_enum_ref` and `error_enum_mut` for borrowed views, or `error_enum_kind` for unit variants without payloads:

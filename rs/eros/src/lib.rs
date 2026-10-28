@@ -83,7 +83,7 @@ mod vec;
 
 // re-export macro
 pub use eros_macros::{
-    context, eager_context, error_enum, error_enum_kind, error_enum_mut, error_enum_ref,
+    context, eager_context, error_enum, error_enum_kind, error_enum_mut, error_enum_ref, type_set,
 };
 
 // aliases

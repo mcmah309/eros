@@ -1,0 +1,5 @@
+error: cyclic type set reference to `First`
+ --> tests/trybuild/type_set_rejects_cycles.rs:3:19
+  |
+3 |     type Second = First;
+  |                   ^^^^^

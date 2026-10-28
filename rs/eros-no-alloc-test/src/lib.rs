@@ -71,9 +71,38 @@ impl Write for Buffer {
     }
 }
 
+fn classified_debug_checks() {
+    // Exercise both public classification paths using only stack-backed buffers.
+    for through_result in [false, true] {
+        let error = classify::code_error(41);
+        #[cfg(feature = "error_location")]
+        let location = error.location();
+        let classified = if through_result {
+            classify::classify_result(Err(error)).unwrap_err()
+        } else {
+            classify::classify_error(error)
+        };
+        #[cfg(feature = "error_location")]
+        assert!(core::ptr::eq(location, classified.location()));
+
+        let mut actual = Buffer::new();
+        write!(&mut actual, "{classified:?}").unwrap();
+        let mut expected = Buffer::new();
+        write!(&mut expected, "error: domain 42").unwrap();
+        #[cfg(feature = "error_location")]
+        write!(&mut expected, "\nlocation: {location}").unwrap();
+        assert_eq!(actual.contents(), expected.contents());
+
+        let mut alternate = Buffer::new();
+        write!(&mut alternate, "{classified:#?}").unwrap();
+        assert_eq!(alternate.contents(), b"error: domain 42");
+    }
+}
+
 /// Exercised both by the host tests and by a binary with no global allocator.
 pub fn run_checks() {
     classify::run_checks();
+    classified_debug_checks();
     classification::run_checks();
     // Host tests discover these scenarios individually. Freestanding builds
     // execute them here, including their ownership counters, once per run.

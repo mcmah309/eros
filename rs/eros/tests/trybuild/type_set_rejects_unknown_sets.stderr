@@ -1,0 +1,5 @@
+error: unknown type set `Outside`; declare it in this type_set! invocation
+ --> tests/trybuild/type_set_rejects_unknown_sets.rs:4:19
+  |
+4 |     type Errors = Outside || (std::io::Error,);
+  |                   ^^^^^^^
