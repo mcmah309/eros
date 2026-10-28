@@ -36,7 +36,7 @@ type PublicErrors = (DomainError,);
 pub fn run_checks() {
     classify_word_payloads();
     map_inner_checks();
-    collapse_checks();
+    classify_checks();
     into_inner_checks();
     let known: ErrorUnion = ErrorUnion::new(fmt::Error);
     #[cfg(feature = "error_location")]
@@ -200,7 +200,7 @@ fn into_inner_checks() {
     assert_eq!(DROPS.load(Ordering::SeqCst), before + 1);
 }
 
-fn collapse_checks() {
+fn classify_checks() {
     type Destination = (fmt::Error, Code);
     for is_code in [false, true] {
         let input: ErrorUnion<(Code, fmt::Error)> = if is_code {
@@ -211,7 +211,7 @@ fn collapse_checks() {
         #[cfg(feature = "error_location")]
         let location = input.location();
         let mut calls = 0;
-        let output: ErrorUnion<Destination> = input.collapse(|inner| {
+        let output: ErrorUnion<Destination> = input.classify(|inner| {
             calls += 1;
             Code {
                 error_code: inner
@@ -230,7 +230,7 @@ fn collapse_checks() {
     }
 
     let failure: eros::Result<u8> = Err(ErrorUnion::new(Code { error_code: 0 }));
-    let output: eros::Result<u8, (fmt::Error, Status)> = failure.collapse(classify_code);
+    let output: eros::Result<u8, (fmt::Error, Status)> = failure.classify(classify_code);
     assert_eq!(
         output.unwrap_err().narrow::<Status, _>().unwrap(),
         Status::Bus
@@ -238,10 +238,10 @@ fn collapse_checks() {
 
     let success: eros::Result<u8, (Code,)> = Ok(7);
     let output: eros::Result<u8, (Status, fmt::Error)> =
-        success.collapse(|_| -> Status { panic!("collapse must not run for successful values") });
+        success.classify(|_| -> Status { panic!("classify must not run for successful values") });
     assert_eq!(output.unwrap(), 7);
 
     let error: ErrorUnion = ErrorUnion::new(Code { error_code: 41 });
-    let output: ErrorUnion = error.collapse(classify_code);
+    let output: ErrorUnion = error.classify(classify_code);
     assert!(output.is_inner::<Status>());
 }

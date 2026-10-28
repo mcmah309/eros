@@ -54,7 +54,10 @@ impl<E: TypeSet> ErrorUnion<E> {
         }
     }
 
-    /// Maps every inner error and widens to the destination error set.
+    /// Maps every inner error into the destination error set.
+    ///
+    /// Accepts typed or untyped unions, including converting an untyped union
+    /// into a typed set by mapping its inner error.
     ///
     /// Equivalent to `self.map_inner(f).widen()`. The destination is inferred
     /// from the surrounding type and must contain the replacement type. The
@@ -66,7 +69,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// use eros::ErrorUnion;
     /// use core::{fmt, num::ParseIntError};
     /// let error: ErrorUnion = ErrorUnion::new(fmt::Error);
-    /// let error: ErrorUnion<(ParseIntError, fmt::Error)> = error.collapse(|inner| {
+    /// let error: ErrorUnion<(ParseIntError, fmt::Error)> = error.classify(|inner| {
     ///     assert!(inner.is::<fmt::Error>());
     ///     fmt::Error
     /// });
@@ -79,10 +82,10 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// use eros::ErrorUnion;
     /// use core::{fmt, num::ParseIntError};
     /// let error: ErrorUnion = ErrorUnion::new(fmt::Error);
-    /// let _: ErrorUnion<(ParseIntError,)> = error.collapse(|_| fmt::Error);
+    /// let _: ErrorUnion<(ParseIntError,)> = error.classify(|_| fmt::Error);
     /// ```
     #[inline]
-    pub fn collapse<Other, T, Index>(self, f: impl FnOnce(InnerError) -> T) -> ErrorUnion<Other>
+    pub fn classify<Other, T, Index>(self, f: impl FnOnce(InnerError) -> T) -> ErrorUnion<Other>
     where
         Other: TypeSet,
         T: SendSyncError,
@@ -117,7 +120,7 @@ mod tests {
         let original_context = error.inner.diagnostics().context.as_ptr();
 
         let error = error.map_inner(|_| MsgError::from("cannot open configuration"));
-        let _error: ErrorUnion<(core::fmt::Error, MsgError)> = error.collapse(|_| core::fmt::Error);
+        let _error: ErrorUnion<(core::fmt::Error, MsgError)> = error.classify(|_| core::fmt::Error);
 
         #[cfg(feature = "backtrace")]
         {

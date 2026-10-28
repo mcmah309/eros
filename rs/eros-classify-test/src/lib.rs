@@ -59,7 +59,7 @@ mod tests {
         let trace = error.span_trace().to_string();
 
         let input: eros::Result<u8, library::Errors> = Err(error);
-        let output: eros::Result<u8, (fmt::Error, AppError)> = input.collapse(|mut inner| {
+        let output: eros::Result<u8, (fmt::Error, AppError)> = input.classify(|mut inner| {
             assert!(inner.is::<DomainError>());
             assert!(!inner.is::<Box<DomainError>>());
             inner.downcast_mut::<DomainError>().unwrap().0 += 1;

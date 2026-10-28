@@ -57,11 +57,11 @@ pub fn category(mut inner: InnerError) -> DomainError {
 }
 
 pub fn classify_error(error: ErrorUnion) -> ErrorUnion<Errors> {
-    error.collapse(category)
+    error.classify(category)
 }
 
 pub fn classify_result(result: eros::Result<u8>) -> eros::Result<u8, Errors> {
-    result.collapse(category)
+    result.classify(category)
 }
 
 pub fn wrap_concrete(error: ErrorUnion) -> ErrorUnion<(WrappedCode,)> {

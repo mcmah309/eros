@@ -729,25 +729,28 @@ where
     where
         T: SendSyncError;
 
-    /// Maps every inner error and widens to the destination error set.
+    /// Maps every inner error into the destination error set.
+    ///
+    /// Accepts typed or untyped results, including converting an untyped result
+    /// into a typed set by mapping its inner error.
     ///
     /// Equivalent to `self.map_inner(f).widen()`. The destination is inferred
     /// from the surrounding type and must contain the replacement type.
     /// Successful values pass through unchanged without calling `f`. Every
     /// error reaches the callback, including an existing replacement error.
-    /// Saved diagnostics are preserved. See [`ErrorUnion::collapse`].
+    /// Saved diagnostics are preserved. See [`ErrorUnion::classify`].
     ///
     /// ```
     /// use eros::{ErrorUnion, ReshapeUnion};
     /// use core::{fmt, num::ParseIntError};
     /// fn load() -> eros::Result<u16, (ParseIntError, fmt::Error)> {
     ///     let input: eros::Result<u16> = Err(ErrorUnion::new(fmt::Error));
-    ///     let port = input.collapse(|_| fmt::Error)?;
+    ///     let port = input.classify(|_| fmt::Error)?;
     ///     Ok(port)
     /// }
     /// assert!(load().unwrap_err().is_inner::<fmt::Error>());
     /// ```
-    fn collapse<Other, T, Index>(
+    fn classify<Other, T, Index>(
         self,
         f: impl FnOnce(crate::InnerError) -> T,
     ) -> crate::Result<S, Other>
@@ -946,7 +949,7 @@ where
     }
 
     #[inline]
-    fn collapse<Other, T, Index>(
+    fn classify<Other, T, Index>(
         self,
         f: impl FnOnce(crate::InnerError) -> T,
     ) -> crate::Result<S, Other>

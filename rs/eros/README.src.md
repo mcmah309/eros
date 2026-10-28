@@ -237,7 +237,7 @@ To convert the whole result directly, use `.erase()` with `use eros::Erase;`.
 ### Handling A Type Along An Otherwise Untyped Path
 
 In a mostly untyped codebase, keep returning `eros::Result<T>` until a path
-needs to explicitly track an error type. Use `collapse` on the result to wrap
+needs to explicitly track an error type. Use `classify` on the result to wrap
 loader errors as `PortConfigError`. Downstream signatures describe the
 categories callers care about without exposing implementation error types.
 The callback receives an owned `InnerError`, including when the original error
@@ -274,7 +274,7 @@ fn load_port(contents: &str) -> eros::Result<u16> {
 fn checked_port(contents: &str)
     -> eros::Result<u16, (DynamicPortNotAllowed, PortConfigError)>
 {
-    let port = load_port(contents).collapse(|inner| PortConfigError(inner.into()))?;
+    let port = load_port(contents).classify(|inner| PortConfigError(inner.into()))?;
     eros::ensure!(port != 0, DynamicPortNotAllowed);
     Ok(port)
 }
@@ -297,7 +297,7 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 # fn main() {}
 ```
 
-`collapse(f)` is shorthand for `map_inner(f).widen()`: it transforms every error
+`classify(f)` is shorthand for `map_inner(f).widen()`: it transforms every error
 and infers the destination error set from the surrounding type. The destination
 must contain the replacement type; it does not control whether the callback
 runs. Use `map_inner` alone when a singleton error set is sufficient. The original
