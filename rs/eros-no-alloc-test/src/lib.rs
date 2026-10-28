@@ -9,8 +9,8 @@ use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
 
 #[path = "../../eros/tests/no_alloc/composition.rs"]
 mod composition;
-#[path = "../../eros/tests/no_alloc/inline.rs"]
-mod inline;
+// Shared tests also exercise Eros's alloc configuration in its own harness.
+#[allow(unexpected_cfgs)]
 #[path = "../../eros/tests/no_alloc/messages.rs"]
 mod messages;
 
@@ -69,8 +69,6 @@ impl Write for Buffer {
 pub fn run_checks() {
     messages::run_checks();
     composition::run_checks();
-    #[cfg(not(test))]
-    inline::run_checks();
     let mut union: ErrorUnion<Failures> = ErrorUnion::new(Failure);
     #[cfg(feature = "error_location")]
     let location = union.location();

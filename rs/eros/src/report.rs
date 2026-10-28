@@ -36,27 +36,27 @@ impl<'a> ErrorReport<'a> {
     pub fn contexts(
         &self,
     ) -> impl DoubleEndedIterator<Item = &'a crate::ContextFrame> + ExactSizeIterator {
-        self.inner.context.iter()
+        self.inner.diagnostics().context.iter()
     }
 
     /// Borrows the saved Eros backtrace, without capturing a new one.
     #[cfg(feature = "backtrace")]
     pub const fn backtrace(&self) -> &'a std::backtrace::Backtrace {
-        &self.inner.backtrace
+        &self.inner.diagnostics().backtrace
     }
 
     /// Borrows the original span trace without capturing a new one.
     /// Requires `error_span_trace` (also enabled by `span_trace`).
     #[cfg(feature = "error_span_trace")]
     pub const fn span_trace(&self) -> &'a tracing_error::SpanTrace {
-        &self.inner.span_trace
+        &self.inner.diagnostics().span_trace
     }
 
     /// Returns the original Eros capture location.
     /// Requires `error_location` (also enabled by `location`).
     #[cfg(feature = "error_location")]
     pub const fn location(&self) -> &'static core::panic::Location<'static> {
-        self.inner.location
+        self.inner.diagnostics().location
     }
 }
 

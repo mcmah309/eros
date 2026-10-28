@@ -8,7 +8,8 @@ use core::fmt::{self, Debug, Display};
 /// on the message text, regardless of how it is stored.
 /// [`Self::from_static_ref`] borrows a static string descriptor and works without
 /// `alloc`. With `alloc`, `from_static`, `from_owned`, and string conversions are
-/// also available.
+/// also available. Storing `MsgError` in an `ErrorUnion` requires `alloc`;
+/// without it, literal error macros generate anonymous zero-sized error types.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MsgError(
     #[cfg(feature = "alloc")] Cow<'static, str>,
@@ -20,9 +21,10 @@ impl core::error::Error for MsgError {}
 impl MsgError {
     /// Borrows a static string descriptor without allocating.
     ///
-    /// Without `alloc`, this stores one thin pointer, fitting Eros's inline word.
-    /// The descriptor must also be static; a local variable holding a static
-    /// string is insufficient. Literal macros create the descriptor automatically.
+    /// Without `alloc`, this stores one thin pointer. It can be used as a
+    /// standalone error, but cannot enter an `ErrorUnion`, which requires ZSTs
+    /// in that mode. The descriptor must also be static; a local variable
+    /// holding a static string is insufficient.
     ///
     /// ```
     /// static MESSAGE: &str = "connection failed";
