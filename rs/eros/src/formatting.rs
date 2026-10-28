@@ -793,7 +793,13 @@ fn better_backtrace(backtrace: &std::backtrace::Backtrace) -> Option<String> {
             frames.retain(|frame| {
                 !(frame.is_dependency_code()
                     || frame.is_post_panic_code()
-                    || frame.is_runtime_init_code())
+                    || frame.is_runtime_init_code()
+                    // color-backtrace's runtime heuristics miss these glibc
+                    // thread entry points, including their internal aliases.
+                    || matches!(
+                        frame.name.as_deref(),
+                        Some("__clone" | "__clone3" | "__GI___clone" | "__GI___clone3")
+                    ))
             });
         },
     ));
@@ -812,8 +818,126 @@ fn better_backtrace(backtrace: &std::backtrace::Backtrace) -> Option<String> {
 
 #[cfg(all(test, feature = "better_backtrace"))]
 mod tests {
+    use crate::{ErrorUnion, ErrorUnionVec};
     use alloc::{format, string::String, vec::Vec};
     use std::backtrace::Backtrace;
+
+    #[inline(never)]
+    fn captured_error(message: &'static str) -> ErrorUnion<(std::io::Error,)> {
+        ErrorUnion::new_from_parts(
+            std::io::Error::other(message),
+            Backtrace::force_capture(),
+            #[cfg(feature = "error_span_trace")]
+            tracing_error::SpanTrace::capture(),
+            #[cfg(feature = "context")]
+            Vec::new(),
+            #[cfg(feature = "error_location")]
+            core::panic::Location::caller(),
+        )
+    }
+
+    fn assert_filtered_trace(text: &str) {
+        assert!(text.contains("formatting::tests::captured_error"), "{text}");
+        assert!(text.contains("at "), "frame locations must remain: {text}");
+        assert!(
+            text.contains("frames hidden"),
+            "runtime frames must be filtered: {text}"
+        );
+        assert!(!text.contains(" BACKTRACE "), "{text}");
+        assert!(!text.contains('\u{1b}'), "{text}");
+        for symbol in ["__clone", "__clone3", "__GI___clone", "__GI___clone3"] {
+            let suffix = format!(": {symbol}");
+            assert!(
+                !text.lines().any(|line| line.ends_with(&suffix)),
+                "glibc thread entry frames must be filtered: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn better_backtrace_single_error_formats() {
+        // Example output: tests/output_formatting/better_backtrace_single_error/debug.txt.
+        let error = captured_error("invalid port").context("configure server");
+
+        assert_eq!(format!("{error:#}"), "invalid port");
+        assert_eq!(format!("{error}"), "invalid port");
+        let expected = if cfg!(feature = "context") {
+            "error: invalid port\ncontext:\n    - configure server"
+        } else {
+            "error: invalid port"
+        };
+        assert_eq!(format!("{error:#?}"), expected);
+
+        let detailed = format!("{error:?}");
+        std::println!("{detailed}");
+        assert!(detailed.starts_with("error: invalid port\n"));
+        let (message, trace) = detailed.split_once("\nbacktrace:\n").unwrap();
+        assert_eq!(detailed.matches("backtrace:").count(), 1);
+        if cfg!(feature = "context") {
+            assert!(message.contains("\ncontext:\n    - configure server"));
+        }
+        assert_filtered_trace(trace);
+        assert!(trace.lines().all(|line| line.starts_with("    ")));
+        assert!(!detailed.ends_with('\n'));
+    }
+
+    #[test]
+    fn better_backtrace_collection_formats() {
+        // Example output: tests/output_formatting/better_backtrace_collection/debug.txt.
+        let first = captured_error("invalid port").context("read http port");
+        let second = captured_error("invalid port").context("read https port");
+        let errors = ErrorUnionVec::new(alloc::vec![first, second]);
+        let mut error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
+        error.inner.backtrace = Backtrace::force_capture();
+        let error = error.context("configure server");
+
+        assert_eq!(format!("{error:#}"), "errors (2 total):");
+        assert_eq!(format!("{error}"), "errors (2 total):");
+        let alternate = format!("{error:#?}");
+        assert!(!alternate.contains("backtrace"), "{alternate}");
+        assert!(!alternate.contains("captured_error"), "{alternate}");
+
+        let detailed = format!("{error:?}");
+        std::println!("{detailed}");
+        assert!(detailed.starts_with("error:\n    errors (2 total):\n"));
+        // Distinct capture sites remain distinct detailed reports, even when
+        // both children have the same error message and context is disabled.
+        assert!(detailed.contains("\n          at: [0]\n"), "{detailed}");
+        assert!(detailed.contains("\n          at: [1]\n"), "{detailed}");
+        assert_eq!(detailed.matches("backtrace:").count(), 3);
+        let children: Vec<_> = detailed.split("\n          backtrace:\n").skip(1).collect();
+        assert_eq!(children.len(), 2);
+        for child in children {
+            let trace = child
+                .lines()
+                .take_while(|line| line.starts_with("              "))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert_filtered_trace(&trace);
+        }
+        assert_eq!(detailed.matches("\nbacktrace:\n").count(), 1);
+        if cfg!(feature = "context") {
+            assert!(detailed.contains("\ncontext:\n    - configure server"));
+        }
+        assert!(!detailed.contains(" BACKTRACE "), "{detailed}");
+        assert!(!detailed.contains('\u{1b}'), "{detailed}");
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn better_backtrace_json_matches_debug() {
+        let error = captured_error("invalid port").context("configure server");
+        let json = error.to_debug_json();
+        let trace = json["backtrace"].as_str().unwrap();
+        assert_filtered_trace(trace);
+        let indented = trace
+            .lines()
+            .map(|line| format!("    {line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(format!("{error:?}").ends_with(&format!("\nbacktrace:\n{indented}")));
+        assert!(error.to_display_json().get("backtrace").is_none());
+    }
 
     #[test]
     fn better_backtrace_removes_color_backtrace_banner() {
