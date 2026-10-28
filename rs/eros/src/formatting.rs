@@ -120,8 +120,8 @@ impl<'a> Report<'a> {
     #[cfg(feature = "backtrace")]
     pub(crate) fn backtrace_text(&self) -> Option<String> {
         if self.backtrace_status() == "captured" {
-            #[cfg(feature = "better_backtrace")]
-            if let Some(text) = better_backtrace(self.backtrace) {
+            #[cfg(feature = "filtered_backtrace")]
+            if let Some(text) = filtered_backtrace(self.backtrace) {
                 return Some(text.trim_end_matches('\n').into());
             }
             return Some(self.backtrace.to_string().trim_end_matches('\n').into());
@@ -784,8 +784,8 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LineWriter<'_, W> {
     }
 }
 
-#[cfg(feature = "better_backtrace")]
-fn better_backtrace(backtrace: &std::backtrace::Backtrace) -> Option<String> {
+#[cfg(feature = "filtered_backtrace")]
+fn filtered_backtrace(backtrace: &std::backtrace::Backtrace) -> Option<String> {
     use alloc::{boxed::Box, vec::Vec};
     let trace = btparse::deserialize(backtrace).ok()?;
     let printer = color_backtrace::BacktracePrinter::new().add_frame_filter(Box::new(
@@ -816,7 +816,7 @@ fn better_backtrace(backtrace: &std::backtrace::Backtrace) -> Option<String> {
     Some(text)
 }
 
-#[cfg(all(test, feature = "better_backtrace"))]
+#[cfg(all(test, feature = "filtered_backtrace"))]
 mod tests {
     use crate::{ErrorUnion, ErrorUnionVec};
     use alloc::{format, string::String, vec::Vec};
@@ -855,8 +855,8 @@ mod tests {
     }
 
     #[test]
-    fn better_backtrace_single_error_formats() {
-        // Example output: tests/output_formatting/better_backtrace_single_error/debug.txt.
+    fn filtered_backtrace_single_error_formats() {
+        // Example output: tests/output_formatting/filtered_backtrace_single_error/debug.txt.
         let error = captured_error("invalid port").context("configure server");
 
         assert_eq!(format!("{error:#}"), "invalid port");
@@ -882,8 +882,8 @@ mod tests {
     }
 
     #[test]
-    fn better_backtrace_collection_formats() {
-        // Example output: tests/output_formatting/better_backtrace_collection/debug.txt.
+    fn filtered_backtrace_collection_formats() {
+        // Example output: tests/output_formatting/filtered_backtrace_collection/debug.txt.
         let first = captured_error("invalid port").context("read http port");
         let second = captured_error("invalid port").context("read https port");
         let errors = ErrorUnionVec::new(alloc::vec![first, second]);
@@ -925,7 +925,7 @@ mod tests {
 
     #[cfg(feature = "json")]
     #[test]
-    fn better_backtrace_json_matches_debug() {
+    fn filtered_backtrace_json_matches_debug() {
         let error = captured_error("invalid port").context("configure server");
         let json = error.to_debug_json();
         let trace = json["backtrace"].as_str().unwrap();
@@ -940,7 +940,7 @@ mod tests {
     }
 
     #[test]
-    fn better_backtrace_removes_color_backtrace_banner() {
+    fn filtered_backtrace_removes_color_backtrace_banner() {
         // Exercise the formatter even when environment-controlled capture is disabled.
         let backtrace = Backtrace::force_capture();
         let trace = btparse::deserialize(&backtrace).expect("backtrace must deserialize");
@@ -955,12 +955,12 @@ mod tests {
             "color-backtrace's banner changed: {original}"
         );
 
-        let formatted = super::better_backtrace(&backtrace)
-            .expect("better_backtrace must format without falling back");
+        let formatted = super::filtered_backtrace(&backtrace)
+            .expect("filtered_backtrace must format without falling back");
         assert!(!formatted.contains(" BACKTRACE "), "{formatted}");
         assert!(
             formatted
-                .contains("formatting::tests::better_backtrace_removes_color_backtrace_banner"),
+                .contains("formatting::tests::filtered_backtrace_removes_color_backtrace_banner"),
             "the application frame must remain: {formatted}"
         );
     }

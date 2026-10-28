@@ -54,8 +54,8 @@ error_span_trace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
 context_span_trace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
 # Enables both error and context span trace capture.
 span_trace = ["error_span_trace", "context_span_trace"]
-# Parses and removes the unnecessary noise from the backtrace before printing
-better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
+# Formats captured backtraces with heuristic frame filtering.
+filtered_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
 # Captures where an error first enters Eros, without requiring alloc or std.
 error_location = []
 # Captures context attachment locations when context is enabled; does not enable context.

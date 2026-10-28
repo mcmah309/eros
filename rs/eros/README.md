@@ -829,9 +829,12 @@ record a different span from the error's origin. Detailed reports show each
 context's trace beneath its message; debug JSON includes `span_trace` on each
 context object. Display (`{}`) and alternate Debug (`{:#?}`) omit all traces.
 
-### Better Backtrace
+### Filtered Backtrace
 
-Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `better_backtrace` to filter recognized dependency and runtime frames automatically.
+Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `filtered_backtrace` to filter recognized dependency and runtime frames automatically.
+
+Filtering only changes formatted output; the original trace remains available
+through `.backtrace()`.
 
 ### Error Enum Macro
 

@@ -376,7 +376,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
     for shared in [false, true] {
         let original = anyhow_failure_origin();
         let original_status = original.backtrace().status();
-        #[cfg(not(feature = "better_backtrace"))]
+        #[cfg(not(feature = "filtered_backtrace"))]
         let original_frames = original.backtrace().to_string();
         let error = if shared {
             ErrorUnion::from_anyhow_arc(Arc::new(original))
@@ -399,7 +399,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
             std::backtrace::BacktraceStatus::Captured => {
                 let frames = original_section.strip_prefix('\n').unwrap();
                 assert!(frames.contains("anyhow_failure_origin"), "{report}");
-                #[cfg(not(feature = "better_backtrace"))]
+                #[cfg(not(feature = "filtered_backtrace"))]
                 assert_eq!(
                     frames,
                     original_frames
