@@ -1,4 +1,4 @@
-#![cfg(feature = "diagnostic")]
+#![cfg(feature = "json")]
 
 use eros::{ErrorUnion, ErrorUnionVec, MsgError};
 use serde_json::Value;

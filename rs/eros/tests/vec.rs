@@ -77,7 +77,7 @@ fn wrapping_preserves_child_reports_and_registers_human_and_json_traversal() {
     let first = double_even(1).unwrap_err();
     let second = double_even(128).unwrap_err();
     let expected_reports = [format!("{first:?}"), format!("{second:?}")];
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     let expected_json = [first.to_debug_json(), second.to_debug_json()];
     let errors = vec![first, second];
     let original_allocation = errors.as_ptr();
@@ -96,7 +96,7 @@ fn wrapping_preserves_child_reports_and_registers_human_and_json_traversal() {
         .visit_children(&mut |child| children.push(child));
     assert_eq!(format!("{:?}", children[0]), expected_reports[0]);
     assert_eq!(format!("{:?}", children[1]), expected_reports[1]);
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     assert_eq!(
         error.to_debug_json()["children"],
         serde_json::json!(expected_json)
@@ -234,7 +234,7 @@ fn matching_messages_group_nonconsecutive_ranges_in_first_occurrence_order() {
     assert_eq!(children.len(), 10);
     assert_eq!(children[3].to_string(), "alpha");
     assert_eq!(children[4].to_string(), "zebra");
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         let json = error.to_debug_json();
         assert_eq!(json["children"].as_array().unwrap().len(), 10);

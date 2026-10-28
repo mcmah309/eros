@@ -29,7 +29,7 @@ fn matching_handler_and_fallback_keep_their_own_metadata_and_identity() {
         let fallback = fallback.user_context("fallback user message");
         let fallback_ptr = common::identity(fallback.inner());
         let fallback_report = format!("{fallback:?}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         let fallback_json = fallback.to_debug_json();
         let result: eros::Result<String, (io::Error, MsgError)> = Err(error);
         let replacement = String::from("recovered");
@@ -53,7 +53,7 @@ fn matching_handler_and_fallback_keep_their_own_metadata_and_identity() {
             let error = result.unwrap_err();
             assert_eq!(common::identity(error.inner()), fallback_ptr);
             assert_eq!(format!("{error:?}"), fallback_report);
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             assert_eq!(error.to_debug_json(), fallback_json);
         }
     }
@@ -72,7 +72,7 @@ fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
         let error = error.context("retained operation");
         let original = common::identity(error.inner());
         let report = format!("{error:?}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         let diagnostic = error.to_debug_json();
         let result: eros::Result<(), Input> = Err(error);
         let result: eros::Result<(), Output> =
@@ -80,7 +80,7 @@ fn unhandled_variants_can_be_reordered_and_widened_without_losing_metadata() {
         let error = result.unwrap_err();
         assert_eq!(common::identity(error.inner()), original);
         assert_eq!(format!("{error:?}"), report);
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         assert_eq!(error.to_debug_json(), diagnostic);
         match (index, OutputError::from(error)) {
             (0, OutputError::Msg(error)) => assert_eq!(error.as_str(), "message"),

@@ -67,4 +67,4 @@ anyhow = ["std", "dep:anyhow"]
 # Adds context methods that are user facing. Useful for applications reporting error messages to users.
 user_context = ["context"]
 # Exposes to_display_json()/to_debug_json() as structured JSON values.
-diagnostic = ["alloc", "dep:serde_json"]
+json = ["alloc", "dep:serde_json"]

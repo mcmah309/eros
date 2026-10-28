@@ -6,9 +6,9 @@ pub struct Fixtures {
     pub debug: &'static str,
     pub debug_special: &'static str,
     pub debug_unlocated: Option<&'static str>,
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     pub display_json: &'static str,
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     pub debug_json: &'static str,
 }
 
@@ -182,7 +182,7 @@ fn record(case: &str, file: &str, actual: &str) -> bool {
         "1" => {
             assert!(
                 cfg!(all(
-                    feature = "diagnostic",
+                    feature = "json",
                     feature = "context",
                     feature = "error_location",
                     feature = "context_location",
@@ -247,12 +247,12 @@ pub fn assert_case(case: &str, report: ErrorReport<'_>, fixtures: Fixtures) {
         &normalize_debug(report, format!("{report:?}")),
         &expected_debug(expected),
     );
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     assert_json(case, report, fixtures.display_json, fixtures.debug_json);
 }
 
 #[cfg(all(
-    feature = "diagnostic",
+    feature = "json",
     any(
         feature = "error_location",
         all(feature = "context", feature = "context_location")
@@ -269,7 +269,7 @@ fn assert_location(value: &mut serde_json::Value, location: &core::panic::Locati
 }
 
 #[cfg(all(
-    feature = "diagnostic",
+    feature = "json",
     any(
         feature = "error_spantrace",
         all(feature = "context", feature = "context_spantrace")
@@ -307,7 +307,7 @@ fn normalize_span_json(trace: &tracing_error::SpanTrace, value: &mut serde_json:
     }
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     #[cfg(feature = "error_location")]
     assert_location(&mut value["location"], report.location());
@@ -389,7 +389,7 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     }
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 fn adapt_expected_json(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(object) => {
@@ -425,7 +425,7 @@ fn adapt_expected_json(value: &mut serde_json::Value) {
     }
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 fn display_projection(mut value: serde_json::Value) -> serde_json::Value {
     let object = value.as_object_mut().unwrap();
     for key in ["contexts", "location", "backtrace", "span_trace"] {
@@ -439,7 +439,7 @@ fn display_projection(mut value: serde_json::Value) -> serde_json::Value {
     value
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 fn assert_json(case: &str, report: ErrorReport<'_>, display_fixture: &str, debug_fixture: &str) {
     let display = report.to_display_json();
     let mut debug = report.to_debug_json();

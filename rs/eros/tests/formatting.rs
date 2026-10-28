@@ -138,7 +138,7 @@ fn erasing_the_union_preserves_every_format_and_captured_metadata() {
         format!("{typed:?}"),
         format!("{typed:#?}"),
     ];
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     let diagnostic_expected = [typed.to_display_json(), typed.to_debug_json()];
     let erased: ErrorUnion = typed.into();
 
@@ -151,7 +151,7 @@ fn erasing_the_union_preserves_every_format_and_captured_metadata() {
         ],
         expected
     );
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     assert_eq!(
         [erased.to_display_json(), erased.to_debug_json()],
         diagnostic_expected
@@ -172,7 +172,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     let expected_display = error.to_string();
     let expected_debug = format!("{error:?}");
     let expected_alternate_debug = format!("{error:#?}");
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     let expected_diagnostic = error.to_debug_json();
     let original_root = error.inner() as *const dyn eros::SendSyncError as *const ();
     #[cfg(feature = "error_location")]
@@ -222,7 +222,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert_eq!(recovered.to_string(), expected_display);
     assert_eq!(format!("{recovered:?}"), expected_debug);
     assert_eq!(format!("{recovered:#?}"), expected_alternate_debug);
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     assert_eq!(recovered.to_debug_json(), expected_diagnostic);
 }
 
@@ -253,7 +253,7 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
     let (_, contexts_and_backtrace) = original_report
         .split_once("\ncaused by:\n    - permission denied")
         .unwrap();
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     let mut expected_diagnostic = error.to_debug_json();
 
     let error: ErrorUnion<(StartupError,)> = error.map_inner(|old| {
@@ -286,12 +286,12 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
         ],
         expected
     );
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     let expected_display = serde_json::json!({
         "root": "startup failed",
         "sources": ["cannot open configuration", "permission denied"],
     });
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         expected_diagnostic["root"] = expected_display["root"].clone();
         expected_diagnostic["sources"] = expected_display["sources"].clone();
@@ -309,7 +309,7 @@ fn replacing_an_anyerror_root_preserves_metadata_in_every_format() {
         ],
         expected
     );
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         assert_eq!(error.to_display_json(), expected_display);
         assert_eq!(error.to_debug_json(), expected_diagnostic);
@@ -362,7 +362,7 @@ fn anyhow_owned_and_shared_adapters_preserve_source_order_after_new_root() {
             native_chain_messages(error.source().unwrap()),
             expected_sources
         );
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         assert_eq!(
             error.to_display_json(),
             serde_json::json!({"root": "startup failed", "sources": expected_sources})
@@ -385,7 +385,7 @@ fn anyhow_owned_and_shared_reports_keep_the_original_capture() {
         };
         let report = format!("{error:?}");
         let (_, original_section) = report.split_once("\nbacktrace:").unwrap();
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         if original_status == std::backtrace::BacktraceStatus::Captured {
             assert!(
                 error.to_debug_json()["backtrace"]
@@ -590,7 +590,7 @@ fn tracing_percent_and_question_mark_use_the_public_human_formats() {
     );
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 #[test]
 fn to_display_json_is_data_with_the_same_root_and_source_messages() {
     let error = start_service().unwrap_err();
@@ -610,7 +610,7 @@ fn to_display_json_is_data_with_the_same_root_and_source_messages() {
     );
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 #[test]
 fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
     let native = NativeError::caused_by(
@@ -691,7 +691,7 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
 }
 
 #[cfg(all(
-    feature = "diagnostic",
+    feature = "json",
     any(feature = "error_location", feature = "context_location")
 ))]
 fn assert_json_location(location: &serde_json::Value, line: u32) {
@@ -701,7 +701,7 @@ fn assert_json_location(location: &serde_json::Value, line: u32) {
     assert!(location["column"].as_u64().unwrap() > 0);
 }
 
-#[cfg(all(feature = "diagnostic", feature = "user_context"))]
+#[cfg(all(feature = "json", feature = "user_context"))]
 #[test]
 fn diagnostic_contexts_preserve_user_facing_markers_in_stack_order() {
     let error = eros::error!("permission denied")

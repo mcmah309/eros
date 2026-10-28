@@ -59,10 +59,10 @@ pub mod __private {
 
 mod any_error;
 mod context;
-#[cfg(feature = "diagnostic")]
-mod diagnostic;
 mod error_union;
 mod formatting;
+#[cfg(feature = "json")]
+mod json;
 mod macros;
 mod msg_error;
 mod narrowing;

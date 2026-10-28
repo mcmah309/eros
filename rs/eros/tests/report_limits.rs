@@ -151,7 +151,7 @@ fn deeply_nested_batches_stop_expanding_at_the_report_limit() {
     assert_eq!(text.matches("- error:").count(), 10);
     assert_eq!(text.matches("errors (1 total):").count(), 11);
     assert!(text.contains("... 1 errors omitted (report limit reached)"));
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     for mut value in [error.to_display_json(), error.to_debug_json()] {
         for _ in 0..10 {
             assert!(value.get("children_omitted").is_none());
@@ -164,7 +164,7 @@ fn deeply_nested_batches_stop_expanding_at_the_report_limit() {
     }
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 #[test]
 fn json_reports_limit_children_and_mark_omissions() {
     for count in [0, 9, 10, 11, 10_000] {
@@ -194,7 +194,7 @@ fn json_reports_limit_children_and_mark_omissions() {
     }
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 #[test]
 fn nested_json_reports_share_one_report_limit() {
     let error: ErrorUnion<(ErrorUnionVec<(Batch,)>,)> = nested_batch().into_union();

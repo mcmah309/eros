@@ -225,7 +225,7 @@ fn erasure_preserves_boxes_and_diagnostics_without_unwrapping() {
             let root = common::identity(error.inner());
             let contents = common::identity(error.as_single().as_ref());
             let report = format!("{error:?}");
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             let diagnostic = error.to_debug_json();
             let error = if as_result {
                 let result: eros::Result<(), Boxed> = Err(error);
@@ -235,7 +235,7 @@ fn erasure_preserves_boxes_and_diagnostics_without_unwrapping() {
             };
             assert_eq!(common::identity(error.inner()), root);
             assert_eq!(format!("{error:?}"), report);
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             assert_eq!(error.to_debug_json(), diagnostic);
             // Erasing cannot expose the contained error for direct recovery.
             let error = error.narrow::<fmt::Error, _>().unwrap_err();

@@ -32,7 +32,7 @@ fn context_trace_fields_follow_the_context_feature_flag() {
             "{text}"
         );
     }
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         let json = error.to_debug_json();
         assert_eq!(

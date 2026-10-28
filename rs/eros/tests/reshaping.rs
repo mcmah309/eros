@@ -88,7 +88,7 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
         let error = error.user_context("user message");
         let original_inner = common::identity(error.inner());
         let original_report = format!("{error:?}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         let original_json = error.to_debug_json();
 
         // The requested order differs from the input; the complement must retain
@@ -125,7 +125,7 @@ fn group_narrow_partitions_every_variant_and_preserves_metadata_and_identity() {
 
         assert_eq!(common::identity(error.inner()), original_inner);
         assert_eq!(format!("{error:?}"), original_report);
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         assert_eq!(error.to_debug_json(), original_json);
     }
 }
@@ -200,7 +200,7 @@ fn result_group_narrow_preserves_successes_and_both_error_branches() {
         let error = error.user_context("user message");
         let original = common::identity(error.inner());
         let report = format!("{error:?}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         let json = error.to_debug_json();
         let result: eros::Result<String, Triple> = Err(error);
         let selected: Result<
@@ -223,7 +223,7 @@ fn result_group_narrow_preserves_successes_and_both_error_branches() {
         };
         assert_eq!(common::identity(error.inner()), original);
         assert_eq!(format!("{error:?}"), report);
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         assert_eq!(error.to_debug_json(), json);
     }
 }
@@ -294,7 +294,7 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
         let error = error.user_context("user message");
         let original = common::identity(error.inner());
         let report = format!("{error:?}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         let diagnostic = error.to_debug_json();
         let result: eros::Result<(), Triple> = Err(error);
         let mut calls = 0;
@@ -304,7 +304,7 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
                 calls += 1;
                 assert_eq!(common::identity(error.inner()), original);
                 assert_eq!(format!("{error:?}"), report);
-                #[cfg(feature = "diagnostic")]
+                #[cfg(feature = "json")]
                 assert_eq!(error.to_debug_json(), diagnostic);
                 assert_eq!(error.into_single(), fmt::Error);
             });
@@ -315,7 +315,7 @@ fn recover_preserves_error_identity_and_metadata_in_both_branches() {
             let error = result.unwrap_err();
             assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             assert_eq!(error.to_debug_json(), diagnostic);
             assert!(error.is_inner::<MsgError>());
         }

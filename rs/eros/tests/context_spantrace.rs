@@ -76,7 +76,7 @@ fn each_context_retains_its_attachment_span_after_the_subscriber_exits() {
             }
         });
     });
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         let json = error.to_debug_json();
         assert_eq!(error.report().to_debug_json(), json);
@@ -229,7 +229,7 @@ fn context_span_fields_distinguish_batch_groups_only_in_detailed_reports() {
     assert_eq!(compact.matches("- error: failure").count(), 1, "{compact}");
     assert!(compact.contains("at: [0..3]"), "{compact}");
     assert!(!compact.contains("span trace"));
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         let error: ErrorUnion<(ErrorUnionVec<(MsgError,)>,)> = batch.into_union();
         let json = error.to_debug_json();
@@ -265,7 +265,7 @@ fn uncaptured_context_traces_keep_their_status_and_serialize_as_null() {
             status
         );
         assert!(format!("{error:?}").contains(&format!("\n      span trace: {text}")));
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         for json in [error.to_debug_json(), error.report().to_debug_json()] {
             assert_eq!(
                 json["contexts"][0].get("span_trace"),

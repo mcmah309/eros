@@ -32,9 +32,9 @@ macro_rules! assert_outputs {
                     "/debug.special.txt"
                 )),
                 debug_unlocated: $unlocated,
-                #[cfg(feature = "diagnostic")]
+                #[cfg(feature = "json")]
                 display_json: include_str!(concat!("output_formatting/", $name, "/display.json")),
-                #[cfg(feature = "diagnostic")]
+                #[cfg(feature = "json")]
                 debug_json: include_str!(concat!("output_formatting/", $name, "/debug.json")),
             },
         )

@@ -22,7 +22,7 @@ fn leaf_reports_work_without_alloc_and_preserve_formats() {
     error
         .report()
         .visit_children(&mut |_| panic!("no children"));
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     assert!(error.to_debug_json().get("children").is_none());
 }
 
@@ -171,7 +171,7 @@ mod allocated {
         assert!(!format!("{error:#?}").contains("invalid email"));
         *error.as_single_mut() = BatchErrors::default();
         assert!(!format!("{error:#?}").contains("at:"));
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         assert!(error.to_debug_json().get("children").is_none());
 
         let replacement = batch().map_single(|_| Empty);
@@ -201,7 +201,7 @@ mod allocated {
             "- error: import failed\n          at: [0]\n          caused by:\n              - permission denied"
         ));
         assert_eq!(report.matches("caused by:").count(), 1);
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         {
             let json = error.to_debug_json();
             assert_eq!(json["sources"], serde_json::json!([]));
@@ -213,7 +213,7 @@ mod allocated {
         }
     }
 
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     #[test]
     fn json_preserves_each_child_report_without_flattening_context_or_backtraces() {
         let first = email_failure();

@@ -69,7 +69,7 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
             let error = error.user_context("user message");
             let original = common::identity(error.inner());
             let report = format!("{error:?}");
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             let diagnostic = error.to_debug_json();
 
             let error: ErrorUnion<Expanded> = if as_result {
@@ -101,7 +101,7 @@ fn widen_preserves_every_variant_through_identity_reordering_expansion_and_erasu
             };
             assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             assert_eq!(error.to_debug_json(), diagnostic);
         }
     }

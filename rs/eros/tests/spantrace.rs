@@ -189,7 +189,7 @@ fn multiline_span_fields_align_under_with_heading() {
             "{report}"
         );
         assert!(!report.contains('\r'), "{report}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         {
             let diagnostic = error.to_debug_json();
             let trace = diagnostic["span_trace"].as_str().unwrap();
@@ -225,7 +225,7 @@ fn uncaptured_traces_have_single_status_lines() {
         }
         assert_eq!(format!("{:?}", error.report()), report);
         assert!(!format!("{error:#?}").contains("span trace"));
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         for diagnostic in [error.to_debug_json(), error.report().to_debug_json()] {
             assert_eq!(diagnostic.get("span_trace"), Some(&serde_json::Value::Null));
         }
@@ -387,7 +387,7 @@ fn batch_grouping_distinguishes_span_fields_only_in_detailed_reports() {
     error.report().visit_children(&mut |child| {
         assert_eq!(names(child.span_trace()), ["read_configuration", "item"]);
     });
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     {
         let diagnostic = error.to_debug_json();
         assert_eq!(diagnostic["children"].as_array().unwrap().len(), 3);
@@ -400,7 +400,7 @@ fn batch_grouping_distinguishes_span_fields_only_in_detailed_reports() {
     }
 }
 
-#[cfg(feature = "diagnostic")]
+#[cfg(feature = "json")]
 #[test]
 fn debug_json_contains_the_saved_trace_and_display_json_omits_it() {
     let error = captured_error();

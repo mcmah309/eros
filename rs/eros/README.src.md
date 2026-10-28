@@ -637,7 +637,7 @@ Different sources, contexts, or nested children form separate groups; ordinary
 Debug also distinguishes locations, backtraces, and span traces.
 
 See [Logging](#logging) for tracing fields and
-[Structured Diagnostics](#structured-diagnostics) for JSON reports.
+[Structured JSON](#structured-json) for JSON reports.
 
 ## Best Practices
 
@@ -851,7 +851,7 @@ Choose a [formatting mode](#formatting) for the information you want to log:
 | `{:#?}` | `error = %format_args!("{error:#?}")` |
 | `{:?}` | `error = ?error` |
 
-For JSON report values, see [Structured Diagnostics](#structured-diagnostics).
+For JSON report values, see [Structured JSON](#structured-json).
 
 For logging, [`err_trail`](https://github.com/mcmah309/err_trail) is recommended. Libraries can use its constructs like `error!`, `warn!`, `info!`, `debug!`, and `trace!` macros while downstream applications select the `tracing`, `log`, or `defmt` backend. If no backend is selected by a downstream, then the code is optimized away by the compiler.
 
@@ -1041,14 +1041,14 @@ Update preparation failed
 For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving all saved diagnostics. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
 
 
-### Structured Diagnostics
+### Structured JSON
 
-Enable `diagnostic` to get error reports as `serde_json::Value` with
+Enable `json` to get error reports as `serde_json::Value` with
 `.to_display_json()` or `.to_debug_json()`. Debug JSON includes context, locations,
 and traces when enabled. Both include child reports.
 
 ```rust
-# #[cfg(feature = "diagnostic")]
+# #[cfg(feature = "json")]
 # fn main() {
 # use eros::Context;
 # #[derive(Debug)]
@@ -1095,11 +1095,11 @@ let error = error.map_inner(|source| StartupError { source });
 println!("replacement: {error}");
 # assert_eq!(error.to_string(), "startup failed\n    caused by:\n        - cannot open configuration\n        - permission denied");
 # }
-# #[cfg(not(feature = "diagnostic"))]
+# #[cfg(not(feature = "json"))]
 # fn main() {}
 ```
 
-With default Eros features, `diagnostic`, and `RUST_LIB_BACKTRACE=0`, the output is:
+With default Eros features, `json`, and `RUST_LIB_BACKTRACE=0`, the output is:
 
 ```text
 to_display_json: {"root":"cannot open configuration","sources":["permission denied"]}
@@ -1653,7 +1653,7 @@ The `error_location` feature works with or without `alloc` and adds one location
 reference per error without allocating. `context_location` adds one location
 reference per context frame when `context` is enabled; it does not enable
 `context` or `alloc` itself. Both support `no_std`. The `location` feature enables
-both flags. The `std`, `context`, and `diagnostic` features enable
+both flags. The `std`, `context`, and `json` features enable
 `alloc` automatically. `backtrace`, `error_spantrace`, and `context_spantrace`
 require `std`. With `context` disabled,
 static string contexts remain accepted as no-ops and lazy context closures are

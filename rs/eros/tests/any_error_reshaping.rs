@@ -11,7 +11,7 @@ type Selected = (fmt::Error, MsgError);
 struct Snapshot {
     address: common::Identity,
     report: String,
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     diagnostic: serde_json::Value,
 }
 
@@ -20,7 +20,7 @@ impl Snapshot {
         Self {
             address: common::identity(error.inner()),
             report: format!("{error:?}"),
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             diagnostic: error.to_debug_json(),
         }
     }
@@ -28,7 +28,7 @@ impl Snapshot {
     fn assert_preserved<E: TypeSet>(&self, error: &ErrorUnion<E>) {
         assert_eq!(common::identity(error.inner()), self.address);
         assert_eq!(format!("{error:?}"), self.report);
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         assert_eq!(error.to_debug_json(), self.diagnostic);
     }
 }

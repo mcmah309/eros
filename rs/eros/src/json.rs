@@ -9,7 +9,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// The object contains `root` (a string) and `sources` (an array of strings
     /// in source-chain order). See [`crate::ErrorUnionVec`] for batch reporting.
     /// This creates data, without logging or serializing it to text. Requires
-    /// the `diagnostic` feature; works with `no_std + alloc`.
+    /// the `json` feature; works with `no_std + alloc`.
     pub fn to_display_json(&self) -> Value {
         self.report().to_display_json()
     }

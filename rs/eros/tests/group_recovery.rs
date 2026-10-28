@@ -29,7 +29,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
         let error = error.user_context("user message");
         let original = common::identity(error.inner());
         let report = format!("{error:?}");
-        #[cfg(feature = "diagnostic")]
+        #[cfg(feature = "json")]
         let diagnostic = error.to_debug_json();
         let result: eros::Result<u8, Input> = Err(error);
         let mut calls = 0;
@@ -37,7 +37,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             calls += 1;
             assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             assert_eq!(error.to_debug_json(), diagnostic);
             match (index, SelectedError::from(error)) {
                 (0, SelectedError::Msg(error)) => assert_eq!(error.as_str(), "message"),
@@ -54,7 +54,7 @@ fn recover_selects_every_group_member_and_preserves_the_remainder() {
             let error = result.unwrap_err();
             assert_eq!(common::identity(error.inner()), original);
             assert_eq!(format!("{error:?}"), report);
-            #[cfg(feature = "diagnostic")]
+            #[cfg(feature = "json")]
             assert_eq!(error.to_debug_json(), diagnostic);
             match (index, RemainingError::from(error)) {
                 (1, RemainingError::Io(_)) | (3, RemainingError::ParseInt(_)) => {}

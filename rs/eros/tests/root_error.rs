@@ -96,7 +96,7 @@ fn closure_can_replace_the_old_root_with_an_unrelated_error_and_chain() {
     );
     assert_eq!(error.source().unwrap().to_string(), "permission denied");
     assert!(!format!("{error:#?}").contains("original failure"));
-    #[cfg(feature = "diagnostic")]
+    #[cfg(feature = "json")]
     assert_eq!(
         error.to_display_json(),
         serde_json::json!({

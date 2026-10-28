@@ -22,7 +22,7 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 /// Use [`into_union`](Self::into_union) to register recursive human and JSON
 /// reporting. Ordinary `.union()` and [`ErrorUnion::new`] do not register children.
 ///
-/// With the `diagnostic` feature, the returned union's
+/// With the `json` feature, the returned union's
 /// `to_display_json()` and `to_debug_json()` methods include registered children
 /// recursively in a `children` array, omitted when empty. Each child has its own
 /// root/source messages and, for Debug JSON, diagnostic metadata. The same
