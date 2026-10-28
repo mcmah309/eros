@@ -104,7 +104,7 @@ jobs:
           cargo +nightly miri test -p eros
           cargo +nightly miri test -p eros --no-default-features
           cargo +nightly miri test -p eros --no-default-features --features alloc
-          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition --test classify --test root_storage --test static_messages
+          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition --test classify --test root_storage --test storage_safety --test static_messages
           cargo +nightly miri test -p eros-no-alloc-test --lib --features location
           cargo +nightly miri test -p eros-classify-test --no-default-features
           cargo +nightly miri test -p eros-classify-test --all-features
