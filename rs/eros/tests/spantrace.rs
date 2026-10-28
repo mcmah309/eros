@@ -213,16 +213,15 @@ fn uncaptured_traces_have_single_status_lines() {
             tracing::info_span!("without_error_layer").in_scope(|| ErrorUnion::new(fmt::Error))
         });
     for (error, status, expected) in [
-        (empty, SpanTraceStatus::EMPTY, "empty"),
+        (empty, SpanTraceStatus::EMPTY, "no active spans"),
         (unsupported, SpanTraceStatus::UNSUPPORTED, "unsupported"),
     ] {
         assert_eq!(error.span_trace().status(), status);
         let report = format!("{error:?}");
-        if expected == "empty" {
-            assert!(report.contains("\nspan trace: not captured"), "{report}");
-        } else {
-            assert!(report.contains("\nspan trace: unsupported"), "{report}");
-        }
+        assert!(
+            report.contains(&format!("\nspan trace: {expected}")),
+            "{report}"
+        );
         assert_eq!(format!("{:?}", error.report()), report);
         assert!(!format!("{error:#?}").contains("span trace"));
         #[cfg(feature = "json")]

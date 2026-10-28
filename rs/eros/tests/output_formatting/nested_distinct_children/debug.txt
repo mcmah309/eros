@@ -5,23 +5,23 @@ error:
                   - error: alpha
                     at: [0]
                     location: <location>
-                    span trace: not captured
+                    span trace: no active spans
                     backtrace: <status>
           at: [0]
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
         - error:
               errors (1 total):
                   - error: beta
                     at: [0]
                     location: <location>
-                    span trace: not captured
+                    span trace: no active spans
                     backtrace: <status>
           at: [1]
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

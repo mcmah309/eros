@@ -3,5 +3,5 @@ caused by:
     - cannot open configuration
     - permission denied
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

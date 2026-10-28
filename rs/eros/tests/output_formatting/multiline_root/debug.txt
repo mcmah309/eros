@@ -2,5 +2,5 @@ error:
   invalid record
   retry exhausted
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

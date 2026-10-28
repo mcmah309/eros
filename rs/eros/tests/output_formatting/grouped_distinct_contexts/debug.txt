@@ -5,19 +5,19 @@ error:
           context:
               - row 17
                 location: <location>
-                span trace: not captured
+                span trace: no active spans
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
         - error: invalid input
           at: [1]
           context:
               - row 29
                 location: <location>
-                span trace: not captured
+                span trace: no active spans
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

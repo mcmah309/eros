@@ -5,9 +5,9 @@ error:
           context:
               - validate customer 104
                 location: <location>
-                span trace: not captured
+                span trace: no active spans
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
         - error:
             missing field
@@ -16,14 +16,14 @@ error:
           context:
               - validate customer 209
                 location: <location>
-                span trace: not captured
+                span trace: no active spans
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
 context:
     - import customers.csv
       location: <location>
-      span trace: not captured
+      span trace: no active spans
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

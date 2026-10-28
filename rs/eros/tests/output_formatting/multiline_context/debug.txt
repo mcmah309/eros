@@ -3,7 +3,7 @@ context:
     - validate record
       row 17
       location: <location>
-      span trace: not captured
+      span trace: no active spans
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

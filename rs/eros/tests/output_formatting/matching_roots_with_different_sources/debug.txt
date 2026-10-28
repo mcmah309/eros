@@ -5,15 +5,15 @@ error:
           caused by:
               - permission denied
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
         - error: import failed
           at: [1]
           caused by:
               - file missing
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

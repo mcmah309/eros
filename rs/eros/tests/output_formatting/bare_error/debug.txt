@@ -1,4 +1,4 @@
 error: invalid input
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

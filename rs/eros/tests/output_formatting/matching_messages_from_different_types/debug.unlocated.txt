@@ -2,7 +2,7 @@ error:
     errors (2 total):
         - error: invalid input
           at: [0..2]
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

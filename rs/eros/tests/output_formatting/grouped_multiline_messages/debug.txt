@@ -5,8 +5,8 @@ error:
             retry exhausted
           at: [0..3]
           location: <location>
-          span trace: not captured
+          span trace: no active spans
           backtrace: <status>
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

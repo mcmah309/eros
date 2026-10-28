@@ -257,7 +257,7 @@ fn uncaptured_context_traces_keep_their_status_and_serialize_as_null() {
         tracing::info_span!("without_error_layer").in_scope(|| root().context("unsupported"))
     });
     for (error, status, text) in [
-        (empty, SpanTraceStatus::EMPTY, "not captured"),
+        (empty, SpanTraceStatus::EMPTY, "no active spans"),
         (unsupported, SpanTraceStatus::UNSUPPORTED, "unsupported"),
     ] {
         assert_eq!(

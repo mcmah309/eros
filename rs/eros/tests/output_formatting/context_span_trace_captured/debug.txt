@@ -12,5 +12,5 @@ context:
             with: request_id=42
             location: <location>
 location: <location>
-span trace: not captured
+span trace: no active spans
 backtrace: <status>

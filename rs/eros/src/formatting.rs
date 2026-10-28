@@ -387,7 +387,8 @@ impl ReportRenderer {
             self.nested().next_line(out, &text)
         } else {
             let status = match status {
-                "disabled" | "empty" => "not captured",
+                "disabled" => "not captured",
+                "empty" => "no active spans",
                 status => status,
             };
             self.next_line(out, &format_args!("{name}: {status}"))

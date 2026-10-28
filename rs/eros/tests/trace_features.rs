@@ -15,7 +15,7 @@ fn debug_trace_fields_follow_their_own_feature_flags() {
             "{text}"
         );
         #[cfg(feature = "error_spantrace")]
-        assert!(text.contains("\nspan trace: not captured"), "{text}");
+        assert!(text.contains("\nspan trace: no active spans"), "{text}");
         assert!(!text.contains("(captured)"), "{text}");
     }
 }
