@@ -46,21 +46,20 @@ fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<Trac
 
 #[cfg(not(any(feature = "backtrace", feature = "context", feature = "error_location")))]
 #[test]
-fn boxed_extraction_preserves_payload_allocation() {
+fn boxed_extraction_reuses_the_original_allocation() {
     let drops = Arc::new(AtomicUsize::new(0));
     let error: ErrorUnion = ErrorUnion::new(tracked(&drops));
-    let original = error
-        .downcast_inner_ref::<Tracked>()
-        .unwrap()
-        .payload
-        .as_ptr();
+    let original = error.inner() as *const dyn SendSyncError as *const ();
 
     let boxed = error.into_inner();
+    assert_eq!(
+        boxed.as_ref() as *const dyn SendSyncError as *const (),
+        original
+    );
     let root = (boxed.as_ref() as &dyn core::any::Any)
         .downcast_ref::<Tracked>()
         .unwrap();
     assert_eq!(root.payload, [1, 2, 3]);
-    assert_eq!(root.payload.as_ptr(), original);
     assert_eq!(drops.load(Ordering::SeqCst), 0);
     drop(boxed);
     assert_eq!(drops.load(Ordering::SeqCst), 1);
@@ -68,20 +67,16 @@ fn boxed_extraction_preserves_payload_allocation() {
 
 #[cfg(not(any(feature = "backtrace", feature = "context", feature = "error_location")))]
 #[test]
-fn boxed_mapping_preserves_payload_allocation() {
+fn boxed_mapping_reuses_the_original_allocation() {
     let drops = Arc::new(AtomicUsize::new(0));
     let error: ErrorUnion = ErrorUnion::new(tracked(&drops));
-    let original = error
-        .downcast_inner_ref::<Tracked>()
-        .unwrap()
-        .payload
-        .as_ptr();
+    let original = error.inner() as *const dyn SendSyncError as *const ();
 
     let error = error.map_inner(|old| {
-        let root = (old.as_ref() as &dyn core::any::Any)
-            .downcast_ref::<Tracked>()
-            .unwrap();
-        assert_eq!(root.payload.as_ptr(), original);
+        assert_eq!(
+            old.as_ref() as *const dyn SendSyncError as *const (),
+            original
+        );
         old
     });
     let boxed = error.into_single();

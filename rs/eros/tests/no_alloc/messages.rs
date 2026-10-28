@@ -1,23 +1,18 @@
-#[cfg(feature = "alloc")]
-use core::error::Error;
 use core::{
     cell::Cell,
+    error::Error,
     fmt::{self, Write},
     hash::{Hash, Hasher},
 };
-#[cfg(feature = "alloc")]
-use eros::{Erase, ReshapeUnion};
-use eros::{ErrorUnion, MsgError};
+use eros::{ErrorUnion, Erase, MsgError, ReshapeUnion};
 
-#[cfg(feature = "alloc")]
 #[eros::error_enum(Owned)]
 #[eros::error_enum_ref(Shared)]
 #[eros::error_enum_mut(Mutable)]
 type Messages = (MsgError, fmt::Error);
 
-#[cfg(feature = "alloc")]
 #[cfg_attr(test, test)]
-pub fn static_error_references_preserve_identity() {
+pub fn static_error_references_fit_inline_and_preserve_identity() {
     #[derive(Debug)]
     struct Message(&'static str);
     impl fmt::Display for Message {
@@ -50,42 +45,14 @@ pub fn static_error_references_preserve_identity() {
     assert_eq!(error.into_single().0, "promoted");
 }
 
-// Fixed output storage keeps these checks usable in a freestanding executable.
-fn assert_message(error: &ErrorUnion, expected: &str) {
-    struct Buffer {
-        bytes: [u8; 128],
-        len: usize,
-    }
-    impl Write for Buffer {
-        fn write_str(&mut self, text: &str) -> fmt::Result {
-            let end = self.len + text.len();
-            if end > self.bytes.len() {
-                return Err(fmt::Error);
-            }
-            self.bytes[self.len..end].copy_from_slice(text.as_bytes());
-            self.len = end;
-            Ok(())
-        }
-    }
-    let mut buffer = Buffer {
-        bytes: [0; 128],
-        len: 0,
-    };
-    write!(&mut buffer, "{error}").unwrap();
-    assert_eq!(&buffer.bytes[..buffer.len], expected.as_bytes());
-    assert!(error.inner().source().is_none());
-    #[cfg(not(feature = "alloc"))]
-    assert_eq!(size_of_val(error.inner()), 0);
-}
-
 #[cfg_attr(test, test)]
-pub fn literals_support_escaping_and_forwarding() {
+pub fn literals_support_escaping_forwarding_and_static_descriptors() {
     macro_rules! forwarded {
         ($message:expr) => {
             eros::error!($message)
         };
     }
-    for (mut error, expected) in [
+    for (error, expected) in [
         (eros::error!("literal"), "literal"),
         (eros::error!("literal",), "literal"),
         (eros::error!(""), ""),
@@ -97,47 +64,26 @@ pub fn literals_support_escaping_and_forwarding() {
         (eros::error!("\u{7b}\u{7b}id\u{7d}\u{7d}"), "{id}"),
         (forwarded!("forwarded {{message}}"), "forwarded {message}"),
     ] {
-        assert_message(&error, expected);
-        #[cfg(feature = "alloc")]
-        assert_eq!(
-            error.downcast_inner_ref::<MsgError>().unwrap().as_str(),
-            expected
-        );
-        #[cfg(not(feature = "alloc"))]
-        assert!(!error.is_inner::<MsgError>());
-        let _ = error.inner_mut();
-        // A failed narrowing must retain the anonymous concrete error.
-        let error = error.narrow::<(fmt::Error,), _>().unwrap_err();
-        assert_message(&error, expected);
+        let message = error.downcast_inner::<MsgError>().unwrap();
+        assert_eq!(message.as_str(), expected);
+        assert!(core::ptr::eq(message.as_str(), message.clone().as_str()));
+        assert!(message.source().is_none());
     }
+    static MESSAGE: &str = "static {id} {{message}}";
+    const ERROR: MsgError = MsgError::from_static_ref(&MESSAGE);
+    let error = eros::error!(ERROR);
+    assert_eq!(
+        error.downcast_inner::<MsgError>().unwrap().as_str(),
+        MESSAGE
+    );
 }
 
 #[cfg_attr(test, test)]
-pub fn literal_sites_keep_independent_messages() {
-    fn first() -> ErrorUnion {
-        eros::error!("first")
-    }
-    fn second() -> ErrorUnion {
-        eros::error!("second")
-    }
-    let a = first();
-    let b = second();
-    let c = first();
-    assert_message(&a, "first");
-    assert_message(&b, "second");
-    assert_message(&c, "first");
-    let kind = |e: &ErrorUnion| core::any::Any::type_id(e.inner());
-    assert_eq!(kind(&a), kind(&c));
-    #[cfg(not(feature = "alloc"))]
-    assert_ne!(kind(&a), kind(&b));
-}
-
-#[cfg_attr(test, test)]
-pub fn bail_and_ensure_support_literal_messages() {
-    fn bail() -> eros::Result<()> {
+pub fn bail_and_ensure_support_literal_messages_and_infer_error_sets() {
+    fn bail() -> eros::Result<(), Messages> {
         eros::bail!("literal",);
     }
-    fn ensure(ok: bool, calls: &Cell<u8>) -> eros::Result<u8> {
+    fn ensure(ok: bool, calls: &Cell<u8>) -> eros::Result<u8, Messages> {
         eros::ensure!(
             {
                 calls.set(calls.get() + 1);
@@ -149,12 +95,16 @@ pub fn bail_and_ensure_support_literal_messages() {
     }
     let calls = Cell::new(0);
     assert_eq!(ensure(true, &calls).unwrap(), 42);
-    assert_message(&ensure(false, &calls).unwrap_err(), "condition {failed}");
+    let message = ensure(false, &calls)
+        .unwrap_err()
+        .narrow::<MsgError, _>()
+        .unwrap();
+    assert_eq!(message.as_str(), "condition {failed}");
     assert_eq!(calls.get(), 2);
-    assert_message(&bail().unwrap_err(), "literal");
+    let message = bail().unwrap_err().narrow::<MsgError, _>().unwrap();
+    assert_eq!(message.as_str(), "literal");
 }
 
-#[cfg(feature = "alloc")]
 #[cfg_attr(test, test)]
 pub fn message_errors_compose_with_other_errors_and_generated_enums() {
     fn operation() -> eros::Result<(), (MsgError,)> {
@@ -239,13 +189,16 @@ pub fn literal_macros_capture_the_call_site_and_preserve_it_through_reshaping() 
     let error = eros::error!("located");
     assert_eq!(error.location().line(), expected);
     let location = error.location();
-    let error = error.narrow::<(fmt::Error,), _>().unwrap_err();
+    let error = error
+        .narrow::<(MsgError,), _>()
+        .unwrap()
+        .map_single(|message| message);
     assert!(core::ptr::eq(error.location(), location));
-    fn bail(line: &Cell<u32>) -> eros::Result<()> {
+    fn bail(line: &Cell<u32>) -> eros::Result<(), (MsgError,)> {
         line.set(line!() + 1);
         eros::bail!("located bail");
     }
-    fn ensure(line: &Cell<u32>) -> eros::Result<()> {
+    fn ensure(line: &Cell<u32>) -> eros::Result<(), (MsgError,)> {
         line.set(line!() + 1);
         eros::ensure!(false, "located ensure");
         Ok(())
@@ -260,12 +213,9 @@ pub fn literal_macros_capture_the_call_site_and_preserve_it_through_reshaping() 
 
 #[cfg_attr(test, allow(dead_code))]
 pub fn run_checks() {
-    #[cfg(feature = "alloc")]
-    static_error_references_preserve_identity();
-    literals_support_escaping_and_forwarding();
-    literal_sites_keep_independent_messages();
-    bail_and_ensure_support_literal_messages();
-    #[cfg(feature = "alloc")]
+    static_error_references_fit_inline_and_preserve_identity();
+    literals_support_escaping_forwarding_and_static_descriptors();
+    bail_and_ensure_support_literal_messages_and_infer_error_sets();
     message_errors_compose_with_other_errors_and_generated_enums();
     static_messages_compare_and_hash_by_text_and_format_without_a_heap();
     #[cfg(feature = "error_location")]

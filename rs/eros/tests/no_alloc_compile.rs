@@ -9,49 +9,34 @@ fn allocation_dependent_inputs_are_rejected_during_codegen() {
     fs::create_dir_all(&project).unwrap();
     let examples = [
         (
-            "word_payload",
-            include_str!("no_alloc/word_payload.rs"),
-            "T must be zero-sized",
-        ),
-        (
-            "reference_payload",
-            include_str!("no_alloc/reference_payload.rs"),
-            "T must be zero-sized",
-        ),
-        (
-            "msg_error",
-            include_str!("no_alloc/msg_error.rs"),
-            "T must be zero-sized",
-        ),
-        (
             "aligned_payload",
             include_str!("no_alloc/aligned_payload.rs"),
-            "T must be zero-sized",
+            "T must fit in one pointer-sized word",
         ),
         (
             "erased_payload",
             include_str!("no_alloc/erased_payload.rs"),
-            "T must be zero-sized",
+            "T must fit in one pointer-sized word",
         ),
         (
             "constructor",
             include_str!("no_alloc/constructor.rs"),
-            "T must be zero-sized",
+            "T must fit in one pointer-sized word",
         ),
         (
             "mapping",
             include_str!("no_alloc/mapping.rs"),
-            "T must be zero-sized",
+            "T must fit in one pointer-sized word",
         ),
         (
             "conversion",
             include_str!("no_alloc/conversion.rs"),
-            "T must be zero-sized",
+            "T must fit in one pointer-sized word",
         ),
         (
             "static_payload",
             include_str!("no_alloc/static_payload.rs"),
-            "T must be zero-sized",
+            "T must fit in one pointer-sized word",
         ),
         (
             "message",

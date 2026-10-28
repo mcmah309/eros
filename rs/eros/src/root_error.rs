@@ -21,8 +21,8 @@ impl<E: TypeSet> ErrorUnion<E> {
     ///
     /// Only the inner error is checked, not its sources or contexts. All saved
     /// diagnostics are preserved. Requires `alloc`.
-    /// Classification moves the old root into a new box for the classifier,
-    /// then allocates storage for the returned wrapper.
+    /// Heap roots reuse their allocation inside the wrapper; inline roots are
+    /// boxed. Eros selects inline or boxed storage for the wrapper itself.
     ///
     /// Pass a tuple struct constructor to distinguish errors from one domain
     /// when combining paths. No `From` implementation is required:
@@ -90,7 +90,7 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// Replaces the inner error, passing ownership of the old boxed error to a closure.
     ///
     /// The closure runs once, receives the previous inner error, and returns the new
-    /// concrete error value. Eros allocates storage for the replacement.
+    /// concrete error value. Eros selects inline or boxed storage for the replacement.
     /// Preserve the original failure by storing the old inner error in the new
     /// error and returning it from `Error::source()`. Eros uses the new error's
     /// source chain without automatically adding the old inner error.
@@ -99,8 +99,8 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// Eros capture location, backtrace, and span trace. No new diagnostics
     /// are captured.
     ///
-    /// The old root moves out of its header allocation into a new box before
-    /// the closure runs. Boxing zero-sized roots needs no new allocation.
+    /// Heap-stored roots retain their allocation when passed to the closure.
+    /// Inline non-zero-sized roots are boxed to satisfy the closure's argument.
     ///
     /// The returned union has the replacement type as its single variant.
     /// For a union with a single variant, [`Self::map_single`] passes the concrete
@@ -146,13 +146,13 @@ impl<E: TypeSet> ErrorUnion<E> {
             inner: ErrorUnionInner::new_from_parts(
                 f(parts.error),
                 #[cfg(feature = "backtrace")]
-                parts.diagnostics.backtrace,
+                parts.backtrace,
                 #[cfg(feature = "error_span_trace")]
-                parts.diagnostics.span_trace,
+                parts.span_trace,
                 #[cfg(feature = "context")]
-                parts.diagnostics.context,
+                parts.context,
                 #[cfg(feature = "error_location")]
-                parts.diagnostics.location,
+                parts.location,
             ),
             _pd: core::marker::PhantomData,
         }
@@ -173,15 +173,15 @@ mod tests {
 
         #[cfg(feature = "backtrace")]
         let original_backtrace = {
-            error.inner.diagnostics_mut().backtrace = std::backtrace::Backtrace::force_capture();
+            error.inner.backtrace = std::backtrace::Backtrace::force_capture();
             error.backtrace().to_string()
         };
         #[cfg(feature = "error_location")]
-        let original_location = error.inner.diagnostics().location;
+        let original_location = error.inner.location;
         #[cfg(feature = "context")]
         let error = error.context("read /etc/app.toml").context("start service");
         #[cfg(feature = "context")]
-        let original_context = error.inner.diagnostics().context.as_ptr();
+        let original_context = error.inner.context.as_ptr();
 
         let error = error.map_inner(|_| MsgError::from("cannot open configuration"));
         let _error = error.map_inner(|_| MsgError::from("startup failed"));
@@ -195,23 +195,17 @@ mod tests {
             assert_eq!(_error.backtrace().to_string(), original_backtrace);
         }
         #[cfg(feature = "error_location")]
-        assert!(core::ptr::eq(
-            _error.inner.diagnostics().location,
-            original_location
-        ));
+        assert!(core::ptr::eq(_error.inner.location, original_location));
         #[cfg(feature = "context")]
         {
+            assert_eq!(_error.inner.context.as_ptr(), original_context);
+            assert_eq!(_error.inner.context.len(), 2);
             assert_eq!(
-                _error.inner.diagnostics().context.as_ptr(),
-                original_context
-            );
-            assert_eq!(_error.inner.diagnostics().context.len(), 2);
-            assert_eq!(
-                alloc::format!("{}", _error.inner.diagnostics().context[0].context),
+                alloc::format!("{}", _error.inner.context[0].context),
                 "read /etc/app.toml"
             );
             assert_eq!(
-                alloc::format!("{}", _error.inner.diagnostics().context[1].context),
+                alloc::format!("{}", _error.inner.context[1].context),
                 "start service"
             );
         }

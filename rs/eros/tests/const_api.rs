@@ -54,7 +54,6 @@ const fn saved_report<E: TypeSet>(error: &ErrorUnion<E>) -> ErrorReport<'_> {
     report
 }
 
-#[cfg(feature = "alloc")]
 #[test]
 fn const_report_accessors_preserve_shared_interior_mutability_and_diagnostics() {
     use core::sync::atomic::{AtomicUsize, Ordering};
@@ -130,12 +129,4 @@ fn batches_can_be_initialized_and_inspected_at_compile_time() {
     assert_eq!(errors.len(), 1);
     assert!(!errors.is_empty());
     assert_eq!(errors.into_inner().len(), 1);
-}
-
-#[cfg(not(feature = "alloc"))]
-#[test]
-fn const_report_accessors_borrow_zero_sized_roots() {
-    let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
-    let report = saved_report(&error);
-    assert!(core::ptr::eq(report.inner(), error.inner()));
 }

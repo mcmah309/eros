@@ -8,6 +8,6 @@ impl core::fmt::Display for Message {
 impl core::error::Error for Message {}
 
 fn main() {
-    // Static text needs no heap, but storing its reference makes this error nonzero-sized.
+    // Static text needs no heap, but the fat reference exceeds one word.
     let _: eros::ErrorUnion<(Message,)> = eros::ErrorUnion::new(Message("message"));
 }

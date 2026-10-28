@@ -2,45 +2,36 @@
 use alloc::boxed::Box;
 #[cfg(feature = "context")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
-use core::any::Any;
-#[cfg(feature = "alloc")]
-use core::mem::MaybeUninit;
-use core::{any::TypeId, mem::ManuallyDrop, ptr::NonNull};
+use core::{
+    any::Any,
+    cell::UnsafeCell,
+    mem::{ManuallyDrop, MaybeUninit},
+    ptr::NonNull,
+};
 
 #[cfg(feature = "context")]
 use crate::ContextFrame;
 use crate::SendSyncError;
 
-/// A thin owning pointer with alloc; a static operations pointer for a ZST otherwise.
+#[inline]
+const fn fits_inline<T>() -> bool {
+    size_of::<T>() == 0
+        || (size_of::<T>() <= size_of::<usize>() && align_of::<T>() <= align_of::<usize>())
+}
+
+/// Owns an inline error or a thin pointer to a boxed concrete error. The word
+/// is never read as an integer: MaybeUninit preserves padding and provenance
+/// when the owner moves. UnsafeCell permits the stored T's interior mutability.
 struct StoredError {
-    #[cfg(feature = "alloc")]
-    allocation: NonNull<ErrorHeader>,
-    #[cfg(not(feature = "alloc"))]
+    data: UnsafeCell<MaybeUninit<usize>>,
     ops: &'static ErrorOps,
-}
-
-#[cfg(feature = "alloc")]
-#[repr(C)]
-struct ErrorHeader {
-    ops: &'static ErrorOps,
-    diagnostics: ErrorDiagnostics,
-}
-
-// The common header is at offset zero, while Rust supplies T's required alignment.
-#[cfg(feature = "alloc")]
-#[repr(C)]
-struct HeapError<T: ?Sized> {
-    header: ErrorHeader,
-    value: T,
 }
 
 struct ErrorOps {
-    type_id: TypeId,
-    pointer: unsafe fn(*mut ()) -> *mut dyn SendSyncError,
-    drop: unsafe fn(*mut ()),
+    pointer: unsafe fn(*mut MaybeUninit<usize>) -> *mut dyn SendSyncError,
+    drop: unsafe fn(*mut MaybeUninit<usize>),
     #[cfg(feature = "alloc")]
-    into_box: unsafe fn(*mut ()) -> ErrorParts<Box<dyn SendSyncError>>,
+    into_box: unsafe fn(*mut MaybeUninit<usize>) -> Box<dyn SendSyncError>,
     #[cfg(feature = "alloc")]
     children: Option<ChildVisitor>,
 }
@@ -51,7 +42,6 @@ type ChildVisitor = for<'a> fn(&'a dyn SendSyncError, &mut dyn FnMut(crate::Erro
 struct OpsFor<T>(core::marker::PhantomData<T>);
 impl<T: SendSyncError> OpsFor<T> {
     const OPS: ErrorOps = ErrorOps {
-        type_id: TypeId::of::<T>(),
         pointer: error_pointer::<T>,
         drop: drop_error::<T>,
         #[cfg(feature = "alloc")]
@@ -65,6 +55,7 @@ impl<T: SendSyncError> OpsFor<T> {
 impl<E: crate::TypeSet> OpsFor<crate::ErrorUnionVec<E>> {
     const WITH_CHILDREN: ErrorOps = ErrorOps {
         children: Some(|root, visitor| {
+            // This table is selected only when wrapping an eros::ErrorUnionVec<E>.
             let batch = (root as &dyn Any)
                 .downcast_ref::<crate::ErrorUnionVec<E>>()
                 .expect("child visitor must match the stored batch");
@@ -77,46 +68,50 @@ impl<E: crate::TypeSet> OpsFor<crate::ErrorUnionVec<E>> {
 }
 
 /// # Safety
-/// data must belong to a live StoredError constructed for exactly T.
+/// The word must belong to a live StoredError constructed for exactly T.
 #[inline]
-unsafe fn concrete_pointer<T>(data: *mut ()) -> *mut T {
-    #[cfg(feature = "alloc")]
-    // SAFETY: data points to our original HeapError<T> allocation. addr_of_mut!
-    // borrows neither the allocation nor T, preserving interior mutability.
-    unsafe {
-        core::ptr::addr_of_mut!((*data.cast::<HeapError<T>>()).value)
-    }
-    #[cfg(not(feature = "alloc"))]
-    {
-        let _ = data;
-        // Construction established an inhabited ZST. Its logical owned value
-        // needs no bytes, but every borrow still requires correct alignment.
+unsafe fn concrete_pointer<T>(data: *mut MaybeUninit<usize>) -> *mut T {
+    if size_of::<T>() == 0 {
+        // ZSTs may be more aligned than our word. They have no payload bytes,
+        // so their logical owned value uses a freshly aligned dangling pointer.
         NonNull::<T>::dangling().as_ptr()
+    } else if fits_inline::<T>() {
+        data.cast::<T>()
+    } else {
+        #[cfg(feature = "alloc")]
+        // SAFETY: construction stored the thin Box<T> pointer in this word.
+        unsafe {
+            data.cast::<*mut T>().read()
+        }
+        #[cfg(not(feature = "alloc"))]
+        unreachable!("a non-inline error cannot be constructed without alloc")
     }
 }
 
 /// # Safety
-/// data must own a live T; returned references must obey the owner's borrow.
+/// The word must contain a live error of exactly T; access to the returned
+/// pointer must obey the borrow of the owner from which data was obtained.
 #[inline]
-unsafe fn error_pointer<T: SendSyncError>(data: *mut ()) -> *mut dyn SendSyncError {
-    // Coercion supplies Rust's real trait-object metadata.
+unsafe fn error_pointer<T: SendSyncError>(data: *mut MaybeUninit<usize>) -> *mut dyn SendSyncError {
+    // The coercion supplies Rust's real trait-object metadata without relying
+    // on a vtable layout or storing a pointer into our movable inline word.
     unsafe { concrete_pointer::<T>(data) }
 }
 
 /// # Safety
-/// The caller must own the live T and never access it again afterwards.
+/// The caller must own the live stored T and never access it again afterwards.
 #[inline]
-unsafe fn drop_error<T: SendSyncError>(data: *mut ()) {
-    #[cfg(feature = "alloc")]
-    // SAFETY: recover the original allocation, dropping T and freeing its heap.
-    unsafe {
-        drop(Box::from_raw(data.cast::<HeapError<T>>()));
-    }
-    #[cfg(not(feature = "alloc"))]
-    // SAFETY: construction established validity, including for aligned ZSTs
-    // with destructors. This transfers logical ownership into drop_in_place.
-    unsafe {
-        concrete_pointer::<T>(data).drop_in_place();
+unsafe fn drop_error<T: SendSyncError>(data: *mut MaybeUninit<usize>) {
+    let pointer = unsafe { concrete_pointer::<T>(data) };
+    if fits_inline::<T>() {
+        // SAFETY: the supplied value established validity, even for ZSTs.
+        unsafe { pointer.drop_in_place() };
+    } else {
+        #[cfg(feature = "alloc")]
+        // SAFETY: recover the original Box<T>, dropping T and freeing its heap.
+        unsafe {
+            drop(Box::from_raw(pointer));
+        }
     }
 }
 
@@ -124,120 +119,101 @@ unsafe fn drop_error<T: SendSyncError>(data: *mut ()) {
 /// The caller must exclusively own the live T and suppress StoredError's drop.
 #[cfg(feature = "alloc")]
 #[inline]
-unsafe fn box_error<T: SendSyncError>(data: *mut ()) -> ErrorParts<Box<dyn SendSyncError>> {
-    // Move the original concrete type into its own box, keeping diagnostics
-    // owned while the header allocation is freed.
-    let parts = unsafe { take_heap_error::<T>(data) };
-    ErrorParts {
-        error: Box::new(parts.error),
-        diagnostics: parts.diagnostics,
-    }
-}
-
-/// # Safety
-/// data must be the exclusively owned allocation for exactly T. Its old owner
-/// must suppress Drop, since this function moves every field out and frees it.
-#[cfg(feature = "alloc")]
-#[inline]
-unsafe fn take_heap_error<T>(data: *mut ()) -> ErrorParts<T> {
-    let HeapError {
-        header: ErrorHeader { diagnostics, .. },
-        value,
-    } = *unsafe { Box::from_raw(data.cast::<HeapError<T>>()) };
-    ErrorParts {
-        error: value,
-        diagnostics,
+unsafe fn box_error<T: SendSyncError>(data: *mut MaybeUninit<usize>) -> Box<dyn SendSyncError> {
+    let pointer = unsafe { concrete_pointer::<T>(data) };
+    if fits_inline::<T>() {
+        // SAFETY: transfer the inline value into a new box. Box::new does not
+        // allocate for ZSTs, including those with nontrivial alignment.
+        Box::new(unsafe { pointer.read() })
+    } else {
+        // SAFETY: transfer the original allocation without moving its payload.
+        unsafe { Box::from_raw(pointer) }
     }
 }
 
 impl StoredError {
     #[inline]
-    fn new<T: SendSyncError>(
-        value: T,
-        #[cfg(feature = "alloc")] diagnostics: ErrorDiagnostics,
-    ) -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                allocation: NonNull::from(Box::leak(Box::new(HeapError {
-                    header: ErrorHeader {
-                        ops: &OpsFor::<T>::OPS,
-                        diagnostics,
-                    },
-                    value,
-                })))
-                .cast(),
-            }
-        }
+    fn new<T: SendSyncError>(value: T) -> Self {
         #[cfg(not(feature = "alloc"))]
-        {
-            const {
-                assert!(
-                    size_of::<T>() == 0,
-                    "T must be zero-sized when the alloc feature is disabled"
-                );
-            }
-            // Transfer logical ownership; operations reconstruct aligned ZST
-            // pointers and perform its destructor exactly once when needed.
+        const {
+            assert!(
+                size_of::<T>() <= size_of::<usize>(),
+                "T must fit in one pointer-sized word when the alloc feature is disabled"
+            );
+            assert!(
+                size_of::<T>() == 0 || align_of::<T>() <= align_of::<usize>(),
+                "T's alignment must fit the inline word when the alloc feature is disabled"
+            );
+        }
+        let data = UnsafeCell::new(MaybeUninit::<usize>::uninit());
+        if size_of::<T>() == 0 {
+            // Transfer logical ownership. No bytes need to be written, and
+            // later operations obtain a pointer with T's alignment.
             core::mem::forget(value);
-            Self {
-                ops: &OpsFor::<T>::OPS,
+        } else if fits_inline::<T>() {
+            // SAFETY: T fits the word's size and alignment. The word is not
+            // initialized/read as usize, so T may have padding or references.
+            unsafe { data.get().cast::<T>().write(value) };
+        } else {
+            #[cfg(feature = "alloc")]
+            // SAFETY: a thin pointer fits our word. It is always accessed as a
+            // pointer, preserving its provenance through moves of this owner.
+            unsafe {
+                data.get()
+                    .cast::<*mut T>()
+                    .write(Box::into_raw(Box::new(value)));
             }
+            #[cfg(not(feature = "alloc"))]
+            unreachable!("the inline size/alignment assertion rejects T")
         }
-    }
-
-    #[inline]
-    fn ops(&self) -> &'static ErrorOps {
-        #[cfg(feature = "alloc")]
-        // SAFETY: the common header is initialized and lives until owner drop.
-        // Borrow only the header, leaving T available for interior mutation.
-        unsafe {
-            self.allocation.as_ref().ops
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            self.ops
-        }
-    }
-
-    #[inline]
-    fn data(&self) -> *mut () {
-        #[cfg(feature = "alloc")]
-        {
-            self.allocation.as_ptr().cast()
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            NonNull::<()>::dangling().as_ptr()
-        }
-    }
-
-    #[cfg(feature = "alloc")]
-    fn set_ops(&mut self, ops: &'static ErrorOps) {
-        // SAFETY: exclusive ownership and identical concrete type operations.
-        unsafe {
-            self.allocation.as_mut().ops = ops;
+        Self {
+            data,
+            ops: &OpsFor::<T>::OPS,
         }
     }
 
     #[inline]
     fn error(&self) -> &dyn SendSyncError {
-        // SAFETY: ops matches the live T, and the borrow is bounded by self.
-        unsafe { &*(self.ops().pointer)(self.data()) }
+        // SAFETY: ops matches the live T. The temporary trait-object pointer
+        // points to its current address and the borrow is bounded by self.
+        unsafe { &*(self.ops.pointer)(self.data.get()) }
     }
 
     #[inline]
     fn error_mut(&mut self) -> &mut dyn SendSyncError {
-        // SAFETY: exclusive access to the owned error.
-        unsafe { &mut *(self.ops().pointer)(self.data()) }
+        // SAFETY: exclusive access to the owned error, at its current address.
+        unsafe { &mut *(self.ops.pointer)(self.data.get()) }
+    }
+
+    /// # Safety
+    /// T must be the exact concrete type of the owned error.
+    #[inline]
+    unsafe fn take<T: 'static>(self) -> T {
+        debug_assert!((self.error() as &dyn Any).is::<T>());
+        let owner = ManuallyDrop::new(self);
+        let pointer = unsafe { (owner.ops.pointer)(owner.data.get()).cast::<T>() };
+        if fits_inline::<T>() {
+            // SAFETY: reading transfers ownership; ManuallyDrop suppresses the
+            // old root destructor. No references into the owner remain live.
+            unsafe { pointer.read() }
+        } else {
+            #[cfg(feature = "alloc")]
+            // SAFETY: moving out of the original Box deallocates it without
+            // dropping the extracted T. The caller guarantees the exact type.
+            unsafe {
+                *Box::from_raw(pointer)
+            }
+            #[cfg(not(feature = "alloc"))]
+            unreachable!("a non-inline error cannot be constructed without alloc")
+        }
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn into_box(self) -> ErrorParts<Box<dyn SendSyncError>> {
+    fn into_box(self) -> Box<dyn SendSyncError> {
         let owner = ManuallyDrop::new(self);
-        // SAFETY: transfer exclusive ownership and suppress the old drop.
-        unsafe { (owner.ops().into_box)(owner.data()) }
+        // SAFETY: we transfer exclusive ownership and suppress the old drop.
+        unsafe { (owner.ops.into_box)(owner.data.get()) }
     }
 }
 
@@ -245,25 +221,19 @@ impl Drop for StoredError {
     #[inline]
     fn drop(&mut self) {
         // SAFETY: construction selected these operations for our one live T.
-        unsafe { (self.ops().drop)(self.data()) };
+        unsafe { (self.ops.drop)(self.data.get()) };
     }
 }
 
-// SAFETY: construction only accepts Send + Sync errors, and borrows enforce
-// T's aliasing rules. Neither pointer exposes access independent of its owner.
+// SAFETY: construction only accepts Send + Sync errors. UnsafeCell hides their
+// storage representation, but every borrow still enforces T's aliasing rules.
 unsafe impl Send for StoredError {}
 unsafe impl Sync for StoredError {}
 
-/// With alloc this handle owns a header, diagnostics, and trailing payload in
-/// one allocation. Without alloc only the optional location needs inline bytes.
+/// Diagnostic fields live alongside the root so an inline root needs no heap
+/// container. Diagnostic features may still allocate independently.
 pub(crate) struct ErrorUnionInner {
     error: StoredError,
-    #[cfg(not(feature = "alloc"))]
-    diagnostics: ErrorDiagnostics,
-}
-
-/// Stored in the allocation's header with alloc, or inline without an allocator.
-pub(crate) struct ErrorDiagnostics {
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
     #[cfg(feature = "error_span_trace")]
@@ -276,7 +246,14 @@ pub(crate) struct ErrorDiagnostics {
 
 pub(crate) struct ErrorParts<T> {
     pub(crate) error: T,
-    pub(crate) diagnostics: ErrorDiagnostics,
+    #[cfg(feature = "backtrace")]
+    pub(crate) backtrace: std::backtrace::Backtrace,
+    #[cfg(feature = "error_span_trace")]
+    pub(crate) span_trace: tracing_error::SpanTrace,
+    #[cfg(feature = "context")]
+    pub(crate) context: Vec<ContextFrame>,
+    #[cfg(feature = "error_location")]
+    pub(crate) location: &'static core::panic::Location<'static>,
 }
 
 impl ErrorUnionInner {
@@ -284,22 +261,20 @@ impl ErrorUnionInner {
     #[cfg_attr(feature = "error_location", track_caller)]
     pub(crate) fn new_vec<E: crate::TypeSet>(value: crate::ErrorUnionVec<E>) -> Self {
         let mut inner = Self::new(value);
-        inner
-            .error
-            .set_ops(&OpsFor::<crate::ErrorUnionVec<E>>::WITH_CHILDREN);
+        inner.error.ops = &OpsFor::<crate::ErrorUnionVec<E>>::WITH_CHILDREN;
         inner
     }
 
     pub(crate) fn visit_children<'a>(&'a self, _visitor: &mut dyn FnMut(crate::ErrorReport<'a>)) {
         #[cfg(feature = "alloc")]
-        if let Some(children) = self.error.ops().children {
+        if let Some(children) = self.error.ops.children {
             children(self.error(), _visitor);
         }
     }
 
     #[cfg(feature = "alloc")]
     pub(crate) fn is_collection(&self) -> bool {
-        self.error.ops().children.is_some()
+        self.error.ops.children.is_some()
     }
 
     #[cfg_attr(feature = "error_location", track_caller)]
@@ -325,7 +300,8 @@ impl ErrorUnionInner {
         #[cfg(feature = "context")] context: Vec<ContextFrame>,
         #[cfg(feature = "error_location")] location: &'static core::panic::Location<'static>,
     ) -> Self {
-        let diagnostics = ErrorDiagnostics {
+        Self {
+            error: StoredError::new(value),
             #[cfg(feature = "backtrace")]
             backtrace,
             #[cfg(feature = "error_span_trace")]
@@ -334,49 +310,7 @@ impl ErrorUnionInner {
             context,
             #[cfg(feature = "error_location")]
             location,
-        };
-        Self::from_parts(ErrorParts {
-            error: value,
-            diagnostics,
-        })
-    }
-
-    #[inline]
-    fn from_parts<T: SendSyncError>(parts: ErrorParts<T>) -> Self {
-        Self {
-            error: StoredError::new(
-                parts.error,
-                #[cfg(feature = "alloc")]
-                parts.diagnostics,
-            ),
-            #[cfg(not(feature = "alloc"))]
-            diagnostics: parts.diagnostics,
         }
-    }
-
-    #[cfg(any(
-        feature = "backtrace",
-        feature = "error_span_trace",
-        feature = "context",
-        feature = "error_location"
-    ))]
-    pub(crate) const fn diagnostics(&self) -> &ErrorDiagnostics {
-        #[cfg(feature = "alloc")]
-        // SAFETY: the initialized header lives for the owner's entire borrow.
-        // Borrow only diagnostics; the trailing payload remains independent.
-        unsafe {
-            &self.error.allocation.as_ref().diagnostics
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            &self.diagnostics
-        }
-    }
-
-    #[cfg(any(feature = "backtrace", feature = "context"))]
-    pub(crate) fn diagnostics_mut(&mut self) -> &mut ErrorDiagnostics {
-        // SAFETY: exclusive access to the live header's diagnostics.
-        unsafe { &mut (*self.error.allocation.as_ptr()).diagnostics }
     }
 
     #[inline]
@@ -390,7 +324,7 @@ impl ErrorUnionInner {
 
     #[inline]
     pub(crate) fn is_error_type<T: 'static>(&self) -> bool {
-        self.error.ops().type_id == TypeId::of::<T>()
+        (self.error() as &dyn Any).is::<T>()
     }
 
     /// # Safety
@@ -404,7 +338,6 @@ impl ErrorUnionInner {
             // moving it into the return place. This also handles a panic in a
             // context destructor without leaking the extracted root.
             error = parts.error;
-            let _diagnostics = parts.diagnostics;
         }
         error
     }
@@ -413,46 +346,42 @@ impl ErrorUnionInner {
     /// T must be the exact concrete type of the owned error.
     #[inline]
     pub(crate) unsafe fn downcast_error_unchecked_with_parts<T: 'static>(self) -> ErrorParts<T> {
-        debug_assert!(self.is_error_type::<T>());
-        let owner = ManuallyDrop::new(self.error);
-        #[cfg(feature = "alloc")]
-        // SAFETY: exact type, exclusive ownership, and the old drop is suppressed.
-        unsafe {
-            take_heap_error::<T>(owner.data())
-        }
-        #[cfg(not(feature = "alloc"))]
-        // SAFETY: transfer the inhabited ZST, suppressing the old owner's drop.
-        unsafe {
-            ErrorParts {
-                error: concrete_pointer::<T>(owner.data()).read(),
-                diagnostics: self.diagnostics,
-            }
+        ErrorParts {
+            error: unsafe { self.error.take::<T>() },
+            #[cfg(feature = "backtrace")]
+            backtrace: self.backtrace,
+            #[cfg(feature = "error_span_trace")]
+            span_trace: self.span_trace,
+            #[cfg(feature = "context")]
+            context: self.context,
+            #[cfg(feature = "error_location")]
+            location: self.location,
         }
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
     pub(crate) fn into_boxed_parts(self) -> ErrorParts<Box<dyn SendSyncError>> {
-        self.error.into_box()
+        ErrorParts {
+            error: self.error.into_box(),
+            #[cfg(feature = "backtrace")]
+            backtrace: self.backtrace,
+            #[cfg(feature = "error_span_trace")]
+            span_trace: self.span_trace,
+            #[cfg(feature = "context")]
+            context: self.context,
+            #[cfg(feature = "error_location")]
+            location: self.location,
+        }
     }
 
     #[inline]
     pub(crate) fn downcast_error_ref<T: 'static>(&self) -> Option<&T> {
-        if self.is_error_type::<T>() {
-            // SAFETY: the exact type was checked using the shared operations.
-            Some(unsafe { self.downcast_error_ref_unchecked::<T>() })
-        } else {
-            None
-        }
+        (self.error() as &dyn Any).downcast_ref()
     }
     #[inline]
     pub(crate) fn downcast_error_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        if self.is_error_type::<T>() {
-            // SAFETY: the type matches and the owner is exclusively borrowed.
-            Some(unsafe { self.downcast_error_mut_unchecked::<T>() })
-        } else {
-            None
-        }
+        (self.error_mut() as &mut dyn Any).downcast_mut()
     }
 
     /// # Safety
@@ -460,115 +389,16 @@ impl ErrorUnionInner {
     #[inline]
     pub(crate) unsafe fn downcast_error_ref_unchecked<T: 'static>(&self) -> &T {
         debug_assert!(self.is_error_type::<T>());
-        // SAFETY: project the known concrete payload directly, without creating
-        // a trait object or dispatching through the pointer operation.
-        unsafe { &*concrete_pointer::<T>(self.error.data()) }
+        // SAFETY: exact type, and the reference lifetime follows self.
+        unsafe { &*(self.error() as *const dyn SendSyncError).cast::<T>() }
     }
+
     /// # Safety
     /// T must be the exact concrete type of the owned error.
     #[inline]
     pub(crate) unsafe fn downcast_error_mut_unchecked<T: 'static>(&mut self) -> &mut T {
         debug_assert!(self.is_error_type::<T>());
         // SAFETY: exact type and exclusive access, with lifetime following self.
-        unsafe { &mut *concrete_pointer::<T>(self.error.data()) }
-    }
-
-    /// # Safety
-    /// T must be the exact concrete type of the owned error.
-    #[inline]
-    pub(crate) unsafe fn map_single<T, U>(self, f: impl FnOnce(T) -> U) -> Self
-    where
-        T: SendSyncError,
-        U: SendSyncError,
-    {
-        debug_assert!(self.is_error_type::<T>());
-        #[cfg(feature = "alloc")]
-        if const {
-            size_of::<HeapError<T>>() == size_of::<HeapError<U>>()
-                && align_of::<HeapError<T>>() == align_of::<HeapError<U>>()
-        } {
-            let owner = ManuallyDrop::new(self);
-            // SAFETY: MaybeUninit<T> has T's size/alignment, so this guard owns
-            // the original allocation. Once T moves to f, unwinding drops the
-            // diagnostics and frees the allocation without touching the dead T.
-            let allocation =
-                unsafe { Box::from_raw(owner.error.data().cast::<HeapError<MaybeUninit<T>>>()) };
-            let old = unsafe { allocation.value.as_ptr().read() };
-            let value = f(old);
-            let raw = Box::into_raw(allocation).cast::<HeapError<U>>();
-            // SAFETY: the complete layouts match, including alignment. Moving
-            // U into the payload and installing its operations restores a live
-            // owner. Diagnostics retain their original place and ownership.
-            unsafe {
-                core::ptr::addr_of_mut!((*raw).value).write(value);
-                core::ptr::addr_of_mut!((*raw).header.ops).write(&OpsFor::<U>::OPS);
-                return Self {
-                    error: StoredError {
-                        allocation: NonNull::new_unchecked(raw.cast()),
-                    },
-                };
-            }
-        }
-        // Different layouts need fresh storage. Both moved values have normal
-        // local owners here, so a panic in f also drops saved diagnostics.
-        let parts = unsafe { self.downcast_error_unchecked_with_parts::<T>() };
-        Self::from_parts(ErrorParts {
-            error: f(parts.error),
-            diagnostics: parts.diagnostics,
-        })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn root_storage_is_one_word_with_a_pointer_niche() {
-        assert_eq!(size_of::<StoredError>(), size_of::<usize>());
-        assert_eq!(align_of::<StoredError>(), align_of::<usize>());
-        assert_eq!(size_of::<Option<StoredError>>(), size_of::<usize>());
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn equal_size_with_different_alignment_requires_replacement_storage() {
-        #[derive(Debug)]
-        #[repr(align(256))]
-        struct Aligned(u8);
-        impl core::fmt::Display for Aligned {
-            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                write!(f, "{}", self.0)
-            }
-        }
-        impl core::error::Error for Aligned {}
-
-        // The two complete allocations have equal sizes but different required
-        // alignments. Reusing the first as the second would give Box the wrong
-        // deallocation layout, even if its address happened to be aligned.
-        const BYTES: usize = size_of::<HeapError<Aligned>>() - size_of::<ErrorHeader>();
-        #[derive(Debug)]
-        struct Unaligned([u8; BYTES]);
-        impl core::fmt::Display for Unaligned {
-            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                write!(f, "{}", self.0[0])
-            }
-        }
-        impl core::error::Error for Unaligned {}
-        assert_eq!(
-            size_of::<HeapError<Unaligned>>(),
-            size_of::<HeapError<Aligned>>()
-        );
-        assert_ne!(
-            align_of::<HeapError<Unaligned>>(),
-            align_of::<HeapError<Aligned>>()
-        );
-        let error = ErrorUnionInner::new(Unaligned([73; BYTES]));
-        // SAFETY: construction established exactly Unaligned.
-        let mapped = unsafe { error.map_single::<Unaligned, Aligned>(|old| Aligned(old.0[0])) };
-        let value = mapped.downcast_error_ref::<Aligned>().unwrap();
-        assert_eq!((value as *const Aligned).addr() % 256, 0);
-        assert_eq!(value.0, 73);
-        drop(mapped); // Miri checks that the allocator receives the correct layout.
+        unsafe { &mut *(self.error_mut() as *mut dyn SendSyncError).cast::<T>() }
     }
 }

@@ -3,7 +3,7 @@ use core::{any::Any, error::Error, fmt};
 use eros::AnyError;
 #[cfg(not(feature = "context"))]
 use eros::Context;
-use eros::{Erase, ErrorUnion, IntoUnion, ReshapeUnion};
+use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -138,10 +138,7 @@ fn zero_sized_roots_can_borrow_non_zero_sized_static_sources() {
     }
     let union: ErrorUnion<(Root,)> = ErrorUnion::new(Root);
     assert_eq!(union.source().unwrap().to_string(), "source\nmore");
-    assert_eq!(
-        union.to_string(),
-        "root\n    caused by:\n        - source\n          more\n        - leaf"
-    );
+    assert_eq!(union.to_string(), "root\n    caused by:\n        - source\n          more\n        - leaf");
     assert_eq!(std::format!("{union:#}"), "root");
     assert_eq!(
         std::format!("{union:#?}"),
@@ -270,11 +267,7 @@ fn aligned_zsts_preserve_ownership_through_borrowing_extraction_and_panics() {
 #[cfg(not(feature = "alloc"))]
 #[test]
 fn storage_size_is_independent_of_the_concrete_zst_alignment() {
-    let words = if cfg!(feature = "error_location") {
-        2
-    } else {
-        1
-    };
+    let words = if cfg!(feature = "error_location") { 3 } else { 2 };
     assert_eq!(
         size_of::<ErrorUnion<AnyError>>(),
         words * size_of::<usize>()

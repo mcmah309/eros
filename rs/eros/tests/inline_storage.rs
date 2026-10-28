@@ -1,40 +1,22 @@
-#[cfg(feature = "alloc")]
-#[test]
-fn diagnostics_do_not_increase_the_union_handle_size() {
-    use eros::{AnyError, ErrorUnion, ErrorUnionAdapter};
-    type Typed = (core::fmt::Error, std::io::Error);
-    assert_eq!(size_of::<ErrorUnion<AnyError>>(), size_of::<usize>());
-    assert_eq!(size_of::<ErrorUnion<Typed>>(), size_of::<usize>());
-    assert_eq!(size_of::<ErrorUnionAdapter<Typed>>(), size_of::<usize>());
-    assert_eq!(size_of::<Option<ErrorUnion<Typed>>>(), size_of::<usize>());
-    assert_eq!(size_of::<eros::Result<(), Typed>>(), size_of::<usize>());
-}
+#[path = "no_alloc/inline.rs"]
+mod inline;
 
-#[cfg(feature = "alloc")]
-#[path = "common/payloads.rs"]
-mod payloads;
-
-#[cfg(feature = "alloc")]
 #[derive(Debug)]
 struct Tracked(std::sync::Arc<std::sync::atomic::AtomicUsize>);
-#[cfg(feature = "alloc")]
 impl std::fmt::Display for Tracked {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("tracked root")
+        f.write_str("tracked inline root")
     }
 }
-#[cfg(feature = "alloc")]
 impl std::error::Error for Tracked {}
-#[cfg(feature = "alloc")]
 impl Drop for Tracked {
     fn drop(&mut self) {
         self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
-#[cfg(feature = "alloc")]
 #[test]
-fn panicking_mapping_drops_the_root_once() {
+fn panicking_inline_mapping_drops_the_root_once() {
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -43,19 +25,20 @@ fn panicking_mapping_drops_the_root_once() {
     assert_eq!(size_of::<Tracked>(), size_of::<usize>());
     let error: eros::ErrorUnion<(Tracked,)> = eros::ErrorUnion::new(Tracked(drops.clone()));
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.map_single(|_root| -> std::fmt::Error { panic!("mapping failed") })
+        error.map_single(|_root| -> std::fmt::Error { panic!("inline mapping failed") })
     }));
     assert_eq!(
         outcome.unwrap_err().downcast_ref::<&str>(),
-        Some(&"mapping failed")
+        Some(&"inline mapping failed")
     );
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
 
 #[cfg(feature = "context")]
 #[test]
-fn panicking_context_cleanup_drops_root_and_container_once() {
+fn panicking_context_cleanup_drops_an_extracted_inline_root_once() {
     use std::{
+        error::Error,
         fmt,
         sync::{
             Arc,
@@ -69,14 +52,13 @@ fn panicking_context_cleanup_drops_root_and_container_once() {
             f.write_str("panic")
         }
     }
-    impl std::error::Error for PanickingContext {}
+    impl Error for PanickingContext {}
     impl Drop for PanickingContext {
         fn drop(&mut self) {
             panic!("context cleanup failed");
         }
     }
     for extract in [
-        |error: eros::ErrorUnion<(Tracked,)>| drop(error),
         |error: eros::ErrorUnion<(Tracked,)>| drop(error.into_single()),
         |error: eros::ErrorUnion<(Tracked,)>| drop(error.into_inner()),
     ] {
@@ -92,9 +74,8 @@ fn panicking_context_cleanup_drops_root_and_container_once() {
     }
 }
 
-#[cfg(feature = "alloc")]
 #[test]
-fn mutable_references_remain_valid_after_moves_and_downcasts() {
+fn inline_mutable_references_remain_valid_after_moves_and_downcasts() {
     use eros::ErrorUnion;
     use std::{error::Error, fmt};
 
@@ -114,7 +95,7 @@ fn mutable_references_remain_valid_after_moves_and_downcasts() {
     let error = erased.narrow::<(Reference,), _>().unwrap().into_single();
     assert_eq!(*error.0, 43);
     // Reclaim the deliberately leaked allocation after transferring its unique
-    // reference through root storage. Miri checks for leaks and aliasing.
+    // reference through inline storage. Miri checks for leaks and aliasing.
     unsafe {
         drop(Box::from_raw(error.0 as *mut usize));
     }
@@ -122,14 +103,13 @@ fn mutable_references_remain_valid_after_moves_and_downcasts() {
 
 #[cfg(not(feature = "backtrace"))]
 mod allocation_checks {
-    use eros::Erase;
     #[cfg(feature = "alloc")]
-    use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
-    #[cfg(feature = "alloc")]
-    use std::error::Error;
+    use eros::SendSyncError;
+    use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
     use std::{
         alloc::{GlobalAlloc, Layout, System},
         cell::Cell,
+        error::Error,
         fmt,
     };
 
@@ -174,21 +154,17 @@ mod allocation_checks {
         f();
         COUNTS.with(|counts| counts.get().unwrap())
     }
-    #[cfg(feature = "alloc")]
     #[derive(Debug)]
     struct Small(usize);
-    #[cfg(feature = "alloc")]
     impl fmt::Display for Small {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.0)
         }
     }
-    #[cfg(feature = "alloc")]
     impl Error for Small {}
 
-    #[cfg(feature = "alloc")]
     #[test]
-    fn small_roots_allocate_once_and_composing_operations_reuse_storage() {
+    fn small_roots_and_composing_operations_do_not_allocate() {
         let counts = measured(|| {
             let input: eros::Result<(), (Small, fmt::Error)> = Err(Small(usize::MAX)).union();
             let erased = input.erase().unwrap_err();
@@ -201,69 +177,7 @@ mod allocation_checks {
                 .recover::<fmt::Error, _>(|_| panic!("wrong variant"))
                 .into_value();
         });
-        assert_eq!(counts, (1, 1));
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn matching_layout_mapping_reuses_the_allocation_and_updates_operations() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        static DROPS: AtomicUsize = AtomicUsize::new(0);
-        #[derive(Debug)]
-        struct Replacement(&'static AtomicUsize);
-        impl fmt::Display for Replacement {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str("replacement")
-            }
-        }
-        impl Error for Replacement {}
-        impl Drop for Replacement {
-            fn drop(&mut self) {
-                self.0.fetch_add(1, Ordering::SeqCst);
-            }
-        }
-        assert_eq!(
-            measured(|| {
-                let error: ErrorUnion<(Small,)> = ErrorUnion::new(Small(42));
-                let original = error.as_single() as *const Small as *const ();
-                let mut mapped = error.map_single(|old| {
-                    assert_eq!(old.0, 42);
-                    Replacement(&DROPS)
-                });
-                assert_eq!(
-                    mapped.as_single() as *const Replacement as *const (),
-                    original
-                );
-                assert!(mapped.is_inner::<Replacement>());
-                assert!(!mapped.is_inner::<Small>());
-                assert!(mapped.downcast_inner_ref::<Small>().is_none());
-                assert!(mapped.downcast_inner_mut::<Small>().is_none());
-                assert!(mapped.downcast_inner_mut::<Replacement>().is_some());
-                drop(mapped);
-            }),
-            (1, 1)
-        );
-        assert_eq!(DROPS.load(Ordering::SeqCst), 1);
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn zero_sized_roots_allocate_one_header_and_extract_without_another_allocation() {
-        assert_eq!(
-            measured(|| {
-                let error: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
-                assert_eq!(error.into_single(), fmt::Error);
-            }),
-            (1, 1)
-        );
-        assert_eq!(
-            measured(|| {
-                let error: ErrorUnion<(fmt::Error,)> = ErrorUnion::new(fmt::Error);
-                let boxed = error.into_inner();
-                assert!((boxed.as_ref() as &dyn std::any::Any).is::<fmt::Error>());
-            }),
-            (1, 1)
-        );
+        assert_eq!(counts, (0, 0));
     }
 
     #[cfg(not(feature = "alloc"))]
@@ -271,16 +185,19 @@ mod allocation_checks {
     fn literal_message_errors_and_recovery_do_not_allocate() {
         assert_eq!(
             measured(|| {
-                fn operation() -> eros::Result<()> {
+                fn operation() -> eros::Result<(), (eros::MsgError,)> {
                     eros::bail!("message {{text}}");
                 }
-                let error = operation().erase().unwrap_err();
-                assert_eq!(size_of_val(error.inner()), 0);
-                let error = error.narrow::<(fmt::Error,), _>().unwrap_err();
+                let result: eros::Result<(), (fmt::Error, eros::MsgError)> = operation().widen();
+                let erased = result.erase().unwrap_err();
+                let error = erased.narrow::<(eros::MsgError,), _>().unwrap();
+                assert_eq!(error.as_single().as_str(), "message {text}");
                 drop(eros::ErrorUnionAdapter::from(error));
-                let mut error = eros::error!("another message");
-                assert_eq!(size_of_val(error.inner_mut()), 0);
-                assert!(!error.is_inner::<eros::MsgError>());
+                let error = eros::error!("another message");
+                assert_eq!(
+                    error.downcast_inner::<eros::MsgError>().unwrap().as_str(),
+                    "another message"
+                );
             }),
             (0, 0)
         );
@@ -300,35 +217,16 @@ mod allocation_checks {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn padded_payload_mapping_reuses_the_complete_layout() {
-        #[derive(Debug)]
-        struct Byte(u8);
-        impl fmt::Display for Byte {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.0)
-            }
-        }
-        impl Error for Byte {}
-        assert_ne!(size_of::<Byte>(), size_of::<Small>());
-        assert_eq!(
-            measured(|| {
-                let error: ErrorUnion<(Byte,)> = ErrorUnion::new(Byte(17));
-                let address = error.as_single() as *const Byte as *const ();
-                let error = error.map_single(|byte| Small(usize::from(byte.0)));
-                assert_eq!(error.as_single() as *const Small as *const (), address);
-                assert_eq!(error.into_single().0, 17);
-            }),
-            (1, 1)
-        );
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn boxed_extraction_moves_the_original_concrete_type() {
+    fn large_roots_allocate_once_and_boxed_extraction_reuses_the_heap() {
         let counts = measured(|| {
             let error: ErrorUnion = ErrorUnion::new(Large([17, 29]));
+            let address = error.inner() as *const dyn SendSyncError as *const ();
             let error = error.narrow::<(Large,), _>().unwrap();
             let boxed = error.into_inner();
+            assert_eq!(
+                boxed.as_ref() as *const dyn SendSyncError as *const (),
+                address
+            );
             assert_eq!(
                 (boxed.as_ref() as &dyn std::any::Any)
                     .downcast_ref::<Large>()
@@ -338,12 +236,12 @@ mod allocation_checks {
             );
             drop(boxed);
         });
-        assert_eq!(counts, (2, 2));
+        assert_eq!(counts, (1, 1));
     }
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn boxed_extraction_and_mapping_have_expected_allocation_counts() {
+    fn inline_boxed_extraction_allocates_and_mapping_switches_both_ways() {
         assert_eq!(
             measured(|| {
                 let error: ErrorUnion<(Small,)> = ErrorUnion::new(Small(42));
@@ -357,7 +255,7 @@ mod allocation_checks {
                 );
                 drop(boxed);
             }),
-            (2, 2)
+            (1, 1)
         );
         assert_eq!(
             measured(|| {
@@ -366,7 +264,7 @@ mod allocation_checks {
                 let small = large.map_single(|large| Small(large.0[0] + large.0[1]));
                 assert_eq!(small.into_single().0, 133);
             }),
-            (3, 3)
+            (1, 1)
         );
         assert_eq!(
             measured(|| {
@@ -382,7 +280,7 @@ mod allocation_checks {
                 });
                 assert_eq!(mapped.into_single().0, 43);
             }),
-            (3, 3)
+            (1, 1)
         );
     }
 
@@ -407,30 +305,4 @@ mod allocation_checks {
             (1, 1)
         );
     }
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn matching_layout_mapping_keeps_diagnostics_in_place() {
-    use eros::ErrorUnion;
-    let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
-    let error = error.context("saved");
-    #[cfg(feature = "backtrace")]
-    let backtrace = error.backtrace() as *const _;
-    #[cfg(feature = "error_span_trace")]
-    let span_trace = error.span_trace() as *const _;
-    #[cfg(feature = "error_location")]
-    let location = error.location();
-    #[cfg(feature = "context")]
-    let frame = error.contexts().next().unwrap() as *const _;
-    let mapped = error.map_single(|error| error);
-    #[cfg(feature = "backtrace")]
-    assert!(core::ptr::eq(mapped.backtrace(), backtrace));
-    #[cfg(feature = "error_span_trace")]
-    assert!(core::ptr::eq(mapped.span_trace(), span_trace));
-    #[cfg(feature = "error_location")]
-    assert!(core::ptr::eq(mapped.location(), location));
-    #[cfg(feature = "context")]
-    assert!(core::ptr::eq(mapped.contexts().next().unwrap(), frame));
-    assert_eq!(mapped.into_single(), core::fmt::Error);
 }

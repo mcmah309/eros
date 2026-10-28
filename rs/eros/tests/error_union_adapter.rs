@@ -168,7 +168,6 @@ fn question_mark_converts_matching_unions_without_reshaping() {
     assert_eq!(propagate(empty).unwrap(), 7);
 }
 
-#[cfg(feature = "alloc")]
 #[test]
 fn borrowing_and_recovery_preserve_typed_and_erased_roots() {
     #[derive(Debug)]
