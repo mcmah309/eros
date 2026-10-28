@@ -56,7 +56,7 @@ fn batch_collection_continues_after_failures_and_preserves_typed_children() {
     assert_eq!(visited, [0, 1, 128, 3, 2]);
     let error = result.unwrap_err();
     assert_eq!(error.to_string(), "errors (3 total):");
-    let children = error.into_single().into_errors();
+    let children: Vec<ErrorUnion<ItemErrors>> = error.into_single().into();
     assert_eq!(children.len(), 3);
     assert!(children[0].is_inner::<Odd>());
     assert!(children[1].is_inner::<Overflow>());
@@ -81,7 +81,8 @@ fn wrapping_preserves_child_reports_and_registers_human_and_json_traversal() {
     let expected_json = [first.to_debug_json(), second.to_debug_json()];
     let errors = vec![first, second];
     let original_allocation = errors.as_ptr();
-    let batch = Batch::new(errors);
+    let original_capacity = errors.capacity();
+    let batch = Batch::from(errors);
     assert_eq!(batch.iter().as_slice().as_ptr(), original_allocation);
     let error: ErrorUnion<(Batch, std::fmt::Error)> = batch.union();
     let error = error.context("process batch");
@@ -103,9 +104,16 @@ fn wrapping_preserves_child_reports_and_registers_human_and_json_traversal() {
     );
     let error: ErrorUnion = error.erase();
     assert_eq!(format!("{error:#?}"), report);
-    let recovered = error.narrow::<(Batch,), _>().unwrap().into_single();
-    let errors = recovered.into_errors();
+    let errors = error
+        .narrow::<(Batch,), _>()
+        .unwrap()
+        .into_single()
+        .into_inner();
     assert_eq!(errors.as_ptr(), original_allocation);
+    assert_eq!(errors.capacity(), original_capacity);
+    for (child, expected) in errors.iter().zip(expected_reports) {
+        assert_eq!(format!("{child:?}"), expected);
+    }
 }
 
 #[test]
@@ -240,7 +248,8 @@ fn matching_messages_group_nonconsecutive_ranges_in_first_occurrence_order() {
         assert_eq!(json["children"].as_array().unwrap().len(), 10);
         assert_eq!(json["children"][9]["root"], "zebra");
     }
-    assert_eq!(error.into_single().into_errors().len(), 10);
+    let errors = Vec::from(error.into_single());
+    assert_eq!(errors.len(), 10);
 }
 
 #[test]

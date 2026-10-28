@@ -55,7 +55,7 @@ fn large_batches_limit_formatting_and_preserve_all_errors() {
         let mut visited = 0;
         error.report().visit_children(&mut |_| visited += 1);
         assert_eq!(visited, count);
-        let recovered = error.into_single().into_errors();
+        let recovered = Vec::from(error.into_single());
         assert_eq!(recovered.len(), count);
         if let Some(last) = recovered.into_iter().last() {
             assert_eq!(last.into_single().index, count - 1);

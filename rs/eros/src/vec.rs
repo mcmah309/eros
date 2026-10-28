@@ -18,6 +18,7 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 ///
 /// Requires `alloc`. An empty batch is allowed while accumulating failures;
 /// check [`is_empty`](Self::is_empty) before returning it as an error.
+/// Convert to or from a `Vec<ErrorUnion<E>>` with [`From`] without reallocating.
 ///
 /// Use [`union`](Self::union) on the batch to register recursive human and JSON
 /// reporting. Converting a result with [`IntoUnion::union`](crate::IntoUnion::union)
@@ -80,8 +81,8 @@ impl<E: TypeSet> ErrorUnionVec<E> {
         self.errors.iter_mut()
     }
 
-    /// Returns the original vector and its typed unions without reallocating.
-    pub fn into_errors(self) -> AllocVec<ErrorUnion<E>> {
+    /// Returns the original vector, preserving its allocation and child diagnostics.
+    pub fn into_inner(self) -> AllocVec<ErrorUnion<E>> {
         self.errors
     }
 
@@ -112,6 +113,12 @@ impl<E: TypeSet> Default for ErrorUnionVec<E> {
 impl<E: TypeSet> From<AllocVec<ErrorUnion<E>>> for ErrorUnionVec<E> {
     fn from(errors: AllocVec<ErrorUnion<E>>) -> Self {
         Self::new(errors)
+    }
+}
+
+impl<E: TypeSet> From<ErrorUnionVec<E>> for AllocVec<ErrorUnion<E>> {
+    fn from(errors: ErrorUnionVec<E>) -> Self {
+        errors.into_inner()
     }
 }
 
