@@ -49,19 +49,22 @@ mod inline;
 pub(crate) use inline::{Owner as ErrorOwner, Storage};
 
 #[cfg(feature = "alloc")]
-type ChildVisitor = for<'a> fn(&'a dyn SendSyncError, &mut dyn FnMut(crate::ErrorReport<'a>));
+type ChildVisitor = for<'a> fn(
+    &'a dyn SendSyncError,
+    usize,
+    &mut dyn FnMut(crate::ErrorReport<'a>) -> bool,
+) -> usize;
 
 #[cfg(feature = "alloc")]
 fn visit_batch<'a, E: crate::TypeSet>(
     root: &'a dyn SendSyncError,
-    visitor: &mut dyn FnMut(crate::ErrorReport<'a>),
-) {
+    limit: usize,
+    visitor: &mut dyn FnMut(crate::ErrorReport<'a>) -> bool,
+) -> usize {
     let batch = (root as &dyn core::any::Any)
         .downcast_ref::<crate::ErrorUnionVec<E>>()
         .expect("child visitor must match the stored batch");
-    for child in batch {
-        visitor(child.report());
-    }
+    batch.visit_reports(limit, visitor)
 }
 
 pub(crate) struct ErrorUnionInner {
@@ -108,8 +111,23 @@ impl ErrorUnionInner {
     pub(crate) fn visit_children<'a>(&'a self, _visitor: &mut dyn FnMut(crate::ErrorReport<'a>)) {
         #[cfg(feature = "alloc")]
         if let Some(children) = self.storage.children() {
-            children(self.error(), _visitor);
+            children(self.error(), usize::MAX, &mut |child| {
+                _visitor(child);
+                true
+            });
         }
+    }
+
+    // Returns the full count without borrowing or visiting omitted children.
+    #[cfg(feature = "alloc")]
+    pub(crate) fn visit_children_while<'a>(
+        &'a self,
+        limit: usize,
+        visitor: &mut dyn FnMut(crate::ErrorReport<'a>) -> bool,
+    ) -> usize {
+        self.storage
+            .children()
+            .map_or(0, |children| children(self.error(), limit, visitor))
     }
 
     #[cfg(feature = "alloc")]
@@ -317,6 +335,32 @@ impl ErrorOwner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn child_visits_stop_at_the_limit_or_visitor_request() {
+        let batch: crate::ErrorUnionVec = (0..10_000)
+            .map(|_| crate::ErrorUnion::new(core::fmt::Error))
+            .collect();
+        let inner = ErrorUnionInner::new_vec(batch);
+        for limit in [0, 1, 10] {
+            let mut visited = 0;
+            let total = inner.visit_children_while(limit, &mut |_| {
+                visited += 1;
+                true
+            });
+            assert_eq!(visited, limit);
+            assert_eq!(total, 10_000);
+        }
+        let mut visited = 0;
+        let total = inner.visit_children_while(10, &mut |_| {
+            visited += 1;
+            false
+        });
+        assert_eq!(visited, 1);
+        assert_eq!(total, 10_000);
+    }
+
     #[test]
     fn handle_and_its_option_obey_the_feature_size_limit() {
         let words = HANDLE_WORDS;

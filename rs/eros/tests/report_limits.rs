@@ -2,6 +2,125 @@
 
 use eros::{ErrorUnion, ErrorUnionVec};
 
+#[test]
+fn prepared_child_messages_preserve_fragmented_line_endings_and_blank_lines() {
+    #[derive(Debug)]
+    struct Fragmented {
+        text: &'static str,
+        split: usize,
+    }
+    impl std::fmt::Display for Fragmented {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(&self.text[..self.split])?;
+            f.write_str(&self.text[self.split..])
+        }
+    }
+    impl std::error::Error for Fragmented {}
+
+    for text in [
+        "",
+        "\n",
+        "\r",
+        "\r\n",
+        "\n\n",
+        "a\n\n",
+        "a\r\n\r\n",
+        "a\rb\r",
+        "é\r\n🦀\nend",
+    ] {
+        let lines: Vec<_> = text.lines().collect();
+        let mut expected = String::from("errors (1 total):\n    - error:");
+        if lines.len() > 1 {
+            for line in &lines {
+                expected.push_str("\n        ");
+                expected.push_str(line);
+            }
+        } else {
+            expected.push(' ');
+            expected.push_str(lines.first().copied().unwrap_or_default());
+        }
+        expected.push_str("\n      at: [0]");
+        for split in 0..=text.len() {
+            if text.is_char_boundary(split) {
+                let child: ErrorUnion<(Fragmented,)> = ErrorUnion::new(Fragmented { text, split });
+                let batch = ErrorUnionVec::new(vec![child]);
+                assert_eq!(
+                    format!("{batch:#?}"),
+                    expected,
+                    "text={text:?}, split={split}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn nested_reports_format_each_message_once_per_render() {
+    use std::{
+        error::Error,
+        fmt,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering::Relaxed},
+        },
+    };
+
+    #[derive(Debug)]
+    struct Counted {
+        calls: Arc<AtomicUsize>,
+        source: Option<Box<Counted>>,
+    }
+    impl fmt::Display for Counted {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.calls.fetch_add(1, Relaxed);
+            f.write_str("counted message")
+        }
+    }
+    impl Error for Counted {
+        fn source(&self) -> Option<&(dyn Error + 'static)> {
+            self.source
+                .as_ref()
+                .map(|source| source.as_ref() as &dyn Error)
+        }
+    }
+
+    let calls: [Arc<AtomicUsize>; 3] = core::array::from_fn(|_| Arc::new(AtomicUsize::new(0)));
+    let mut error: ErrorUnion = ErrorUnion::new(Counted {
+        calls: calls[0].clone(),
+        source: Some(Box::new(Counted {
+            calls: calls[1].clone(),
+            source: None,
+        })),
+    });
+    #[cfg(feature = "context")]
+    {
+        error = error.context(Box::new(Counted {
+            calls: calls[2].clone(),
+            source: None,
+        }) as Box<dyn eros::SendSyncDebugDisplay>);
+    }
+    for _ in 0..9 {
+        error = ErrorUnionVec::new(vec![error]).union();
+    }
+    for alternate in [false, true] {
+        for counter in &calls {
+            counter.store(0, Relaxed);
+        }
+        let text = if alternate {
+            format!("{error:#?}")
+        } else {
+            format!("{error:?}")
+        };
+        assert!(text.contains("counted message"));
+        assert_eq!(calls[0].load(Relaxed), 1);
+        assert_eq!(calls[1].load(Relaxed), 1);
+        assert_eq!(
+            calls[2].load(Relaxed),
+            usize::from(cfg!(feature = "context"))
+        );
+    }
+}
+
 // Omitted children must never be formatted, even for grouping or JSON.
 #[derive(Debug, thiserror::Error)]
 struct Failure {

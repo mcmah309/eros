@@ -26,7 +26,6 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 
 
 [dev-dependencies]
-reqwest = { version = "0.12", features = ["blocking"] }
 trybuild = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }

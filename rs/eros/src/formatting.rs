@@ -7,7 +7,7 @@ use alloc::string::String;
 ))]
 use alloc::string::ToString;
 #[cfg(feature = "alloc")]
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::vec::Vec;
 use core::{error::Error, fmt};
 
 use crate::SendSyncError;
@@ -95,6 +95,11 @@ impl<'a> Report<'a> {
         };
         #[cfg(feature = "alloc")]
         {
+            // Standalone errors do not need grouping or allocated preparation.
+            if !self.inner.is_collection() {
+                renderer.error(f, self.root)?;
+                return renderer.detail_fields(f, self);
+            }
             let mut remaining = MAX_CHILD_REPORTS;
             let node = DebugNode::new(self.inner, renderer.detailed, &mut remaining)?;
             renderer.node(f, &node)
@@ -343,9 +348,12 @@ impl ReportRenderer {
                 #[cfg(feature = "context_span_trace")]
                 if self.detailed {
                     let trace = SpanTraceDisplay(&context.span_trace);
-                    values
-                        .continued()
-                        .trace(out, "span trace", trace.status(), trace.text())?;
+                    values.continued().trace(
+                        out,
+                        "span trace",
+                        trace.status(),
+                        trace.text().as_deref(),
+                    )?;
                 }
             }
         }
@@ -357,14 +365,14 @@ impl ReportRenderer {
                 out,
                 "span trace",
                 report.span_trace_status(),
-                report.span_trace_text(),
+                report.span_trace_text().as_deref(),
             )?;
             #[cfg(feature = "backtrace")]
             fields.trace(
                 out,
                 "backtrace",
                 report.backtrace_status(),
-                report.backtrace_text(),
+                report.backtrace_text().as_deref(),
             )?;
         }
         Ok(())
@@ -380,7 +388,7 @@ impl ReportRenderer {
         out: &mut (impl fmt::Write + ?Sized),
         name: &str,
         status: &str,
-        text: Option<String>,
+        text: Option<&str>,
     ) -> fmt::Result {
         if let Some(text) = text {
             self.next_line(out, &format_args!("{name}:"))?;
@@ -395,8 +403,109 @@ impl ReportRenderer {
         }
     }
 
+    // message_text already normalized line endings and removed one final LF.
+    // Write its lines directly so intentional trailing blank lines survive.
     #[cfg(feature = "alloc")]
-    fn node(self, out: &mut (impl fmt::Write + ?Sized), node: &DebugNode<'_>) -> fmt::Result {
+    fn prepared_line(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        text: &str,
+        bullet: bool,
+    ) -> fmt::Result {
+        write!(out, "{:indent$}", "", indent = self.indent)?;
+        if bullet {
+            out.write_str("- ")?;
+        }
+        let continuation = self.indent + if bullet { 2 } else { 0 };
+        let mut lines = text.split('\n');
+        out.write_str(lines.next().unwrap_or_default())?;
+        for line in lines {
+            write!(out, "\n{:continuation$}{line}", "")?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    fn prepared_error(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        text: &str,
+        bullet: bool,
+    ) -> fmt::Result {
+        if text.contains('\n') {
+            self.line(out, &if bullet { "- error:" } else { "error:" })?;
+            out.write_char('\n')?;
+            let message = if bullet {
+                self.nested()
+            } else {
+                self.continued()
+            };
+            message.prepared_line(out, text, false)
+        } else {
+            let prefix = if bullet { "- error: " } else { "error: " };
+            write!(out, "{:indent$}{prefix}{text}", "", indent = self.indent)
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    fn prepared_fields(
+        self,
+        out: &mut (impl fmt::Write + ?Sized),
+        fields: &[DebugField],
+    ) -> fmt::Result {
+        let mut sources = false;
+        #[cfg(feature = "context")]
+        let mut contexts = false;
+        for field in fields {
+            match field {
+                DebugField::Source(text) => {
+                    if !sources {
+                        self.next_line(out, &"caused by:")?;
+                        sources = true;
+                    }
+                    out.write_char('\n')?;
+                    self.nested().prepared_line(out, text, true)?;
+                }
+                #[cfg(feature = "context")]
+                DebugField::Context(text) => {
+                    if !contexts {
+                        self.next_line(out, &"context:")?;
+                        contexts = true;
+                    }
+                    out.write_char('\n')?;
+                    self.nested().prepared_line(out, text, true)?;
+                }
+                #[cfg(all(feature = "context", feature = "context_location"))]
+                DebugField::ContextLocation(text) => {
+                    self.nested()
+                        .continued()
+                        .next_line(out, &format_args!("location: {text}"))?;
+                }
+                #[cfg(all(feature = "context", feature = "context_span_trace"))]
+                DebugField::ContextSpanTrace(status, text) => {
+                    self.nested()
+                        .continued()
+                        .trace(out, "span trace", status, text.as_deref())?;
+                }
+                #[cfg(feature = "error_location")]
+                DebugField::Location(text) => {
+                    self.next_line(out, &format_args!("location: {text}"))?
+                }
+                #[cfg(feature = "backtrace")]
+                DebugField::Backtrace(status, text) => {
+                    self.trace(out, "backtrace", status, text.as_deref())?
+                }
+                #[cfg(feature = "error_span_trace")]
+                DebugField::SpanTrace(status, text) => {
+                    self.trace(out, "span trace", status, text.as_deref())?
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    fn node(self, out: &mut (impl fmt::Write + ?Sized), node: &DebugNode) -> fmt::Result {
         if let Some(groups) = &node.children {
             let collection = if node.report.is_some() {
                 self.line(out, &"error:")?;
@@ -407,10 +516,10 @@ impl ReportRenderer {
             };
             collection.collection(out, groups)?;
         } else if let Some(report) = &node.report {
-            self.error(out, report.root)?;
+            self.prepared_error(out, report.root.as_ref().expect("leaf message"), false)?;
         }
         if let Some(report) = &node.report {
-            self.detail_fields(out, report)?;
+            self.prepared_fields(out, &report.fields)?;
         }
         Ok(())
     }
@@ -419,7 +528,7 @@ impl ReportRenderer {
     fn collection(
         self,
         out: &mut (impl fmt::Write + ?Sized),
-        children: &DebugChildren<'_>,
+        children: &DebugChildren,
     ) -> fmt::Result {
         let count = children.total;
         let empty = if count == 0 { " []" } else { "" };
@@ -438,11 +547,7 @@ impl ReportRenderer {
     }
 
     #[cfg(feature = "alloc")]
-    fn groups(
-        self,
-        out: &mut (impl fmt::Write + ?Sized),
-        groups: &[DebugGroup<'_>],
-    ) -> fmt::Result {
+    fn groups(self, out: &mut (impl fmt::Write + ?Sized), groups: &[DebugGroup]) -> fmt::Result {
         for group in groups {
             out.write_char('\n')?;
             self.nested().group(out, group)?;
@@ -451,7 +556,7 @@ impl ReportRenderer {
     }
 
     #[cfg(feature = "alloc")]
-    fn group(self, out: &mut (impl fmt::Write + ?Sized), group: &DebugGroup<'_>) -> fmt::Result {
+    fn group(self, out: &mut (impl fmt::Write + ?Sized), group: &DebugGroup) -> fmt::Result {
         let fields = Self {
             indent: self.indent + 2,
             ..self
@@ -461,51 +566,52 @@ impl ReportRenderer {
             out.write_char('\n')?;
             fields.nested().collection(out, children)?;
         } else if let Some(report) = &group.node.report {
-            let message = message_text(report.root)?;
-            if message.contains('\n') {
-                self.line(out, &"- error:")?;
-                // Render the original value so line endings are normalized
-                // once, retaining intentional trailing blank lines.
-                fields.continued().next_line(out, report.root)?;
-            } else {
-                self.line(out, &format_args!("- error: {}", report.root))?;
-            }
+            self.prepared_error(out, report.root.as_ref().expect("leaf message"), true)?;
         }
         fields.next_line(out, &format_args!("at: [{}]", Positions(&group.positions)))?;
         if let Some(report) = &group.node.report {
-            fields.detail_fields(out, report)?;
+            fields.prepared_fields(out, &report.fields)?;
         }
         Ok(())
     }
 }
 
-/// Prepared grouping borrows the saved reports. Preparing a child once avoids
-/// recursively rebuilding its groups each time it is rendered at a new depth.
+// Prepared text is both the grouping key and the rendered data. Comparing at
+// most ten nodes avoids cloning recursive keys or formatting diagnostics again.
 #[cfg(feature = "alloc")]
-struct DebugNode<'a> {
-    report: Option<Report<'a>>,
-    children: Option<DebugChildren<'a>>,
+#[derive(PartialEq, Eq)]
+struct DebugNode {
+    report: Option<PreparedReport>,
+    children: Option<DebugChildren>,
 }
 
 #[cfg(feature = "alloc")]
-struct DebugChildren<'a> {
-    groups: Vec<DebugGroup<'a>>,
+#[derive(PartialEq, Eq)]
+struct DebugChildren {
+    groups: Vec<DebugGroup>,
     total: usize,
     omitted: usize,
 }
 
 #[cfg(feature = "alloc")]
-struct DebugGroup<'a> {
+#[derive(PartialEq, Eq)]
+struct DebugGroup {
     positions: Vec<usize>,
-    node: DebugNode<'a>,
+    node: DebugNode,
 }
 
-/// Preserve field boundaries even when a message contains report-like text.
-/// Only visible values participate, so alternate Debug still ignores metadata.
 #[cfg(feature = "alloc")]
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-enum GroupKeyPart {
-    Root(String),
+#[derive(PartialEq, Eq)]
+struct PreparedReport {
+    root: Option<String>,
+    fields: Vec<DebugField>,
+}
+
+// Preserve field boundaries even when a message contains report-like text.
+// Only visible values participate, so alternate Debug still ignores metadata.
+#[cfg(feature = "alloc")]
+#[derive(PartialEq, Eq)]
+enum DebugField {
     Source(String),
     #[cfg(feature = "context")]
     Context(String),
@@ -519,11 +625,6 @@ enum GroupKeyPart {
     Backtrace(&'static str, Option<String>),
     #[cfg(feature = "error_span_trace")]
     SpanTrace(&'static str, Option<String>),
-    Children {
-        total: usize,
-        omitted: usize,
-        groups: Vec<(Vec<usize>, Vec<GroupKeyPart>)>,
-    },
 }
 
 #[cfg(feature = "alloc")]
@@ -534,129 +635,104 @@ pub(crate) fn message_text(value: &(impl fmt::Display + ?Sized)) -> Result<Strin
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> DebugNode<'a> {
+impl DebugNode {
     fn new(
-        inner: &'a crate::storage::ErrorUnionInner,
+        inner: &crate::storage::ErrorUnionInner,
         detailed: bool,
         remaining: &mut usize,
     ) -> Result<Self, fmt::Error> {
         let children = if inner.is_collection() {
             Some(group_reports(
-                |visitor| inner.visit_children(visitor),
+                |limit, visitor| inner.visit_children_while(limit, visitor),
                 detailed,
                 remaining,
             )?)
         } else {
             None
         };
+        let report = Report::from_inner(inner);
+        let root = if children.is_none() {
+            Some(message_text(report.root)?)
+        } else {
+            None
+        };
+        let mut fields = Vec::new();
+        for source in report.sources() {
+            fields.push(DebugField::Source(message_text(source)?));
+        }
+        #[cfg(feature = "context")]
+        for context in report.contexts {
+            fields.push(DebugField::Context(message_text(&context.context)?));
+            #[cfg(feature = "context_location")]
+            if detailed {
+                fields.push(DebugField::ContextLocation(message_text(context.location)?));
+            }
+            #[cfg(feature = "context_span_trace")]
+            if detailed {
+                let trace = SpanTraceDisplay(&context.span_trace);
+                fields.push(DebugField::ContextSpanTrace(trace.status(), trace.text()));
+            }
+        }
+        if detailed {
+            #[cfg(feature = "error_location")]
+            fields.push(DebugField::Location(message_text(report.location)?));
+            #[cfg(feature = "error_span_trace")]
+            fields.push(DebugField::SpanTrace(
+                report.span_trace_status(),
+                report.span_trace_text(),
+            ));
+            #[cfg(feature = "backtrace")]
+            fields.push(DebugField::Backtrace(
+                report.backtrace_status(),
+                report.backtrace_text(),
+            ));
+        }
         Ok(Self {
-            report: Some(Report::from_inner(inner)),
+            report: Some(PreparedReport { root, fields }),
             children,
         })
-    }
-
-    fn grouping_key(&self, detailed: bool) -> Result<Vec<GroupKeyPart>, fmt::Error> {
-        let mut key = Vec::new();
-        if let Some(children) = &self.children {
-            let groups = children
-                .groups
-                .iter()
-                .map(|group| Ok((group.positions.clone(), group.node.grouping_key(detailed)?)))
-                .collect::<Result<_, fmt::Error>>()?;
-            key.push(GroupKeyPart::Children {
-                total: children.total,
-                omitted: children.omitted,
-                groups,
-            });
-        }
-        if let Some(report) = &self.report {
-            if self.children.is_none() {
-                key.push(GroupKeyPart::Root(message_text(report.root)?));
-            }
-            for source in report.sources() {
-                key.push(GroupKeyPart::Source(message_text(source)?));
-            }
-            #[cfg(feature = "context")]
-            for context in report.contexts {
-                key.push(GroupKeyPart::Context(message_text(&context.context)?));
-                #[cfg(feature = "context_location")]
-                if detailed {
-                    key.push(GroupKeyPart::ContextLocation(message_text(
-                        context.location,
-                    )?));
-                }
-                #[cfg(feature = "context_span_trace")]
-                if detailed {
-                    let trace = SpanTraceDisplay(&context.span_trace);
-                    key.push(GroupKeyPart::ContextSpanTrace(trace.status(), trace.text()));
-                }
-            }
-            if detailed {
-                #[cfg(feature = "error_location")]
-                key.push(GroupKeyPart::Location(message_text(report.location)?));
-                #[cfg(feature = "backtrace")]
-                key.push(GroupKeyPart::Backtrace(
-                    report.backtrace_status(),
-                    report.backtrace_text(),
-                ));
-                #[cfg(feature = "error_span_trace")]
-                key.push(GroupKeyPart::SpanTrace(
-                    report.span_trace_status(),
-                    report.span_trace_text(),
-                ));
-            }
-        }
-        Ok(key)
     }
 }
 
 #[cfg(feature = "alloc")]
 fn group_reports<'a>(
-    visit: impl FnOnce(&mut dyn FnMut(crate::ErrorReport<'a>)),
+    visit: impl FnOnce(usize, &mut dyn FnMut(crate::ErrorReport<'a>) -> bool) -> usize,
     detailed: bool,
     remaining: &mut usize,
-) -> Result<DebugChildren<'a>, fmt::Error> {
-    let mut groups = Vec::<DebugGroup<'a>>::new();
-    let mut lookup = BTreeMap::<Vec<GroupKeyPart>, usize>::new();
+) -> Result<DebugChildren, fmt::Error> {
+    let mut groups = Vec::<DebugGroup>::new();
     let mut result = Ok(());
-    let mut total = 0;
-    let mut omitted = 0;
-    visit(&mut |child| {
-        let position = total;
-        total += 1;
-        if result.is_ok() {
-            if *remaining == 0 {
-                omitted += 1;
-                return;
+    let mut visited = 0;
+    let total = visit(*remaining, &mut |child| {
+        let position = visited;
+        visited += 1;
+        *remaining -= 1;
+        result = (|| {
+            let node = DebugNode::new(child.inner, detailed, remaining)?;
+            if let Some(group) = groups.iter_mut().find(|group| group.node == node) {
+                group.positions.push(position);
+            } else {
+                groups.push(DebugGroup {
+                    positions: alloc::vec![position],
+                    node,
+                });
             }
-            *remaining -= 1;
-            result = (|| {
-                let node = DebugNode::new(child.inner, detailed, remaining)?;
-                let key = node.grouping_key(detailed)?;
-                let index = *lookup.entry(key).or_insert(groups.len());
-                if index == groups.len() {
-                    groups.push(DebugGroup {
-                        positions: Vec::new(),
-                        node,
-                    });
-                }
-                groups[index].positions.push(position);
-                Ok(())
-            })();
-        }
+            Ok(())
+        })();
+        result.is_ok() && *remaining != 0
     });
     result?;
     Ok(DebugChildren {
         groups,
         total,
-        omitted,
+        omitted: total - visited,
     })
 }
 
 #[cfg(feature = "alloc")]
 pub(crate) fn debug_vector<'a>(
     f: &mut fmt::Formatter<'_>,
-    visit: impl FnOnce(&mut dyn FnMut(crate::ErrorReport<'a>)),
+    visit: impl FnOnce(usize, &mut dyn FnMut(crate::ErrorReport<'a>) -> bool) -> usize,
 ) -> fmt::Result {
     let renderer = ReportRenderer {
         indent: 0,

@@ -92,15 +92,12 @@ impl ErrorReport<'_> {
 
     fn add_children(&self, value: &mut Value, detailed: bool, remaining: &mut usize) {
         let mut children = Vec::new();
-        let mut omitted = 0usize;
-        self.visit_children(&mut |child| {
-            if *remaining == 0 {
-                omitted += 1;
-                return;
-            }
+        let total = self.inner.visit_children_while(*remaining, &mut |child| {
             *remaining -= 1;
             children.push(child.to_json(detailed, remaining));
+            *remaining != 0
         });
+        let omitted = total - children.len();
         if !children.is_empty() {
             value["children"] = children.into();
         }

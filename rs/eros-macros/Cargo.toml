@@ -20,7 +20,7 @@ syn = { version = "2.0", features = ["full"] }
 
 [dev-dependencies]
 eros = { path = "../eros" }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [features]
 default = []

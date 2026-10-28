@@ -14,7 +14,8 @@ use crate::{AnyError, ErrorUnion, TypeSet, storage::ErrorUnionInner, type_set::C
 /// Grouping preserves the stored errors and their insertion order.
 /// Debug and JSON reporting expand at most 10 child reports across the whole
 /// tree, in depth-first insertion order, and indicate omitted children. The
-/// limit applies before grouping and does not affect iteration or recovery.
+/// omitted count uses the vector length without inspecting omitted children.
+/// The limit applies before grouping and does not affect iteration or recovery.
 ///
 /// Requires `alloc`. An empty batch is allowed while accumulating failures;
 /// check [`is_empty`](Self::is_empty) before returning it as an error.
@@ -91,6 +92,19 @@ impl<E: TypeSet> ErrorUnionVec<E> {
     #[inline]
     pub fn into_inner(self) -> AllocVec<ErrorUnion<E>> {
         self.errors
+    }
+
+    pub(crate) fn visit_reports<'a>(
+        &'a self,
+        limit: usize,
+        visitor: &mut dyn FnMut(crate::ErrorReport<'a>) -> bool,
+    ) -> usize {
+        for child in self.errors.iter().take(limit) {
+            if !visitor(child.report()) {
+                break;
+            }
+        }
+        self.len()
     }
 
     /// Wraps this batch and enables recursive child reporting.
@@ -182,11 +196,7 @@ impl<E: TypeSet> fmt::Display for ErrorUnionVec<E> {
 
 impl<E: TypeSet> fmt::Debug for ErrorUnionVec<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        crate::formatting::debug_vector(f, |visitor| {
-            for child in self {
-                visitor(child.report());
-            }
-        })
+        crate::formatting::debug_vector(f, |limit, visitor| self.visit_reports(limit, visitor))
     }
 }
 
