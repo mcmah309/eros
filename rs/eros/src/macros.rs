@@ -4,7 +4,7 @@
 /// the supplied error type.
 ///
 /// ```
-/// fn validate(port: u16) -> eros::Result<(), (eros::MsgError,)> {
+/// fn validate(port: u16) -> eros::Result<()> {
 ///     if port == 0 {
 ///         eros::bail!("port must be nonzero");
 ///     }
@@ -35,7 +35,7 @@ macro_rules! bail {
 /// Plain string literals work without `alloc`:
 /// ```
 /// let error = eros::error!("User not found");
-/// assert_eq!(error.downcast_inner::<eros::MsgError>().unwrap().as_str(), "User not found");
+/// assert_eq!(error.to_string(), "User not found");
 /// ```
 /// With `alloc`, string literals also support runtime formatting:
 /// ```
@@ -48,11 +48,12 @@ macro_rules! bail {
 /// assert_eq!(error.to_string(), "User 7 not found");
 /// # }
 /// ```
-/// `error!` optimizes allocations unlike `format!`.
-/// Plain literals use [`MsgError::from_static_ref`](crate::MsgError::from_static_ref)
-/// and work without `alloc`. Formatted messages use `MsgError::from_owned` and
-/// require `alloc`. Storage is selected at compile time. Escape literal braces
-/// as `{{` and `}}`, just like `format!`.
+/// With `alloc`, plain literals use [`MsgError::from_static_ref`](crate::MsgError::from_static_ref),
+/// while formatted messages use `MsgError::from_owned`. Without `alloc`, each
+/// plain literal expands to an anonymous zero-sized error whose `Display` and
+/// `Debug` write the static text. These anonymous types use erased error sets
+/// and cannot be downcast to `MsgError`. Runtime formatting requires `alloc`.
+/// Escape literal braces as `{{` and `}}`, just like `format!`.
 ///
 /// Wrap string constants and variables explicitly in [`MsgError`](crate::MsgError).
 /// Static messages borrow the text and keep it unchanged:
@@ -85,7 +86,7 @@ macro_rules! error {
 /// The condition is evaluated once; the error is constructed only on failure.
 ///
 /// ```
-/// fn validate(port: u16) -> eros::Result<(), (eros::MsgError,)> {
+/// fn validate(port: u16) -> eros::Result<()> {
 ///     eros::ensure!(port != 0, "port must be nonzero");
 ///     Ok(())
 /// }
@@ -128,4 +129,34 @@ macro_rules! __eros_format_message {
     ($($argument:tt)*) => {
         compile_error!("formatted error messages require the eros alloc feature")
     };
+}
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+#[macro_export]
+macro_rules! __eros_static_message {
+    ($message:literal) => {
+        $crate::MsgError::from_static_ref(&$message)
+    };
+}
+
+#[doc(hidden)]
+#[cfg(not(feature = "alloc"))]
+#[macro_export]
+macro_rules! __eros_static_message {
+    ($message:literal) => {{
+        struct __ErosMessage;
+        impl ::core::fmt::Display for __ErosMessage {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                f.write_str($message)
+            }
+        }
+        impl ::core::fmt::Debug for __ErosMessage {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                ::core::fmt::Display::fmt(self, f)
+            }
+        }
+        impl ::core::error::Error for __ErosMessage {}
+        __ErosMessage
+    }};
 }

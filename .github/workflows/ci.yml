@@ -64,6 +64,12 @@ jobs:
         if: matrix.args == ''
         run: cargo test -p eros-macros
 
+      - name: Test downstream classification and feature unification
+        if: matrix.args == ''
+        run: |
+          cargo test -p eros-classify-test --no-default-features
+          cargo test -p eros-classify-test --all-features
+
       - name: Test captured backtraces
         if: matrix.args == '--all-features'
         env:
@@ -98,7 +104,10 @@ jobs:
           cargo +nightly miri test -p eros
           cargo +nightly miri test -p eros --no-default-features
           cargo +nightly miri test -p eros --no-default-features --features alloc
-          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition --test inline_storage --test static_messages
+          cargo +nightly miri test -p eros --no-default-features --features location --lib --test zst --test type_set --test no_alloc_composition --test classify --test root_storage --test static_messages
+          cargo +nightly miri test -p eros-no-alloc-test --lib --features location
+          cargo +nightly miri test -p eros-classify-test --no-default-features
+          cargo +nightly miri test -p eros-classify-test --all-features
           cargo +nightly miri test -p eros --release
           cargo +nightly miri test -p eros --release --no-default-features
           cargo +nightly miri test -p eros --release --no-default-features --features alloc

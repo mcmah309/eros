@@ -150,6 +150,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "eros-classify-test"
+version = "0.1.0"
+dependencies = [
+ "eros",
+ "eros-no-alloc-test",
+]
+
+[[package]]
 name = "eros-macros"
 version = "0.8.1"
 dependencies = [

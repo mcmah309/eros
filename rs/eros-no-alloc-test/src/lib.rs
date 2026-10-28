@@ -1,5 +1,7 @@
 #![no_std]
 
+pub mod classify;
+
 use core::{
     error::Error,
     fmt::{self, Write},
@@ -7,10 +9,14 @@ use core::{
 };
 use eros::{ErrorUnion, IntoUnion, ReshapeUnion};
 
+#[path = "../../eros/tests/no_alloc/classification.rs"]
+mod classification;
 #[path = "../../eros/tests/no_alloc/composition.rs"]
 mod composition;
-#[path = "../../eros/tests/no_alloc/inline.rs"]
-mod inline;
+#[path = "../../eros/tests/common/payloads.rs"]
+mod payloads;
+// Shared tests also exercise Eros's alloc configuration in its own harness.
+#[allow(unexpected_cfgs)]
 #[path = "../../eros/tests/no_alloc/messages.rs"]
 mod messages;
 
@@ -67,10 +73,19 @@ impl Write for Buffer {
 
 /// Exercised both by the host tests and by a binary with no global allocator.
 pub fn run_checks() {
+    classify::run_checks();
+    classification::run_checks();
+    // Host tests discover these scenarios individually. Freestanding builds
+    // execute them here, including their ownership counters, once per run.
+    #[cfg(not(test))]
+    {
+        payloads::payload_values_survive_mutation_moving_reshaping_and_enum_extraction();
+        payloads::full_word_payload_survives_multiple_moves_and_shared_interior_mutation();
+        payloads::thin_static_reference_preserves_pointer_provenance_and_source();
+        payloads::non_copy_owners_drop_once_after_recovery_mapping_and_extraction();
+    }
     messages::run_checks();
     composition::run_checks();
-    #[cfg(not(test))]
-    inline::run_checks();
     let mut union: ErrorUnion<Failures> = ErrorUnion::new(Failure);
     #[cfg(feature = "error_location")]
     let location = union.location();

@@ -18,6 +18,7 @@ pub mod __private {
     use crate::{ErrorUnion, TypeSet};
 
     pub use crate::__eros_format_message as formatted_message;
+    pub use crate::__eros_static_message as static_message;
     #[cfg(feature = "alloc")]
     pub use alloc::format;
     pub use eros_macros::format_error;
@@ -61,6 +62,7 @@ mod any_error;
 mod context;
 mod error_union;
 mod formatting;
+mod inner_error;
 #[cfg(feature = "json")]
 mod json;
 mod macros;
@@ -69,7 +71,6 @@ mod narrowing;
 pub mod prelude;
 mod recovery;
 mod report;
-#[cfg(feature = "alloc")]
 mod root_error;
 #[cfg(any(feature = "error_span_trace", feature = "context_span_trace"))]
 mod span_trace_fields;
@@ -98,6 +99,7 @@ pub use context::SendSyncDebugDisplay;
 pub use error_union::ErrorUnion;
 pub use error_union::ErrorUnionAdapter;
 pub use error_union::SendSyncError;
+pub use inner_error::InnerError;
 pub use msg_error::MsgError;
 pub use report::ErrorReport;
 #[cfg(any(feature = "error_span_trace", feature = "context_span_trace"))]

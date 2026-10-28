@@ -1,0 +1,16 @@
+[package]
+name = "eros-classify-test"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Tests downstream classification with a no-alloc library dependency."
+
+[dependencies]
+eros = { path = "../eros", default-features = false, features = ["alloc"] }
+eros-no-alloc-test = { path = "../eros-no-alloc-test" }
+
+[features]
+default = ["diagnostics"]
+diagnostics = ["eros/context", "eros/location", "eros-no-alloc-test/location"]
+backtrace = ["eros/backtrace"]
+traces = ["eros/span_trace"]

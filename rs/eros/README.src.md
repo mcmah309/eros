@@ -237,7 +237,7 @@ To convert the whole result directly, use `.erase()` with `use eros::Erase;`.
 ### Handling A Type Along An Otherwise Untyped Path
 
 In a mostly untyped codebase, keep returning `eros::Result<T>` until a path
-needs to explicitly track an error type. Use `classify(PortConfigError)` to
+needs to explicitly track an error type. Use `classify` to
 keep the types callers handle explicitly and classify implementation errors
 as `PortConfigError`. Downstream signatures describe the categories callers
 care about without exposing every error type used inside the implementation.
@@ -273,7 +273,7 @@ fn load_port(contents: &str) -> eros::Result<u16> {
 fn checked_port(contents: &str)
     -> eros::Result<u16, (MissingPort, DynamicPortNotAllowed, PortConfigError)>
 {
-    let port = load_port(contents).classify(PortConfigError)?;
+    let port = load_port(contents).classify(|inner| PortConfigError(inner.into_boxed()))?;
     eros::ensure!(port != 0, DynamicPortNotAllowed);
     Ok(port)
 }
@@ -298,10 +298,17 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 
 `classify` checks only the concrete inner error, not its sources or contexts.
 Matching types, including an existing `PortConfigError`, retain their storage and
-pass through without invoking the constructor. Otherwise, the constructor
-receives the boxed inner error once. Heap roots reuse their allocation inside
-the wrapper; inline roots are boxed. Eros selects storage for the wrapper
-according to its size and alignment. All diagnostics are preserved.
+pass through without invoking the callback. Other roots transfer to the callback
+as an owned `InnerError`. The callback can inspect, mutate, extract, drop, or
+retain that owner. Passing it requires no new allocation. Saved diagnostics
+remain with the replacement, and no new diagnostics are captured.
+
+`InnerError` and its downcasting methods are available with every feature
+configuration. Enabling `alloc` adds `InnerError::into_boxed()` to preserve the
+original concrete error as an owned source. An already boxed root reuses its
+allocation when root diagnostics are disabled; inline nonzero roots and roots
+sharing an allocation with diagnostics move into a new box when that method
+is called. The replacement follows the compile-time storage choice.
 
 Classification also keeps errors from different domains distinct. An
 `io::Error` while reading configuration and an `io::Error` while connecting to
@@ -378,9 +385,20 @@ The `error_location` feature records where an error first enters Eros. The `cont
 
 Eros comes with the `context` and `backtrace` feature flags enabled by default. Disabling them removes backtrace and context tracking from `ErrorUnion<T>`, and all context methods become a no-op. Thus, it may be optimized away by the compiler.
 
-Eros stores each root error in two pointer-sized words: one word holds the payload or a thin heap pointer, and the other points to static, type-specific operations for borrowing, dropping, and boxed extraction. The size of tuple of possible error types adds no storage. Widening, narrowing, and erasing a union's type set reuse its existing storage.
+`ErrorUnion` occupies two pointer-sized words, growing to three only when `error_location` is enabled without `alloc`. The possible error types add no storage. Storage is selected at compile time:
 
-Errors fitting one word with at most `usize` alignment are stored inline, with no allocation. Zero-sized errors, including unit structs, also need no allocation and support arbitrary alignment. With `alloc` enabled, larger or more aligned errors automatically use a `Box`; these optimizations happen at compile time and without `alloc`, constructing them fails at compile time. The storage choice depends on the concrete type's size and alignment, so the compiler can eliminate this branch for each type. Boxing errors is a common trick to increase performance and decrease stack memory usage in many cases. This is because boxing may decrease the size of the return type, e.g. `Result<(),Box<u128>>` is smaller than `Result<(),u128>>`.
+| Configuration | Storage | Root allocations |
+| --- | --- | --- |
+| `alloc`, no root diagnostics, error fits one word | Inline payload and static operations pointer | None |
+| `alloc`, no root diagnostics, larger or more aligned error | Thin `Box<T>` pointer and static operations pointer | One |
+| `alloc`, root diagnostics enabled | Boxed fat pointer; diagnostics and trailing payload share one allocation | One |
+| No `alloc`, error fits one word | Inline payload and static operations pointer, plus optional location reference | None |
+
+Root diagnostics are `backtrace`, `context`, `error_span_trace`, and `error_location`. When any are enabled with `alloc`, their fields live in the heap allocation and never enlarge the handle. Trace capture and context contents may allocate separately. `context_location` and `context_span_trace` describe context frames and do not by themselves add root diagnostic fields.
+
+Inline nonzero payloads must fit both the size and alignment of `usize`. ZSTs support arbitrary alignment. Without `alloc`, oversized or over-aligned nonzero errors are rejected at compile time. The handle uses two words without root location and three with it.
+
+Widening, narrowing, and erasing reuse storage. Typed extraction, such as `into_single`, adds no allocation. `into_inner` reuses an existing `Box<T>` when root diagnostics are disabled; inline nonzero errors and errors stored with diagnostics move into a new box. Boxing a ZST requires no allocation. `map_single` keeps inline results allocation-free and reuses boxed storage when complete sizes and alignments match.
 
 See the [Use In Libraries](#use-in-libraries) section as well.
 
@@ -645,7 +663,7 @@ See [Logging](#logging) for tracing fields and
 
 `eros`'s flexibility and optimizations make it the perfect option for both libraries and binaries.
 
-*Libraries should consider setting `default-features = false` on their `eros` dependency* and allowing downstream crates to enable the diagnostic features they need. Keep `features = ["alloc"]` enabled if the library stores errors exceeding one pointer-sized word or its alignment; smaller errors use inline storage in either mode. The library can enable diagnostic features for its own tests.
+*Libraries should consider setting `default-features = false` on their `eros` dependency* and allowing downstream crates to enable the diagnostic features they need. Keep `features = ["alloc"]` enabled if the library stores errors exceeding one word in size or alignment. Without it, concrete errors must fit one word, or be zero-sized. The library can enable diagnostic features for its own tests.
 
 #### Public APIs
 
@@ -705,7 +723,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, `error_span_trace`, or `error_location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
+This way the library can use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only see a single concrete error type. Converting at the boundary with `into_inner()` discards saved diagnostics. It reuses the root allocation when diagnostics are disabled and the root was already boxed; other roots move into a new box. The conversion cost does not depend on the number of possible error variants.
 
 For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
@@ -1434,13 +1452,12 @@ features to use and enable the other features such as `alloc` as needed.
 ### Without an allocator
 
 Each concrete error must implement `core::error::Error + Send + Sync + 'static`
-and fit the inline storage:
+and fit in the size and alignment of `usize`. Zero-sized errors support
+arbitrary alignment. Only the active error must satisfy these storage limits;
+other types may still appear in its type set. The handle occupies two words,
+or three with `error_location` enabled. Enums, numeric error codes, and thin
+references to static errors can be stored without allocation.
 
-```text
-size_of::<T>() <= size_of::<usize>()
-size_of::<T>() == 0 || align_of::<T>() <= align_of::<usize>()
-```
-Example:
 ```rust
 use core::{error::Error, fmt};
 use eros::{ErrorUnion, Erase, IntoUnion, ReshapeUnion};
@@ -1454,117 +1471,65 @@ impl fmt::Display for Timeout {
 }
 impl Error for Timeout {}
 
-#[derive(Debug)]
-struct Status(u8);
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "device status {}", self.0)
-    }
-}
-impl Error for Status {}
-
 fn poll(ready: bool) -> eros::Result<(), (Timeout,)> {
-    if !ready {
-        eros::bail!(Timeout);
-    }
+    eros::ensure!(ready, Timeout);
     Ok(())
 }
 
-fn read(ready: bool, status: u8) -> eros::Result<(), (Timeout, Status)> {
-    poll(ready).widen()?;
-    if status != 0 {
-        return Err(Status(status)).union();
-    }
-    Ok(())
-}
-
-let error = read(true, 7).erase().unwrap_err();
-assert_eq!(error.narrow::<Status, _>().unwrap().0, 7);
-
-let recovered = read(false, 0).recover::<Timeout, _>(|_| ());
-assert!(recovered.is_ok()); // Status is still a possible error.
+let error = poll(false).erase().unwrap_err();
+assert_eq!(error.narrow::<Timeout, _>().unwrap().to_string(), "operation timed out");
+let recovered = poll(false).recover::<Timeout, _>(|_| ());
+assert!(recovered.is_ok());
 ```
 
 ### Static message errors
 
-Literal messages in `error!`, `bail!`, and `ensure!` work without `alloc`. The
-macro creates a static string descriptor, and the no-`alloc` `MsgError` stores
-a thin `&'static &'static str` pointing to it:
+Literal messages in `error!`, `bail!`, and `ensure!` work without `alloc`. Each
+literal expands to an ad hoc zero-sized error whose `Display` and `Debug` write
+the static text. There is no string pointer in the concrete error itself.
 
 ```rust
-use eros::{ErrorUnion, MsgError};
-
-fn validate(ready: bool) -> eros::Result<(), (MsgError,)> {
+fn validate(ready: bool) -> eros::Result<()> {
     eros::ensure!(ready, "device is not ready");
     eros::bail!("operation failed");
 }
 
-assert_eq!(validate(false).unwrap_err().into_single().as_str(), "device is not ready");
-assert_eq!(validate(true).unwrap_err().into_single().as_str(), "operation failed");
-
+assert_eq!(validate(false).unwrap_err().to_string(), "device is not ready");
+assert_eq!(validate(true).unwrap_err().to_string(), "operation failed");
 let message = eros::error!("unexpected {{status}}");
-assert_eq!(message.downcast_inner::<MsgError>().unwrap().as_str(), "unexpected {status}");
-
-static MESSAGE: &str = "device disconnected";
-let error: ErrorUnion<(MsgError,)> =
-    ErrorUnion::new(MsgError::from_static_ref(&MESSAGE));
-assert_eq!(error.into_single().as_str(), MESSAGE);
+assert_eq!(message.to_string(), "unexpected {status}");
 ```
 
-Escape literal braces as `{{` and `}}`, as with formatting macros.
-`MsgError::from_static_ref` accepts a reference to a **static descriptor**; a
-local variable holding a static string is insufficient.
+Escape literal braces as `{{` and `}}`, as with formatting macros. Without
+`alloc`, literal messages have anonymous concrete types and use erased error
+sets; they cannot be downcast to `MsgError`. Use named error types for typed
+`bail!` and `ensure!` results. With `alloc`, literals retain their `MsgError` type.
 
 ### What requires `alloc`
 
-A `&'static str` itself occupies two words: a data pointer and a length. An error
-containing that field exceeds the inline capacity even though its text is
-static. This example is rejected with `alloc` disabled:
+Errors exceeding one word in size or alignment require `alloc`. A direct
+`&'static str` contains two words and exceeds the payload limit, while a thin
+reference to a static error or `MsgError::from_static_ref` fits.
 
-```rust,ignore
-#[derive(Debug)]
-struct Message(&'static str);
-impl core::fmt::Display for Message {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.0)
-    }
-}
-impl core::error::Error for Message {}
-
-// Compile-time error: T must fit in one pointer-sized word.
-let _: eros::ErrorUnion<(Message,)> = eros::ErrorUnion::new(Message("failed"));
-```
-
-Use the literal macros, `MsgError::from_static_ref`, a unit error whose `Display`
-writes static text, or a thin reference to a static error struct instead.
-For the `Message` type above, store the whole error in a `static` and pass a
-reference to it. The stored type becomes `&'static Message`, which occupies one
-word even though `Message` itself occupies two:
+Numeric error codes work without `alloc`:
 
 ```rust
-# #[derive(Debug)]
-# struct Message(&'static str);
-# impl core::fmt::Display for Message {
-#     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-#         f.write_str(self.0)
-#     }
-# }
-# impl core::error::Error for Message {}
-static MESSAGE: Message = Message("message");
-let error: eros::ErrorUnion<(&'static Message,)> = eros::ErrorUnion::new(&MESSAGE);
-assert!(core::ptr::eq(error.into_single(), &MESSAGE));
+#[derive(Debug)]
+struct Code(usize);
+impl core::fmt::Display for Code {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "device status {}", self.0)
+    }
+}
+impl core::error::Error for Code {}
+
+let error: eros::ErrorUnion<(Code,)> = eros::ErrorUnion::new(Code(7));
+assert_eq!(error.into_single().0, 7);
 ```
 
-Declaring a static does not change the size of `Message`; passing its reference
-is what makes it fit. For this type, `ErrorUnion::new(&Message("message"))` also
-works because Rust promotes the borrowed constant expression to static storage.
-
-Payloads such as `[usize; 2]` and non-zero-sized types aligned beyond `usize`
-also exceed the capacity. Eros checks size and alignment at compile time when
-the constructor is instantiated.
-
-Runtime formatting requires `alloc`, including implicit format captures. These
-examples are rejected with `alloc` disabled:
+Formatted message macros require `alloc`, including implicit format captures.
+Custom errors can format their stored fields into a formatter without allocating.
+These message macro examples are rejected with `alloc` disabled:
 
 ```rust,ignore
 fn operation(code: u8) -> eros::Result<()> {
@@ -1574,13 +1539,42 @@ fn operation(code: u8) -> eros::Result<()> {
 let _ = eros::error!("device status {}", 7); // Explicit arguments need formatting.
 ```
 
+### Classification without allocation
+
+`classify` works on both unions and results. The callback owns the original
+error through `InnerError` and returns a replacement fitting the inline payload word. Existing
+members of the destination tuple pass through without calling the callback.
+The original capture location is preserved.
+
+```rust
+use eros::ReshapeUnion;
+use core::fmt;
+
+// The owner can inspect the original concrete error to choose a domain error.
+let result: eros::Result<()> = Err(eros::error!("device unavailable"));
+let classified: eros::Result<(), (fmt::Error,)> = result.classify(|_| fmt::Error);
+assert!(classified.unwrap_err().is_inner::<fmt::Error>());
+```
+
+The callback always receives `InnerError`, even when a downstream crate enables
+`alloc`. Its `is::<T>()`, `downcast_ref::<T>()`, `downcast_mut::<T>()`, and
+`downcast::<T>()` methods inspect or extract the original concrete error using
+its actual storage. The type remains the same whether stored inline or on the
+heap. Failed owned downcasts return the original owner.
+
+Extracting a concrete error allows a wrapper such as `DomainError(Code(7))`
+to fit the inline limit. Retaining the erased `InnerError` itself requires more
+than one payload word, so a replacement containing it requires `alloc`. With
+`alloc`, `inner.into_boxed()` can also keep the original as a boxed source.
+
 ### With an allocator
 
 Enable `alloc` to use arbitrary-sized errors and owned or runtime-formatted
 messages in a `no_std` environment with a global allocator:
 
-Small roots still use inline storage; larger or more aligned roots automatically
-use a `Box`. Allocation behavior and diagnostic costs are described in
+With root diagnostics enabled, a boxed fat pointer owns one allocation containing
+the diagnostics and trailing payload. Otherwise, small roots stay inline and
+larger roots use `Box<T>`. The union handle always occupies two words with `alloc`. Allocation behavior and diagnostic costs are described in
 [Reducing Error Handling Overhead](#reducing-error-handling-overhead).
 
 The `error_location` feature works with or without `alloc` and adds one location
