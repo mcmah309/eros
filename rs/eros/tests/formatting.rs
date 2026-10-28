@@ -183,7 +183,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     fn accepts_error<E: Error + Send + Sync + 'static>(error: E) -> E {
         error
     }
-    let native: eros::ErrorUnionAdapter<(NativeError,)> = accepts_error(error.into_adapter());
+    let native: eros::ErrorUnionAdapter<(NativeError,)> = accepts_error(error.adapter());
     assert_eq!(
         native.as_ref().inner() as *const dyn eros::SendSyncError as *const (),
         original_root
@@ -199,7 +199,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     let error: ErrorUnion<(NativeError,)> = native.into_unadapted();
     #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(error.location(), original_location));
-    let native: Box<dyn Error + Send + Sync> = Box::new(error.into_adapter());
+    let native: Box<dyn Error + Send + Sync> = Box::new(error.adapter());
 
     assert!(native.is::<eros::ErrorUnionAdapter<(NativeError,)>>());
 

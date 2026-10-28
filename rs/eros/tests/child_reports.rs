@@ -143,7 +143,7 @@ mod allocated {
         let error: ErrorUnion<(fmt::Error, BatchErrors)> = error.widen();
         let error: ErrorUnion = error.erase();
         let error = error.narrow::<(BatchErrors,), _>().unwrap();
-        let error = error.into_adapter().into_unadapted();
+        let error = error.adapter().into_unadapted();
         assert_eq!(format!("{error:?}"), expected);
         let result = Err::<(), _>(error);
         result

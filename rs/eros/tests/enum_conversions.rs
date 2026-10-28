@@ -56,7 +56,7 @@ macro_rules! check_arity {
                 let error: ErrorUnion<Set> = ErrorUnion::new(Payload::<$n>(original.clone()));
                 let error = error.context("retained metadata");
                 let report = format!("{error:?}");
-                let adapter: Box<dyn std::error::Error + Send + Sync> = Box::new(error.into_adapter());
+                let adapter: Box<dyn std::error::Error + Send + Sync> = Box::new(error.adapter());
                 assert!(std::error::Error::source(adapter.as_ref()).is_none());
                 let error = adapter.downcast::<eros::ErrorUnionAdapter<Set>>()
                     .unwrap().into_unadapted();

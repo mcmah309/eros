@@ -165,11 +165,13 @@ impl ErrorUnion {
 
 /// An [`ErrorUnion`] adapter implementing [`core::error::Error`].
 ///
-/// Created using [`ErrorUnion::into_adapter`] or [`From`] without allocating or
+/// Created using [`ErrorUnion::adapter`] or [`From`] without allocating or
 /// discarding saved diagnostics.
 ///
 /// Use [`AsRef`] or [`AsMut`] to borrow the union, and
 /// [`into_unadapted`](Self::into_unadapted) to recover it by value.
+/// To adapt a result's error directly, use [`ReshapeUnion::adapter`].
+/// For plain errors, call [`IntoUnion::union`] first.
 ///
 /// For a boxed trait object, use its native `downcast` method with the adapter's
 /// exact error set, then call [`into_unadapted`](Self::into_unadapted).
@@ -183,7 +185,7 @@ impl ErrorUnion {
 /// use eros::ErrorUnionAdapter;
 ///
 /// let error = eros::error!("missing configuration");
-/// let boxed: Box<dyn core::error::Error + Send + Sync> = Box::new(error.into_adapter());
+/// let boxed: Box<dyn core::error::Error + Send + Sync> = Box::new(error.adapter());
 /// let error = boxed.downcast::<ErrorUnionAdapter>()
 ///     .map(|adapter| adapter.into_unadapted())
 ///     .unwrap();
@@ -291,11 +293,11 @@ where
     /// use eros::ErrorUnion;
     ///
     /// let error: ErrorUnion<(core::fmt::Error,)> = ErrorUnion::new(core::fmt::Error);
-    /// let adapter = error.into_adapter();
+    /// let adapter = error.adapter();
     /// let error: ErrorUnion<(core::fmt::Error,)> = adapter.into_unadapted();
     /// let _: core::fmt::Error = error.into_single();
     /// ```
-    pub fn into_adapter(self) -> ErrorUnionAdapter<E> {
+    pub fn adapter(self) -> ErrorUnionAdapter<E> {
         self.into()
     }
 }
@@ -645,14 +647,58 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
 //************************************************************************//
 
 /// Reshapes error sets and handles specific error types directly on results.
+///
+/// Implemented for [`crate::Result<T, E>`]. Reshaping an existing union retains
+/// its saved diagnostics; extracting a concrete error discards them.
+/// Import this trait directly or through [`crate::prelude`].
 pub trait ReshapeUnion<S, E>
 where
     E: TypeSet,
 {
+    /// Adapts the result's union to [`core::error::Error`] without allocating.
+    ///
+    /// Preserves the error set and all saved diagnostics. Successful values
+    /// pass through unchanged. Equivalent to `.map_err(ErrorUnion::adapter)`.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, ErrorUnionAdapter, ReshapeUnion};
+    ///
+    /// fn load() -> Result<(), ErrorUnionAdapter> {
+    ///     let result: eros::Result<()> = Err(ErrorUnion::new(core::fmt::Error));
+    ///     result.adapter()
+    /// }
+    ///
+    /// assert!(load().unwrap_err().into_unadapted().is_inner::<core::fmt::Error>());
+    /// ```
+    fn adapter(self) -> Result<S, ErrorUnionAdapter<E>>;
+
     /// Classifies implementation errors into a category meaningful to callers.
     ///
-    /// Successful values and matching error types pass through without calling
-    /// the classifier. See [`ErrorUnion::classify`]. Requires `alloc`.
+    /// `Other` must contain `ClassifiedError`. Errors whose concrete type already
+    /// belongs to `Other` pass through unchanged. For other types, the classifier
+    /// receives the boxed inner error once and returns the replacement error.
+    /// Successful values pass through without calling the classifier.
+    ///
+    /// Preserves all saved diagnostics. A wrapper can retain the original error
+    /// as its source. See [`ErrorUnion::classify`] for storage details. Requires `alloc`.
+    ///
+    /// ```
+    /// # #[cfg(feature = "alloc")]
+    /// # {
+    /// use eros::{ErrorUnion, ReshapeUnion, SendSyncError};
+    /// use std::num::ParseIntError;
+    ///
+    /// #[derive(Debug, thiserror::Error)]
+    /// #[error("configuration failed: {0}")]
+    /// struct ConfigError(#[source] Box<dyn SendSyncError>);
+    ///
+    /// let result: eros::Result<u16> =
+    ///     Err(ErrorUnion::new(std::io::Error::other("cannot read port")));
+    /// let result: eros::Result<u16, (ParseIntError, ConfigError)> =
+    ///     result.classify(ConfigError);
+    /// assert!(result.unwrap_err().is_inner::<ConfigError>());
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     fn classify<Other, ClassifiedError, Index>(
         self,
@@ -663,9 +709,23 @@ where
         ClassifiedError: SendSyncError,
         Other::Variants: Contains<ClassifiedError, Index>;
 
-    /// Turns the `ErrorUnion` into a `ErrorUnion` with a set of variants
-    /// which is a superset of the current one. This may also be
-    /// the same set of variants, but in a different order.
+    /// Expands or reorders the result's error set.
+    ///
+    /// The destination must contain every type in the original set, or use
+    /// [`AnyError`] to erase the set. `Other` is inferred from the destination;
+    /// the proof parameter `Index` is inferred by the compiler.
+    /// Successful values pass through unchanged. Errors retain their concrete
+    /// type, storage, and saved diagnostics without allocating or capturing new ones.
+    ///
+    /// ```
+    /// use eros::{ErrorUnion, ReshapeUnion};
+    /// use core::{fmt, num::ParseIntError};
+    ///
+    /// let result: eros::Result<(), (fmt::Error,)> = Err(ErrorUnion::new(fmt::Error));
+    /// let result: eros::Result<(), (ParseIntError, fmt::Error)> = result.widen();
+    /// let erased: eros::Result<()> = result.widen();
+    /// assert!(erased.unwrap_err().is_inner::<fmt::Error>());
+    /// ```
     fn widen<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
@@ -678,6 +738,8 @@ where
     /// error and discards its diagnostics. Tuple targets such as `(T,)` or
     /// `(A, B)` return an `ErrorUnion` with its diagnostics. The remainder
     /// always retains its diagnostics. Specify the target explicitly.
+    /// Successful values pass through as `Err(Ok(value))`. The proof parameter
+    /// `Index` is inferred by the compiler.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -705,6 +767,7 @@ where
     /// Calls `f` once on a matching error and returns its value as `Ok`. The
     /// handler receives a union of the selected types with its original
     /// diagnostics. Unhandled types retain their original order.
+    /// Successful values and unhandled errors pass through without calling `f`.
     ///
     /// Use `recover::<ErrorType, _>(...)` for one type or
     /// `recover::<(FirstError, SecondError), _>(...)` for a group of 2–26 types.
@@ -799,8 +862,8 @@ where
 
     /// Extracts the success value once no possible error types remain.
     ///
-    /// Only available for `eros::Result<S, ()>`. As opposed to `unwrap`,
-    /// calling this method does not compile if an unhandled error type remains in the result's set.
+    /// Only available for `eros::Result<S, ()>`. Calling this method does not
+    /// compile if an unhandled error type remains in the result's set.
     ///
     /// ```
     /// # #[cfg(feature = "alloc")]
@@ -822,6 +885,10 @@ impl<S, E> ReshapeUnion<S, E> for Result<S, ErrorUnion<E>>
 where
     E: TypeSet,
 {
+    fn adapter(self) -> Result<S, ErrorUnionAdapter<E>> {
+        self.map_err(ErrorUnion::adapter)
+    }
+
     #[cfg(feature = "alloc")]
     fn classify<Other, ClassifiedError, Index>(
         self,
@@ -912,8 +979,30 @@ where
 
 //************************************************************************//
 
+/// Converts plain result errors into unions.
+///
+/// Implemented for `Result<S, F>` when `F` implements [`SendSyncError`]. The
+/// destination determines whether errors are tracked in a typed set or erased
+/// with [`AnyError`]. Successful values pass through unchanged.
+/// Import this trait directly or through [`crate::prelude`].
 pub trait IntoUnion<S, F> {
     /// Wraps the result's error in a union whose error set is inferred from the destination.
+    ///
+    /// A typed destination must include `F`; [`AnyError`] accepts any supported
+    /// error type. The proof parameter `Index` is inferred by the compiler.
+    /// Errors enter Eros through [`ErrorUnion::new`], capturing enabled diagnostics
+    /// and following its storage requirements. Successful values pass through unchanged.
+    ///
+    /// ```
+    /// use eros::IntoUnion;
+    /// use core::{fmt, num::ParseIntError};
+    ///
+    /// let typed: eros::Result<(), (fmt::Error, ParseIntError)> = Err(fmt::Error).union();
+    /// assert!(typed.unwrap_err().is_inner::<fmt::Error>());
+    ///
+    /// let erased: eros::Result<()> = Err(fmt::Error).union();
+    /// assert!(erased.unwrap_err().is_inner::<fmt::Error>());
+    /// ```
     fn union<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,

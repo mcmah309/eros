@@ -459,7 +459,7 @@ fn erased_adapter_cannot_be_recovered_as_a_concrete_or_empty_set() {
     let error: ErrorUnion = union(&root, &context).into();
     let original = error.inner() as *const dyn SendSyncError as *const ();
     let report = format!("{error:?}");
-    let adapter: Box<dyn core::error::Error + Send + Sync> = Box::new(error.into_adapter());
+    let adapter: Box<dyn core::error::Error + Send + Sync> = Box::new(error.adapter());
     let adapter_address = core::ptr::from_ref(&*adapter).cast::<()>();
 
     // Even a matching payload cannot change the adapter's original set parameter.
@@ -495,7 +495,7 @@ fn typed_adapter_recovery_requires_its_original_set() {
     let root = Arc::new(AtomicUsize::new(0));
     let context = Arc::new(AtomicUsize::new(0));
     let adapter: Box<dyn core::error::Error + Send + Sync> =
-        Box::new(union(&root, &context).into_adapter());
+        Box::new(union(&root, &context).adapter());
     let adapter = adapter
         .downcast::<eros::ErrorUnionAdapter<AnyError>>()
         .unwrap_err();

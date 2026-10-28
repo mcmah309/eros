@@ -182,7 +182,7 @@ fn reshaping_mapping_recovery_and_adapters_preserve_context_traces() {
             let error = error.erase();
             assert_saved(&error);
             let error = error.narrow::<(fmt::Error,), _>().unwrap();
-            let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(error.into_adapter());
+            let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(error.adapter());
             let error = boxed
                 .downcast::<ErrorUnionAdapter<(fmt::Error,)>>()
                 .unwrap()

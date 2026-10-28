@@ -60,7 +60,7 @@ fn debug_json_omits_span_trace_when_disabled_for_typed_and_erased_errors() {
     // Active tracing spans must not add JSON fields when Eros's feature is off.
     let error: ErrorUnion<(MsgError,)> = with_span(|| ErrorUnion::new(MsgError::from("failure")));
     let typed = [error.to_debug_json(), error.report().to_debug_json()];
-    let erased = error.erase().into_adapter();
+    let erased = error.erase().adapter();
     for value in typed.into_iter().chain([
         erased.as_ref().to_debug_json(),
         erased.as_ref().report().to_debug_json(),
@@ -230,7 +230,7 @@ fn debug_json_preserves_user_context_flags_at_every_batch_depth_after_erasure() 
         .context("outer detail")
         .user_context("outer hint")
         .erase();
-    let adapter = outer.into_adapter();
+    let adapter = outer.adapter();
     for value in [
         adapter.as_ref().to_debug_json(),
         adapter.as_ref().report().to_debug_json(),
@@ -262,7 +262,7 @@ fn debug_json_omits_user_context_flags_when_disabled_at_every_batch_depth() {
         .into_union::<(ErrorUnionVec,), _>()
         .context("outer detail")
         .erase();
-    let adapter = outer.into_adapter();
+    let adapter = outer.adapter();
     for value in [
         adapter.as_ref().to_debug_json(),
         adapter.as_ref().report().to_debug_json(),
@@ -375,7 +375,7 @@ fn json_omits_failed_messages_and_preserves_other_diagnostics() {
     let error: ErrorUnion =
         ErrorUnionVec::new(vec![leaf("first child"), error.erase(), leaf("last child")])
             .into_union();
-    let adapter = error.into_adapter();
+    let adapter = error.adapter();
     for (value, detailed) in [
         (adapter.as_ref().to_display_json(), false),
         (adapter.as_ref().report().to_display_json(), false),

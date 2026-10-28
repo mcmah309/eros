@@ -117,7 +117,7 @@ fn generic_dyn_error_roundtrip_supports_typed_and_erased_sets() {
         let display = format!("{error}");
         let debug = format!("{error:?}");
         let original = error.inner() as *const dyn SendSyncError as *const ();
-        let boxed: Box<dyn core::error::Error + Send + Sync> = Box::new(error.into_adapter());
+        let boxed: Box<dyn core::error::Error + Send + Sync> = Box::new(error.adapter());
         let error = boxed
             .downcast::<eros::ErrorUnionAdapter<E>>()
             .unwrap()

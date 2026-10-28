@@ -53,7 +53,7 @@ struct Multiline;
 fn bare_error() {
     let error: ErrorUnion<(InvalidInput,)> = ErrorUnion::new(InvalidInput);
     assert_outputs!("bare_error", error.report());
-    assert_outputs!("bare_error", error.erase().into_adapter().as_ref().report());
+    assert_outputs!("bare_error", error.erase().adapter().as_ref().report());
 }
 
 #[test]
@@ -191,7 +191,7 @@ mod allocated {
             })),
         });
         assert_outputs!("source_chain", error.report());
-        assert_outputs!("source_chain", error.into_adapter().as_ref().report());
+        assert_outputs!("source_chain", error.adapter().as_ref().report());
     }
 
     #[test]
@@ -251,10 +251,7 @@ mod allocated {
         let error: ErrorUnion<(ErrorUnionVec<(std::io::Error,)>,)> = errors.into_union();
         assert_outputs!("grouped_ranges", error.report());
         assert_outputs!("grouped_ranges", error.report());
-        assert_outputs!(
-            "grouped_ranges",
-            error.erase().into_adapter().as_ref().report()
-        );
+        assert_outputs!("grouped_ranges", error.erase().adapter().as_ref().report());
     }
 
     #[test]
@@ -387,7 +384,7 @@ mod allocated {
         assert_outputs!("nested_parent_contexts", outer.report());
         assert_outputs!(
             "nested_parent_contexts",
-            outer.erase().into_adapter().as_ref().report()
+            outer.erase().adapter().as_ref().report()
         );
     }
 
