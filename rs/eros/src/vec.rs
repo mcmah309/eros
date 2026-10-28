@@ -52,17 +52,17 @@ pub struct ErrorUnionVec<E: TypeSet = AnyError> {
 
 impl<E: TypeSet> ErrorUnionVec<E> {
     /// Takes ownership of existing unions without reallocating or recapturing diagnostics.
-    pub fn new(errors: AllocVec<ErrorUnion<E>>) -> Self {
+    pub const fn new(errors: AllocVec<ErrorUnion<E>>) -> Self {
         Self { errors }
     }
 
     /// Returns the number of failures.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.errors.len()
     }
 
     /// Returns whether the batch has no failures.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
 

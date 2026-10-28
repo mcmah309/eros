@@ -425,7 +425,7 @@ where
     }
 
     #[cfg(feature = "backtrace")]
-    pub fn backtrace(&self) -> &std::backtrace::Backtrace {
+    pub const fn backtrace(&self) -> &std::backtrace::Backtrace {
         &self.inner.backtrace
     }
 
@@ -436,7 +436,7 @@ where
     /// traces. Reshaping, recovery, and mapping preserve the original trace;
     /// borrowing or formatting never captures a new one.
     #[cfg(feature = "error_span_trace")]
-    pub fn span_trace(&self) -> &tracing_error::SpanTrace {
+    pub const fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.inner.span_trace
     }
 
@@ -447,7 +447,7 @@ where
     /// `context` and `context_location`, each context frame also exposes
     /// its attachment location.
     #[cfg(feature = "error_location")]
-    pub fn location(&self) -> &'static core::panic::Location<'static> {
+    pub const fn location(&self) -> &'static core::panic::Location<'static> {
         self.inner.location
     }
 

@@ -13,7 +13,7 @@ pub struct ErrorReport<'a> {
 
 impl<E: TypeSet> ErrorUnion<E> {
     /// Borrows this union's report without erasing its owned error set.
-    pub fn report(&self) -> ErrorReport<'_> {
+    pub const fn report(&self) -> ErrorReport<'_> {
         ErrorReport { inner: &self.inner }
     }
 }
@@ -41,21 +41,21 @@ impl<'a> ErrorReport<'a> {
 
     /// Borrows the saved Eros backtrace, without capturing a new one.
     #[cfg(feature = "backtrace")]
-    pub fn backtrace(&self) -> &'a std::backtrace::Backtrace {
+    pub const fn backtrace(&self) -> &'a std::backtrace::Backtrace {
         &self.inner.backtrace
     }
 
     /// Borrows the original span trace without capturing a new one.
     /// Requires `error_span_trace` (also enabled by `span_trace`).
     #[cfg(feature = "error_span_trace")]
-    pub fn span_trace(&self) -> &'a tracing_error::SpanTrace {
+    pub const fn span_trace(&self) -> &'a tracing_error::SpanTrace {
         &self.inner.span_trace
     }
 
     /// Returns the original Eros capture location.
     /// Requires `error_location` (also enabled by `location`).
     #[cfg(feature = "error_location")]
-    pub fn location(&self) -> &'static core::panic::Location<'static> {
+    pub const fn location(&self) -> &'static core::panic::Location<'static> {
         self.inner.location
     }
 }

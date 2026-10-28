@@ -56,28 +56,28 @@ impl ContextFrame {
 #[cfg(feature = "context")]
 impl ContextFrame {
     /// Returns the attached message or boxed value without formatting or cloning it.
-    pub fn value(&self) -> &ContextValue {
+    pub const fn value(&self) -> &ContextValue {
         &self.context
     }
 
     /// Returns where this context was attached.
     /// Requires `context_location` (also enabled by `location`).
     #[cfg(feature = "context_location")]
-    pub fn location(&self) -> &'static core::panic::Location<'static> {
+    pub const fn location(&self) -> &'static core::panic::Location<'static> {
         self.location
     }
 
     /// Borrows the span trace captured when this context was attached.
     /// Requires `context_span_trace` (also enabled by `span_trace`).
     #[cfg(feature = "context_span_trace")]
-    pub fn span_trace(&self) -> &tracing_error::SpanTrace {
+    pub const fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.span_trace
     }
 
     /// Returns whether this frame was attached with `user_context` or
     /// `with_user_context`. Requires the `user_context` feature.
     #[cfg(feature = "user_context")]
-    pub fn is_user_context(&self) -> bool {
+    pub const fn is_user_context(&self) -> bool {
         self.is_user_context
     }
 }
@@ -102,10 +102,10 @@ enum ContextValueInner {
 
 impl ContextValue {
     /// Returns the message text, or `None` for boxed context.
-    pub fn as_str(&self) -> Option<&str> {
+    pub const fn as_str(&self) -> Option<&str> {
         match &self.0 {
             #[cfg(feature = "alloc")]
-            ContextValueInner::OwnedMessage(message) => Some(message),
+            ContextValueInner::OwnedMessage(message) => Some(message.as_str()),
             ContextValueInner::StaticMessage(message) => Some(message),
             #[cfg(feature = "alloc")]
             ContextValueInner::Boxed(_) => None,

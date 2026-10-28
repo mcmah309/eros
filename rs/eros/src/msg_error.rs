@@ -51,13 +51,19 @@ impl MsgError {
     /// Takes ownership of a string without allocating or copying its contents.
     #[cfg(feature = "alloc")]
     #[inline]
-    pub fn from_owned(message: String) -> Self {
+    pub const fn from_owned(message: String) -> Self {
         Self(Cow::Owned(message))
     }
 
     /// Returns the message text.
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_str(&self) -> &str {
+        #[cfg(feature = "alloc")]
+        match &self.0 {
+            Cow::Borrowed(message) => message,
+            Cow::Owned(message) => message.as_str(),
+        }
+        #[cfg(not(feature = "alloc"))]
+        self.0
     }
 }
 
