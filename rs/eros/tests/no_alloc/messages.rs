@@ -182,7 +182,7 @@ pub fn static_messages_compare_and_hash_by_text_and_format_without_a_heap() {
     assert_eq!(&buffer.bytes[..buffer.len], b"message error: message");
 }
 
-#[cfg(feature = "location")]
+#[cfg(feature = "error_location")]
 #[cfg_attr(test, test)]
 pub fn literal_macros_capture_the_call_site_and_preserve_it_through_reshaping() {
     let expected = line!() + 1;
@@ -218,6 +218,6 @@ pub fn run_checks() {
     bail_and_ensure_support_literal_messages_and_infer_error_sets();
     message_errors_compose_with_other_errors_and_generated_enums();
     static_messages_compare_and_hash_by_text_and_format_without_a_heap();
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     literal_macros_capture_the_call_site_and_preserve_it_through_reshaping();
 }

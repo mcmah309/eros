@@ -9,7 +9,9 @@ description = "Verifies Eros in a freestanding executable without an allocator."
 eros = { path = "../eros", default-features = false }
 
 [features]
-location = ["eros/location"]
+error_location = ["eros/error_location"]
+context_location = ["eros/context_location"]
+location = ["error_location", "context_location", "eros/location"]
 freestanding = []
 
 [[bin]]

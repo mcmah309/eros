@@ -1,0 +1,23 @@
+{
+  "backtrace": null,
+  "contexts": [
+    {
+      "location": {
+        "column": 0,
+        "file": "<file>",
+        "line": 0
+      },
+      "message": "load settings",
+      "span_trace": "- output_formatting::attach_settings\n  with:\n    path=\"config.toml\"\n    attempt=2\n  location: <location>\n- output_formatting::request\n  with: request_id=42\n  location: <location>",
+      "user_facing": false
+    }
+  ],
+  "location": {
+    "column": 0,
+    "file": "<file>",
+    "line": 0
+  },
+  "root": "invalid input",
+  "sources": [],
+  "span_trace": null
+}

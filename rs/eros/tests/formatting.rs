@@ -175,7 +175,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     #[cfg(feature = "diagnostic")]
     let expected_diagnostic = error.to_debug_json();
     let original_root = error.inner() as *const dyn eros::SendSyncError as *const ();
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     let original_location = error.location();
 
     // The concrete adapter works at generic Error boundaries and keeps the
@@ -197,7 +197,7 @@ fn assert_native_adapter_roundtrip(error: ErrorUnion<(NativeError,)>) {
     assert_eq!(format!("{native:?}"), expected_debug);
     assert_eq!(format!("{native:#?}"), expected_alternate_debug);
     let error: ErrorUnion<(NativeError,)> = native.into_unadapted();
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(error.location(), original_location));
     let native: Box<dyn Error + Send + Sync> = Box::new(error.into_adapter());
 
@@ -470,33 +470,34 @@ fn context_follows_stack_order_and_error_context_uses_its_display() {
     assert_eq!(format!("{error:#?}"), report_without_metadata());
 }
 
-#[cfg(feature = "location")]
+#[cfg(any(feature = "error_location", feature = "context_location"))]
 #[test]
 fn debug_places_captured_locations_below_the_root_and_each_context() {
     let native = NativeError::leaf("configuration missing");
-    let root_line = line!() + 1;
+    let _root_line = line!() + 1;
     let error: ErrorUnion<(NativeError,)> = ErrorUnion::new(native);
-    let inner_line = line!() + 1;
+    let _inner_line = line!() + 1;
     let error = error.context("read /etc/app.toml");
-    let outer_line = line!() + 1;
+    let _outer_line = line!() + 1;
     let error = error.context("start service");
     let report = format!("{error:?}");
 
-    assert!(
-        report.contains(&format!("\nlocation: {}:{root_line}:", file!())),
+    assert_eq!(
+        report.contains(&format!("\nlocation: {}:{_root_line}:", file!())),
+        cfg!(feature = "error_location"),
         "{report}"
     );
-    if cfg!(feature = "context") {
+    if cfg!(all(feature = "context", feature = "context_location")) {
         assert!(
             report.contains(&format!(
-                "    - read /etc/app.toml\n      location: {}:{inner_line}:",
+                "    - read /etc/app.toml\n      location: {}:{_inner_line}:",
                 file!()
             )),
             "{report}"
         );
         assert!(
             report.contains(&format!(
-                "    - start service\n      location: {}:{outer_line}:",
+                "    - start service\n      location: {}:{_outer_line}:",
                 file!()
             )),
             "{report}"
@@ -631,18 +632,18 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
     );
     assert_eq!(
         diagnostic.as_object().unwrap().len(),
-        3 + usize::from(cfg!(feature = "location"))
-            + usize::from(cfg!(feature = "spantrace"))
+        3 + usize::from(cfg!(feature = "error_location"))
+            + usize::from(cfg!(feature = "error_spantrace"))
             + usize::from(cfg!(feature = "backtrace"))
     );
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     assert_eq!(diagnostic.get("span_trace"), Some(&serde_json::Value::Null));
-    #[cfg(not(feature = "spantrace"))]
+    #[cfg(not(feature = "error_spantrace"))]
     assert!(diagnostic.get("span_trace").is_none());
 
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     assert_json_location(&diagnostic["location"], _root_line);
-    #[cfg(not(feature = "location"))]
+    #[cfg(not(feature = "error_location"))]
     assert!(diagnostic.get("location").is_none());
 
     let contexts = diagnostic["contexts"].as_array().unwrap();
@@ -654,10 +655,11 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
             assert_eq!(context["user_facing"], false);
             assert_eq!(
                 context.as_object().unwrap().len(),
-                if cfg!(feature = "location") { 3 } else { 2 }
+                2 + usize::from(cfg!(feature = "context_location"))
+                    + usize::from(cfg!(feature = "context_spantrace"))
             );
         }
-        #[cfg(feature = "location")]
+        #[cfg(feature = "context_location")]
         {
             assert_json_location(&contexts[0]["location"], _inner_line);
             assert_json_location(&contexts[1]["location"], _outer_line);
@@ -688,7 +690,10 @@ fn to_debug_json_includes_contexts_locations_and_enabled_traces() {
     assert!(diagnostic.get("backtrace").is_none());
 }
 
-#[cfg(all(feature = "diagnostic", feature = "location"))]
+#[cfg(all(
+    feature = "diagnostic",
+    any(feature = "error_location", feature = "context_location")
+))]
 fn assert_json_location(location: &serde_json::Value, line: u32) {
     assert_eq!(location.as_object().unwrap().len(), 3);
     assert_eq!(location["file"], file!());

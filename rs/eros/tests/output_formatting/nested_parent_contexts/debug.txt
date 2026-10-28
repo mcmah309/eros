@@ -7,6 +7,7 @@ error:
                     context:
                         - validate row 17
                           location: <location>
+                          span trace: not captured
                     location: <location>
                     span trace: not captured
                     backtrace: <status>
@@ -14,12 +15,14 @@ error:
           context:
               - import page
                 location: <location>
+                span trace: not captured
           location: <location>
           span trace: not captured
           backtrace: <status>
 context:
     - import file
       location: <location>
+      span trace: not captured
 location: <location>
 span trace: not captured
 backtrace: <status>

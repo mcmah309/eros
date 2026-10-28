@@ -276,7 +276,7 @@ fn equal_messages_with_distinct_contexts_form_separate_groups() {
     );
 }
 
-#[cfg(feature = "location")]
+#[cfg(feature = "error_location")]
 #[test]
 fn equal_messages_retain_distinct_locations_in_detailed_reports() {
     let first: ErrorUnion<(std::io::Error,)> =
@@ -300,6 +300,27 @@ fn equal_messages_retain_distinct_locations_in_detailed_reports() {
         detailed.matches("backtrace:").count(),
         2 * usize::from(cfg!(feature = "backtrace"))
     );
+}
+
+#[cfg(all(feature = "context", feature = "context_location"))]
+#[test]
+fn equal_messages_retain_distinct_context_locations_in_detailed_reports() {
+    // The root capture site is identical; only the attachment sites differ.
+    let root = || -> ErrorUnion<(core::fmt::Error,)> { ErrorUnion::new(core::fmt::Error) };
+    let first = root().context("same context");
+    let second = root().context("same context");
+    #[cfg(feature = "error_location")]
+    assert!(core::ptr::eq(first.location(), second.location()));
+    let first_location = first.contexts().next().unwrap().location().to_string();
+    let second_location = second.contexts().next().unwrap().location().to_string();
+    assert_ne!(first_location, second_location);
+    let batch = ErrorUnionVec::new(vec![first, second]);
+    let detailed = format!("{batch:?}");
+    assert!(detailed.contains("      at: [0]"), "{detailed}");
+    assert!(detailed.contains("      at: [1]"), "{detailed}");
+    assert!(detailed.contains(&first_location), "{detailed}");
+    assert!(detailed.contains(&second_location), "{detailed}");
+    assert!(format!("{batch:#?}").contains("      at: [0..2]"));
 }
 
 #[test]

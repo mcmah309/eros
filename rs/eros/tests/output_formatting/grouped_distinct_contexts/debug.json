@@ -11,6 +11,7 @@
             "line": 0
           },
           "message": "row 17",
+          "span_trace": null,
           "user_facing": false
         }
       ],
@@ -33,6 +34,7 @@
             "line": 0
           },
           "message": "row 29",
+          "span_trace": null,
           "user_facing": false
         }
       ],
@@ -55,6 +57,7 @@
             "line": 0
           },
           "message": "row 17",
+          "span_trace": null,
           "user_facing": false
         }
       ],

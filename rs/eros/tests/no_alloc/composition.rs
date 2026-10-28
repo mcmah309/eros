@@ -49,14 +49,14 @@ fn assert_variant<E: TypeSet>(error: &ErrorUnion<E>, index: usize) {
 // and (when enabled) the original call-site location.
 struct Snapshot {
     data: *const (),
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     location: &'static core::panic::Location<'static>,
 }
 impl Snapshot {
     fn new<E: TypeSet>(error: &ErrorUnion<E>) -> Self {
         Self {
             data: error.inner() as *const dyn SendSyncError as *const (),
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             location: error.location(),
         }
     }
@@ -65,7 +65,7 @@ impl Snapshot {
             self.data,
             error.inner() as *const dyn SendSyncError as *const ()
         );
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         assert!(core::ptr::eq(self.location, error.location()));
     }
 }
@@ -289,7 +289,7 @@ pub fn fallible_chain_replaces_reintroduces_maps_and_recovers() {
         original.assert_preserved(&error);
         error.map_single(|_: Fallback| Decode)
     });
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(
         original.location,
         mapped.as_ref().unwrap_err().location()

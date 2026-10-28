@@ -161,7 +161,7 @@ fn static_context_remains_a_noop_without_allocation() {
     assert!(result.unwrap_err().is_inner::<eros::AbsentValueError>());
 }
 
-#[cfg(feature = "location")]
+#[cfg(feature = "error_location")]
 #[test]
 fn reshaping_and_mapping_preserve_the_original_location() {
     let expected = line!() + 1;
@@ -267,7 +267,7 @@ fn aligned_zsts_preserve_ownership_through_borrowing_extraction_and_panics() {
 #[cfg(not(feature = "alloc"))]
 #[test]
 fn storage_size_is_independent_of_the_concrete_zst_alignment() {
-    let words = if cfg!(feature = "location") { 3 } else { 2 };
+    let words = if cfg!(feature = "error_location") { 3 } else { 2 };
     assert_eq!(
         size_of::<ErrorUnion<AnyError>>(),
         words * size_of::<usize>()

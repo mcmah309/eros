@@ -37,9 +37,12 @@ fn contexts_borrow_frames_in_attachment_order() {
 }
 
 #[test]
-#[cfg(feature = "location")]
+#[cfg(any(
+    feature = "error_location",
+    all(feature = "context", feature = "context_location")
+))]
 fn locations_expose_original_capture_and_each_context_attachment() {
-    let root_line = line!() + 1;
+    let _root_line = line!() + 1;
     let error: ErrorUnion<(MsgError,)> = ErrorUnion::new(MsgError::from("root"));
     let _first_line = line!() + 1;
     let error = error.context("first");
@@ -50,16 +53,58 @@ fn locations_expose_original_capture_and_each_context_attachment() {
     let error: ErrorUnion<(std::fmt::Error, MsgError)> = error.widen();
     let error: ErrorUnion = error.into();
 
-    let location = error.location();
-    assert_eq!(location.file(), file!());
-    assert_eq!(location.line(), root_line);
-    assert!(location.column() > 0);
-    #[cfg(feature = "context")]
+    #[cfg(feature = "error_location")]
+    {
+        let location = error.location();
+        assert_eq!(location.file(), file!());
+        assert_eq!(location.line(), _root_line);
+        assert!(location.column() > 0);
+    }
+    #[cfg(all(feature = "context", feature = "context_location"))]
     for (frame, line) in error.contexts().zip([_first_line, _second_line]) {
         let location = frame.location();
         assert_eq!(location.file(), file!());
         assert_eq!(location.line(), line);
         assert!(location.column() > 0);
+    }
+}
+
+// Each adapter may create a root and attach context in the same call. Check
+// both locations independently so either feature preserves the public call site.
+#[test]
+#[cfg(any(
+    feature = "error_location",
+    all(feature = "context", feature = "context_location")
+))]
+fn context_adapters_capture_the_public_call_site() {
+    macro_rules! check {
+        ($error:expr) => {{
+            let expected_line = line!();
+            let error = $error;
+            #[cfg(feature = "error_location")]
+            {
+                assert_eq!(error.location().file(), file!());
+                assert_eq!(error.location().line(), expected_line);
+                assert!(core::ptr::eq(error.location(), error.report().location()));
+            }
+            #[cfg(all(feature = "context", feature = "context_location"))]
+            for frame in error.contexts() {
+                assert_eq!(frame.location().file(), file!());
+                assert_eq!(frame.location().line(), expected_line);
+            }
+        }};
+    }
+    let failure = || Err::<(), _>(std::fmt::Error);
+    check!(failure().context("eager").unwrap_err());
+    check!(failure().with_context(|| "lazy").unwrap_err());
+    check!(None::<()>.context("eager").unwrap_err());
+    check!(None::<()>.with_context(|| "lazy").unwrap_err());
+    #[cfg(feature = "user_context")]
+    {
+        check!(failure().user_context("eager").unwrap_err());
+        check!(failure().with_user_context(|| "lazy").unwrap_err());
+        check!(None::<()>.user_context("eager").unwrap_err());
+        check!(None::<()>.with_user_context(|| "lazy").unwrap_err());
     }
 }
 
@@ -93,7 +138,7 @@ fn contexts_include_user_facing_flags_and_locations() {
             .collect::<Vec<_>>(),
         ["public", "lazy public"]
     );
-    #[cfg(feature = "location")]
+    #[cfg(feature = "context_location")]
     for (frame, line) in error.contexts().skip(1).zip([_public_line, _lazy_line]) {
         assert_eq!(frame.location().line(), line);
     }

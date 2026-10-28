@@ -81,7 +81,7 @@ mod allocated {
         );
         assert!(!detailed.ends_with('\n'));
 
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         {
             let parent = error.location();
             assert!(detailed.contains(&parent.to_string()));
@@ -106,9 +106,9 @@ mod allocated {
             assert!(core::ptr::addr_eq(child.inner(), original.inner()));
             #[cfg(feature = "backtrace")]
             assert!(core::ptr::eq(child.backtrace(), original.backtrace()));
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             assert!(core::ptr::eq(child.span_trace(), original.span_trace()));
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             assert!(core::ptr::eq(child.location(), original.location()));
             #[cfg(feature = "context")]
             assert!(core::ptr::eq(

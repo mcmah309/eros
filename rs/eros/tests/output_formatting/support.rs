@@ -34,11 +34,14 @@ fn visit_reports(report: ErrorReport<'_>, visitor: &mut impl FnMut(ErrorReport<'
     report.visit_children(&mut |child| visit_reports(child, visitor));
 }
 
-#[cfg(feature = "spantrace")]
-fn normalize_span_locations(report: ErrorReport<'_>, mut text: String) -> String {
+#[cfg(any(
+    feature = "error_spantrace",
+    all(feature = "context", feature = "context_spantrace")
+))]
+fn normalize_span_locations(trace: &tracing_error::SpanTrace, mut text: String) -> String {
     // Keep span names, fields, frame order, and indentation in the fixtures;
     // only source locations change when the test file is edited or moved.
-    report.span_trace().with_spans(|metadata, _fields| {
+    trace.with_spans(|metadata, _fields| {
         if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
             let location = format!("location: {file}:{line}");
             text = text
@@ -63,23 +66,27 @@ fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
     let mut statuses = Vec::new();
     visit_reports(report, &mut |report| {
         statuses.push(trace_status(report));
-        #[cfg(feature = "spantrace")]
+        #[cfg(feature = "error_spantrace")]
         {
-            text = normalize_span_locations(report, std::mem::take(&mut text));
+            text = normalize_span_locations(report.span_trace(), std::mem::take(&mut text));
         }
-        #[cfg(feature = "location")]
+        #[cfg(all(feature = "context", feature = "context_spantrace"))]
+        for frame in report.contexts() {
+            text = normalize_span_locations(frame.span_trace(), std::mem::take(&mut text));
+        }
+        #[cfg(feature = "error_location")]
         {
             text = text.replace(
                 &format!("location: {}", report.location()),
                 "location: <location>",
             );
-            #[cfg(feature = "context")]
-            for frame in report.contexts() {
-                text = text.replace(
-                    &format!("location: {}", frame.location()),
-                    "location: <location>",
-                );
-            }
+        }
+        #[cfg(all(feature = "context", feature = "context_location"))]
+        for frame in report.contexts() {
+            text = text.replace(
+                &format!("location: {}", frame.location()),
+                "location: <location>",
+            );
         }
     });
     let lines: Vec<_> = text.split('\n').collect();
@@ -121,10 +128,35 @@ fn normalize_debug(report: ErrorReport<'_>, mut text: String) -> String {
 }
 
 fn expected_debug(text: &str) -> String {
+    let mut context_indent = None;
+    let mut span_indent = None;
     text.split('\n')
         .filter(|line| {
-            (cfg!(feature = "location") || !line.trim_start().starts_with("location: <location>"))
-                && (cfg!(feature = "spantrace") || !line.trim_start().starts_with("span trace:"))
+            let trimmed = line.trim_start();
+            let indent = line.len() - trimmed.len();
+            if trimmed == "context:" {
+                context_indent = Some(indent);
+            } else if context_indent.is_some_and(|context| indent <= context) {
+                context_indent = None;
+            }
+            if trimmed == "span trace:" {
+                span_indent = Some(indent);
+            } else if span_indent.is_some_and(|span| indent <= span) {
+                span_indent = None;
+            }
+            (!trimmed.starts_with("location: <location>")
+                || span_indent.is_some()
+                || if context_indent.is_some_and(|context| indent == context + 6) {
+                    cfg!(feature = "context_location")
+                } else {
+                    cfg!(feature = "error_location")
+                })
+                && (!trimmed.starts_with("span trace:")
+                    || if context_indent.is_some_and(|context| indent == context + 6) {
+                        cfg!(feature = "context_spantrace")
+                    } else {
+                        cfg!(feature = "error_spantrace")
+                    })
                 && (cfg!(feature = "backtrace") || !line.trim_start().starts_with("backtrace:"))
         })
         .collect::<Vec<_>>()
@@ -152,7 +184,10 @@ fn record(case: &str, file: &str, actual: &str) -> bool {
                 cfg!(all(
                     feature = "diagnostic",
                     feature = "context",
-                    feature = "location"
+                    feature = "error_location",
+                    feature = "context_location",
+                    feature = "error_spantrace",
+                    feature = "context_spantrace"
                 )),
                 "record fixtures with --all-features"
             );
@@ -197,7 +232,7 @@ pub fn assert_case(case: &str, report: ErrorReport<'_>, fixtures: Fixtures) {
         &format!("{report:#?}"),
         fixtures.debug_special,
     );
-    let basic = !cfg!(feature = "location") && trace_status(report) != "captured";
+    let basic = !cfg!(feature = "error_location") && trace_status(report) != "captured";
     let (file, expected) = if basic {
         fixtures
             .debug_unlocated
@@ -216,7 +251,13 @@ pub fn assert_case(case: &str, report: ErrorReport<'_>, fixtures: Fixtures) {
     assert_json(case, report, fixtures.display_json, fixtures.debug_json);
 }
 
-#[cfg(all(feature = "diagnostic", feature = "location"))]
+#[cfg(all(
+    feature = "diagnostic",
+    any(
+        feature = "error_location",
+        all(feature = "context", feature = "context_location")
+    )
+))]
 fn assert_location(value: &mut serde_json::Value, location: &core::panic::Location<'_>) {
     assert_eq!(
         *value,
@@ -227,11 +268,50 @@ fn assert_location(value: &mut serde_json::Value, location: &core::panic::Locati
     *value = serde_json::json!({"file": "<file>", "line": 0, "column": 0});
 }
 
+#[cfg(all(
+    feature = "diagnostic",
+    any(
+        feature = "error_spantrace",
+        all(feature = "context", feature = "context_spantrace")
+    )
+))]
+fn normalize_span_json(trace: &tracing_error::SpanTrace, value: &mut serde_json::Value) {
+    use tracing_error::SpanTraceStatus;
+    if trace.status() == SpanTraceStatus::CAPTURED {
+        let text = value["span_trace"]
+            .as_str()
+            .expect("captured span trace text");
+        trace.with_spans(|metadata, fields| {
+            assert!(text.contains(&format!("- {}::{}", metadata.target(), metadata.name())));
+            if !fields.is_empty() {
+                let expected = if fields.lines().nth(1).is_some() {
+                    let lines = fields
+                        .lines()
+                        .map(|line| format!("    {line}"))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    format!("  with:\n{lines}")
+                } else {
+                    format!("  with: {fields}")
+                };
+                assert!(text.contains(&expected));
+            }
+            if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
+                assert!(text.contains(&format!("  location: {file}:{line}")));
+            }
+            true
+        });
+        value["span_trace"] = normalize_span_locations(trace, text.to_owned()).into();
+    } else {
+        assert_eq!(value.get("span_trace"), Some(&serde_json::Value::Null));
+    }
+}
+
 #[cfg(feature = "diagnostic")]
 fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     assert_location(&mut value["location"], report.location());
-    #[cfg(not(feature = "location"))]
+    #[cfg(not(feature = "error_location"))]
     assert!(value.get("location").is_none());
     let contexts = value["contexts"]
         .as_array_mut()
@@ -245,10 +325,14 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
             assert_eq!(value["user_facing"], frame.is_user_facing());
             #[cfg(not(feature = "user_context"))]
             assert_eq!(value["user_facing"], false);
-            #[cfg(feature = "location")]
+            #[cfg(feature = "context_location")]
             assert_location(&mut value["location"], frame.location());
-            #[cfg(not(feature = "location"))]
+            #[cfg(not(feature = "context_location"))]
             assert!(value.get("location").is_none());
+            #[cfg(feature = "context_spantrace")]
+            normalize_span_json(frame.span_trace(), value);
+            #[cfg(not(feature = "context_spantrace"))]
+            assert!(value.get("span_trace").is_none());
         }
     }
     #[cfg(not(feature = "context"))]
@@ -286,40 +370,9 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
     }
     #[cfg(not(feature = "backtrace"))]
     assert!(value.get("backtrace").is_none());
-    #[cfg(feature = "spantrace")]
-    {
-        use tracing_error::SpanTraceStatus;
-        let trace = report.span_trace();
-        if trace.status() == SpanTraceStatus::CAPTURED {
-            let text = value["span_trace"]
-                .as_str()
-                .expect("captured span trace text");
-            trace.with_spans(|metadata, fields| {
-                assert!(text.contains(&format!("- {}::{}", metadata.target(), metadata.name())));
-                if !fields.is_empty() {
-                    let expected = if fields.lines().nth(1).is_some() {
-                        let lines = fields
-                            .lines()
-                            .map(|line| format!("    {line}"))
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        format!("  with:\n{lines}")
-                    } else {
-                        format!("  with: {fields}")
-                    };
-                    assert!(text.contains(&expected));
-                }
-                if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
-                    assert!(text.contains(&format!("  location: {file}:{line}")));
-                }
-                true
-            });
-            value["span_trace"] = normalize_span_locations(report, text.to_owned()).into();
-        } else {
-            assert_eq!(value.get("span_trace"), Some(&serde_json::Value::Null));
-        }
-    }
-    #[cfg(not(feature = "spantrace"))]
+    #[cfg(feature = "error_spantrace")]
+    normalize_span_json(report.span_trace(), value);
+    #[cfg(not(feature = "error_spantrace"))]
     assert!(value.get("span_trace").is_none());
     let mut children = Vec::new();
     report.visit_children(&mut |child| children.push(child));
@@ -340,10 +393,20 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
 fn adapt_expected_json(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(object) => {
-            if !cfg!(feature = "location") {
+            let include_location = if object.contains_key("message") {
+                cfg!(feature = "context_location")
+            } else {
+                cfg!(feature = "error_location")
+            };
+            if !include_location {
                 object.remove("location");
             }
-            if !cfg!(feature = "spantrace") {
+            let include_span_trace = if object.contains_key("message") {
+                cfg!(feature = "context_spantrace")
+            } else {
+                cfg!(feature = "error_spantrace")
+            };
+            if !include_span_trace {
                 object.remove("span_trace");
             }
             if !cfg!(feature = "backtrace") {

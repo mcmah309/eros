@@ -44,7 +44,7 @@ fn union(root: &Arc<AtomicUsize>, context: &Arc<AtomicUsize>) -> ErrorUnion<Trac
     error.context(ContextValue::from(context))
 }
 
-#[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+#[cfg(not(any(feature = "backtrace", feature = "context", feature = "error_location")))]
 #[test]
 fn boxed_extraction_reuses_the_original_allocation() {
     let drops = Arc::new(AtomicUsize::new(0));
@@ -65,7 +65,7 @@ fn boxed_extraction_reuses_the_original_allocation() {
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
 
-#[cfg(not(any(feature = "backtrace", feature = "context", feature = "location")))]
+#[cfg(not(any(feature = "backtrace", feature = "context", feature = "error_location")))]
 #[test]
 fn boxed_mapping_reuses_the_original_allocation() {
     let drops = Arc::new(AtomicUsize::new(0));

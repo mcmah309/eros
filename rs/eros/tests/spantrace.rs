@@ -1,4 +1,4 @@
-#![cfg(feature = "spantrace")]
+#![cfg(feature = "error_spantrace")]
 
 use eros::{ErrorUnion, ErrorUnionAdapter, ErrorUnionVec, IntoUnion, MsgError, ReshapeUnion};
 use std::{fmt, future::Future, sync::Arc, task::Poll};

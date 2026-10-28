@@ -89,7 +89,7 @@ impl<E: TypeSet> ErrorUnionVec<E> {
     /// The destination set can contain other error types alongside this batch.
     /// Context added to the returned union describes the batch; child contexts
     /// and captured traces remain attached to their original unions.
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     pub fn into_union<OutSet, Index>(self) -> ErrorUnion<OutSet>
     where
         OutSet: TypeSet,

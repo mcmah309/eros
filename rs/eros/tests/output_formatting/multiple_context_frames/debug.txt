@@ -3,39 +3,51 @@ context:
     - step 1
       continuation
       location: <location>
+      span trace: not captured
     - step 2
       continuation
       location: <location>
+      span trace: not captured
     - step 3
       continuation
       location: <location>
+      span trace: not captured
     - step 4
       continuation
       location: <location>
+      span trace: not captured
     - step 5
       continuation
       location: <location>
+      span trace: not captured
     - step 6
       continuation
       location: <location>
+      span trace: not captured
     - step 7
       continuation
       location: <location>
+      span trace: not captured
     - step 8
       continuation
       location: <location>
+      span trace: not captured
     - step 9
       continuation
       location: <location>
+      span trace: not captured
     - step 10
       continuation
       location: <location>
+      span trace: not captured
     - step 11
       continuation
       location: <location>
+      span trace: not captured
     - step 12
       continuation
       location: <location>
+      span trace: not captured
 location: <location>
 span trace: not captured
 backtrace: <status>

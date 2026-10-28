@@ -118,7 +118,7 @@ impl ErrorUnion {
     /// errors exceeding the inline size or alignment are rejected at compile
     /// time when the constructor is instantiated. Zero-sized errors support
     /// arbitrary alignment. Diagnostics may allocate independently of the root.
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     pub fn new<T, OutSet, Index>(t: T) -> ErrorUnion<OutSet>
     where
         T: SendSyncError,
@@ -135,9 +135,9 @@ impl ErrorUnion {
     pub(crate) fn new_from_parts<T, OutSet, Index>(
         t: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "spantrace")] span_trace: tracing_error::SpanTrace,
+        #[cfg(feature = "error_spantrace")] span_trace: tracing_error::SpanTrace,
         #[cfg(feature = "context")] context: Vec<ContextFrame>,
-        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
+        #[cfg(feature = "error_location")] location: &'static core::panic::Location<'static>,
     ) -> ErrorUnion<OutSet>
     where
         T: SendSyncError,
@@ -149,11 +149,11 @@ impl ErrorUnion {
                 t,
                 #[cfg(feature = "backtrace")]
                 backtrace,
-                #[cfg(feature = "spantrace")]
+                #[cfg(feature = "error_spantrace")]
                 span_trace,
                 #[cfg(feature = "context")]
                 context,
-                #[cfg(feature = "location")]
+                #[cfg(feature = "error_location")]
                 location,
             ),
             _pd: PhantomData,
@@ -429,11 +429,11 @@ where
 
     /// Borrows the span trace captured when this error first entered Eros.
     ///
-    /// Requires the `spantrace` feature. The application must install
+    /// Requires `error_spantrace` (also enabled by `spantrace`). The application must install
     /// [`tracing_error::ErrorLayer`] and instrument its operations for useful
     /// traces. Reshaping, recovery, and mapping preserve the original trace;
     /// borrowing or formatting never captures a new one.
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     pub fn span_trace(&self) -> &tracing_error::SpanTrace {
         &self.inner.span_trace
     }
@@ -441,9 +441,10 @@ where
     /// Returns where the error was first wrapped in an Eros union.
     ///
     /// Reshaping and mapping retain this original location.
-    /// With the `context` feature, each context frame also
-    /// exposes its attachment location.
-    #[cfg(feature = "location")]
+    /// Requires `error_location` (also enabled by `location`). With
+    /// `context` and `context_location`, each context frame also exposes
+    /// its attachment location.
+    #[cfg(feature = "error_location")]
     pub fn location(&self) -> &'static core::panic::Location<'static> {
         self.inner.location
     }
@@ -460,7 +461,7 @@ where
     /// let error = eros::error!("permission denied").context("read configuration");
     /// for frame in error.contexts() {
     ///     println!("{}", frame.value());
-    ///     #[cfg(feature = "location")]
+    ///     #[cfg(feature = "context_location")]
     ///     println!("  at {}", frame.location());
     /// }
     /// # }
@@ -520,7 +521,7 @@ where
     /// Adds additional context. This becomes a no-op if the `context` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     pub fn context<C: Into<ContextValue>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
@@ -533,7 +534,7 @@ where
     #[cfg(feature = "user_context")]
     #[allow(unused_mut)]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     pub fn user_context<C: Into<ContextValue>>(mut self, context: C) -> Self {
         #[cfg(feature = "context")]
         self.inner
@@ -547,7 +548,7 @@ where
     /// Lazily adds additional context. This becomes a no-op if the `context` feature is disabled.
     #[allow(unused_mut)]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     pub fn with_context<F, C: Into<ContextValue>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
@@ -563,7 +564,7 @@ where
     #[cfg(feature = "user_context")]
     #[allow(unused_mut)]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     pub fn with_user_context<F, C: Into<ContextValue>>(mut self, f: F) -> Self
     where
         F: FnOnce() -> C,
@@ -629,11 +630,11 @@ impl<A: SendSyncError> ErrorUnion<(A,)> {
                 f(inner.error),
                 #[cfg(feature = "backtrace")]
                 inner.backtrace,
-                #[cfg(feature = "spantrace")]
+                #[cfg(feature = "error_spantrace")]
                 inner.span_trace,
                 #[cfg(feature = "context")]
                 inner.context,
-                #[cfg(feature = "location")]
+                #[cfg(feature = "error_location")]
                 inner.location,
             ),
             _pd: PhantomData,
@@ -920,7 +921,7 @@ pub trait IntoUnion<S, F> {
 }
 
 impl<S, F: SendSyncError> IntoUnion<S, F> for Result<S, F> {
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     fn union<Other, Index>(self) -> Result<S, ErrorUnion<Other>>
     where
         Other: TypeSet,
@@ -953,7 +954,7 @@ pub trait Erase<S> {
 }
 
 impl<S, F: SendSyncError> Erase<S> for Result<S, F> {
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     fn erase(self) -> Result<S, ErrorUnion> {
         match self {
             Ok(value) => Ok(value),
@@ -1072,32 +1073,32 @@ impl core::error::Error for AnyhowErrorArc {
 
 #[cfg(feature = "anyhow")]
 impl ErrorUnion {
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     pub fn from_anyhow(error: anyhow::Error) -> ErrorUnion {
         ErrorUnion::new_from_parts(
             AnyhowError(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             core::panic::Location::caller(),
         )
     }
 
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     pub fn from_anyhow_arc(error: alloc::sync::Arc<anyhow::Error>) -> ErrorUnion {
         ErrorUnion::new_from_parts(
             AnyhowErrorArc(error),
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::disabled(),
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             core::panic::Location::caller(),
         )
     }
@@ -1160,8 +1161,8 @@ mod tests {
     #[cfg(not(any(
         feature = "backtrace",
         feature = "context",
-        feature = "location",
-        feature = "spantrace"
+        feature = "error_location",
+        feature = "error_spantrace"
     )))]
     #[test]
     fn inner_without_metadata_uses_two_words_for_every_error_type() {

@@ -236,11 +236,11 @@ pub(crate) struct ErrorUnionInner {
     error: StoredError,
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     pub(crate) span_trace: tracing_error::SpanTrace,
     #[cfg(feature = "context")]
     pub(crate) context: Vec<ContextFrame>,
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
 }
 
@@ -248,17 +248,17 @@ pub(crate) struct ErrorParts<T> {
     pub(crate) error: T,
     #[cfg(feature = "backtrace")]
     pub(crate) backtrace: std::backtrace::Backtrace,
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     pub(crate) span_trace: tracing_error::SpanTrace,
     #[cfg(feature = "context")]
     pub(crate) context: Vec<ContextFrame>,
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
 }
 
 impl ErrorUnionInner {
     #[cfg(feature = "alloc")]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     pub(crate) fn new_vec<E: crate::TypeSet>(value: crate::ErrorUnionVec<E>) -> Self {
         let mut inner = Self::new(value);
         inner.error.ops = &OpsFor::<crate::ErrorUnionVec<E>>::WITH_CHILDREN;
@@ -277,17 +277,17 @@ impl ErrorUnionInner {
         self.error.ops.children.is_some()
     }
 
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "error_location", track_caller)]
     pub(crate) fn new<T: SendSyncError>(value: T) -> Self {
         Self::new_from_parts(
             value,
             #[cfg(feature = "backtrace")]
             std::backtrace::Backtrace::capture(),
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context")]
             Vec::new(),
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             core::panic::Location::caller(),
         )
     }
@@ -296,19 +296,19 @@ impl ErrorUnionInner {
     pub(crate) fn new_from_parts<T: SendSyncError>(
         value: T,
         #[cfg(feature = "backtrace")] backtrace: std::backtrace::Backtrace,
-        #[cfg(feature = "spantrace")] span_trace: tracing_error::SpanTrace,
+        #[cfg(feature = "error_spantrace")] span_trace: tracing_error::SpanTrace,
         #[cfg(feature = "context")] context: Vec<ContextFrame>,
-        #[cfg(feature = "location")] location: &'static core::panic::Location<'static>,
+        #[cfg(feature = "error_location")] location: &'static core::panic::Location<'static>,
     ) -> Self {
         Self {
             error: StoredError::new(value),
             #[cfg(feature = "backtrace")]
             backtrace,
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             span_trace,
             #[cfg(feature = "context")]
             context,
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             location,
         }
     }
@@ -350,11 +350,11 @@ impl ErrorUnionInner {
             error: unsafe { self.error.take::<T>() },
             #[cfg(feature = "backtrace")]
             backtrace: self.backtrace,
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             span_trace: self.span_trace,
             #[cfg(feature = "context")]
             context: self.context,
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             location: self.location,
         }
     }
@@ -366,11 +366,11 @@ impl ErrorUnionInner {
             error: self.error.into_box(),
             #[cfg(feature = "backtrace")]
             backtrace: self.backtrace,
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             span_trace: self.span_trace,
             #[cfg(feature = "context")]
             context: self.context,
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             location: self.location,
         }
     }

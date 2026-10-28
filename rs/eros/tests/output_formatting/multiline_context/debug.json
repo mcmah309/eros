@@ -8,6 +8,7 @@
         "line": 0
       },
       "message": "validate record\nrow 17",
+      "span_trace": null,
       "user_facing": false
     }
   ],

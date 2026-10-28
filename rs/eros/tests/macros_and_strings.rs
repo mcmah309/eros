@@ -319,7 +319,7 @@ fn bail_and_ensure_infer_typed_error_sets() {
     );
 }
 
-#[cfg(feature = "location")]
+#[cfg(feature = "error_location")]
 #[test]
 fn typed_bail_and_ensure_capture_the_call_site() {
     fn bailing(line: &Cell<u32>) -> eros::Result<(), (MsgError,)> {

@@ -72,7 +72,7 @@ pub fn run_checks() {
     #[cfg(not(test))]
     inline::run_checks();
     let mut union: ErrorUnion<Failures> = ErrorUnion::new(Failure);
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     let location = union.location();
     assert!(union.is_inner::<Failure>());
     assert!(union.downcast_inner_ref::<u64>().is_none());
@@ -86,22 +86,22 @@ pub fn run_checks() {
     assert_eq!(buffer.contents(), b"error:\n  failure\n  detail");
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{union:?}").unwrap();
-    assert!(
-        buffer
-            .contents()
-            .ends_with(b"backtrace (feature disabled):")
-    );
+    let mut expected = Buffer::new();
+    write!(&mut expected, "error:\n  failure\n  detail").unwrap();
+    #[cfg(feature = "error_location")]
+    write!(&mut expected, "\nlocation: {location}").unwrap();
+    assert_eq!(buffer.contents(), expected.contents());
     let union = union.narrow::<(Failure,), _>().unwrap();
     let adapter = eros::ErrorUnionAdapter::from(union);
     let mut buffer = Buffer::new();
     write!(&mut buffer, "{adapter}").unwrap();
     let union = adapter.into_unadapted();
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(location, union.location()));
     let before = DROPS.load(Ordering::SeqCst);
     let mapped = union.map_single(|_failure| fmt::Error);
     assert_eq!(DROPS.load(Ordering::SeqCst), before + 1);
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     assert!(core::ptr::eq(location, mapped.location()));
     let _ = mapped.into_single();
 

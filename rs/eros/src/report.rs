@@ -46,14 +46,15 @@ impl<'a> ErrorReport<'a> {
     }
 
     /// Borrows the original span trace without capturing a new one.
-    /// Requires the `spantrace` feature.
-    #[cfg(feature = "spantrace")]
+    /// Requires `error_spantrace` (also enabled by `spantrace`).
+    #[cfg(feature = "error_spantrace")]
     pub fn span_trace(&self) -> &'a tracing_error::SpanTrace {
         &self.inner.span_trace
     }
 
     /// Returns the original Eros capture location.
-    #[cfg(feature = "location")]
+    /// Requires `error_location` (also enabled by `location`).
+    #[cfg(feature = "error_location")]
     pub fn location(&self) -> &'static core::panic::Location<'static> {
         self.inner.location
     }

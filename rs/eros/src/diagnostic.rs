@@ -20,9 +20,11 @@ impl<E: TypeSet> ErrorUnion<E> {
     /// objects (`file`, `line`, `column`), and enabled traces.
     /// Each context has `message` and `user_facing`. With `backtrace`, adds
     /// `backtrace` as rendered text when captured, or null otherwise.
-    /// Locations are omitted when the `location` feature is off.
-    /// With `spantrace`, also adds `span_trace` as rendered text when captured,
-    /// or null otherwise. The field is omitted when `spantrace` is disabled.
+    /// Root locations require `error_location`; context locations require
+    /// `context_location`. The `location` feature enables both.
+    /// `error_spantrace` adds root `span_trace` text, and `context_spantrace`
+    /// adds it to each context. Enabled traces are null when not captured;
+    /// disabled fields are omitted. The `spantrace` feature enables both.
     /// See [`crate::ErrorUnionVec`] for batch reporting.
     pub fn to_debug_json(&self) -> Value {
         self.report().to_debug_json()
@@ -70,14 +72,20 @@ impl ErrorReport<'_> {
             {
                 frame["user_facing"] = context.is_user_facing.into();
             }
-            #[cfg(feature = "location")]
+            #[cfg(feature = "context_location")]
             {
                 frame["location"] = location_value(context.location);
+            }
+            #[cfg(feature = "context_spantrace")]
+            {
+                frame["span_trace"] = crate::formatting::SpanTraceDisplay(&context.span_trace)
+                    .text()
+                    .into();
             }
             contexts.push(frame);
         }
         value["contexts"] = contexts.into();
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         {
             value["location"] = location_value(_report.location);
         }
@@ -85,7 +93,7 @@ impl ErrorReport<'_> {
         {
             value["backtrace"] = _report.backtrace_text().into();
         }
-        #[cfg(feature = "spantrace")]
+        #[cfg(feature = "error_spantrace")]
         {
             value["span_trace"] = _report.span_trace_text().into();
         }
@@ -118,7 +126,10 @@ fn display_value(report: &Report<'_>) -> Value {
     })
 }
 
-#[cfg(feature = "location")]
+#[cfg(any(
+    feature = "error_location",
+    all(feature = "context", feature = "context_location")
+))]
 fn location_value(location: &core::panic::Location<'_>) -> Value {
     json!({ "file": location.file(), "line": location.line(), "column": location.column() })
 }

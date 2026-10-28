@@ -4,8 +4,10 @@ caused by:
 context:
     - read /etc/app.toml
       location: <location>
+      span trace: not captured
     - start service
       location: <location>
+      span trace: not captured
 location: <location>
 span trace: not captured
 backtrace: <status>

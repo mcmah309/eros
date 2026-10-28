@@ -147,11 +147,11 @@ impl<E: TypeSet> ErrorUnion<E> {
                 f(parts.error),
                 #[cfg(feature = "backtrace")]
                 parts.backtrace,
-                #[cfg(feature = "spantrace")]
+                #[cfg(feature = "error_spantrace")]
                 parts.span_trace,
                 #[cfg(feature = "context")]
                 parts.context,
-                #[cfg(feature = "location")]
+                #[cfg(feature = "error_location")]
                 parts.location,
             ),
             _pd: core::marker::PhantomData,
@@ -176,7 +176,7 @@ mod tests {
             error.inner.backtrace = std::backtrace::Backtrace::force_capture();
             error.backtrace().to_string()
         };
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         let original_location = error.inner.location;
         #[cfg(feature = "context")]
         let error = error.context("read /etc/app.toml").context("start service");
@@ -194,7 +194,7 @@ mod tests {
             );
             assert_eq!(_error.backtrace().to_string(), original_backtrace);
         }
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         assert!(core::ptr::eq(_error.inner.location, original_location));
         #[cfg(feature = "context")]
         {

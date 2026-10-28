@@ -16,7 +16,9 @@ impl<T: Any + Debug + Display + Send + Sync + 'static> SendSyncDebugDisplay for 
 #[derive(Debug)]
 pub struct ContextFrame {
     pub(crate) context: ContextValue,
-    #[cfg(feature = "location")]
+    #[cfg(feature = "context_spantrace")]
+    pub(crate) span_trace: tracing_error::SpanTrace,
+    #[cfg(feature = "context_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
     #[cfg(feature = "user_context")]
     pub(crate) is_user_facing: bool,
@@ -24,11 +26,13 @@ pub struct ContextFrame {
 
 #[cfg(feature = "context")]
 impl ContextFrame {
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     pub(crate) fn new(context: ContextValue) -> Self {
         Self {
             context,
-            #[cfg(feature = "location")]
+            #[cfg(feature = "context_spantrace")]
+            span_trace: tracing_error::SpanTrace::capture(),
+            #[cfg(feature = "context_location")]
             location: core::panic::Location::caller(),
             #[cfg(feature = "user_context")]
             is_user_facing: false,
@@ -36,11 +40,13 @@ impl ContextFrame {
     }
 
     #[cfg(feature = "user_context")]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     pub(crate) fn new_user_facing(context: ContextValue) -> Self {
         Self {
             context,
-            #[cfg(feature = "location")]
+            #[cfg(feature = "context_spantrace")]
+            span_trace: tracing_error::SpanTrace::capture(),
+            #[cfg(feature = "context_location")]
             location: core::panic::Location::caller(),
             is_user_facing: true,
         }
@@ -54,10 +60,18 @@ impl ContextFrame {
         &self.context
     }
 
-    /// Returns where this context was attached. Requires the `location` feature.
-    #[cfg(feature = "location")]
+    /// Returns where this context was attached.
+    /// Requires `context_location` (also enabled by `location`).
+    #[cfg(feature = "context_location")]
     pub fn location(&self) -> &'static core::panic::Location<'static> {
         self.location
+    }
+
+    /// Borrows the span trace captured when this context was attached.
+    /// Requires `context_spantrace` (also enabled by `spantrace`).
+    #[cfg(feature = "context_spantrace")]
+    pub fn span_trace(&self) -> &tracing_error::SpanTrace {
+        &self.span_trace
     }
 
     /// Returns whether this context was attached with `user_context` or
@@ -217,7 +231,7 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
     type OutSet = InSet;
 
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     fn context<C: Into<ContextValue>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
@@ -230,7 +244,7 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
     }
 
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     fn with_context<F, C: Into<ContextValue>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
@@ -247,7 +261,7 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
 
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     fn user_context<C: Into<ContextValue>>(
         self,
         context: C,
@@ -264,7 +278,7 @@ impl<T, InSet: TypeSet> Context for Result<T, ErrorUnion<InSet>> {
 
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(feature = "context_location", track_caller)]
     fn with_user_context<F, C: Into<ContextValue>>(
         self,
         f: F,
@@ -288,7 +302,10 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
     type OutSet = (E,);
 
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn context<C: Into<ContextValue>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
@@ -308,7 +325,10 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
     }
 
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn with_context<F, C: Into<ContextValue>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
@@ -332,7 +352,10 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
 
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn user_context<C: Into<ContextValue>>(
         self,
         context: C,
@@ -356,7 +379,10 @@ impl<T, E: SendSyncError> Context for Result<T, E> {
 
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn with_user_context<F, C: Into<ContextValue>>(
         self,
         f: F,
@@ -426,7 +452,10 @@ impl<T> Context for Option<T> {
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn context<C: Into<ContextValue>>(self, context: C) -> Result<T, ErrorUnion<Self::OutSet>> {
         // Note: We use match so the call location gets passed through
         #[cfg(feature = "context")]
@@ -454,7 +483,10 @@ impl<T> Context for Option<T> {
     /// to further explain why the value should exist or provided additional context
     /// around the operation.
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn with_context<F, C: Into<ContextValue>>(self, f: F) -> Result<T, ErrorUnion<Self::OutSet>>
     where
         F: FnOnce() -> C,
@@ -478,7 +510,10 @@ impl<T> Context for Option<T> {
 
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn user_context<C: Into<ContextValue>>(
         self,
         context: C,
@@ -502,7 +537,10 @@ impl<T> Context for Option<T> {
 
     #[cfg(feature = "user_context")]
     #[allow(unused_variables)]
-    #[cfg_attr(feature = "location", track_caller)]
+    #[cfg_attr(
+        any(feature = "error_location", feature = "context_location"),
+        track_caller
+    )]
     fn with_user_context<F, C: Into<ContextValue>>(
         self,
         f: F,

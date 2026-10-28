@@ -21,10 +21,20 @@ jobs:
           - "--no-default-features --features std"
           - "--no-default-features --features context"
           - "--no-default-features --features location"
+          - "--no-default-features --features error_location"
+          - "--no-default-features --features context_location"
+          - "--no-default-features --features context,error_location,user_context,diagnostic"
+          - "--no-default-features --features context,context_location,user_context,diagnostic"
+          - "--no-default-features --features context,error_location,context_location,user_context,diagnostic"
           - "--no-default-features --features diagnostic"
           - "--no-default-features --features context,location,user_context,diagnostic"
           - "--no-default-features --features anyhow"
           - "--no-default-features --features backtrace,diagnostic"
+          - "--no-default-features --features error_spantrace"
+          - "--no-default-features --features context_spantrace"
+          - "--no-default-features --features context,error_spantrace,user_context,diagnostic"
+          - "--no-default-features --features context,context_spantrace,user_context,diagnostic"
+          - "--no-default-features --features context,error_spantrace,context_spantrace,user_context,diagnostic"
           - "--no-default-features --features spantrace"
           - "--no-default-features --features spantrace,diagnostic"
 
@@ -108,6 +118,11 @@ jobs:
       - name: Check builds without std
         run: cargo build -p eros-no-std-test --no-default-features --target thumbv7em-none-eabihf --release
 
+      - name: Check independent location features without std
+        run: |
+          cargo check -p eros --no-default-features --features error_location --target thumbv7em-none-eabihf
+          cargo check -p eros --no-default-features --features context,context_location --target thumbv7em-none-eabihf
+
       - name: Run no_std tests (on host)
         env:
           RUSTFLAGS: "--cfg test_in_ci"
@@ -119,7 +134,7 @@ jobs:
       - name: Build embedded executable without an allocator
         run: >-
           cargo rustc -p eros-no-alloc-test --bin no-allocator
-          --features freestanding,location --target thumbv7em-none-eabihf --release
+          --features freestanding,error_location --target thumbv7em-none-eabihf --release
           -- -C linker=rust-lld -C link-arg=--entry=_start
 
       - name: Run executable without an allocator

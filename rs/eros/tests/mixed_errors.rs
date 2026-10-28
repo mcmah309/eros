@@ -73,7 +73,7 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
     ];
     for (index, error) in inputs.into_iter().enumerate() {
         let error = error.context("operation");
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         let location = error.location();
         #[cfg(feature = "backtrace")]
         let backtrace = error.backtrace().to_string();
@@ -89,7 +89,7 @@ fn domain_wrappers_stay_distinct_when_paths_are_merged_and_erased() {
                 .widen(),
             _ => unreachable!(),
         };
-        #[cfg(feature = "location")]
+        #[cfg(feature = "error_location")]
         assert!(std::ptr::eq(error.location(), location));
         #[cfg(feature = "backtrace")]
         assert_eq!(error.backtrace().to_string(), backtrace);

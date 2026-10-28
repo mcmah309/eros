@@ -1,6 +1,10 @@
 #[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(any(feature = "backtrace", feature = "spantrace"))]
+#[cfg(any(
+    feature = "backtrace",
+    feature = "error_spantrace",
+    all(feature = "context", feature = "context_spantrace")
+))]
 use alloc::string::ToString;
 #[cfg(feature = "alloc")]
 use alloc::{collections::BTreeMap, vec::Vec};
@@ -21,11 +25,11 @@ pub(crate) struct Report<'a> {
     pub(crate) root: &'a dyn SendSyncError,
     #[cfg(feature = "context")]
     pub(crate) contexts: &'a [crate::context::ContextFrame],
-    #[cfg(feature = "location")]
+    #[cfg(feature = "error_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
     #[cfg(feature = "backtrace")]
     backtrace: &'a std::backtrace::Backtrace,
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     span_trace: &'a tracing_error::SpanTrace,
 }
 
@@ -59,11 +63,11 @@ impl<'a> Report<'a> {
             root,
             #[cfg(feature = "context")]
             contexts: &inner.context,
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             location: inner.location,
             #[cfg(feature = "backtrace")]
             backtrace,
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             span_trace: &inner.span_trace,
         }
     }
@@ -125,27 +129,46 @@ impl<'a> Report<'a> {
         None
     }
 
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     pub(crate) fn span_trace_status(&self) -> &'static str {
+        SpanTraceDisplay(self.span_trace).status()
+    }
+
+    #[cfg(feature = "error_spantrace")]
+    pub(crate) fn span_trace_text(&self) -> Option<String> {
+        SpanTraceDisplay(self.span_trace).text()
+    }
+}
+
+#[cfg(any(
+    feature = "error_spantrace",
+    all(feature = "context", feature = "context_spantrace")
+))]
+pub(crate) struct SpanTraceDisplay<'a>(pub(crate) &'a tracing_error::SpanTrace);
+
+#[cfg(any(
+    feature = "error_spantrace",
+    all(feature = "context", feature = "context_spantrace")
+))]
+impl SpanTraceDisplay<'_> {
+    pub(crate) fn status(&self) -> &'static str {
         use tracing_error::SpanTraceStatus;
-        match self.span_trace.status() {
+        match self.0.status() {
             SpanTraceStatus::CAPTURED => "captured",
             SpanTraceStatus::EMPTY => "empty",
             SpanTraceStatus::UNSUPPORTED => "unsupported",
         }
     }
 
-    #[cfg(feature = "spantrace")]
-    pub(crate) fn span_trace_text(&self) -> Option<String> {
-        (self.span_trace_status() == "captured")
-            .then(|| SpanTraceDisplay(self.span_trace).to_string())
+    pub(crate) fn text(&self) -> Option<String> {
+        (self.status() == "captured").then(|| self.to_string())
     }
 }
 
-#[cfg(feature = "spantrace")]
-struct SpanTraceDisplay<'a>(&'a tracing_error::SpanTrace);
-
-#[cfg(feature = "spantrace")]
+#[cfg(any(
+    feature = "error_spantrace",
+    all(feature = "context", feature = "context_spantrace")
+))]
 impl fmt::Display for SpanTraceDisplay<'_> {
     fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
         let renderer = ReportRenderer {
@@ -299,9 +322,9 @@ impl ReportRenderer {
         self.source_fields(out, report)?;
         #[cfg(any(
             feature = "context",
-            feature = "location",
+            feature = "error_location",
             feature = "backtrace",
-            feature = "spantrace"
+            feature = "error_spantrace"
         ))]
         let fields = self;
         #[cfg(feature = "context")]
@@ -311,18 +334,25 @@ impl ReportRenderer {
             fields.next_line(out, &"context:")?;
             for context in report.contexts {
                 values.next_bullet(out, &context.context)?;
-                #[cfg(feature = "location")]
+                #[cfg(feature = "context_location")]
                 if self.detailed {
                     values
                         .continued()
                         .next_line(out, &format_args!("location: {}", context.location))?;
                 }
+                #[cfg(feature = "context_spantrace")]
+                if self.detailed {
+                    let trace = SpanTraceDisplay(&context.span_trace);
+                    values
+                        .continued()
+                        .trace(out, "span trace", trace.status(), trace.text())?;
+                }
             }
         }
         if self.detailed {
-            #[cfg(feature = "location")]
+            #[cfg(feature = "error_location")]
             fields.next_line(out, &format_args!("location: {}", report.location))?;
-            #[cfg(feature = "spantrace")]
+            #[cfg(feature = "error_spantrace")]
             fields.trace(
                 out,
                 "span trace",
@@ -340,7 +370,11 @@ impl ReportRenderer {
         Ok(())
     }
 
-    #[cfg(any(feature = "backtrace", feature = "spantrace"))]
+    #[cfg(any(
+        feature = "backtrace",
+        feature = "error_spantrace",
+        all(feature = "context", feature = "context_spantrace")
+    ))]
     fn trace(
         self,
         out: &mut (impl fmt::Write + ?Sized),
@@ -475,13 +509,15 @@ enum GroupKeyPart {
     Source(String),
     #[cfg(feature = "context")]
     Context(String),
-    #[cfg(all(feature = "context", feature = "location"))]
+    #[cfg(all(feature = "context", feature = "context_location"))]
     ContextLocation(String),
-    #[cfg(feature = "location")]
+    #[cfg(all(feature = "context", feature = "context_spantrace"))]
+    ContextSpanTrace(&'static str, Option<String>),
+    #[cfg(feature = "error_location")]
     Location(String),
     #[cfg(feature = "backtrace")]
     Backtrace(&'static str, Option<String>),
-    #[cfg(feature = "spantrace")]
+    #[cfg(feature = "error_spantrace")]
     SpanTrace(&'static str, Option<String>),
     Children {
         total: usize,
@@ -543,22 +579,27 @@ impl<'a> DebugNode<'a> {
             #[cfg(feature = "context")]
             for context in report.contexts {
                 key.push(GroupKeyPart::Context(message_key(&context.context)?));
-                #[cfg(feature = "location")]
+                #[cfg(feature = "context_location")]
                 if detailed {
                     key.push(GroupKeyPart::ContextLocation(message_key(
                         context.location,
                     )?));
                 }
+                #[cfg(feature = "context_spantrace")]
+                if detailed {
+                    let trace = SpanTraceDisplay(&context.span_trace);
+                    key.push(GroupKeyPart::ContextSpanTrace(trace.status(), trace.text()));
+                }
             }
             if detailed {
-                #[cfg(feature = "location")]
+                #[cfg(feature = "error_location")]
                 key.push(GroupKeyPart::Location(message_key(report.location)?));
                 #[cfg(feature = "backtrace")]
                 key.push(GroupKeyPart::Backtrace(
                     report.backtrace_status(),
                     report.backtrace_text(),
                 ));
-                #[cfg(feature = "spantrace")]
+                #[cfg(feature = "error_spantrace")]
                 key.push(GroupKeyPart::SpanTrace(
                     report.span_trace_status(),
                     report.span_trace_text(),

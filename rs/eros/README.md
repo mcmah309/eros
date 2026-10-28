@@ -278,7 +278,7 @@ a typed union into an untyped one.
 
 Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
 
-For code already instrumented with `tracing`, [span traces](#tracing-span-traces) offer an alternative to adding operation context manually: the `spantrace` feature captures the active span and its parents, including their fields, when an error first enters Eros.
+For code already instrumented with `tracing`, [span traces](#tracing-span-traces) offer an alternative to adding operation context manually: the `error_spantrace` feature captures the active span and its parents, including their fields, when an error first enters Eros. Use `context_spantrace` to capture spans at context attachments, or `spantrace` for both.
 
 ```rust
 use eros::Context;
@@ -319,7 +319,7 @@ backtrace:
 
 #### Location
 
-The `location` feature flag adds a location at compile time for error creation and each context. This can be used with or in place of `backtrace`, as it is lighter than a full backtrace and can be used in wasm environments (backtraces do not work in wasm environments) and no_std environments.
+The `error_location` feature records where an error first enters Eros. The `context_location` feature records where each context is attached when `context` is enabled. Enable `location` as a shortcut for both. Location capture is lighter than a full backtrace and works in wasm and `no_std` environments.
 
 ### Reducing Error Handling Overhead
 
@@ -606,7 +606,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, `spantrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, `error_spantrace`, or `error_location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
 
 For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
@@ -722,7 +722,7 @@ fn func1b() -> eros::Result<()> {
 
 ### Backtrace vs Location
 
-`eros` has two location tracking feature flags `backtrace`, which captures a backtrace at error creation if `RUST_BACKTRACE` env variable is set, and `location`, which captures the location in the code that the error and context were created from. `location` is more efficient than `backtrace` since the call location is injected at compile time. While backtrace is generally more precise and useful. Both of these can be used together. `location` becomes especially useful for wasm or no_std environments where backtraces are not supported. `location` is not enabled by default, while `backtrace` is.
+`backtrace` captures a backtrace at error creation when enabled by the backtrace environment settings. For lighter location tracking, enable `error_location` to capture where an error first enters Eros, `context_location` to capture where each context is attached, or `location` for both. The two location flags work independently and can be combined with `backtrace` or `spantrace`. They use compiler-provided call locations and support wasm and `no_std` environments. None of the location flags is enabled by default; `backtrace` is.
 
 ### Logging
 
@@ -780,9 +780,12 @@ WARN Something went wrong
 
 ### Tracing Span Traces
 
-The optional `spantrace` feature captures the current [`tracing`](https://docs.rs/tracing)
-span and its parents, including fields and source locations, when an error first
-enters Eros.
+The optional `error_spantrace` feature captures the current
+[`tracing`](https://docs.rs/tracing) span and its parents, including fields and
+source locations, when an error first enters Eros. `context_spantrace` captures
+that information separately when each context is attached. Enable `spantrace`
+as a shortcut for both. Both capture features require `std`; `context_spantrace`
+does not enable `context` itself.
 
 ```rust
 use tracing_subscriber::prelude::*;
@@ -817,8 +820,14 @@ backtrace: not captured
 Here, `bail!` captures the `load_settings` span before the function returns.
 Converting an error into an Eros error after the function returns would miss that span.
 
-Print the trace with `{:?}` or inspect it with `.span_trace()` on an `ErrorUnion`
-or `ErrorReport`. Display (`{}`) and alternate Debug (`{:#?}`) omit it.
+Print the saved traces with `{:?}`. With `error_spantrace`, inspect the original
+trace through `.span_trace()` on an `ErrorUnion` or `ErrorReport`. With `context`
+and `context_spantrace`, inspect each attachment trace through
+`error.contexts()` and `ContextFrame::span_trace()`. Attaching context preserves
+the original error trace, so a context attached by an instrumented caller can
+record a different span from the error's origin. Detailed reports show each
+context's trace beneath its message; debug JSON includes `span_trace` on each
+context object. Display (`{}`) and alternate Debug (`{:#?}`) omit all traces.
 
 ### Better Backtrace
 
@@ -1346,9 +1355,13 @@ Small roots still use inline storage; larger or more aligned roots automatically
 use a `Box`. Allocation behavior and diagnostic costs are described in
 [Reducing Error Handling Overhead](#reducing-error-handling-overhead).
 
-The `location` feature works with or without `alloc` and adds a location reference
-without allocating. The `std`, `context`, and `diagnostic` features enable
-`alloc` automatically. `backtrace` requires `std`. With `context` disabled,
+The `error_location` feature works with or without `alloc` and adds one location
+reference per error without allocating. `context_location` adds one location
+reference per context frame when `context` is enabled; it does not enable
+`context` or `alloc` itself. Both support `no_std`. The `location` feature enables
+both flags. The `std`, `context`, and `diagnostic` features enable
+`alloc` automatically. `backtrace`, `error_spantrace`, and `context_spantrace`
+require `std`. With `context` disabled,
 static string contexts remain accepted as no-ops and lazy context closures are
 not evaluated. Default features enable `alloc`, context, and backtraces, so keep
 them disabled for an environment without an allocator.

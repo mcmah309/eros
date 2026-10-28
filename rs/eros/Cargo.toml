@@ -41,7 +41,7 @@ thiserror = "2"
 default = ["alloc", "context", "backtrace"]
 # Enables heap fallback for errors exceeding one word, and owned messages.
 alloc = []
-# Enables the `std` library. Required for `backtrace`, `spantrace`, and `anyhow`. When disabled,
+# Enables the `std` library. Required for `backtrace`, both span trace features, and `anyhow`. When disabled,
 # `eros` is `no_std`. Without alloc, errors must fit the inline size/alignment.
 std = ["alloc"]
 # Enables context
@@ -49,11 +49,19 @@ context = ["alloc", "eros-macros/context"]
 # Enables backtrace
 backtrace = ["std"]
 # Captures the current tracing span and its parents when an error first enters Eros.
-spantrace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
+error_spantrace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
+# Captures tracing spans at context attachment; does not enable context.
+context_spantrace = ["std", "dep:tracing-error", "dep:tracing-subscriber"]
+# Enables both error and context span trace capture.
+spantrace = ["error_spantrace", "context_spantrace"]
 # Parses and removes the unnecessary noise from the backtrace before printing
 better_backtrace = ["backtrace", "dep:color-backtrace", "dep:btparse"]
-# Enables location capture
-location = []
+# Captures where an error first enters Eros, without requiring alloc or std.
+error_location = []
+# Captures context attachment locations when context is enabled; does not enable context.
+context_location = []
+# Enables both error and context location capture.
+location = ["error_location", "context_location"]
 # Add integration with anyhow
 anyhow = ["std", "dep:anyhow"]
 # Adds context methods that are user facing. Useful for applications reporting error messages to users.

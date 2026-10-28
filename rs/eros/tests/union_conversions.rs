@@ -136,7 +136,7 @@ fn successful_conversions_accept_owned_and_borrowed_values_without_extra_bounds(
     assert_eq!(result.unwrap(), "borrowed success");
 }
 
-#[cfg(feature = "location")]
+#[cfg(feature = "error_location")]
 #[test]
 fn union_captures_the_call_site_and_widen_keeps_it() {
     let original: Result<(), MsgError> = Err(MsgError::from("root"));

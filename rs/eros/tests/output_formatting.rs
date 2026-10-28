@@ -62,7 +62,7 @@ fn multiline_root() {
     assert_outputs!("multiline_root", error.report());
 }
 
-#[cfg(not(feature = "spantrace"))]
+#[cfg(not(feature = "error_spantrace"))]
 #[test]
 fn span_trace_disabled() {
     tracing::subscriber::with_default(tracing_subscriber::registry(), || {
@@ -72,7 +72,7 @@ fn span_trace_disabled() {
     });
 }
 
-#[cfg(feature = "spantrace")]
+#[cfg(feature = "error_spantrace")]
 mod span_traces {
     use super::*;
     use tracing_error::{ErrorLayer, SpanTraceStatus};
@@ -144,6 +144,22 @@ mod span_traces {
             assert_outputs!("span_trace_unsupported", error.report());
         });
     }
+}
+
+#[cfg(all(feature = "context", feature = "context_spantrace"))]
+#[test]
+fn context_span_trace_captured() {
+    use tracing_subscriber::prelude::*;
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_error::ErrorLayer::new(eros::SpanTraceFields));
+    let error: ErrorUnion<(InvalidInput,)> = ErrorUnion::new(InvalidInput);
+    let error = tracing::subscriber::with_default(subscriber, || {
+        tracing::info_span!("request", request_id = 42).in_scope(|| {
+            tracing::info_span!("attach_settings", path = "config.toml", attempt = 2)
+                .in_scope(|| error.context("load settings"))
+        })
+    });
+    assert_outputs!("context_span_trace_captured", error.report());
 }
 
 #[cfg(feature = "alloc")]
@@ -392,11 +408,11 @@ mod allocated {
         // richer formats must not restyle the existing message or cause list.
         let without_metadata = rich
             .lines()
-            .take_while(|line| {
+            .take_while(|line| !line.starts_with("backtrace:") && !line.starts_with("span trace:"))
+            .filter(|line| {
                 let line = line.trim_start();
-                !line.starts_with("backtrace:") && !line.starts_with("span trace:")
+                !line.starts_with("location:") && !line.starts_with("span trace:")
             })
-            .filter(|line| !line.trim_start().starts_with("location:"))
             .collect::<Vec<_>>()
             .join("\n");
         assert_eq!(without_metadata, format!("{error:#?}"));

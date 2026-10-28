@@ -1,0 +1,3 @@
+error: invalid input
+context:
+    - load settings

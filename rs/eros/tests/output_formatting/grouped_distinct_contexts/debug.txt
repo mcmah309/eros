@@ -5,6 +5,7 @@ error:
           context:
               - row 17
                 location: <location>
+                span trace: not captured
           location: <location>
           span trace: not captured
           backtrace: <status>
@@ -13,6 +14,7 @@ error:
           context:
               - row 29
                 location: <location>
+                span trace: not captured
           location: <location>
           span trace: not captured
           backtrace: <status>

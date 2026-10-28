@@ -5,6 +5,7 @@ error:
           context:
               - validate customer 104
                 location: <location>
+                span trace: not captured
           location: <location>
           span trace: not captured
           backtrace: <status>
@@ -15,12 +16,14 @@ error:
           context:
               - validate customer 209
                 location: <location>
+                span trace: not captured
           location: <location>
           span trace: not captured
           backtrace: <status>
 context:
     - import customers.csv
       location: <location>
+      span trace: not captured
 location: <location>
 span trace: not captured
 backtrace: <status>
