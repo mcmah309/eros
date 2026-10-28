@@ -316,14 +316,16 @@ Paths intentionally using the same category can share one variant. Use
 
 `erase()` returns to `eros::Result<T>` while preserving the concrete root,
 including its boxes and domain wrappers. Later callers can still downcast or
-recover `PortConfigError`. Only the static error set changes; context, location,
-and backtrace remain intact. The method is also available directly on
+recover `PortConfigError`. Only the static error set changes; all saved diagnostics
+remain intact. The method is also available directly on
 `ErrorUnion`. Plain `into()` and `?` perform the same type erasure when converting
 a typed union into an untyped one.
 
 ### Adding Context As Errors Propagate
 
 Errors should always provide context of the operations in the call stack that led to the error. Users can add context with `.context` or `.with_context`. Errors also capture a `Backtrace`.
+
+For code already instrumented with `tracing`, [span traces](#tracing-span-traces) offer an alternative to adding operation context manually: the `spantrace` feature captures the active span and its parents, including their fields, when an error first enters Eros.
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -357,7 +359,7 @@ context:
     - Parse server port
     - Configure server api
     - Start application
-backtrace (captured):
+backtrace:
     [3 frames hidden for brevity]
        3: example::parse_port
                  at ./src/main.rs:4:29
@@ -594,11 +596,11 @@ Only annotated parameters are included in the generated context. Parameters with
 | `{:#}` (`Display`) | Root only | `errors (N total):` heading |
 | `{}` (`Display`) | Root and `Error::source()` chain | Same heading |
 | `{:#?}` (`Debug`) | Root, sources, and contexts | `errors (N total):` list of grouped child reports |
-| `{:?}` (`Debug`) | Same report, plus enabled locations and backtrace | Same grouping, including metadata |
+| `{:?}` (`Debug`) | Same report, plus enabled locations, backtrace, and span trace | Same grouping, including metadata |
 
 Sources and contexts use bullets; contexts appear innermost first. Empty
-sections are omitted. Alternate Debug omits locations and backtraces at every
-nesting level. Formatting never captures a new backtrace.
+sections are omitted. Alternate Debug omits locations, backtraces, and span traces
+at every nesting level. Formatting never captures new diagnostics.
 
 Debug groups identical visible child reports in first-occurrence order, with
 zero-based positions and half-open ranges (`0..3` means indices 0, 1, and 2):
@@ -632,7 +634,7 @@ errors (6 total):
 ```
 
 Different sources, contexts, or nested children form separate groups; ordinary
-Debug also distinguishes locations and backtraces.
+Debug also distinguishes locations, backtraces, and span traces.
 
 See [Logging](#logging) for tracing fields and
 [Structured Diagnostics](#structured-diagnostics) for JSON reports.
@@ -703,7 +705,7 @@ pub fn public_api() -> Result<(), CrateError> {
 
 </details>
 
-This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
+This way the library can still use `ErrorUnion` internally for function composition, enabling features like `context` and `backtrace` for its own tests, while downstream crates only ever see a single concrete error type. `CrateError` is a newtype wrapper around a boxed error, so the conversion at the boundary stays cheap regardless of how many error variants the library handles internally. When no crate enables `context`, `backtrace`, `spantrace`, or `location`, converting an internal `ErrorUnion` into a library's boxed error via `into_inner()` reuses the allocation for heap-stored errors, so there is no cost to use `eros` in a library for any downstreams.
 
 For typed tuples, the [error enum macro](#error-enum-macro) generates a concrete error enum for the public API. Convert at the boundary with `map_err(Into::into)`:
 
@@ -898,6 +900,51 @@ WARN Something went wrong
 
 ## Additional Features
 
+### Tracing Span Traces
+
+The optional `spantrace` feature captures the current [`tracing`](https://docs.rs/tracing)
+span and its parents, including fields and source locations, when an error first
+enters Eros.
+
+```rust
+# #[cfg(feature = "spantrace")]
+# fn main() {
+use tracing_subscriber::prelude::*;
+
+#[tracing::instrument]
+fn load_settings(path: &str) -> eros::Result<()> {
+    eros::bail!("invalid settings")
+}
+
+tracing_subscriber::registry()
+    .with(tracing_error::ErrorLayer::default())
+    .init();
+
+if let Err(error) = load_settings("config.toml") {
+    println!("{error:?}");
+}
+# }
+# #[cfg(not(feature = "spantrace"))]
+# fn main() {}
+```
+
+With backtrace capture disabled (file path shortened):
+
+```text
+error: invalid settings
+span trace:
+    - span_trace::load_settings
+      with path="config.toml"
+      at span_trace.rs:4
+backtrace: not captured
+```
+
+Here, `bail!` captures the `load_settings` span before the function returns.
+Converting an error into an Eros error after the function returns would miss that span.
+
+Print the trace with `{:?}` or inspect it with `.span_trace()` on an `ErrorUnion`
+or `ErrorReport`. Display (`{}`) and alternate Debug (`{:#?}`) omit it.
+
 ### Better Backtrace
 
 Other backtrace examples in this README use `[N frames hidden for brevity]` to mark frames omitted from the documentation. The default output still includes those frames. Enable `better_backtrace` to filter recognized dependency and runtime frames automatically.
@@ -980,12 +1027,14 @@ Update preparation failed
         - TLS certificate has expired
 ```
 
-For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving context, location, and backtrace. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
+For a union with a single possible error type, `as_single` and `as_single_mut` borrow the concrete error as `&T` and `&mut T`, preserving all saved diagnostics. `map_single` passes the concrete error to the closure and preserves that metadata. Or use `into_single` to extract that error and discard the metadata.
 
 
 ### Structured Diagnostics
 
-The optional `diagnostic` feature adds `.to_display_json()` and `.to_debug_json()`, returning `serde_json::Value`. Display JSON contains `root` and `sources`; Debug JSON adds `contexts`, optional `location` objects, and `backtrace` with `status` and `text`. Registered children appear recursively in `children`, omitted when empty. These methods neither log nor serialize to text.
+Enable `diagnostic` to get error reports as `serde_json::Value` with
+`.to_display_json()` or `.to_debug_json()`. Debug JSON includes context, locations,
+and traces when enabled. Both include child reports.
 
 ```rust
 # #[cfg(feature = "diagnostic")]
@@ -1045,7 +1094,7 @@ With default Eros features, `diagnostic`, and `RUST_LIB_BACKTRACE=0`, the output
 to_display_json: {"root":"cannot open configuration","sources":["permission denied"]}
 ```
 ```text
-to_debug_json: {"backtrace":{"status":"disabled","text":null},"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
+to_debug_json: {"backtrace":null,"contexts":[{"message":"read /etc/app.toml","user_facing":false},{"message":"start service","user_facing":false}],"root":"cannot open configuration","sources":["permission denied"]}
 ```
 ```text
 replacement: startup failed
@@ -1208,7 +1257,7 @@ let error = eros::error!("TLS certificate has expired")
     .context("fetch https://updates.example.com/manifest.json")
     .context("prepare application update to v2.4.0");
 
-println!("{error:#?}"); // Alternate Debug omits locations and the backtrace.
+println!("{error:#?}"); // Alternate Debug omits locations, backtraces, and span traces.
 # assert_eq!(format!("{error:#?}"), "error: TLS certificate has expired\ncontext:\n    - fetch https://updates.example.com/manifest.json\n    - prepare application update to v2.4.0");
 # }
 # #[cfg(not(feature = "context"))]
