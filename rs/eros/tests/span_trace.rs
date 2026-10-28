@@ -277,7 +277,7 @@ fn reshaping_mapping_classification_and_adapters_preserve_the_original_trace() {
             assert_eq!(error.span_trace().to_string(), original);
             let error = error.map_inner(|_| MsgError::from("replacement"));
             assert_eq!(error.span_trace().to_string(), original);
-            let error: ErrorUnion<(fmt::Error,)> = error.classify(|_| fmt::Error);
+            let error: ErrorUnion<(fmt::Error,)> = error.classify(|_: eros::InnerError| fmt::Error);
             assert_eq!(error.span_trace().to_string(), original);
             let error = error.erase().narrow::<(fmt::Error,), _>().unwrap();
             let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(error.adapter());

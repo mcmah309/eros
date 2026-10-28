@@ -59,6 +59,7 @@ pub mod __private {
 }
 
 mod any_error;
+mod classifier;
 mod context;
 mod error_union;
 mod formatting;
@@ -109,6 +110,7 @@ pub use type_set::TypeSet;
 pub use vec::ErrorUnionVec;
 
 // traits
+pub use classifier::Classifier;
 pub use context::Context;
 pub use error_union::Erase;
 pub use error_union::IntoUnion;

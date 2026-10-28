@@ -65,7 +65,7 @@ pub fn classify_result(result: eros::Result<u8>) -> eros::Result<u8, Errors> {
 }
 
 pub fn wrap_concrete(error: ErrorUnion) -> ErrorUnion<(WrappedCode,)> {
-    error.classify(|inner| WrappedCode(inner.downcast::<Code>().unwrap()))
+    error.classify(|inner: eros::InnerError| WrappedCode(inner.downcast::<Code>().unwrap()))
 }
 
 pub fn run_checks() {

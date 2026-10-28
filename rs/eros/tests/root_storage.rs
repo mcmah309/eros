@@ -218,11 +218,12 @@ mod allocation_checks {
     fn owned_classification_does_not_box_the_old_root() {
         let counts = measured(|| {
             let original: ErrorUnion = ErrorUnion::new(Small(37));
-            let classified: ErrorUnion<(fmt::Error,)> = original.classify(|original| {
-                let original = original.downcast_ref::<Small>().unwrap();
-                assert_eq!(original.0, 37);
-                fmt::Error
-            });
+            let classified: ErrorUnion<(fmt::Error,)> =
+                original.classify(|original: eros::InnerError| {
+                    let original = original.downcast_ref::<Small>().unwrap();
+                    assert_eq!(original.0, 37);
+                    fmt::Error
+                });
             assert!(classified.is_inner::<fmt::Error>());
         });
         // Root diagnostics require an old and a replacement container. No

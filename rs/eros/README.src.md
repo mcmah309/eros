@@ -273,7 +273,7 @@ fn load_port(contents: &str) -> eros::Result<u16> {
 fn checked_port(contents: &str)
     -> eros::Result<u16, (MissingPort, DynamicPortNotAllowed, PortConfigError)>
 {
-    let port = load_port(contents).classify(|inner| PortConfigError(inner.into_boxed()))?;
+    let port = load_port(contents).classify(PortConfigError)?;
     eros::ensure!(port != 0, DynamicPortNotAllowed);
     Ok(port)
 }
@@ -299,9 +299,22 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 `classify` checks only the concrete inner error, not its sources or contexts.
 Matching types, including an existing `PortConfigError`, retain their storage and
 pass through without invoking the callback. Other roots transfer to the callback
-as an owned `InnerError`. The callback can inspect, mutate, extract, drop, or
-retain that owner. Passing it requires no new allocation. Saved diagnostics
+as an owned `InnerError` or, with `alloc`, a `Box<dyn SendSyncError>`. A tuple
+struct constructor taking either type can be passed directly. Saved diagnostics
 remain with the replacement, and no new diagnostics are captured.
+
+An `InnerError` callback can inspect, mutate, extract, drop, or retain the owner
+without boxing it. For example,
+`.classify(|inner: eros::InnerError| PortConfigError(inner.into_boxed()))` is
+equivalent to the constructor call above. Annotate closure parameters with
+`InnerError` or `Box<dyn SendSyncError>` when their type cannot be inferred;
+callbacks that ignore the input can use `|_: eros::InnerError|`.
+
+To discard the original error, pass a replacement value directly, such as
+`.classify(MyError)` for a unit struct or `.classify(MyError { code: 7 })` for an
+error with fields. Values work with or without `alloc`. Successful results and
+errors already in the destination set pass through, dropping the unused
+replacement. Saved diagnostics remain with classified errors.
 
 `InnerError` and its downcasting methods are available with every feature
 configuration. Enabling `alloc` adds `InnerError::into_boxed()` to preserve the
@@ -1552,12 +1565,13 @@ use core::fmt;
 
 // The owner can inspect the original concrete error to choose a domain error.
 let result: eros::Result<()> = Err(eros::error!("device unavailable"));
-let classified: eros::Result<(), (fmt::Error,)> = result.classify(|_| fmt::Error);
+let classified: eros::Result<(), (fmt::Error,)> =
+    result.classify(|_: eros::InnerError| fmt::Error);
 assert!(classified.unwrap_err().is_inner::<fmt::Error>());
 ```
 
-The callback always receives `InnerError`, even when a downstream crate enables
-`alloc`. Its `is::<T>()`, `downcast_ref::<T>()`, `downcast_mut::<T>()`, and
+Callbacks declared to take `InnerError` continue to receive it when a downstream
+crate enables `alloc`. Its `is::<T>()`, `downcast_ref::<T>()`, `downcast_mut::<T>()`, and
 `downcast::<T>()` methods inspect or extract the original concrete error using
 its actual storage. The type remains the same whether stored inline or on the
 heap. Failed owned downcasts return the original owner.

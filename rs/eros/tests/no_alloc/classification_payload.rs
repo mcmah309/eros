@@ -9,5 +9,5 @@ impl core::error::Error for Payload {}
 
 fn main() {
     let error = eros::error!("implementation failure");
-    let _: eros::ErrorUnion<(Payload,)> = error.classify(|_| Payload([1, 2]));
+    let _: eros::ErrorUnion<(Payload,)> = error.classify(|_: eros::InnerError| Payload([1, 2]));
 }

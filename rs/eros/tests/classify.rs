@@ -7,6 +7,49 @@ fn owned_classification_preserves_known_types_and_replaces_unknown_types() {
 }
 
 #[test]
+fn error_values_drop_originals_and_unused_replacements_once() {
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use eros::{ErrorUnion, ReshapeUnion};
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("tracked")]
+    struct Tracked(&'static AtomicUsize);
+    impl Drop for Tracked {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    static ORIGINALS: AtomicUsize = AtomicUsize::new(0);
+    static REPLACEMENTS: AtomicUsize = AtomicUsize::new(0);
+    type Errors = (Tracked, core::fmt::Error);
+
+    let original: ErrorUnion = ErrorUnion::new(Tracked(&ORIGINALS));
+    let classified: ErrorUnion<(Tracked,)> = original.classify(Tracked(&REPLACEMENTS));
+    // A represented original is retained and the supplied value is dropped.
+    assert!(core::ptr::eq(classified.as_single().0, &ORIGINALS));
+    assert_eq!(ORIGINALS.load(Ordering::SeqCst), 0);
+    assert_eq!(REPLACEMENTS.load(Ordering::SeqCst), 1);
+    drop(classified);
+    assert_eq!(ORIGINALS.load(Ordering::SeqCst), 1);
+
+    let success: eros::Result<u8> = Ok(7);
+    let success: eros::Result<u8, Errors> = success.classify(Tracked(&REPLACEMENTS));
+    assert_eq!(success.unwrap(), 7);
+    assert_eq!(REPLACEMENTS.load(Ordering::SeqCst), 2);
+
+    let original: ErrorUnion = ErrorUnion::new(Tracked(&ORIGINALS));
+    let classified: ErrorUnion<(core::fmt::Error,)> = original.classify(core::fmt::Error);
+    assert_eq!(classified.into_single(), core::fmt::Error);
+    assert_eq!(ORIGINALS.load(Ordering::SeqCst), 2);
+
+    let original: ErrorUnion = ErrorUnion::new(core::fmt::Error);
+    let classified: ErrorUnion<(Tracked,)> = original.classify(Tracked(&REPLACEMENTS));
+    assert_eq!(REPLACEMENTS.load(Ordering::SeqCst), 2);
+    drop(classified);
+    assert_eq!(REPLACEMENTS.load(Ordering::SeqCst), 3);
+}
+
+#[test]
 fn panicking_classifier_drops_the_original_once() {
     use core::{
         error::Error,
@@ -29,10 +72,50 @@ fn panicking_classifier_drops_the_original_once() {
     }
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Root);
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(fmt::Error,), _, _>(|_| -> fmt::Error { panic!("classification failed") })
+        error.classify::<(fmt::Error,), _, _, _>(|_: eros::InnerError| -> fmt::Error {
+            panic!("classification failed")
+        })
     }));
     assert!(outcome.is_err());
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn panicking_boxed_classifier_drops_original_and_context_once() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("tracked")]
+    struct Tracked(Arc<AtomicUsize>);
+    impl Drop for Tracked {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    let roots = Arc::new(AtomicUsize::new(0));
+    let error: eros::ErrorUnion = eros::ErrorUnion::new(Tracked(roots.clone()));
+    #[cfg(feature = "context")]
+    let contexts = Arc::new(AtomicUsize::new(0));
+    #[cfg(feature = "context")]
+    let error = error.context(Box::new(Tracked(contexts.clone())) as Box<dyn eros::SendSyncError>);
+
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        error.classify::<(core::fmt::Error,), _, _, _>(
+            |boxed: Box<dyn eros::SendSyncError>| -> core::fmt::Error {
+                assert!((boxed.as_ref() as &dyn std::any::Any).is::<Tracked>());
+                panic!("boxed classification failed");
+            },
+        )
+    }));
+    assert!(outcome.is_err());
+    assert_eq!(roots.load(Ordering::SeqCst), 1);
+    #[cfg(feature = "context")]
+    assert_eq!(contexts.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -74,20 +157,27 @@ fn panicking_original_destructor_drops_replacement_and_saved_context_once() {
         }
     }
 
-    let error: eros::ErrorUnion = eros::ErrorUnion::new(Original);
-    #[cfg(feature = "context")]
-    let error = error.context(Box::new(Tracked(&CONTEXTS)) as Box<dyn eros::SendSyncError>);
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        error.classify::<(Tracked,), _, _>(|original| {
-            let replacement = Tracked(&REPLACEMENTS);
-            drop(original);
-            replacement
-        })
-    }));
-    assert!(outcome.is_err());
-    assert_eq!(REPLACEMENTS.load(Ordering::SeqCst), 1);
-    #[cfg(feature = "context")]
-    assert_eq!(CONTEXTS.load(Ordering::SeqCst), 1);
+    for use_value in [false, true] {
+        let before = REPLACEMENTS.load(Ordering::SeqCst);
+        let error: eros::ErrorUnion = eros::ErrorUnion::new(Original);
+        #[cfg(feature = "context")]
+        let error = error.context(Box::new(Tracked(&CONTEXTS)) as Box<dyn eros::SendSyncError>);
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if use_value {
+                error.classify::<(Tracked,), _, _, _>(Tracked(&REPLACEMENTS))
+            } else {
+                error.classify::<(Tracked,), _, _, _>(|original: eros::InnerError| {
+                    let replacement = Tracked(&REPLACEMENTS);
+                    drop(original);
+                    replacement
+                })
+            }
+        }));
+        assert!(outcome.is_err());
+        assert_eq!(REPLACEMENTS.load(Ordering::SeqCst), before + 1);
+        #[cfg(feature = "context")]
+        assert_eq!(CONTEXTS.load(Ordering::SeqCst), before + 1);
+    }
 }
 
 #[test]
@@ -116,7 +206,7 @@ fn an_owner_can_escape_the_callback_and_transfer_to_another_thread() {
     assert_traits::<eros::InnerError>();
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Owner(&FIRST));
     let mut saved = None;
-    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|inner| {
+    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|inner: eros::InnerError| {
         saved = Some(inner);
         fmt::Error
     });
@@ -158,20 +248,21 @@ fn aligned_zsts_can_be_inspected_and_extracted_from_an_owner() {
         }
     }
     let error: eros::ErrorUnion = eros::ErrorUnion::new(Aligned);
-    let classified: eros::ErrorUnion<(fmt::Error,)> = error.classify(|mut inner| {
-        assert_eq!(
-            core::ptr::from_ref(inner.downcast_ref::<Aligned>().unwrap()).addr() % 256,
-            0
-        );
-        assert_eq!(
-            core::ptr::from_mut(inner.downcast_mut::<Aligned>().unwrap()).addr() % 256,
-            0
-        );
-        let original = inner.downcast::<Aligned>().unwrap();
-        assert_eq!(DROPS.load(Ordering::SeqCst), 0);
-        drop(original);
-        fmt::Error
-    });
+    let classified: eros::ErrorUnion<(fmt::Error,)> =
+        error.classify(|mut inner: eros::InnerError| {
+            assert_eq!(
+                core::ptr::from_ref(inner.downcast_ref::<Aligned>().unwrap()).addr() % 256,
+                0
+            );
+            assert_eq!(
+                core::ptr::from_mut(inner.downcast_mut::<Aligned>().unwrap()).addr() % 256,
+                0
+            );
+            let original = inner.downcast::<Aligned>().unwrap();
+            assert_eq!(DROPS.load(Ordering::SeqCst), 0);
+            drop(original);
+            fmt::Error
+        });
     drop(classified);
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
 }
