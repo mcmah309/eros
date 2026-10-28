@@ -999,7 +999,7 @@ where
     let error_message = root_error_message(error.inner());
     message.push_str(&error_message);
 
-    for frame in error.contexts().filter(|frame| frame.is_user_facing()) {
+    for frame in error.contexts().filter(|frame| frame.is_user_context()) {
         message.push('\n');
         message.push_str(&frame.to_string());
     }

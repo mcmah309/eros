@@ -477,7 +477,7 @@ where
     /// let error = eros::error!("permission denied")
     ///     .context("read configuration")
     ///     .user_context("Could not load your settings.");
-    /// for frame in error.contexts().filter(|frame| frame.is_user_facing()) {
+    /// for frame in error.contexts().filter(|frame| frame.is_user_context()) {
     ///     println!("{frame}");
     /// }
     /// # }

@@ -21,7 +21,7 @@ pub struct ContextFrame {
     #[cfg(feature = "context_location")]
     pub(crate) location: &'static core::panic::Location<'static>,
     #[cfg(feature = "user_context")]
-    pub(crate) is_user_facing: bool,
+    pub(crate) is_user_context: bool,
 }
 
 #[cfg(feature = "context")]
@@ -35,7 +35,7 @@ impl ContextFrame {
             #[cfg(feature = "context_location")]
             location: core::panic::Location::caller(),
             #[cfg(feature = "user_context")]
-            is_user_facing: false,
+            is_user_context: false,
         }
     }
 
@@ -48,7 +48,7 @@ impl ContextFrame {
             span_trace: tracing_error::SpanTrace::capture(),
             #[cfg(feature = "context_location")]
             location: core::panic::Location::caller(),
-            is_user_facing: true,
+            is_user_context: true,
         }
     }
 }
@@ -74,11 +74,11 @@ impl ContextFrame {
         &self.span_trace
     }
 
-    /// Returns whether this context was attached with `user_context` or
+    /// Returns whether this frame was attached with `user_context` or
     /// `with_user_context`. Requires the `user_context` feature.
     #[cfg(feature = "user_context")]
-    pub fn is_user_facing(&self) -> bool {
-        self.is_user_facing
+    pub fn is_user_context(&self) -> bool {
+        self.is_user_context
     }
 }
 

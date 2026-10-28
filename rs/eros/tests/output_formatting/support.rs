@@ -322,7 +322,7 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
         for (value, frame) in contexts.iter_mut().zip(report.contexts()) {
             assert_eq!(value["message"], frame.to_string());
             #[cfg(feature = "user_context")]
-            assert_eq!(value["user_facing"], frame.is_user_facing());
+            assert_eq!(value["user_facing"], frame.is_user_context());
             #[cfg(not(feature = "user_context"))]
             assert_eq!(value["user_facing"], false);
             #[cfg(feature = "context_location")]

@@ -25,7 +25,7 @@ fn contexts_borrow_frames_in_attachment_order() {
     );
     assert!((error_value as &dyn core::any::Any).is::<MsgError>());
     #[cfg(feature = "user_context")]
-    assert!(frames.iter().all(|frame| !frame.is_user_facing()));
+    assert!(frames.iter().all(|frame| !frame.is_user_context()));
     assert_eq!(
         error
             .contexts()
@@ -126,14 +126,14 @@ fn contexts_include_user_facing_flags_and_locations() {
     assert_eq!(
         error
             .contexts()
-            .map(|frame| frame.is_user_facing())
+            .map(|frame| frame.is_user_context())
             .collect::<Vec<_>>(),
         [false, true, true]
     );
     assert_eq!(
         error
             .contexts()
-            .filter(|frame| frame.is_user_facing())
+            .filter(|frame| frame.is_user_context())
             .map(ToString::to_string)
             .collect::<Vec<_>>(),
         ["public", "lazy public"]
@@ -338,7 +338,7 @@ mod user_context {
                 assert_eq!(
                     error
                         .contexts()
-                        .filter(|frame| frame.is_user_facing())
+                        .filter(|frame| frame.is_user_context())
                         .map(ToString::to_string)
                         .collect::<Vec<_>>(),
                     ["first", "counted context"]
@@ -370,7 +370,7 @@ mod user_context {
         assert_eq!(
             error
                 .contexts()
-                .filter(|frame| frame.is_user_facing())
+                .filter(|frame| frame.is_user_context())
                 .count(),
             0
         );
@@ -394,7 +394,7 @@ mod user_context {
         assert_eq!(
             error
                 .contexts()
-                .filter(|frame| frame.is_user_facing())
+                .filter(|frame| frame.is_user_context())
                 .map(ToString::to_string)
                 .collect::<Vec<_>>(),
             ["public first", "public second", "public error"]
@@ -402,7 +402,7 @@ mod user_context {
         assert!(
             error
                 .contexts()
-                .filter(|frame| frame.is_user_facing())
+                .filter(|frame| frame.is_user_context())
                 .last()
                 .unwrap()
                 .value()

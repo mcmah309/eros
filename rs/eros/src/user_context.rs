@@ -42,7 +42,7 @@ mod tests {
 
         let user_context = union_a
             .contexts()
-            .filter(|frame| frame.is_user_facing())
+            .filter(|frame| frame.is_user_context())
             .collect::<Vec<_>>();
 
         assert_eq!(user_context.len(), 1);
@@ -58,7 +58,7 @@ mod tests {
 
         let user_context = union_b
             .contexts()
-            .filter(|frame| frame.is_user_facing())
+            .filter(|frame| frame.is_user_context())
             .collect::<Vec<_>>();
 
         assert_eq!(user_context.len(), 1);

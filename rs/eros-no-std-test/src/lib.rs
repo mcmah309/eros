@@ -211,7 +211,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     assert_eq(u.contexts().len(), 2)?;
     for frame in u.contexts() {
         assert_eq(frame.location().file(), file!())?;
-        assert_eq(frame.is_user_facing(), false)?;
+        assert_eq(frame.is_user_context(), false)?;
         assert!(frame.value().as_str().is_some());
     }
     assert_type::<NotEnoughMemory>(u.inner(), "with_context preserves type")?;
@@ -220,7 +220,7 @@ pub fn run_no_std_checks() -> Result<(), CheckOutcome> {
     let u = u.user_context("Please choose a stronger password.");
     let user_ctxs: alloc::vec::Vec<alloc::string::String> = u
         .contexts()
-        .filter(|frame| frame.is_user_facing())
+        .filter(|frame| frame.is_user_context())
         .map(|frame| frame.to_string())
         .collect();
     assert_eq(user_ctxs.len(), 1)?;

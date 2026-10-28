@@ -70,7 +70,7 @@ impl ErrorReport<'_> {
             });
             #[cfg(feature = "user_context")]
             {
-                frame["user_facing"] = context.is_user_facing.into();
+                frame["user_facing"] = context.is_user_context.into();
             }
             #[cfg(feature = "context_location")]
             {
