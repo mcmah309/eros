@@ -7,7 +7,7 @@ use tracing_error::{ErrorLayer, SpanTrace, SpanTraceStatus};
 use tracing_subscriber::prelude::*;
 
 fn with_traces<T>(f: impl FnOnce() -> T) -> T {
-    let subscriber = tracing_subscriber::registry().with(ErrorLayer::default());
+    let subscriber = tracing_subscriber::registry().with(ErrorLayer::new(eros::SpanTraceFields));
     tracing::subscriber::with_default(subscriber, f)
 }
 
@@ -46,14 +46,14 @@ fn captures_at_creation_and_retains_ancestry_after_leaving_the_subscriber() {
             let report = format!("{error:?}");
             assert!(
                 report.contains(&format!(
-                    "\nspan trace:\n    - {}::read_configuration\n      at ",
+                    "\nspan trace:\n    - {}::read_configuration\n      location: ",
                     module_path!()
                 )),
                 "{report}"
             );
             assert!(
                 report.contains(&format!(
-                    "\n    - {}::request\n      with request_id=42\n      at ",
+                    "\n    - {}::request\n      with: request_id=42\n      location: ",
                     module_path!()
                 )),
                 "{report}"
@@ -68,8 +68,98 @@ fn captures_at_creation_and_retains_ancestry_after_leaving_the_subscriber() {
     });
 }
 
+fn assert_field_layout(multiple_fields: &str, multiple_report_fields: &str) {
+    let empty: ErrorUnion<(fmt::Error,)> =
+        tracing::info_span!("empty", unset = tracing::field::Empty)
+            .in_scope(|| ErrorUnion::new(fmt::Error));
+    empty.span_trace().with_spans(|_, fields| {
+        assert!(fields.is_empty(), "{fields}");
+        true
+    });
+    assert!(!format!("{empty:?}").contains("with:"));
+
+    let single: ErrorUnion<(fmt::Error,)> = tracing::info_span!(
+        "single",
+        path = "config file attempt=99",
+        unset = tracing::field::Empty
+    )
+    .in_scope(|| ErrorUnion::new(fmt::Error));
+    let report = format!("{single:?}");
+    assert!(
+        report.contains("\n      with: path=\"config file attempt=99\"\n      location: "),
+        "{report}"
+    );
+
+    let multiple: ErrorUnion<(fmt::Error,)> = tracing::info_span!(
+        "multiple",
+        path = "config file attempt=99",
+        attempt = 2,
+        unset = tracing::field::Empty
+    )
+    .in_scope(|| ErrorUnion::new(fmt::Error));
+    let report = format!("{multiple:?}");
+    assert!(report.contains(multiple_report_fields), "{report}");
+    assert_eq!(format!("{:?}", multiple.report()), report);
+    assert_eq!(format!("{multiple:#?}"), format!("{empty:#?}"));
+    multiple.span_trace().with_spans(|_, fields| {
+        assert_eq!(fields, multiple_fields);
+        true
+    });
+}
+
 #[test]
-fn multiline_span_fields_align_under_the_span_name() {
+fn eros_error_layer_separates_fields_without_splitting_values() {
+    with_traces(|| {
+        assert_field_layout(
+            "path=\"config file attempt=99\"\nattempt=2",
+            "\n      with:\n        path=\"config file attempt=99\"\n        attempt=2\n      location: ",
+        );
+    });
+}
+
+#[test]
+fn default_error_layer_keeps_multiple_fields_inline() {
+    let subscriber = tracing_subscriber::registry().with(ErrorLayer::default());
+    tracing::subscriber::with_default(subscriber, || {
+        assert_field_layout(
+            "path=\"config file attempt=99\" attempt=2",
+            "\n      with: path=\"config file attempt=99\" attempt=2\n      location: ",
+        );
+    });
+}
+
+#[test]
+fn eros_error_layer_preserves_typed_and_formatted_values() {
+    with_traces(|| {
+        let error: ErrorUnion<(fmt::Error,)> = tracing::info_span!(
+            "values",
+            message = "quoted \"text\"\nnext line",
+            count = 42_u64,
+            enabled = true,
+            ratio = 1.5_f64,
+            display = %"two words attempt=99",
+            debug = ?[1, 2],
+        )
+        .in_scope(|| ErrorUnion::new(fmt::Error));
+        error.span_trace().with_spans(|_, fields| {
+            assert_eq!(
+                fields,
+                "message=\"quoted \\\"text\\\"\\nnext line\"\ncount=42\nenabled=true\nratio=1.5\ndisplay=two words attempt=99\ndebug=[1, 2]"
+            );
+            true
+        });
+        let report = format!("{error:?}");
+        assert!(
+            report.contains(
+                "\n        display=two words attempt=99\n        debug=[1, 2]\n      location: "
+            ),
+            "{report}"
+        );
+    });
+}
+
+#[test]
+fn multiline_span_fields_align_under_with_heading() {
     use tracing_subscriber::{
         field::RecordFields,
         fmt::format::{FormatFields, Writer},
@@ -93,7 +183,7 @@ fn multiline_span_fields_align_under_the_span_name() {
         let report = format!("{error:?}");
         assert!(
             report.contains(&format!(
-                "\nspan trace:\n    - {}::multiline\n      with first=1\n      second=2\n      at ",
+                "\nspan trace:\n    - {}::multiline\n      with:\n        first=1\n        second=2\n      location: ",
                 module_path!()
             )),
             "{report}"
@@ -105,7 +195,7 @@ fn multiline_span_fields_align_under_the_span_name() {
             let trace = diagnostic["span_trace"].as_str().unwrap();
             assert!(
                 trace.starts_with(&format!(
-                    "- {}::multiline\n  with first=1\n  second=2\n  at ",
+                    "- {}::multiline\n  with:\n    first=1\n    second=2\n  location: ",
                     module_path!()
                 )),
                 "{trace}"
@@ -284,7 +374,7 @@ fn batch_grouping_distinguishes_span_fields_only_in_detailed_reports() {
     assert_eq!(detailed.matches("span trace:").count(), 3);
     assert!(
         detailed.contains(&format!(
-            "\n          span trace:\n              - {}::read_configuration\n                at ",
+            "\n          span trace:\n              - {}::read_configuration\n                location: ",
             module_path!()
         )),
         "{detailed}"
@@ -319,12 +409,15 @@ fn debug_json_contains_the_saved_trace_and_display_json_omits_it() {
         .as_str()
         .expect("captured span trace text");
     assert!(
-        trace.starts_with(&format!("- {}::read_configuration\n  at ", module_path!())),
+        trace.starts_with(&format!(
+            "- {}::read_configuration\n  location: ",
+            module_path!()
+        )),
         "{trace}"
     );
     assert!(
         trace.contains(&format!(
-            "\n- {}::request\n  with request_id=42\n  at ",
+            "\n- {}::request\n  with: request_id=42\n  location: ",
             module_path!()
         )),
         "{trace}"

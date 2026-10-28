@@ -40,7 +40,18 @@ fn normalize_span_locations(report: ErrorReport<'_>, mut text: String) -> String
     // only source locations change when the test file is edited or moved.
     report.span_trace().with_spans(|metadata, _fields| {
         if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
-            text = text.replace(&format!("at {file}:{line}"), "at <location>");
+            let location = format!("location: {file}:{line}");
+            text = text
+                .split('\n')
+                .map(|line| {
+                    if line.trim_start() == location {
+                        line.replace(&location, "location: <location>")
+                    } else {
+                        line.to_owned()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
         }
         true
     });
@@ -286,10 +297,20 @@ fn normalize_json(report: ErrorReport<'_>, value: &mut serde_json::Value) {
             trace.with_spans(|metadata, fields| {
                 assert!(text.contains(&format!("- {}::{}", metadata.target(), metadata.name())));
                 if !fields.is_empty() {
-                    assert!(text.contains(&format!("  with {fields}")));
+                    let expected = if fields.lines().nth(1).is_some() {
+                        let lines = fields
+                            .lines()
+                            .map(|line| format!("    {line}"))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        format!("  with:\n{lines}")
+                    } else {
+                        format!("  with: {fields}")
+                    };
+                    assert!(text.contains(&expected));
                 }
                 if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
-                    assert!(text.contains(&format!("  at {file}:{line}")));
+                    assert!(text.contains(&format!("  location: {file}:{line}")));
                 }
                 true
             });

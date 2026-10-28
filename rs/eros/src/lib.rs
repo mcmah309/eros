@@ -71,6 +71,8 @@ mod recovery;
 mod report;
 #[cfg(feature = "alloc")]
 mod root_error;
+#[cfg(feature = "spantrace")]
+mod span_trace_fields;
 mod storage;
 pub mod type_set;
 #[cfg(all(test, feature = "user_context"))]
@@ -98,6 +100,8 @@ pub use error_union::ErrorUnionAdapter;
 pub use error_union::SendSyncError;
 pub use msg_error::MsgError;
 pub use report::ErrorReport;
+#[cfg(feature = "spantrace")]
+pub use span_trace_fields::SpanTraceFields;
 pub use type_set::TypeSet;
 #[cfg(feature = "alloc")]
 pub use vec::ErrorUnionVec;

@@ -912,15 +912,15 @@ enters Eros.
 use tracing_subscriber::prelude::*;
 
 #[tracing::instrument]
-fn load_settings(path: &str) -> eros::Result<()> {
+fn load_settings(path: &str, attempt: u32) -> eros::Result<()> {
     eros::bail!("invalid settings")
 }
 
 tracing_subscriber::registry()
-    .with(tracing_error::ErrorLayer::default())
+    .with(tracing_error::ErrorLayer::new(eros::SpanTraceFields))
     .init();
 
-if let Err(error) = load_settings("config.toml") {
+if let Err(error) = load_settings("config.toml", 2) {
     println!("{error:?}");
 }
 # }
@@ -934,8 +934,10 @@ With backtrace capture disabled (file path shortened):
 error: invalid settings
 span trace:
     - span_trace::load_settings
-      with path="config.toml"
-      at span_trace.rs:4
+      with:
+        path="config.toml"
+        attempt=2
+      location: span_trace.rs:4
 backtrace: not captured
 ```
 

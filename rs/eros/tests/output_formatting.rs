@@ -78,37 +78,56 @@ mod span_traces {
     use tracing_error::{ErrorLayer, SpanTraceStatus};
     use tracing_subscriber::prelude::*;
 
+    fn captured_error() -> ErrorUnion<(InvalidInput,)> {
+        tracing::info_span!("request", request_id = 42).in_scope(|| {
+            tracing::info_span!("read_config", path = "config.toml", attempt = 2)
+                .in_scope(|| ErrorUnion::new(InvalidInput))
+        })
+    }
+
+    fn assert_captured_fields(error: &ErrorUnion<(InvalidInput,)>, config_fields: &str) {
+        assert_eq!(error.span_trace().status(), SpanTraceStatus::CAPTURED);
+        let mut captured_spans = Vec::new();
+        error.span_trace().with_spans(|metadata, fields| {
+            assert_eq!(metadata.file(), Some(file!()));
+            assert!(metadata.line().is_some_and(|line| line > 0));
+            captured_spans.push((metadata.name(), fields.to_owned()));
+            true
+        });
+        assert_eq!(
+            captured_spans,
+            [
+                ("read_config", config_fields.to_owned()),
+                ("request", String::from("request_id=42")),
+            ]
+        );
+    }
+
     #[test]
-    fn span_trace_captured() {
-        let subscriber = tracing_subscriber::registry().with(ErrorLayer::default());
+    fn span_trace_captured_with_eros_fields() {
+        let subscriber =
+            tracing_subscriber::registry().with(ErrorLayer::new(eros::SpanTraceFields));
         tracing::subscriber::with_default(subscriber, || {
-            let error: ErrorUnion<(InvalidInput,)> =
-                tracing::info_span!("request", request_id = 42).in_scope(|| {
-                    tracing::info_span!("read_config", path = "config.toml")
-                        .in_scope(|| ErrorUnion::new(InvalidInput))
-                });
-            assert_eq!(error.span_trace().status(), SpanTraceStatus::CAPTURED);
-            let mut captured_spans = Vec::new();
-            error.span_trace().with_spans(|metadata, fields| {
-                assert_eq!(metadata.file(), Some(file!()));
-                assert!(metadata.line().is_some_and(|line| line > 0));
-                captured_spans.push((metadata.name(), fields.to_owned()));
-                true
-            });
-            assert_eq!(
-                captured_spans,
-                [
-                    ("read_config", String::from("path=\"config.toml\"")),
-                    ("request", String::from("request_id=42")),
-                ]
-            );
+            let error = captured_error();
+            assert_captured_fields(&error, "path=\"config.toml\"\nattempt=2");
             assert_outputs!("span_trace_captured", error.report());
         });
     }
 
     #[test]
-    fn span_trace_empty() {
+    fn span_trace_captured_with_default_fields() {
         let subscriber = tracing_subscriber::registry().with(ErrorLayer::default());
+        tracing::subscriber::with_default(subscriber, || {
+            let error = captured_error();
+            assert_captured_fields(&error, "path=\"config.toml\" attempt=2");
+            assert_outputs!("span_trace_captured_default", error.report());
+        });
+    }
+
+    #[test]
+    fn span_trace_empty() {
+        let subscriber =
+            tracing_subscriber::registry().with(ErrorLayer::new(eros::SpanTraceFields));
         tracing::subscriber::with_default(subscriber, || {
             let error: ErrorUnion<(InvalidInput,)> = ErrorUnion::new(InvalidInput);
             assert_eq!(error.span_trace().status(), SpanTraceStatus::EMPTY);

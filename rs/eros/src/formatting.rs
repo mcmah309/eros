@@ -165,10 +165,15 @@ impl fmt::Display for SpanTraceDisplay<'_> {
                 }
                 let continued = renderer.continued();
                 if !fields.is_empty() {
-                    continued.next_line(out, &format_args!("with {fields}"))?;
+                    if fields.lines().nth(1).is_some() {
+                        continued.next_line(out, &"with:")?;
+                        continued.continued().next_line(out, &fields)?;
+                    } else {
+                        continued.next_line(out, &format_args!("with: {fields}"))?;
+                    }
                 }
                 if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
-                    continued.next_line(out, &format_args!("at {file}:{line}"))?;
+                    continued.next_line(out, &format_args!("location: {file}:{line}"))?;
                 }
                 Ok(())
             })();

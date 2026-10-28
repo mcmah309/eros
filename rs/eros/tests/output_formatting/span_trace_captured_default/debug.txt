@@ -1,0 +1,10 @@
+error: invalid input
+location: <location>
+span trace:
+    - output_formatting::span_traces::read_config
+      with: path="config.toml" attempt=2
+      location: <location>
+    - output_formatting::span_traces::request
+      with: request_id=42
+      location: <location>
+backtrace: <status>
