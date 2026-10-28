@@ -125,6 +125,7 @@ impl ErrorUnion {
         OutSet: TypeSet,
         OutSet::Variants: Contains<T, Index>,
     {
+        // todo when https://github.com/rust-lang/rust/issues/63084 is stabilized we should retstrict `T` from being `ErrorUnionVec` here and maybe elsewhere so it uses the correct construction function such that formatting is how we want it. Today if it uses `.union()` then it becomes how we want it.
         ErrorUnion {
             inner: ErrorUnionInner::new(t),
             _pd: PhantomData,
