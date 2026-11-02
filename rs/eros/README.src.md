@@ -143,38 +143,7 @@ fn main() {
 
 For manual branching, `narrow::<E, _>()` extracts `E` and discards its diagnostics. Use `narrow::<(E,), _>()` or `narrow::<(A, B), _>()` to retain diagnostics in a smaller union. The unmatched remainder always retains its diagnostics.
 
-#### Untyped
-
-Untyped APIs can still support typed recovery. For example, use a default when a configuration file is missing, while propagating permission and parse errors:
-
-```rust
-# #[cfg(feature = "alloc")]
-# fn main() {
-use eros::{ErrorUnion, ReshapeUnion};
-use std::io;
-
-fn load_port(path: &str) -> eros::Result<u16> {
-    let contents = std::fs::read_to_string(path)?;
-    Ok(contents.trim().parse()?)
-}
-
-fn port_or_default(path: &str) -> eros::Result<u16> {
-    load_port(path).try_recover(|error: ErrorUnion<(io::Error,)>| {
-        if error.kind() == io::ErrorKind::NotFound {
-            Ok(8080)
-        } else {
-            Err(error.into())
-        }
-    })
-}
-# }
-# #[cfg(not(feature = "alloc"))]
-# fn main() {}
-```
-
-The handler receives a typed error with its diagnostics. Other errors remain `AnyError`. You can also use `narrow` to select a concrete error or typed group from an untyped union or result.
-
-Use `widen` to add possible error types:
+Use `widen` to expand the error types space:
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -209,11 +178,42 @@ fn main() {
 # fn main() {}
 ```
 
-When callers no longer need the error set, `?` converts typed errors into `eros::Result<T>` automatically. Use `.erase()` with `use eros::Erase;` to convert a whole result or union. Both preserve the concrete error and its diagnostics, so callers can still downcast or recover specific types.
+#### Untyped
 
-### Classifying Errors
+Untyped APIs can still support typed recovery. For example, use a default when a configuration file is missing, while propagating permission and parse errors:
 
-Use `classify` to wrap errors in a type callers care about. Here, loader errors become `PortConfigError`, while `DynamicPortNotAllowed` is handled separately:
+```rust
+# #[cfg(feature = "alloc")]
+# fn main() {
+use eros::{ErrorUnion, ReshapeUnion};
+use std::io;
+
+fn load_port(path: &str) -> eros::Result<u16> {
+    let contents = std::fs::read_to_string(path)?;
+    Ok(contents.trim().parse()?)
+}
+
+fn port_or_default(path: &str) -> eros::Result<u16> {
+    load_port(path).try_recover(|error: ErrorUnion<(io::Error,)>| {
+        if error.kind() == io::ErrorKind::NotFound {
+            Ok(8080)
+        } else {
+            Err(error.into())
+        }
+    })
+}
+# }
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
+```
+
+The handler receives a typed error with its diagnostics. Other errors remain `AnyError`.
+
+When callers no longer need an explicit typed error set, `?` can convert typed errors into the erased `eros::Result<T>` automatically. Use `.erase()` with `use eros::Erase;` to convert a whole result or union more explicitly. Both preserve the concrete error and its diagnostics, so callers can still downcast or recover specific types.
+
+#### Classifying Errors
+
+Classifying errors reduces the number of error types callers need to handle when they no longer care about the distinctions between them. It can also add typed handling to an untyped API. Use `classify` to wrap errors in a type callers care about. Here, loader errors become `PortConfigError`, while `DynamicPortNotAllowed` is handled separately:
 
 ```rust
 # #[cfg(feature = "alloc")]
@@ -265,9 +265,7 @@ fn port_or_default(contents: &str) -> eros::Result<u16> {
 # fn main() {}
 ```
 
-`classify(f)` is shorthand for `map_inner(f).widen()`. The callback receives an owned `InnerError` for every error, even one already of the replacement type. The destination error set is inferred. Use `map_inner` alone for a single-type set, or `narrow` first to transform only selected types. Saved diagnostics are preserved; the original error remains a source only if the callback keeps it, as above.
-
-Wrappers also distinguish errors of the same type from different operations. For example, classify configuration and database I/O errors as `PortConfigError` and `DatabaseError` before combining them with `widen`. Recovering one then leaves the other untouched.
+`classify(f)` is shorthand for `map_inner(f).widen()`. Saved diagnostics are preserved.
 
 ### Errors Have Context
 
